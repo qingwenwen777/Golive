@@ -1,0 +1,38 @@
+{
+  "search": "検索",
+  "searchPlaceholder": "ホロライブ",
+  "voiceSearch": "音声で検索",
+  "create": "作成",
+  "notifications": "通知",
+  "menu": "メニュー",
+  "theme": {
+    "light": "ライトテーマ",
+    "dark": "ダークテーマ",
+    "toggle": "テーマを切り替え"
+  },
+  "lang": {
+    "toggle": "言語",
+    "en": "EN",
+    "ja": "日本語"
+  },
+  "nav": {
+    "home": "ホーム",
+    "shorts": "ショート",
+    "subscriptions": "登録チャンネル",
+    "yourLibrary": "あなた",
+    "history": "履歴",
+    "watchLater": "後で見る",
+    "liked": "高く評価した動画"
+  },
+  "sidebar": {
+    "subsHeading": "登録チャンネル",
+    "foot": {
+      "about": "概要 · プレス · 著作権",
+      "contact": "お問い合わせ · クリエイター",
+      "ads": "広告 · 開発者",
+      "copyright": "© 2026 GoLive"
+    }
+  },
+  "live": "LIVE",
+  "viewersWatching": "{{count}} 人が視聴中"
+}

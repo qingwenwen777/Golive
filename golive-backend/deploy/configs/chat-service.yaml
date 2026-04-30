@@ -1,0 +1,34 @@
+service:
+  name: chat-service
+  http_addr: ":8093"
+  pprof_addr: ":6068"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive_mysql_1718011198@tcp(mysql:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+  shards: 8
+
+redis:
+  addr: "redis:6379"
+  db: 0
+  password: ""
+
+kafka:
+  brokers: ["kafka:9092"]
+  topic: "danmu"
+  group: "chat-consumer"
+  workers: 8
+
+filter:
+  sensitive_path: "./app/chat-service/configs/sensitive.txt"
+  mask: "***"
+
+ratelimit:
+  per_user_per_sec: 3
+  bucket_seconds: 1
+
+room:
+  history_default_limit: 50
+  history_max_limit: 200

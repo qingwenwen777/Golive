@@ -1,0 +1,74 @@
+{
+  "home": {
+    "title": "Home",
+    "liveNow": "Live now",
+    "recommended": "Recommended",
+    "allCategory": "All",
+    "empty": "No live streams right now",
+    "emptySub": "Check back in a bit",
+    "errorTitle": "Couldn't load streams",
+    "errorSub": "Check your connection and try again",
+    "retry": "Retry",
+    "watching": "{{count}} watching",
+    "subscribers": "{{count}} subscribers"
+  },
+  "liveRoom": {
+    "title": "Live Room",
+    "roomId": "Room id: {{id}}",
+    "ended": "This stream has ended",
+    "chat": "Live chat",
+    "openChat": "Open chat",
+    "close": "Close",
+    "more": "More",
+    "topChat": "Top chat",
+    "liveChat": "Live chat",
+    "sayHi": "Say something...",
+    "chatInput": "Chat message",
+    "emoji": "Emoji",
+    "send": "Send",
+    "chatSendFailed": "Connecting or send failed, please try again",
+    "superChat": "Super Chat",
+    "heart": "Heart",
+    "subscribe": "Subscribe",
+    "subscribed": "Subscribed",
+    "subscribers": "{{count}} subscribers",
+    "watching": "{{count}} watching",
+    "like": "Like",
+    "dislike": "Dislike",
+    "share": "Share",
+    "save": "Save",
+    "showMore": "Show more",
+    "showLess": "Show less"
+  },
+  "player": {
+    "play": "Play",
+    "pause": "Pause",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "volume": "Volume",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "pip": "Picture in picture",
+    "quality": "Quality",
+    "qualityAuto": "Auto",
+    "toggleDanmu": "Toggle danmu",
+    "danmuOn": "Danmu: On",
+    "danmuOff": "Danmu: Off",
+    "live": "LIVE",
+    "jumpLive": "Jump to live",
+    "liveProgress": "Live progress"
+  },
+  "channel": {
+    "title": "Channel",
+    "name": "Channel: {{name}}"
+  },
+  "login": {
+    "title": "Login",
+    "placeholder": "Stage 2 placeholder"
+  },
+  "notFound": {
+    "title": "404",
+    "subtitle": "Page not found",
+    "back": "Back to home"
+  }
+}

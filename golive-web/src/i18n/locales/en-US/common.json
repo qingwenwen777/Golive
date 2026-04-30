@@ -1,0 +1,38 @@
+{
+  "search": "Search",
+  "searchPlaceholder": "hololive",
+  "voiceSearch": "Search with your voice",
+  "create": "Create",
+  "notifications": "Notifications",
+  "menu": "Menu",
+  "theme": {
+    "light": "Light theme",
+    "dark": "Dark theme",
+    "toggle": "Toggle theme"
+  },
+  "lang": {
+    "toggle": "Language",
+    "en": "EN",
+    "ja": "日本語"
+  },
+  "nav": {
+    "home": "Home",
+    "liveNow": "Live now",
+    "subscriptions": "Subscriptions",
+    "yourLibrary": "You",
+    "history": "History",
+    "watchLater": "Watch later",
+    "liked": "Liked live rooms"
+  },
+  "sidebar": {
+    "subsHeading": "Subscriptions",
+    "foot": {
+      "about": "About · Press · Copyright",
+      "contact": "Contact us · Creators",
+      "ads": "Advertise · Developers",
+      "copyright": "© 2026 GoLive"
+    }
+  },
+  "live": "LIVE",
+  "viewersWatching": "{{count}} watching"
+}

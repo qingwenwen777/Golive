@@ -1,0 +1,11 @@
+bin/
+dist/
+*.exe
+*.log
+.env
+.env.local
+tmp/
+vendor/
+.idea/
+.vscode/
+coverage.out

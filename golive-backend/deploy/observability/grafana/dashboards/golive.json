@@ -1,0 +1,233 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "title": "GoLive Overview",
+  "uid": "golive-overview",
+  "tags": ["golive"],
+  "schemaVersion": 39,
+  "timezone": "",
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(http_requests_total, service)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "HTTP",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP RPS by service",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 1, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(http_requests_total{service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP latency p50/p95/p99 (all services)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, service) (rate(http_request_duration_seconds_bucket{service=~\"$service\"}[1m])))",
+          "legendFormat": "p50 {{service}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, service) (rate(http_request_duration_seconds_bucket{service=~\"$service\"}[1m])))",
+          "legendFormat": "p95 {{service}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, service) (rate(http_request_duration_seconds_bucket{service=~\"$service\"}[1m])))",
+          "legendFormat": "p99 {{service}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP errors (4xx + 5xx) /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (service, code) (rate(http_requests_total{code=~\"4..|5..\",service=~\"$service\"}[1m]))",
+          "legendFormat": "{{service}} {{code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "5xx rate (last 5m)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 9, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{code=~\"5..\"}[5m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+
+    { "type": "row", "title": "WebSocket (im-gateway)", "gridPos": { "x": 0, "y": 16, "w": 24, "h": 1 } },
+    {
+      "type": "stat",
+      "title": "Active connections",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 17, "w": 6, "h": 6 },
+      "targets": [{ "expr": "im_connections_active", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Active rooms",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 6, "y": 17, "w": 6, "h": 6 },
+      "targets": [{ "expr": "im_rooms_active", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Messages sent / received /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 17, "w": 12, "h": 6 },
+      "targets": [
+        { "expr": "sum by (type) (rate(im_messages_sent_total[1m]))", "legendFormat": "out {{type}}", "refId": "A" },
+        { "expr": "sum by (type) (rate(im_messages_received_total[1m]))", "legendFormat": "in {{type}}", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Messages dropped by reason /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 6 },
+      "targets": [
+        { "expr": "sum by (reason) (rate(im_messages_dropped_total[1m]))", "legendFormat": "{{reason}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Broadcast latency p95",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(im_broadcast_latency_seconds_bucket[1m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+
+    { "type": "row", "title": "Business (gift / super-chat)", "gridPos": { "x": 0, "y": 29, "w": 24, "h": 1 } },
+    {
+      "type": "timeseries",
+      "title": "Gift revenue (coins/min)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 30, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (status) (increase(gift_revenue_coin_total[1m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Super-chat revenue by tier (coins/min)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (tier) (increase(super_chat_revenue_coin_total[1m]))",
+          "legendFormat": "tier {{tier}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox publish ok / failed /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 37, "w": 12, "h": 7 },
+      "targets": [
+        { "expr": "sum by (topic) (rate(outbox_published_total[1m]))", "legendFormat": "ok {{topic}}", "refId": "A" },
+        { "expr": "sum by (topic) (rate(outbox_failed_total[1m]))", "legendFormat": "fail {{topic}}", "refId": "B" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Outbox dead rows",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 37, "w": 6, "h": 7 },
+      "targets": [{ "expr": "outbox_rows{status=\"dead\"}", "refId": "A" }]
+    },
+
+    { "type": "row", "title": "Chat", "gridPos": { "x": 0, "y": 44, "w": 24, "h": 1 } },
+    {
+      "type": "timeseries",
+      "title": "Danmu processed by outcome /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 45, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(danmu_processed_total[1m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Kafka produce throughput",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 45, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (service, topic, outcome) (rate(kafka_produced_total[1m]))",
+          "legendFormat": "{{service}} {{topic}} {{outcome}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

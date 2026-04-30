@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm -v)",
+      "Bash(corepack enable *)",
+      "Bash(corepack prepare *)",
+      "PowerShell(npm install *)",
+      "Bash(mkdir -p /c/Users/xhb/Desktop/Golive/golive-web)",
+      "Bash(pnpm create *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm dlx *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm list *)",
+      "Bash(pnpm exec *)",
+      "Bash(git *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm test:coverage)",
+      "Bash(awk *)",
+      "Bash(go build *)",
+      "PowerShell(go build *)",
+      "Bash(npx tsc *)",
+      "PowerShell(Get-ChildItem *)",
+      "Bash(echo \"EXIT=$?\")"
+    ]
+  }
+}

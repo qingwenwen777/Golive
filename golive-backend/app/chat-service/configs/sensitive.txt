@@ -1,0 +1,10 @@
+# One sensitive word per line. Lines starting with # are ignored.
+# Matching is case-insensitive on ASCII; CJK matched as-is.
+fuck
+shit
+bitch
+asshole
+傻逼
+垃圾
+sb
+nmsl

@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Install this file as:
+#   /srv/git/golive.git/hooks/post-receive
+#
+# It checks out the pushed branch into WORK_TREE, builds the Vite frontend
+# with a China-friendly npm mirror, then restarts the Docker Compose stack.
+
+APP_NAME="golive"
+WORK_TREE="${WORK_TREE:-/srv/${APP_NAME}/app}"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+FALLBACK_BRANCH="${FALLBACK_BRANCH:-master}"
+GIT_DIR="${GIT_DIR:-/srv/git/${APP_NAME}.git}"
+
+log() {
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
+
+deploy_ref() {
+  local newrev="$1"
+  local ref="$2"
+  local deleted="0000000000000000000000000000000000000000"
+
+  if [[ "$newrev" == "$deleted" ]]; then
+    log "skip ${ref}; branch was deleted"
+    return 0
+  fi
+
+  local branch="${ref#refs/heads/}"
+
+  if [[ "$branch" != "$DEPLOY_BRANCH" && "$branch" != "$FALLBACK_BRANCH" ]]; then
+    log "skip ${ref}; deploy branch is ${DEPLOY_BRANCH} or ${FALLBACK_BRANCH}"
+    return 0
+  fi
+
+  log "deploying ${branch} to ${WORK_TREE}"
+  mkdir -p "$WORK_TREE"
+  git --work-tree="$WORK_TREE" --git-dir="$GIT_DIR" checkout -f "$branch"
+
+  log "building frontend"
+  docker run --rm \
+    -v "${WORK_TREE}/golive-web:/app" \
+    -w /app \
+    node:20-alpine \
+    sh -lc 'corepack enable && pnpm config set registry https://registry.npmmirror.com && pnpm install --frozen-lockfile && pnpm build'
+
+  log "starting services"
+  cd "${WORK_TREE}/golive-backend/deploy"
+  docker compose up -d --remove-orphans
+
+  log "current service status"
+  docker compose ps
+}
+
+while read -r oldrev newrev refname; do
+  deploy_ref "$newrev" "$refname"
+done

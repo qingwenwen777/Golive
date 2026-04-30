@@ -1,0 +1,329 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/ui/dropdown-menu.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=d2feafe2"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=d2feafe2"; const React = ((m) => m?.__esModule ? m : { ...typeof m === "object" && !Array.isArray(m) || typeof m === "function" ? m : {}, default: m })(__vite__cjsImport3_react);
+import * as DropdownMenuPrimitive from "/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js?v=d2feafe2";
+import { Check, ChevronRight, Circle } from "/node_modules/.vite/deps/lucide-react.js?v=d2feafe2";
+import { cn } from "/src/lib/cn.ts";
+const DropdownMenu = DropdownMenuPrimitive.Root;
+const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+const DropdownMenuGroup = DropdownMenuPrimitive.Group;
+const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
+const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+const DropdownMenuSubTrigger = React.forwardRef(
+  _c = ({ className, inset, children, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.SubTrigger,
+    {
+      ref,
+      className: cn(
+        "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+        inset && "pl-8",
+        className
+      ),
+      ...props,
+      children: [
+        children,
+        /* @__PURE__ */ jsxDEV(ChevronRight, { className: "ml-auto" }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 54,
+          columnNumber: 5
+        }, this)
+      ]
+    },
+    void 0,
+    true,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 44,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c2 = DropdownMenuSubTrigger;
+DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
+const DropdownMenuSubContent = React.forwardRef(
+  _c3 = ({ className, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.SubContent,
+    {
+      ref,
+      className: cn(
+        "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]",
+        className
+      ),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 64,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c4 = DropdownMenuSubContent;
+DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
+const DropdownMenuContent = React.forwardRef(
+  _c5 = ({ className, sideOffset = 4, ...props }, ref) => /* @__PURE__ */ jsxDEV(DropdownMenuPrimitive.Portal, { children: /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.Content,
+    {
+      ref,
+      sideOffset,
+      className: cn(
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]",
+        className
+      ),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 81,
+      columnNumber: 5
+    },
+    this
+  ) }, void 0, false, {
+    fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+    lineNumber: 80,
+    columnNumber: 1
+  }, this)
+);
+_c6 = DropdownMenuContent;
+DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
+const DropdownMenuItem = React.forwardRef(
+  _c7 = ({ className, inset, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.Item,
+    {
+      ref,
+      className: cn(
+        "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+        inset && "pl-8",
+        className
+      ),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 100,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c8 = DropdownMenuItem;
+DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
+const DropdownMenuCheckboxItem = React.forwardRef(
+  _c9 = ({ className, children, checked, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.CheckboxItem,
+    {
+      ref,
+      className: cn(
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      ),
+      checked,
+      ...props,
+      children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "absolute left-2 flex h-3.5 w-3.5 items-center justify-center", children: /* @__PURE__ */ jsxDEV(DropdownMenuPrimitive.ItemIndicator, { children: /* @__PURE__ */ jsxDEV(Check, { className: "h-4 w-4" }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 127,
+          columnNumber: 9
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 126,
+          columnNumber: 7
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 125,
+          columnNumber: 5
+        }, this),
+        children
+      ]
+    },
+    void 0,
+    true,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 116,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c0 = DropdownMenuCheckboxItem;
+DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName;
+const DropdownMenuRadioItem = React.forwardRef(
+  _c1 = ({ className, children, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.RadioItem,
+    {
+      ref,
+      className: cn(
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      ),
+      ...props,
+      children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "absolute left-2 flex h-3.5 w-3.5 items-center justify-center", children: /* @__PURE__ */ jsxDEV(DropdownMenuPrimitive.ItemIndicator, { children: /* @__PURE__ */ jsxDEV(Circle, { className: "h-2 w-2 fill-current" }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 150,
+          columnNumber: 9
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 149,
+          columnNumber: 7
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+          lineNumber: 148,
+          columnNumber: 5
+        }, this),
+        children
+      ]
+    },
+    void 0,
+    true,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 140,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c10 = DropdownMenuRadioItem;
+DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName;
+const DropdownMenuLabel = React.forwardRef(
+  _c11 = ({ className, inset, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.Label,
+    {
+      ref,
+      className: cn(
+        "px-2 py-1.5 text-sm font-semibold",
+        inset && "pl-8",
+        className
+      ),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 164,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c12 = DropdownMenuLabel;
+DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
+const DropdownMenuSeparator = React.forwardRef(
+  _c13 = ({ className, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DropdownMenuPrimitive.Separator,
+    {
+      ref,
+      className: cn("-mx-1 my-1 h-px bg-muted", className),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 180,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c14 = DropdownMenuSeparator;
+DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
+const DropdownMenuShortcut = ({
+  className,
+  ...props
+}) => {
+  return /* @__PURE__ */ jsxDEV(
+    "span",
+    {
+      className: cn("ml-auto text-xs tracking-widest opacity-60", className),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx",
+      lineNumber: 193,
+      columnNumber: 5
+    },
+    this
+  );
+};
+_c15 = DropdownMenuShortcut;
+DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup
+};
+var _c, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c0, _c1, _c10, _c11, _c12, _c13, _c14, _c15;
+$RefreshReg$(_c, "DropdownMenuSubTrigger$React.forwardRef");
+$RefreshReg$(_c2, "DropdownMenuSubTrigger");
+$RefreshReg$(_c3, "DropdownMenuSubContent$React.forwardRef");
+$RefreshReg$(_c4, "DropdownMenuSubContent");
+$RefreshReg$(_c5, "DropdownMenuContent$React.forwardRef");
+$RefreshReg$(_c6, "DropdownMenuContent");
+$RefreshReg$(_c7, "DropdownMenuItem$React.forwardRef");
+$RefreshReg$(_c8, "DropdownMenuItem");
+$RefreshReg$(_c9, "DropdownMenuCheckboxItem$React.forwardRef");
+$RefreshReg$(_c0, "DropdownMenuCheckboxItem");
+$RefreshReg$(_c1, "DropdownMenuRadioItem$React.forwardRef");
+$RefreshReg$(_c10, "DropdownMenuRadioItem");
+$RefreshReg$(_c11, "DropdownMenuLabel$React.forwardRef");
+$RefreshReg$(_c12, "DropdownMenuLabel");
+$RefreshReg$(_c13, "DropdownMenuSeparator$React.forwardRef");
+$RefreshReg$(_c14, "DropdownMenuSeparator");
+$RefreshReg$(_c15, "DropdownMenuShortcut");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dropdown-menu.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QUFBQSxFQUVZO0FBR2hCO0FBQUNvQyxPQVZLRDtBQVdOQSxxQkFBcUJoQyxjQUFjO0FBRW5DO0FBQUEsRUFDRXJCO0FBQUFBLEVBQ0FFO0FBQUFBLEVBQ0F5QjtBQUFBQSxFQUNBSztBQUFBQSxFQUNBSTtBQUFBQSxFQUNBSztBQUFBQSxFQUNBSTtBQUFBQSxFQUNBSTtBQUFBQSxFQUNBSTtBQUFBQSxFQUNBakQ7QUFBQUEsRUFDQUU7QUFBQUEsRUFDQUU7QUFBQUEsRUFDQWU7QUFBQUEsRUFDQVg7QUFBQUEsRUFDQUY7QUFBQUE7QUFDRCxJQUFBSSxJQUFBTSxLQUFBSSxLQUFBQyxLQUFBRyxLQUFBRSxLQUFBRyxLQUFBQyxLQUFBRyxLQUFBRSxLQUFBRyxLQUFBQyxNQUFBRyxNQUFBQyxNQUFBRyxNQUFBQyxNQUFBRztBQUFBLGFBQUF4QyxJQUFBO0FBQUEsYUFBQU0sS0FBQTtBQUFBLGFBQUFJLEtBQUE7QUFBQSxhQUFBQyxLQUFBO0FBQUEsYUFBQUcsS0FBQTtBQUFBLGFBQUFFLEtBQUE7QUFBQSxhQUFBRyxLQUFBO0FBQUEsYUFBQUMsS0FBQTtBQUFBLGFBQUFHLEtBQUE7QUFBQSxhQUFBRSxLQUFBO0FBQUEsYUFBQUcsS0FBQTtBQUFBLGFBQUFDLE1BQUE7QUFBQSxhQUFBRyxNQUFBO0FBQUEsYUFBQUMsTUFBQTtBQUFBLGFBQUFHLE1BQUE7QUFBQSxhQUFBQyxNQUFBO0FBQUEsYUFBQUcsTUFBQSIsIm5hbWVzIjpbIlJlYWN0IiwiRHJvcGRvd25NZW51UHJpbWl0aXZlIiwiQ2hlY2siLCJDaGV2cm9uUmlnaHQiLCJDaXJjbGUiLCJjbiIsIkRyb3Bkb3duTWVudSIsIlJvb3QiLCJEcm9wZG93bk1lbnVUcmlnZ2VyIiwiVHJpZ2dlciIsIkRyb3Bkb3duTWVudUdyb3VwIiwiR3JvdXAiLCJEcm9wZG93bk1lbnVQb3J0YWwiLCJQb3J0YWwiLCJEcm9wZG93bk1lbnVTdWIiLCJTdWIiLCJEcm9wZG93bk1lbnVSYWRpb0dyb3VwIiwiUmFkaW9Hcm91cCIsIkRyb3Bkb3duTWVudVN1YlRyaWdnZXIiLCJmb3J3YXJkUmVmIiwiX2MiLCJjbGFzc05hbWUiLCJpbnNldCIsImNoaWxkcmVuIiwicHJvcHMiLCJyZWYiLCJfYzIiLCJkaXNwbGF5TmFtZSIsIlN1YlRyaWdnZXIiLCJEcm9wZG93bk1lbnVTdWJDb250ZW50IiwiX2MzIiwiX2M0IiwiU3ViQ29udGVudCIsIkRyb3Bkb3duTWVudUNvbnRlbnQiLCJfYzUiLCJzaWRlT2Zmc2V0IiwiX2M2IiwiQ29udGVudCIsIkRyb3Bkb3duTWVudUl0ZW0iLCJfYzciLCJfYzgiLCJJdGVtIiwiRHJvcGRvd25NZW51Q2hlY2tib3hJdGVtIiwiX2M5IiwiY2hlY2tlZCIsIl9jMCIsIkNoZWNrYm94SXRlbSIsIkRyb3Bkb3duTWVudVJhZGlvSXRlbSIsIl9jMSIsIl9jMTAiLCJSYWRpb0l0ZW0iLCJEcm9wZG93bk1lbnVMYWJlbCIsIl9jMTEiLCJfYzEyIiwiTGFiZWwiLCJEcm9wZG93bk1lbnVTZXBhcmF0b3IiLCJfYzEzIiwiX2MxNCIsIlNlcGFyYXRvciIsIkRyb3Bkb3duTWVudVNob3J0Y3V0IiwiX2MxNSJdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJkcm9wZG93bi1tZW51LnRzeCJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgKiBhcyBSZWFjdCBmcm9tIFwicmVhY3RcIlxuaW1wb3J0ICogYXMgRHJvcGRvd25NZW51UHJpbWl0aXZlIGZyb20gXCJAcmFkaXgtdWkvcmVhY3QtZHJvcGRvd24tbWVudVwiXG5pbXBvcnQgeyBDaGVjaywgQ2hldnJvblJpZ2h0LCBDaXJjbGUgfSBmcm9tIFwibHVjaWRlLXJlYWN0XCJcblxuaW1wb3J0IHsgY24gfSBmcm9tIFwiQC9saWIvY25cIlxuXG5jb25zdCBEcm9wZG93bk1lbnUgPSBEcm9wZG93bk1lbnVQcmltaXRpdmUuUm9vdFxuXG5jb25zdCBEcm9wZG93bk1lbnVUcmlnZ2VyID0gRHJvcGRvd25NZW51UHJpbWl0aXZlLlRyaWdnZXJcblxuY29uc3QgRHJvcGRvd25NZW51R3JvdXAgPSBEcm9wZG93bk1lbnVQcmltaXRpdmUuR3JvdXBcblxuY29uc3QgRHJvcGRvd25NZW51UG9ydGFsID0gRHJvcGRvd25NZW51UHJpbWl0aXZlLlBvcnRhbFxuXG5jb25zdCBEcm9wZG93bk1lbnVTdWIgPSBEcm9wZG93bk1lbnVQcmltaXRpdmUuU3ViXG5cbmNvbnN0IERyb3Bkb3duTWVudVJhZGlvR3JvdXAgPSBEcm9wZG93bk1lbnVQcmltaXRpdmUuUmFkaW9Hcm91cFxuXG5jb25zdCBEcm9wZG93bk1lbnVTdWJUcmlnZ2VyID0gUmVhY3QuZm9yd2FyZFJlZjxcbiAgUmVhY3QuRWxlbWVudFJlZjx0eXBlb2YgRHJvcGRvd25NZW51UHJpbWl0aXZlLlN1YlRyaWdnZXI+LFxuICBSZWFjdC5Db21wb25lbnRQcm9wc1dpdGhvdXRSZWY8dHlwZW9mIERyb3Bkb3duTWVudVByaW1pdGl2ZS5TdWJUcmlnZ2VyPiAmIHtcbiAgICBpbnNldD86IGJvb2xlYW5cbiAgfVxuPigoeyBjbGFzc05hbWUsIGluc2V0LCBjaGlsZHJlbiwgLi4ucHJvcHMgfSwgcmVmKSA9PiAoXG4gIDxEcm9wZG93bk1lbnVQcmltaXRpdmUuU3ViVHJpZ2dlclxuICAgIHJlZj17cmVmfVxuICAgIGNsYXNzTmFtZT17Y24oXG4gICAgICBcImZsZXggY3Vyc29yLWRlZmF1bHQgc2VsZWN0LW5vbmUgaXRlbXMtY2VudGVyIGdhcC0yIHJvdW5kZWQtc20gcHgtMiBweS0xLjUgdGV4dC1zbSBvdXRsaW5lLW5vbmUgZm9jdXM6YmctYWNjZW50IGRhdGEtW3N0YXRlPW9wZW5dOmJnLWFjY2VudCBbJl9zdmddOnBvaW50ZXItZXZlbnRzLW5vbmUgWyZfc3ZnXTpzaXplLTQgWyZfc3ZnXTpzaHJpbmstMFwiLFxuICAgICAgaW5zZXQgJiYgXCJwbC04XCIsXG4gICAgICBjbGFzc05hbWVcbiAgICApfVxuICAgIHsuLi5wcm9wc31cbiAgPlxuICAgIHtjaGlsZHJlbn1cbiAgICA8Q2hldnJvblJpZ2h0IGNsYXNzTmFtZT1cIm1sLWF1dG9cIiAvPlxuICA8L0Ryb3Bkb3duTWVudVByaW1pdGl2ZS5TdWJUcmlnZ2VyPlxuKSlcbkRyb3Bkb3duTWVudVN1YlRyaWdnZXIuZGlzcGxheU5hbWUgPVxuICBEcm9wZG93bk1lbnVQcmltaXRpdmUuU3ViVHJpZ2dlci5kaXNwbGF5TmFtZVxuXG5jb25zdCBEcm9wZG93bk1lbnVTdWJDb250ZW50ID0gUmVhY3QuZm9yd2FyZFJlZjxcbiAgUmVhY3QuRWxlbWVudFJlZjx0eXBlb2YgRHJvcGRvd25NZW51UHJpbWl0aXZlLlN1YkNvbnRlbnQ+LFxuICBSZWFjdC5Db21wb25lbnRQcm9wc1dpdGhvdXRSZWY8dHlwZW9mIERyb3Bkb3duTWVudVByaW1pdGl2ZS5TdWJDb250ZW50PlxuPigoeyBjbGFzc05hbWUsIC4uLnByb3BzIH0sIHJlZikgPT4gKFxuICA8RHJvcGRvd25NZW51UHJpbWl0aXZlLlN1YkNvbnRlbnRcbiAgICByZWY9e3JlZn1cbiAgICBjbGFzc05hbWU9e2NuKFxuICAgICAgXCJ6LTUwIG1pbi13LVs4cmVtXSBvdmVyZmxvdy1oaWRkZW4gcm91bmRlZC1tZCBib3JkZXIgYmctcG9wb3ZlciBwLTEgdGV4dC1wb3BvdmVyLWZvcmVncm91bmQgc2hhZG93LWxnIGRhdGEtW3N0YXRlPW9wZW5dOmFuaW1hdGUtaW4gZGF0YS1bc3RhdGU9Y2xvc2VkXTphbmltYXRlLW91dCBkYXRhLVtzdGF0ZT1jbG9zZWRdOmZhZGUtb3V0LTAgZGF0YS1bc3RhdGU9b3Blbl06ZmFkZS1pbi0wIGRhdGEtW3N0YXRlPWNsb3NlZF06em9vbS1vdXQtOTUgZGF0YS1bc3RhdGU9b3Blbl06em9vbS1pbi05NSBkYXRhLVtzaWRlPWJvdHRvbV06c2xpZGUtaW4tZnJvbS10b3AtMiBkYXRhLVtzaWRlPWxlZnRdOnNsaWRlLWluLWZyb20tcmlnaHQtMiBkYXRhLVtzaWRlPXJpZ2h0XTpzbGlkZS1pbi1mcm9tLWxlZnQtMiBkYXRhLVtzaWRlPXRvcF06c2xpZGUtaW4tZnJvbS1ib3R0b20tMiBvcmlnaW4tWy0tcmFkaXgtZHJvcGRvd24tbWVudS1jb250ZW50LXRyYW5zZm9ybS1vcmlnaW5dXCIsXG4gICAgICBjbGFzc05hbWVcbiAgICApfVxuICAgIHsuLi5wcm9wc31cbiAgLz5cbikpXG5Ecm9wZG93bk1lbnVTdWJDb250ZW50LmRpc3BsYXlOYW1lID1cbiAgRHJvcGRvd25NZW51UHJpbWl0aXZlLlN1YkNvbnRlbnQuZGlzcGxheU5hbWVcblxuY29uc3QgRHJvcGRvd25NZW51Q29udGVudCA9IFJlYWN0LmZvcndhcmRSZWY8XG4gIFJlYWN0LkVsZW1lbnRSZWY8dHlwZW9mIERyb3Bkb3duTWVudVByaW1pdGl2ZS5Db250ZW50PixcbiAgUmVhY3QuQ29tcG9uZW50UHJvcHNXaXRob3V0UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuQ29udGVudD5cbj4oKHsgY2xhc3NOYW1lLCBzaWRlT2Zmc2V0ID0gNCwgLi4ucHJvcHMgfSwgcmVmKSA9PiAoXG4gIDxEcm9wZG93bk1lbnVQcmltaXRpdmUuUG9ydGFsPlxuICAgIDxEcm9wZG93bk1lbnVQcmltaXRpdmUuQ29udGVudFxuICAgICAgcmVmPXtyZWZ9XG4gICAgICBzaWRlT2Zmc2V0PXtzaWRlT2Zmc2V0fVxuICAgICAgY2xhc3NOYW1lPXtjbihcbiAgICAgICAgXCJ6LTUwIG1heC1oLVt2YXIoLS1yYWRpeC1kcm9wZG93bi1tZW51LWNvbnRlbnQtYXZhaWxhYmxlLWhlaWdodCldIG1pbi13LVs4cmVtXSBvdmVyZmxvdy15LWF1dG8gb3ZlcmZsb3cteC1oaWRkZW4gcm91bmRlZC1tZCBib3JkZXIgYmctcG9wb3ZlciBwLTEgdGV4dC1wb3BvdmVyLWZvcmVncm91bmQgc2hhZG93LW1kIGRhdGEtW3N0YXRlPW9wZW5dOmFuaW1hdGUtaW4gZGF0YS1bc3RhdGU9Y2xvc2VkXTphbmltYXRlLW91dCBkYXRhLVtzdGF0ZT1jbG9zZWRdOmZhZGUtb3V0LTAgZGF0YS1bc3RhdGU9b3Blbl06ZmFkZS1pbi0wIGRhdGEtW3N0YXRlPWNsb3NlZF06em9vbS1vdXQtOTUgZGF0YS1bc3RhdGU9b3Blbl06em9vbS1pbi05NSBkYXRhLVtzaWRlPWJvdHRvbV06c2xpZGUtaW4tZnJvbS10b3AtMiBkYXRhLVtzaWRlPWxlZnRdOnNsaWRlLWluLWZyb20tcmlnaHQtMiBkYXRhLVtzaWRlPXJpZ2h0XTpzbGlkZS1pbi1mcm9tLWxlZnQtMiBkYXRhLVtzaWRlPXRvcF06c2xpZGUtaW4tZnJvbS1ib3R0b20tMiBvcmlnaW4tWy0tcmFkaXgtZHJvcGRvd24tbWVudS1jb250ZW50LXRyYW5zZm9ybS1vcmlnaW5dXCIsXG4gICAgICAgIGNsYXNzTmFtZVxuICAgICAgKX1cbiAgICAgIHsuLi5wcm9wc31cbiAgICAvPlxuICA8L0Ryb3Bkb3duTWVudVByaW1pdGl2ZS5Qb3J0YWw+XG4pKVxuRHJvcGRvd25NZW51Q29udGVudC5kaXNwbGF5TmFtZSA9IERyb3Bkb3duTWVudVByaW1pdGl2ZS5Db250ZW50LmRpc3BsYXlOYW1lXG5cbmNvbnN0IERyb3Bkb3duTWVudUl0ZW0gPSBSZWFjdC5mb3J3YXJkUmVmPFxuICBSZWFjdC5FbGVtZW50UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuSXRlbT4sXG4gIFJlYWN0LkNvbXBvbmVudFByb3BzV2l0aG91dFJlZjx0eXBlb2YgRHJvcGRvd25NZW51UHJpbWl0aXZlLkl0ZW0+ICYge1xuICAgIGluc2V0PzogYm9vbGVhblxuICB9XG4+KCh7IGNsYXNzTmFtZSwgaW5zZXQsIC4uLnByb3BzIH0sIHJlZikgPT4gKFxuICA8RHJvcGRvd25NZW51UHJpbWl0aXZlLkl0ZW1cbiAgICByZWY9e3JlZn1cbiAgICBjbGFzc05hbWU9e2NuKFxuICAgICAgXCJyZWxhdGl2ZSBmbGV4IGN1cnNvci1kZWZhdWx0IHNlbGVjdC1ub25lIGl0ZW1zLWNlbnRlciBnYXAtMiByb3VuZGVkLXNtIHB4LTIgcHktMS41IHRleHQtc20gb3V0bGluZS1ub25lIHRyYW5zaXRpb24tY29sb3JzIGZvY3VzOmJnLWFjY2VudCBmb2N1czp0ZXh0LWFjY2VudC1mb3JlZ3JvdW5kIGRhdGEtW2Rpc2FibGVkXTpwb2ludGVyLWV2ZW50cy1ub25lIGRhdGEtW2Rpc2FibGVkXTpvcGFjaXR5LTUwIFsmX3N2Z106cG9pbnRlci1ldmVudHMtbm9uZSBbJl9zdmddOnNpemUtNCBbJl9zdmddOnNocmluay0wXCIsXG4gICAgICBpbnNldCAmJiBcInBsLThcIixcbiAgICAgIGNsYXNzTmFtZVxuICAgICl9XG4gICAgey4uLnByb3BzfVxuICAvPlxuKSlcbkRyb3Bkb3duTWVudUl0ZW0uZGlzcGxheU5hbWUgPSBEcm9wZG93bk1lbnVQcmltaXRpdmUuSXRlbS5kaXNwbGF5TmFtZVxuXG5jb25zdCBEcm9wZG93bk1lbnVDaGVja2JveEl0ZW0gPSBSZWFjdC5mb3J3YXJkUmVmPFxuICBSZWFjdC5FbGVtZW50UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuQ2hlY2tib3hJdGVtPixcbiAgUmVhY3QuQ29tcG9uZW50UHJvcHNXaXRob3V0UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuQ2hlY2tib3hJdGVtPlxuPigoeyBjbGFzc05hbWUsIGNoaWxkcmVuLCBjaGVja2VkLCAuLi5wcm9wcyB9LCByZWYpID0+IChcbiAgPERyb3Bkb3duTWVudVByaW1pdGl2ZS5DaGVja2JveEl0ZW1cbiAgICByZWY9e3JlZn1cbiAgICBjbGFzc05hbWU9e2NuKFxuICAgICAgXCJyZWxhdGl2ZSBmbGV4IGN1cnNvci1kZWZhdWx0IHNlbGVjdC1ub25lIGl0ZW1zLWNlbnRlciByb3VuZGVkLXNtIHB5LTEuNSBwbC04IHByLTIgdGV4dC1zbSBvdXRsaW5lLW5vbmUgdHJhbnNpdGlvbi1jb2xvcnMgZm9jdXM6YmctYWNjZW50IGZvY3VzOnRleHQtYWNjZW50LWZvcmVncm91bmQgZGF0YS1bZGlzYWJsZWRdOnBvaW50ZXItZXZlbnRzLW5vbmUgZGF0YS1bZGlzYWJsZWRdOm9wYWNpdHktNTBcIixcbiAgICAgIGNsYXNzTmFtZVxuICAgICl9XG4gICAgY2hlY2tlZD17Y2hlY2tlZH1cbiAgICB7Li4ucHJvcHN9XG4gID5cbiAgICA8c3BhbiBjbGFzc05hbWU9XCJhYnNvbHV0ZSBsZWZ0LTIgZmxleCBoLTMuNSB3LTMuNSBpdGVtcy1jZW50ZXIganVzdGlmeS1jZW50ZXJcIj5cbiAgICAgIDxEcm9wZG93bk1lbnVQcmltaXRpdmUuSXRlbUluZGljYXRvcj5cbiAgICAgICAgPENoZWNrIGNsYXNzTmFtZT1cImgtNCB3LTRcIiAvPlxuICAgICAgPC9Ecm9wZG93bk1lbnVQcmltaXRpdmUuSXRlbUluZGljYXRvcj5cbiAgICA8L3NwYW4+XG4gICAge2NoaWxkcmVufVxuICA8L0Ryb3Bkb3duTWVudVByaW1pdGl2ZS5DaGVja2JveEl0ZW0+XG4pKVxuRHJvcGRvd25NZW51Q2hlY2tib3hJdGVtLmRpc3BsYXlOYW1lID1cbiAgRHJvcGRvd25NZW51UHJpbWl0aXZlLkNoZWNrYm94SXRlbS5kaXNwbGF5TmFtZVxuXG5jb25zdCBEcm9wZG93bk1lbnVSYWRpb0l0ZW0gPSBSZWFjdC5mb3J3YXJkUmVmPFxuICBSZWFjdC5FbGVtZW50UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuUmFkaW9JdGVtPixcbiAgUmVhY3QuQ29tcG9uZW50UHJvcHNXaXRob3V0UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuUmFkaW9JdGVtPlxuPigoeyBjbGFzc05hbWUsIGNoaWxkcmVuLCAuLi5wcm9wcyB9LCByZWYpID0+IChcbiAgPERyb3Bkb3duTWVudVByaW1pdGl2ZS5SYWRpb0l0ZW1cbiAgICByZWY9e3JlZn1cbiAgICBjbGFzc05hbWU9e2NuKFxuICAgICAgXCJyZWxhdGl2ZSBmbGV4IGN1cnNvci1kZWZhdWx0IHNlbGVjdC1ub25lIGl0ZW1zLWNlbnRlciByb3VuZGVkLXNtIHB5LTEuNSBwbC04IHByLTIgdGV4dC1zbSBvdXRsaW5lLW5vbmUgdHJhbnNpdGlvbi1jb2xvcnMgZm9jdXM6YmctYWNjZW50IGZvY3VzOnRleHQtYWNjZW50LWZvcmVncm91bmQgZGF0YS1bZGlzYWJsZWRdOnBvaW50ZXItZXZlbnRzLW5vbmUgZGF0YS1bZGlzYWJsZWRdOm9wYWNpdHktNTBcIixcbiAgICAgIGNsYXNzTmFtZVxuICAgICl9XG4gICAgey4uLnByb3BzfVxuICA+XG4gICAgPHNwYW4gY2xhc3NOYW1lPVwiYWJzb2x1dGUgbGVmdC0yIGZsZXggaC0zLjUgdy0zLjUgaXRlbXMtY2VudGVyIGp1c3RpZnktY2VudGVyXCI+XG4gICAgICA8RHJvcGRvd25NZW51UHJpbWl0aXZlLkl0ZW1JbmRpY2F0b3I+XG4gICAgICAgIDxDaXJjbGUgY2xhc3NOYW1lPVwiaC0yIHctMiBmaWxsLWN1cnJlbnRcIiAvPlxuICAgICAgPC9Ecm9wZG93bk1lbnVQcmltaXRpdmUuSXRlbUluZGljYXRvcj5cbiAgICA8L3NwYW4+XG4gICAge2NoaWxkcmVufVxuICA8L0Ryb3Bkb3duTWVudVByaW1pdGl2ZS5SYWRpb0l0ZW0+XG4pKVxuRHJvcGRvd25NZW51UmFkaW9JdGVtLmRpc3BsYXlOYW1lID0gRHJvcGRvd25NZW51UHJpbWl0aXZlLlJhZGlvSXRlbS5kaXNwbGF5TmFtZVxuXG5jb25zdCBEcm9wZG93bk1lbnVMYWJlbCA9IFJlYWN0LmZvcndhcmRSZWY8XG4gIFJlYWN0LkVsZW1lbnRSZWY8dHlwZW9mIERyb3Bkb3duTWVudVByaW1pdGl2ZS5MYWJlbD4sXG4gIFJlYWN0LkNvbXBvbmVudFByb3BzV2l0aG91dFJlZjx0eXBlb2YgRHJvcGRvd25NZW51UHJpbWl0aXZlLkxhYmVsPiAmIHtcbiAgICBpbnNldD86IGJvb2xlYW5cbiAgfVxuPigoeyBjbGFzc05hbWUsIGluc2V0LCAuLi5wcm9wcyB9LCByZWYpID0+IChcbiAgPERyb3Bkb3duTWVudVByaW1pdGl2ZS5MYWJlbFxuICAgIHJlZj17cmVmfVxuICAgIGNsYXNzTmFtZT17Y24oXG4gICAgICBcInB4LTIgcHktMS41IHRleHQtc20gZm9udC1zZW1pYm9sZFwiLFxuICAgICAgaW5zZXQgJiYgXCJwbC04XCIsXG4gICAgICBjbGFzc05hbWVcbiAgICApfVxuICAgIHsuLi5wcm9wc31cbiAgLz5cbikpXG5Ecm9wZG93bk1lbnVMYWJlbC5kaXNwbGF5TmFtZSA9IERyb3Bkb3duTWVudVByaW1pdGl2ZS5MYWJlbC5kaXNwbGF5TmFtZVxuXG5jb25zdCBEcm9wZG93bk1lbnVTZXBhcmF0b3IgPSBSZWFjdC5mb3J3YXJkUmVmPFxuICBSZWFjdC5FbGVtZW50UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuU2VwYXJhdG9yPixcbiAgUmVhY3QuQ29tcG9uZW50UHJvcHNXaXRob3V0UmVmPHR5cGVvZiBEcm9wZG93bk1lbnVQcmltaXRpdmUuU2VwYXJhdG9yPlxuPigoeyBjbGFzc05hbWUsIC4uLnByb3BzIH0sIHJlZikgPT4gKFxuICA8RHJvcGRvd25NZW51UHJpbWl0aXZlLlNlcGFyYXRvclxuICAgIHJlZj17cmVmfVxuICAgIGNsYXNzTmFtZT17Y24oXCItbXgtMSBteS0xIGgtcHggYmctbXV0ZWRcIiwgY2xhc3NOYW1lKX1cbiAgICB7Li4ucHJvcHN9XG4gIC8+XG4pKVxuRHJvcGRvd25NZW51U2VwYXJhdG9yLmRpc3BsYXlOYW1lID0gRHJvcGRvd25NZW51UHJpbWl0aXZlLlNlcGFyYXRvci5kaXNwbGF5TmFtZVxuXG5jb25zdCBEcm9wZG93bk1lbnVTaG9ydGN1dCA9ICh7XG4gIGNsYXNzTmFtZSxcbiAgLi4ucHJvcHNcbn06IFJlYWN0LkhUTUxBdHRyaWJ1dGVzPEhUTUxTcGFuRWxlbWVudD4pID0+IHtcbiAgcmV0dXJuIChcbiAgICA8c3BhblxuICAgICAgY2xhc3NOYW1lPXtjbihcIm1sLWF1dG8gdGV4dC14cyB0cmFja2luZy13aWRlc3Qgb3BhY2l0eS02MFwiLCBjbGFzc05hbWUpfVxuICAgICAgey4uLnByb3BzfVxuICAgIC8+XG4gIClcbn1cbkRyb3Bkb3duTWVudVNob3J0Y3V0LmRpc3BsYXlOYW1lID0gXCJEcm9wZG93bk1lbnVTaG9ydGN1dFwiXG5cbmV4cG9ydCB7XG4gIERyb3Bkb3duTWVudSxcbiAgRHJvcGRvd25NZW51VHJpZ2dlcixcbiAgRHJvcGRvd25NZW51Q29udGVudCxcbiAgRHJvcGRvd25NZW51SXRlbSxcbiAgRHJvcGRvd25NZW51Q2hlY2tib3hJdGVtLFxuICBEcm9wZG93bk1lbnVSYWRpb0l0ZW0sXG4gIERyb3Bkb3duTWVudUxhYmVsLFxuICBEcm9wZG93bk1lbnVTZXBhcmF0b3IsXG4gIERyb3Bkb3duTWVudVNob3J0Y3V0LFxuICBEcm9wZG93bk1lbnVHcm91cCxcbiAgRHJvcGRvd25NZW51UG9ydGFsLFxuICBEcm9wZG93bk1lbnVTdWIsXG4gIERyb3Bkb3duTWVudVN1YkNvbnRlbnQsXG4gIERyb3Bkb3duTWVudVN1YlRyaWdnZXIsXG4gIERyb3Bkb3duTWVudVJhZGlvR3JvdXAsXG59XG4iXSwiZmlsZSI6IkM6L1VzZXJzL3hoYi9EZXNrdG9wL0dvbGl2ZS9nb2xpdmUtd2ViL3NyYy9jb21wb25lbnRzL3VpL2Ryb3Bkb3duLW1lbnUudHN4In0=

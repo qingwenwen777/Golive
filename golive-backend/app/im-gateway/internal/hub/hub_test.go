@@ -1,0 +1,270 @@
+package hub_test
+
+import (
+	"context"
+	"encoding/json"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/pubsub"
+)
+
+// fakeBroker is an in-memory pubsub for tests. Each Subscribe gets its own
+// channel; Publish records the call and broadcasts to all subscribers of
+// that channel.
+type fakeBroker struct {
+	mu          sync.Mutex
+	subs        map[string][]*fakeSub
+	subscribes  int
+	unsubscribes int
+}
+
+func newFakeBroker() *fakeBroker {
+	return &fakeBroker{subs: make(map[string][]*fakeSub)}
+}
+
+func (b *fakeBroker) Subscribe(_ context.Context, channel string) (pubsub.Subscription, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	s := &fakeSub{
+		broker:  b,
+		channel: channel,
+		ch:      make(chan []byte, 16),
+	}
+	b.subs[channel] = append(b.subs[channel], s)
+	b.subscribes++
+	return s, nil
+}
+
+func (b *fakeBroker) Publish(_ context.Context, channel string, payload []byte) error {
+	b.mu.Lock()
+	subs := append([]*fakeSub(nil), b.subs[channel]...)
+	b.mu.Unlock()
+	for _, s := range subs {
+		select {
+		case s.ch <- payload:
+		default:
+		}
+	}
+	return nil
+}
+
+func (b *fakeBroker) onUnsubscribe(channel string, s *fakeSub) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	subs := b.subs[channel]
+	for i, x := range subs {
+		if x == s {
+			b.subs[channel] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+	if len(b.subs[channel]) == 0 {
+		delete(b.subs, channel)
+	}
+	b.unsubscribes++
+}
+
+type fakeSub struct {
+	broker  *fakeBroker
+	channel string
+	ch      chan []byte
+	closed  bool
+	mu      sync.Mutex
+}
+
+func (s *fakeSub) Channel() <-chan []byte { return s.ch }
+func (s *fakeSub) Close() error {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil
+	}
+	s.closed = true
+	close(s.ch)
+	s.mu.Unlock()
+	s.broker.onUnsubscribe(s.channel, s)
+	return nil
+}
+
+// fakeSink records what fanout pushed to it.
+type fakeSink struct {
+	id       string
+	mu       sync.Mutex
+	received [][]byte
+	closed   bool
+	full     bool // simulate slow consumer
+}
+
+func newFakeSink(id string) *fakeSink { return &fakeSink{id: id} }
+
+func (f *fakeSink) ID() string { return f.id }
+func (f *fakeSink) Send(p []byte) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.closed || f.full {
+		return false
+	}
+	cp := make([]byte, len(p))
+	copy(cp, p)
+	f.received = append(f.received, cp)
+	return true
+}
+func (f *fakeSink) Close() {
+	f.mu.Lock()
+	f.closed = true
+	f.mu.Unlock()
+}
+func (f *fakeSink) snapshot() [][]byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([][]byte, len(f.received))
+	copy(out, f.received)
+	return out
+}
+
+// helpers
+
+func waitFor(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("condition timed out")
+}
+
+// tests --------------------------------------------------------------------
+
+func TestHub_LazySubscribeFirstJoinOnly(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0) // disable viewer ticker
+
+	a := newFakeSink("a")
+	b := newFakeSink("b")
+
+	_, err := h.Join("R1", a)
+	require.NoError(t, err)
+	require.Equal(t, 1, br.subscribes)
+
+	_, err = h.Join("R1", b)
+	require.NoError(t, err)
+	require.Equal(t, 1, br.subscribes, "second join must reuse the existing room")
+
+	require.Equal(t, 1, h.RoomCount())
+}
+
+func TestHub_LastLeaveTearsDownSubscription(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+
+	a := newFakeSink("a")
+	b := newFakeSink("b")
+	_, _ = h.Join("R1", a)
+	_, _ = h.Join("R1", b)
+
+	h.Leave("R1", "a")
+	require.Equal(t, 0, br.unsubscribes, "still has b")
+
+	h.Leave("R1", "b")
+	waitFor(t, func() bool { return br.unsubscribes == 1 })
+	require.Equal(t, 0, h.RoomCount())
+}
+
+func TestHub_BroadcastFansOutToAllSinks(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+
+	a, b, c := newFakeSink("a"), newFakeSink("b"), newFakeSink("c")
+	_, _ = h.Join("R1", a)
+	_, _ = h.Join("R1", b)
+	_, _ = h.Join("R1", c)
+
+	require.NoError(t, h.Broadcast(context.Background(), "R1",
+		[]byte(`{"type":"chat","text":"hi"}`)))
+
+	waitFor(t, func() bool {
+		return len(a.snapshot()) >= 1 && len(b.snapshot()) >= 1 && len(c.snapshot()) >= 1
+	})
+}
+
+func TestHub_BroadcastIsolatesPerRoom(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+
+	a := newFakeSink("a")
+	b := newFakeSink("b")
+	_, _ = h.Join("R1", a)
+	_, _ = h.Join("R2", b)
+
+	_ = h.Broadcast(context.Background(), "R1", []byte(`hello-r1`))
+	waitFor(t, func() bool { return len(a.snapshot()) >= 1 })
+	require.Empty(t, b.snapshot(), "R2 must not receive R1 messages")
+}
+
+func TestHub_EvictsSlowConsumer(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+
+	good := newFakeSink("good")
+	slow := newFakeSink("slow")
+	slow.full = true // every Send returns false
+
+	_, _ = h.Join("R1", good)
+	_, _ = h.Join("R1", slow)
+
+	_ = h.Broadcast(context.Background(), "R1", []byte(`x`))
+	waitFor(t, func() bool {
+		slow.mu.Lock()
+		defer slow.mu.Unlock()
+		return slow.closed
+	})
+	require.NotEmpty(t, good.snapshot(), "good consumer still receives")
+}
+
+func TestHub_ViewerCountPushedPeriodically(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 50*time.Millisecond)
+
+	a := newFakeSink("a")
+	_, _ = h.Join("R1", a)
+
+	waitFor(t, func() bool {
+		for _, payload := range a.snapshot() {
+			var probe struct {
+				Type  string `json:"type"`
+				Count int64  `json:"count"`
+			}
+			if json.Unmarshal(payload, &probe) == nil && probe.Type == "viewer_count" && probe.Count == 1 {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func TestHub_SnapshotTopN(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+	for _, room := range []struct {
+		id string
+		n  int
+	}{{"a", 3}, {"b", 1}, {"c", 5}} {
+		for i := 0; i < room.n; i++ {
+			id := room.id + string(rune('0'+i))
+			_, _ = h.Join(room.id, newFakeSink(id))
+		}
+	}
+	stats := h.Snapshot(2)
+	require.Len(t, stats, 2)
+	require.Equal(t, "c", stats[0].ID)
+	require.EqualValues(t, 5, stats[0].Size)
+	require.Equal(t, "a", stats[1].ID)
+}

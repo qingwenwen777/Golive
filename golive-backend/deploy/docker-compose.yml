@@ -1,0 +1,285 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: golive-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: golive_root_1718011198
+      MYSQL_DATABASE: golive
+      MYSQL_USER: golive
+      MYSQL_PASSWORD: golive_mysql_1718011198
+    volumes: [mysql_data:/var/lib/mysql]
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ugolive", "-pgolive_mysql_1718011198"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: golive-redis
+    restart: unless-stopped
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  zookeeper:
+    image: bitnamilegacy/zookeeper:3.9
+    container_name: golive-zookeeper
+    restart: unless-stopped
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+
+  kafka:
+    image: bitnamilegacy/kafka:3.7
+    container_name: golive-kafka
+    restart: unless-stopped
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+
+  # ========== Go application services ==========
+
+  user-service:
+    image: golang:1.22
+    container_name: golive-user-service
+    restart: unless-stopped
+    working_dir: /app
+    command: go run ./app/user-service/cmd -config ./deploy/configs/user-service.yaml
+    volumes:
+      - ..:/app:ro
+      - avatar_uploads:/tmp/golive/avatars
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      GOPROXY: https://goproxy.cn,direct
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  room-service:
+    image: golang:1.22
+    container_name: golive-room-service
+    restart: unless-stopped
+    working_dir: /app
+    command: go run ./app/room-service/cmd -config ./deploy/configs/room-service.yaml
+    volumes:
+      - ..:/app:ro
+      - cover_uploads:/tmp/golive/covers
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      GOPROXY: https://goproxy.cn,direct
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  gift-service:
+    image: golang:1.22
+    container_name: golive-gift-service
+    restart: unless-stopped
+    working_dir: /app
+    command: go run ./app/gift-service/cmd -config ./deploy/configs/gift-service.yaml
+    volumes:
+      - ..:/app:ro
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      GOPROXY: https://goproxy.cn,direct
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  chat-service:
+    image: golang:1.22
+    container_name: golive-chat-service
+    restart: unless-stopped
+    working_dir: /app
+    command: go run ./app/chat-service/cmd -config ./deploy/configs/chat-service.yaml
+    volumes:
+      - ..:/app:ro
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      GOPROXY: https://goproxy.cn,direct
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+  api-gateway:
+    image: golang:1.22
+    container_name: golive-api-gateway
+    restart: unless-stopped
+    working_dir: /app
+    command: go run ./app/api-gateway/cmd -config ./deploy/configs/api-gateway.yaml
+    volumes:
+      - ..:/app:ro
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      GOPROXY: https://goproxy.cn,direct
+    depends_on:
+      user-service:
+        condition: service_started
+      room-service:
+        condition: service_started
+      gift-service:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+  im-gateway:
+    image: golang:1.22
+    container_name: golive-im-gateway
+    restart: unless-stopped
+    working_dir: /app
+    command: go run ./app/im-gateway/cmd -config ./deploy/configs/im-gateway.yaml
+    volumes:
+      - ..:/app:ro
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      GOPROXY: https://goproxy.cn,direct
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  etcd:
+    image: bitnamilegacy/etcd:3.5
+    container_name: golive-etcd
+    restart: unless-stopped
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://0.0.0.0:2379
+
+  srs:
+    image: ossrs/srs:5
+    container_name: golive-srs
+    restart: unless-stopped
+    ports:
+      - "1935:1935"
+    volumes: [./srs.conf:/usr/local/srs/conf/srs.conf:ro]
+    command: ./objs/srs -c conf/srs.conf
+
+  minio:
+    image: minio/minio:latest
+    container_name: golive-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: golive
+      MINIO_ROOT_PASSWORD: golive_minio_1718011198
+    volumes: [minio_data:/data]
+    command: server /data --console-address ":9001"
+
+  # ========== edge reverse proxy ==========
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: golive-nginx
+    restart: unless-stopped
+    depends_on: [srs, api-gateway, im-gateway]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../golive-web/dist:/usr/share/nginx/html:ro
+    ports: ["80:80"]
+
+  # ========== observability stack ==========
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: golive-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"   # UI, access through SSH tunnel if needed
+      - "127.0.0.1:14268:14268"   # jaeger.thrift over HTTP
+      # OTLP receivers exposed only to otel-collector (intra-network)
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    container_name: golive-otel
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on: [jaeger]
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: golive-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # so containerized prom can scrape host services
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: golive-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: golive_grafana_1718011198
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [prometheus]
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+  prom_data:
+  grafana_data:
+  cover_uploads:
+  avatar_uploads:
+  go_mod_cache:
+  go_build_cache:

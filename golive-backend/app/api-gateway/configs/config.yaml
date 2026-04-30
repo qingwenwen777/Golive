@@ -1,0 +1,33 @@
+service:
+  name: api-gateway
+  http_addr: ":8080"
+  pprof_addr: ":6060"
+  log_level: info
+
+upstreams:
+  user_service: "http://127.0.0.1:8090"
+  room_service: "http://127.0.0.1:8091"
+  gift_service: "http://127.0.0.1:8092"
+
+proxy:
+  # Per-request timeout. Frontend axios uses 10s — match it.
+  timeout: 10s
+  # Idle connection pool keeps upstreams warm.
+  max_idle_conns: 100
+  max_idle_conns_per_host: 32
+
+jwt:
+  # MUST match user-service / room-service.
+  secret: "dev-only-please-change-in-prod-9b1c0a"
+
+cors:
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "https://golive.example.com"   # production placeholder
+  max_age: 600
+
+ratelimit:
+  enabled: true
+  rate_per_sec: 100
+  burst: 200

@@ -1,0 +1,27 @@
+service:
+  name: room-service
+  http_addr: ":8091"
+  pprof_addr: ":6063"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive_mysql_1718011198@tcp(mysql:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+
+redis:
+  addr: "redis:6379"
+  db: 0
+  password: ""
+
+jwt:
+  secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
+
+live:
+  stream_key_secret: "golive-1718011198-stream-key-0e49b7c2a65d4391bd8f"
+  stream_key_ttl: 4h
+  flv_base: "http://171.80.11.198/live"
+
+upload:
+  cover_dir: "/tmp/golive/covers"
+  cover_public_url: "/api/uploads/covers"

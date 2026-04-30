@@ -1,0 +1,204 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/ui/dialog.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=d2feafe2"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+"use client";
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=d2feafe2"; const React = ((m) => m?.__esModule ? m : { ...typeof m === "object" && !Array.isArray(m) || typeof m === "function" ? m : {}, default: m })(__vite__cjsImport3_react);
+import * as DialogPrimitive from "/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=d2feafe2";
+import { X } from "/node_modules/.vite/deps/lucide-react.js?v=d2feafe2";
+import { cn } from "/src/lib/cn.ts";
+const Dialog = DialogPrimitive.Root;
+const DialogTrigger = DialogPrimitive.Trigger;
+const DialogPortal = DialogPrimitive.Portal;
+const DialogClose = DialogPrimitive.Close;
+const DialogOverlay = React.forwardRef(
+  _c = ({ className, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DialogPrimitive.Overlay,
+    {
+      ref,
+      className: cn(
+        "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        className
+      ),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+      lineNumber: 40,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c2 = DialogOverlay;
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+const DialogContent = React.forwardRef(
+  _c3 = ({ className, children, ...props }, ref) => /* @__PURE__ */ jsxDEV(DialogPortal, { children: [
+    /* @__PURE__ */ jsxDEV(DialogOverlay, {}, void 0, false, {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+      lineNumber: 56,
+      columnNumber: 5
+    }, this),
+    /* @__PURE__ */ jsxDEV(
+      DialogPrimitive.Content,
+      {
+        ref,
+        className: cn(
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-border bg-bg p-6 text-text shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+          className
+        ),
+        ...props,
+        children: [
+          children,
+          /* @__PURE__ */ jsxDEV(DialogPrimitive.Close, { className: "absolute right-4 top-4 rounded-full p-1 opacity-70 transition-opacity hover:bg-bg-hover hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-blue disabled:pointer-events-none data-[state=open]:bg-bg-hover", children: [
+            /* @__PURE__ */ jsxDEV(X, { className: "h-4 w-4" }, void 0, false, {
+              fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+              lineNumber: 67,
+              columnNumber: 9
+            }, this),
+            /* @__PURE__ */ jsxDEV("span", { className: "sr-only", children: "Close" }, void 0, false, {
+              fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+              lineNumber: 68,
+              columnNumber: 9
+            }, this)
+          ] }, void 0, true, {
+            fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+            lineNumber: 66,
+            columnNumber: 7
+          }, this)
+        ]
+      },
+      void 0,
+      true,
+      {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+        lineNumber: 57,
+        columnNumber: 5
+      },
+      this
+    )
+  ] }, void 0, true, {
+    fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+    lineNumber: 55,
+    columnNumber: 1
+  }, this)
+);
+_c4 = DialogContent;
+DialogContent.displayName = DialogPrimitive.Content.displayName;
+const DialogHeader = ({ className, ...props }) => /* @__PURE__ */ jsxDEV("div", { className: cn("flex flex-col space-y-1.5 text-center sm:text-left", className), ...props }, void 0, false, {
+  fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+  lineNumber: 76,
+  columnNumber: 1
+}, this);
+_c5 = DialogHeader;
+DialogHeader.displayName = "DialogHeader";
+const DialogFooter = ({ className, ...props }) => /* @__PURE__ */ jsxDEV(
+  "div",
+  {
+    className: cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className),
+    ...props
+  },
+  void 0,
+  false,
+  {
+    fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+    lineNumber: 81,
+    columnNumber: 1
+  },
+  this
+);
+_c6 = DialogFooter;
+DialogFooter.displayName = "DialogFooter";
+const DialogTitle = React.forwardRef(
+  _c7 = ({ className, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DialogPrimitive.Title,
+    {
+      ref,
+      className: cn("text-lg font-semibold leading-none tracking-tight", className),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+      lineNumber: 92,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c8 = DialogTitle;
+DialogTitle.displayName = DialogPrimitive.Title.displayName;
+const DialogDescription = React.forwardRef(
+  _c9 = ({ className, ...props }, ref) => /* @__PURE__ */ jsxDEV(
+    DialogPrimitive.Description,
+    {
+      ref,
+      className: cn("text-sm text-text-secondary", className),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx",
+      lineNumber: 104,
+      columnNumber: 1
+    },
+    this
+  )
+);
+_c0 = DialogDescription;
+DialogDescription.displayName = DialogPrimitive.Description.displayName;
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription
+};
+var _c, _c2, _c3, _c4, _c5, _c6, _c7, _c8, _c9, _c0;
+$RefreshReg$(_c, "DialogOverlay$React.forwardRef");
+$RefreshReg$(_c2, "DialogOverlay");
+$RefreshReg$(_c3, "DialogContent$React.forwardRef");
+$RefreshReg$(_c4, "DialogContent");
+$RefreshReg$(_c5, "DialogHeader");
+$RefreshReg$(_c6, "DialogFooter");
+$RefreshReg$(_c7, "DialogTitle$React.forwardRef");
+$RefreshReg$(_c8, "DialogTitle");
+$RefreshReg$(_c9, "DialogDescription$React.forwardRef");
+$RefreshReg$(_c0, "DialogDescription");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/xhb/Desktop/Golive/golive-web/src/components/ui/dialog.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QUFnQmdDLE1BQU1kO0FBRWhELE1BQU1lLG9CQUFvQmxDLE1BQU1hO0FBQUFBLEVBRy9Cc0IsTUFBQ0EsQ0FBQyxFQUFFcEIsV0FBVyxHQUFHQyxNQUFNLEdBQUdDLFFBQzFCO0FBQUEsSUFBQyxnQkFBZ0I7QUFBQSxJQUFoQjtBQUFBLE1BQ0M7QUFBQSxNQUNBLFdBQVdkLEdBQUcsK0JBQStCWSxTQUFTO0FBQUEsTUFDdEQsR0FBSUM7QUFBQUE7QUFBQUEsSUFITjtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUEsRUFHWTtBQUViO0FBQUVvQixNQVRHRjtBQVVOQSxrQkFBa0JmLGNBQWNsQixnQkFBZ0JvQyxZQUFZbEI7QUFFNUQ7QUFBQSxFQUNFZjtBQUFBQSxFQUNBSTtBQUFBQSxFQUNBSTtBQUFBQSxFQUNBRjtBQUFBQSxFQUNBSjtBQUFBQSxFQUNBZTtBQUFBQSxFQUNBSztBQUFBQSxFQUNBRTtBQUFBQSxFQUNBRTtBQUFBQSxFQUNBSTtBQUFBQTtBQUNBLElBQUFwQixJQUFBSSxLQUFBSSxLQUFBRSxLQUFBRyxLQUFBRSxLQUFBRSxLQUFBQyxLQUFBRyxLQUFBQztBQUFBLGFBQUF0QixJQUFBO0FBQUEsYUFBQUksS0FBQTtBQUFBLGFBQUFJLEtBQUE7QUFBQSxhQUFBRSxLQUFBO0FBQUEsYUFBQUcsS0FBQTtBQUFBLGFBQUFFLEtBQUE7QUFBQSxhQUFBRSxLQUFBO0FBQUEsYUFBQUMsS0FBQTtBQUFBLGFBQUFHLEtBQUE7QUFBQSxhQUFBQyxLQUFBIiwibmFtZXMiOlsiUmVhY3QiLCJEaWFsb2dQcmltaXRpdmUiLCJYIiwiY24iLCJEaWFsb2ciLCJSb290IiwiRGlhbG9nVHJpZ2dlciIsIlRyaWdnZXIiLCJEaWFsb2dQb3J0YWwiLCJQb3J0YWwiLCJEaWFsb2dDbG9zZSIsIkNsb3NlIiwiRGlhbG9nT3ZlcmxheSIsImZvcndhcmRSZWYiLCJfYyIsImNsYXNzTmFtZSIsInByb3BzIiwicmVmIiwiX2MyIiwiZGlzcGxheU5hbWUiLCJPdmVybGF5IiwiRGlhbG9nQ29udGVudCIsIl9jMyIsImNoaWxkcmVuIiwiX2M0IiwiQ29udGVudCIsIkRpYWxvZ0hlYWRlciIsIl9jNSIsIkRpYWxvZ0Zvb3RlciIsIl9jNiIsIkRpYWxvZ1RpdGxlIiwiX2M3IiwiX2M4IiwiVGl0bGUiLCJEaWFsb2dEZXNjcmlwdGlvbiIsIl9jOSIsIl9jMCIsIkRlc2NyaXB0aW9uIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbImRpYWxvZy50c3giXSwic291cmNlc0NvbnRlbnQiOlsiJ3VzZSBjbGllbnQnO1xuXG5pbXBvcnQgKiBhcyBSZWFjdCBmcm9tICdyZWFjdCc7XG5pbXBvcnQgKiBhcyBEaWFsb2dQcmltaXRpdmUgZnJvbSAnQHJhZGl4LXVpL3JlYWN0LWRpYWxvZyc7XG5pbXBvcnQgeyBYIH0gZnJvbSAnbHVjaWRlLXJlYWN0JztcblxuaW1wb3J0IHsgY24gfSBmcm9tICdAL2xpYi9jbic7XG5cbmNvbnN0IERpYWxvZyA9IERpYWxvZ1ByaW1pdGl2ZS5Sb290O1xuXG5jb25zdCBEaWFsb2dUcmlnZ2VyID0gRGlhbG9nUHJpbWl0aXZlLlRyaWdnZXI7XG5cbmNvbnN0IERpYWxvZ1BvcnRhbCA9IERpYWxvZ1ByaW1pdGl2ZS5Qb3J0YWw7XG5cbmNvbnN0IERpYWxvZ0Nsb3NlID0gRGlhbG9nUHJpbWl0aXZlLkNsb3NlO1xuXG5jb25zdCBEaWFsb2dPdmVybGF5ID0gUmVhY3QuZm9yd2FyZFJlZjxcbiAgUmVhY3QuRWxlbWVudFJlZjx0eXBlb2YgRGlhbG9nUHJpbWl0aXZlLk92ZXJsYXk+LFxuICBSZWFjdC5Db21wb25lbnRQcm9wc1dpdGhvdXRSZWY8dHlwZW9mIERpYWxvZ1ByaW1pdGl2ZS5PdmVybGF5PlxuPigoeyBjbGFzc05hbWUsIC4uLnByb3BzIH0sIHJlZikgPT4gKFxuICA8RGlhbG9nUHJpbWl0aXZlLk92ZXJsYXlcbiAgICByZWY9e3JlZn1cbiAgICBjbGFzc05hbWU9e2NuKFxuICAgICAgJ2ZpeGVkIGluc2V0LTAgei01MCBiZy1ibGFjay84MCBkYXRhLVtzdGF0ZT1vcGVuXTphbmltYXRlLWluIGRhdGEtW3N0YXRlPWNsb3NlZF06YW5pbWF0ZS1vdXQgZGF0YS1bc3RhdGU9Y2xvc2VkXTpmYWRlLW91dC0wIGRhdGEtW3N0YXRlPW9wZW5dOmZhZGUtaW4tMCcsXG4gICAgICBjbGFzc05hbWUsXG4gICAgKX1cbiAgICB7Li4ucHJvcHN9XG4gIC8+XG4pKTtcbkRpYWxvZ092ZXJsYXkuZGlzcGxheU5hbWUgPSBEaWFsb2dQcmltaXRpdmUuT3ZlcmxheS5kaXNwbGF5TmFtZTtcblxuY29uc3QgRGlhbG9nQ29udGVudCA9IFJlYWN0LmZvcndhcmRSZWY8XG4gIFJlYWN0LkVsZW1lbnRSZWY8dHlwZW9mIERpYWxvZ1ByaW1pdGl2ZS5Db250ZW50PixcbiAgUmVhY3QuQ29tcG9uZW50UHJvcHNXaXRob3V0UmVmPHR5cGVvZiBEaWFsb2dQcmltaXRpdmUuQ29udGVudD5cbj4oKHsgY2xhc3NOYW1lLCBjaGlsZHJlbiwgLi4ucHJvcHMgfSwgcmVmKSA9PiAoXG4gIDxEaWFsb2dQb3J0YWw+XG4gICAgPERpYWxvZ092ZXJsYXkgLz5cbiAgICA8RGlhbG9nUHJpbWl0aXZlLkNvbnRlbnRcbiAgICAgIHJlZj17cmVmfVxuICAgICAgY2xhc3NOYW1lPXtjbihcbiAgICAgICAgJ2ZpeGVkIGxlZnQtWzUwJV0gdG9wLVs1MCVdIHotNTAgZ3JpZCB3LWZ1bGwgbWF4LXctbGcgdHJhbnNsYXRlLXgtWy01MCVdIHRyYW5zbGF0ZS15LVstNTAlXSBnYXAtNCBib3JkZXIgYm9yZGVyLWJvcmRlciBiZy1iZyBwLTYgdGV4dC10ZXh0IHNoYWRvdy1sZyBkdXJhdGlvbi0yMDAgZGF0YS1bc3RhdGU9b3Blbl06YW5pbWF0ZS1pbiBkYXRhLVtzdGF0ZT1jbG9zZWRdOmFuaW1hdGUtb3V0IGRhdGEtW3N0YXRlPWNsb3NlZF06ZmFkZS1vdXQtMCBkYXRhLVtzdGF0ZT1vcGVuXTpmYWRlLWluLTAgZGF0YS1bc3RhdGU9Y2xvc2VkXTp6b29tLW91dC05NSBkYXRhLVtzdGF0ZT1vcGVuXTp6b29tLWluLTk1IGRhdGEtW3N0YXRlPWNsb3NlZF06c2xpZGUtb3V0LXRvLWxlZnQtMS8yIGRhdGEtW3N0YXRlPWNsb3NlZF06c2xpZGUtb3V0LXRvLXRvcC1bNDglXSBkYXRhLVtzdGF0ZT1vcGVuXTpzbGlkZS1pbi1mcm9tLWxlZnQtMS8yIGRhdGEtW3N0YXRlPW9wZW5dOnNsaWRlLWluLWZyb20tdG9wLVs0OCVdIHNtOnJvdW5kZWQtbGcnLFxuICAgICAgICBjbGFzc05hbWUsXG4gICAgICApfVxuICAgICAgey4uLnByb3BzfVxuICAgID5cbiAgICAgIHtjaGlsZHJlbn1cbiAgICAgIDxEaWFsb2dQcmltaXRpdmUuQ2xvc2UgY2xhc3NOYW1lPVwiYWJzb2x1dGUgcmlnaHQtNCB0b3AtNCByb3VuZGVkLWZ1bGwgcC0xIG9wYWNpdHktNzAgdHJhbnNpdGlvbi1vcGFjaXR5IGhvdmVyOmJnLWJnLWhvdmVyIGhvdmVyOm9wYWNpdHktMTAwIGZvY3VzOm91dGxpbmUtbm9uZSBmb2N1czpyaW5nLTIgZm9jdXM6cmluZy1ibHVlIGRpc2FibGVkOnBvaW50ZXItZXZlbnRzLW5vbmUgZGF0YS1bc3RhdGU9b3Blbl06YmctYmctaG92ZXJcIj5cbiAgICAgICAgPFggY2xhc3NOYW1lPVwiaC00IHctNFwiIC8+XG4gICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInNyLW9ubHlcIj5DbG9zZTwvc3Bhbj5cbiAgICAgIDwvRGlhbG9nUHJpbWl0aXZlLkNsb3NlPlxuICAgIDwvRGlhbG9nUHJpbWl0aXZlLkNvbnRlbnQ+XG4gIDwvRGlhbG9nUG9ydGFsPlxuKSk7XG5EaWFsb2dDb250ZW50LmRpc3BsYXlOYW1lID0gRGlhbG9nUHJpbWl0aXZlLkNvbnRlbnQuZGlzcGxheU5hbWU7XG5cbmNvbnN0IERpYWxvZ0hlYWRlciA9ICh7IGNsYXNzTmFtZSwgLi4ucHJvcHMgfTogUmVhY3QuSFRNTEF0dHJpYnV0ZXM8SFRNTERpdkVsZW1lbnQ+KSA9PiAoXG4gIDxkaXYgY2xhc3NOYW1lPXtjbignZmxleCBmbGV4LWNvbCBzcGFjZS15LTEuNSB0ZXh0LWNlbnRlciBzbTp0ZXh0LWxlZnQnLCBjbGFzc05hbWUpfSB7Li4ucHJvcHN9IC8+XG4pO1xuRGlhbG9nSGVhZGVyLmRpc3BsYXlOYW1lID0gJ0RpYWxvZ0hlYWRlcic7XG5cbmNvbnN0IERpYWxvZ0Zvb3RlciA9ICh7IGNsYXNzTmFtZSwgLi4ucHJvcHMgfTogUmVhY3QuSFRNTEF0dHJpYnV0ZXM8SFRNTERpdkVsZW1lbnQ+KSA9PiAoXG4gIDxkaXZcbiAgICBjbGFzc05hbWU9e2NuKCdmbGV4IGZsZXgtY29sLXJldmVyc2Ugc206ZmxleC1yb3cgc206anVzdGlmeS1lbmQgc206c3BhY2UteC0yJywgY2xhc3NOYW1lKX1cbiAgICB7Li4ucHJvcHN9XG4gIC8+XG4pO1xuRGlhbG9nRm9vdGVyLmRpc3BsYXlOYW1lID0gJ0RpYWxvZ0Zvb3Rlcic7XG5cbmNvbnN0IERpYWxvZ1RpdGxlID0gUmVhY3QuZm9yd2FyZFJlZjxcbiAgUmVhY3QuRWxlbWVudFJlZjx0eXBlb2YgRGlhbG9nUHJpbWl0aXZlLlRpdGxlPixcbiAgUmVhY3QuQ29tcG9uZW50UHJvcHNXaXRob3V0UmVmPHR5cGVvZiBEaWFsb2dQcmltaXRpdmUuVGl0bGU+XG4+KCh7IGNsYXNzTmFtZSwgLi4ucHJvcHMgfSwgcmVmKSA9PiAoXG4gIDxEaWFsb2dQcmltaXRpdmUuVGl0bGVcbiAgICByZWY9e3JlZn1cbiAgICBjbGFzc05hbWU9e2NuKCd0ZXh0LWxnIGZvbnQtc2VtaWJvbGQgbGVhZGluZy1ub25lIHRyYWNraW5nLXRpZ2h0JywgY2xhc3NOYW1lKX1cbiAgICB7Li4ucHJvcHN9XG4gIC8+XG4pKTtcbkRpYWxvZ1RpdGxlLmRpc3BsYXlOYW1lID0gRGlhbG9nUHJpbWl0aXZlLlRpdGxlLmRpc3BsYXlOYW1lO1xuXG5jb25zdCBEaWFsb2dEZXNjcmlwdGlvbiA9IFJlYWN0LmZvcndhcmRSZWY8XG4gIFJlYWN0LkVsZW1lbnRSZWY8dHlwZW9mIERpYWxvZ1ByaW1pdGl2ZS5EZXNjcmlwdGlvbj4sXG4gIFJlYWN0LkNvbXBvbmVudFByb3BzV2l0aG91dFJlZjx0eXBlb2YgRGlhbG9nUHJpbWl0aXZlLkRlc2NyaXB0aW9uPlxuPigoeyBjbGFzc05hbWUsIC4uLnByb3BzIH0sIHJlZikgPT4gKFxuICA8RGlhbG9nUHJpbWl0aXZlLkRlc2NyaXB0aW9uXG4gICAgcmVmPXtyZWZ9XG4gICAgY2xhc3NOYW1lPXtjbigndGV4dC1zbSB0ZXh0LXRleHQtc2Vjb25kYXJ5JywgY2xhc3NOYW1lKX1cbiAgICB7Li4ucHJvcHN9XG4gIC8+XG4pKTtcbkRpYWxvZ0Rlc2NyaXB0aW9uLmRpc3BsYXlOYW1lID0gRGlhbG9nUHJpbWl0aXZlLkRlc2NyaXB0aW9uLmRpc3BsYXlOYW1lO1xuXG5leHBvcnQge1xuICBEaWFsb2csXG4gIERpYWxvZ1BvcnRhbCxcbiAgRGlhbG9nT3ZlcmxheSxcbiAgRGlhbG9nQ2xvc2UsXG4gIERpYWxvZ1RyaWdnZXIsXG4gIERpYWxvZ0NvbnRlbnQsXG4gIERpYWxvZ0hlYWRlcixcbiAgRGlhbG9nRm9vdGVyLFxuICBEaWFsb2dUaXRsZSxcbiAgRGlhbG9nRGVzY3JpcHRpb24sXG59O1xuIl0sImZpbGUiOiJDOi9Vc2Vycy94aGIvRGVza3RvcC9Hb2xpdmUvZ29saXZlLXdlYi9zcmMvY29tcG9uZW50cy91aS9kaWFsb2cudHN4In0=

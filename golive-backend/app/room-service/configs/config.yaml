@@ -1,0 +1,29 @@
+service:
+  name: room-service
+  http_addr: ":8091"
+  pprof_addr: ":6063"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive@tcp(127.0.0.1:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+
+redis:
+  addr: "127.0.0.1:6379"
+  db: 0
+  password: ""
+
+jwt:
+  # MUST match user-service. Same HS256 secret verifies access tokens here.
+  secret: "dev-only-please-change-in-prod-9b1c0a"
+
+live:
+  # HMAC key for stream key generation. Different from JWT secret.
+  stream_key_secret: "dev-stream-key-secret-change-me"
+  stream_key_ttl: 4h
+  flv_base: "http://localhost:8082/live"
+
+upload:
+  cover_dir: "./uploads/covers"
+  cover_public_url: "/api/uploads/covers"

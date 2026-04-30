@@ -1,0 +1,10 @@
+node_modules
+dist
+.edge-history-check*
+history-layout-*.png
+vite-*.log
+.git
+.env
+.env.local
+npm-debug.log
+pnpm-debug.log

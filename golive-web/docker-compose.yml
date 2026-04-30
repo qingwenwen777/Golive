@@ -1,0 +1,10 @@
+services:
+  web:
+    build: .
+    image: golive-web:latest
+    container_name: golive-web
+    ports:
+      - "80:80"
+    env_file:
+      - .env
+    restart: unless-stopped

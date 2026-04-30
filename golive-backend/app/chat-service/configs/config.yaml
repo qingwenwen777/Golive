@@ -1,0 +1,34 @@
+service:
+  name: chat-service
+  http_addr: ":8093"
+  pprof_addr: ":6068"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive@tcp(127.0.0.1:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+  shards: 8
+
+redis:
+  addr: "127.0.0.1:6379"
+  db: 0
+  password: ""
+
+kafka:
+  brokers: ["127.0.0.1:9092"]
+  topic: "danmu"
+  group: "chat-consumer"
+  workers: 8           # number of in-process worker goroutines (per-room ordered)
+
+filter:
+  sensitive_path: "./app/chat-service/configs/sensitive.txt"
+  mask: "***"
+
+ratelimit:
+  per_user_per_sec: 3
+  bucket_seconds: 1    # window granularity
+
+room:
+  history_default_limit: 50
+  history_max_limit: 200

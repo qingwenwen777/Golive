@@ -1,0 +1,31 @@
+service:
+  name: im-gateway
+  http_addr: ":8081"
+  pprof_addr: ":6066"
+  log_level: info
+
+ws:
+  # Tunables sized for ~50k concurrent connections per instance.
+  read_limit_bytes: 4096
+  read_idle_timeout: 60s   # disconnect if nothing (heartbeat or otherwise) seen
+  write_deadline: 10s
+  send_buffer: 256         # per-conn outbound queue; overflow → kick
+  pong_wait: 60s
+  max_message_rate: 5      # client→server msgs / sec / conn (chat)
+
+redis:
+  addr: "127.0.0.1:6379"
+  db: 0
+  password: ""
+
+jwt:
+  secret: "dev-only-please-change-in-prod-9b1c0a"
+
+kafka:
+  enabled: false           # flip to true when chat-service is up
+  brokers: ["127.0.0.1:9092"]
+  chat_topic: "danmu"
+
+room:
+  viewer_push_interval: 5s
+  welcome_text: "Welcome to the live room!"

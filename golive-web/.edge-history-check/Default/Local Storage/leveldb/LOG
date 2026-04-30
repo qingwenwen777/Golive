@@ -1,0 +1,4 @@
+2026/05/01-03:43:11.680 b1d8 Reusing MANIFEST C:\Users\xhb\Desktop\Golive\golive-web\.edge-history-check\Default\Local Storage\leveldb/MANIFEST-000001
+2026/05/01-03:43:11.697 b1d8 Recovering log #3
+2026/05/01-03:43:11.697 b1d8 (ignoring error) C:\Users\xhb\Desktop\Golive\golive-web\.edge-history-check\Default\Local Storage\leveldb/000003.log: dropping 749 bytes; Corruption: checksum mismatch
+2026/05/01-03:43:11.705 b1d8 Reusing old log C:\Users\xhb\Desktop\Golive\golive-web\.edge-history-check\Default\Local Storage\leveldb/000003.log 

@@ -1,0 +1,31 @@
+service:
+  name: api-gateway
+  http_addr: ":8080"
+  pprof_addr: ":6060"
+  log_level: info
+
+upstreams:
+  user_service: "http://user-service:8090"
+  room_service: "http://room-service:8091"
+  gift_service: "http://gift-service:8092"
+
+proxy:
+  timeout: 10s
+  max_idle_conns: 100
+  max_idle_conns_per_host: 32
+
+jwt:
+  secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
+
+cors:
+  allowed_origins:
+    - "http://171.80.11.198"
+    - "http://localhost"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+  max_age: 600
+
+ratelimit:
+  enabled: true
+  rate_per_sec: 100
+  burst: 200

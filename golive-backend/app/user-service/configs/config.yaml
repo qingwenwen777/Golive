@@ -1,0 +1,33 @@
+service:
+  name: user-service
+  http_addr: ":8090"
+  pprof_addr: ":6062"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive@tcp(127.0.0.1:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+
+redis:
+  addr: "127.0.0.1:6379"
+  db: 0
+  password: ""
+
+jwt:
+  # CHANGE in production. 32+ random bytes recommended.
+  secret: "dev-only-please-change-in-prod-9b1c0a"
+  access_ttl: 2h
+  refresh_ttl: 168h   # 7 days
+
+upload:
+  avatar_dir: "./uploads/avatars"
+  avatar_public_url: "/api/uploads/avatars"
+
+bootstrap:
+  # Auto-create + seed the demo user on startup. Frontend E2E depends on it.
+  demo_user:
+    enabled: true
+    username: demo
+    password: demo
+    coin_balance: 100000

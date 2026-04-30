@@ -1,0 +1,74 @@
+{
+  "home": {
+    "title": "ホーム",
+    "liveNow": "今ライブ配信中",
+    "recommended": "おすすめ",
+    "allCategory": "すべて",
+    "empty": "現在ライブ配信はありません",
+    "emptySub": "しばらくしてからもう一度お試しください",
+    "errorTitle": "配信を読み込めませんでした",
+    "errorSub": "接続を確認してもう一度お試しください",
+    "retry": "再試行",
+    "watching": "{{count}} 人が視聴中",
+    "subscribers": "チャンネル登録者数 {{count}} 人"
+  },
+  "liveRoom": {
+    "title": "ライブルーム",
+    "roomId": "ルーム ID: {{id}}",
+    "ended": "この配信は終了しました",
+    "chat": "ライブ チャット",
+    "openChat": "チャットを開く",
+    "close": "閉じる",
+    "more": "その他",
+    "topChat": "トップチャット",
+    "liveChat": "ライブ チャット",
+    "sayHi": "コメントを入力...",
+    "chatInput": "チャット入力",
+    "emoji": "絵文字",
+    "send": "送信",
+    "chatSendFailed": "接続中または送信に失敗しました。しばらくしてから再度お試しください",
+    "superChat": "スーパーチャット",
+    "heart": "ハート",
+    "subscribe": "チャンネル登録",
+    "subscribed": "登録済み",
+    "subscribers": "チャンネル登録者数 {{count}} 人",
+    "watching": "{{count}} 人が視聴中",
+    "like": "高評価",
+    "dislike": "低評価",
+    "share": "共有",
+    "save": "保存",
+    "showMore": "もっと見る",
+    "showLess": "折りたたむ"
+  },
+  "player": {
+    "play": "再生",
+    "pause": "一時停止",
+    "mute": "ミュート",
+    "unmute": "ミュート解除",
+    "volume": "音量",
+    "fullscreen": "全画面",
+    "exitFullscreen": "全画面を終了",
+    "pip": "ピクチャー イン ピクチャー",
+    "quality": "画質",
+    "qualityAuto": "自動",
+    "toggleDanmu": "弾幕切替",
+    "danmuOn": "弾幕: オン",
+    "danmuOff": "弾幕: オフ",
+    "live": "ライブ",
+    "jumpLive": "ライブに戻る",
+    "liveProgress": "ライブ進行"
+  },
+  "channel": {
+    "title": "チャンネル",
+    "name": "チャンネル: {{name}}"
+  },
+  "login": {
+    "title": "ログイン",
+    "placeholder": "ステージ 2 プレースホルダー"
+  },
+  "notFound": {
+    "title": "404",
+    "subtitle": "ページが見つかりません",
+    "back": "ホームに戻る"
+  }
+}

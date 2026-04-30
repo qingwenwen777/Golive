@@ -1,0 +1,30 @@
+service:
+  name: im-gateway
+  http_addr: ":8081"
+  pprof_addr: ":6066"
+  log_level: info
+
+ws:
+  read_limit_bytes: 4096
+  read_idle_timeout: 60s
+  write_deadline: 10s
+  send_buffer: 256
+  pong_wait: 60s
+  max_message_rate: 5
+
+redis:
+  addr: "redis:6379"
+  db: 0
+  password: ""
+
+jwt:
+  secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
+
+kafka:
+  enabled: false
+  brokers: ["kafka:9092"]
+  chat_topic: "danmu"
+
+room:
+  viewer_push_interval: 5s
+  welcome_text: "Welcome to the live room!"

@@ -1,0 +1,32 @@
+service:
+  name: gift-service
+  http_addr: ":8092"
+  pprof_addr: ":6067"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive@tcp(127.0.0.1:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+
+redis:
+  addr: "127.0.0.1:6379"
+  db: 0
+  password: ""
+
+jwt:
+  secret: "dev-only-please-change-in-prod-9b1c0a"
+
+kafka:
+  enabled: false              # set true once chat/im stack consumes
+  brokers: ["127.0.0.1:9092"]
+  gift_topic: "gift"
+
+outbox:
+  poll_interval: 1s
+  batch_size: 100
+  max_retries: 5
+  base_backoff: 2s            # exponential: base * 2^retries
+
+idempotency:
+  ttl: 600s

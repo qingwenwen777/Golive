@@ -1,0 +1,32 @@
+service:
+  name: gift-service
+  http_addr: ":8092"
+  pprof_addr: ":6067"
+  log_level: info
+
+mysql:
+  dsn: "golive:golive_mysql_1718011198@tcp(mysql:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open: 50
+  max_idle: 10
+
+redis:
+  addr: "redis:6379"
+  db: 0
+  password: ""
+
+jwt:
+  secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
+
+kafka:
+  enabled: false
+  brokers: ["kafka:9092"]
+  gift_topic: "gift"
+
+outbox:
+  poll_interval: 1s
+  batch_size: 100
+  max_retries: 5
+  base_backoff: 2s
+
+idempotency:
+  ttl: 600s
