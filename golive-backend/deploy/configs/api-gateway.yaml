@@ -19,7 +19,7 @@ jwt:
 
 cors:
   allowed_origins:
-    - "http://171.80.11.198"
+    - "http://154.36.185.85"
     - "http://localhost"
     - "http://localhost:5173"
     - "http://127.0.0.1:5173"

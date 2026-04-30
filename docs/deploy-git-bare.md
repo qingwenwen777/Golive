@@ -1,6 +1,6 @@
 # GoLive Git Bare 部署说明
 
-目标服务器：`171.80.11.198`
+目标服务器：`154.36.185.85`
 
 ## 1. 服务器准备
 
@@ -9,7 +9,7 @@
 开放公网端口：
 
 ```text
-8080  Web 访问（国内服务器 80 端口需 ICP 备案，故使用 8080）
+80    Web 访问
 1935  OBS RTMP 推流
 443   后续配置 HTTPS 时再开放
 ```
@@ -42,8 +42,8 @@ git init --bare /srv/git/golive.git
 安装 hook。第一次服务器还没有 checkout 出 `/srv/golive/app`，所以先从本机把脚本传上去：
 
 ```bash
-scp scripts/post-receive.golive.example 你的服务器用户名@171.80.11.198:/tmp/post-receive
-ssh 你的服务器用户名@171.80.11.198
+scp scripts/post-receive.golive.example 你的服务器用户名@154.36.185.85:/tmp/post-receive
+ssh 你的服务器用户名@154.36.185.85
 cp /tmp/post-receive /srv/git/golive.git/hooks/post-receive
 chmod +x /srv/git/golive.git/hooks/post-receive
 ```
@@ -60,7 +60,7 @@ chmod +x /srv/git/golive.git/hooks/post-receive
 在本机项目根目录执行：
 
 ```bash
-git remote add prod ssh://你的服务器用户名@171.80.11.198/srv/git/golive.git
+git remote add prod ssh://你的服务器用户名@154.36.185.85/srv/git/golive.git
 git push prod main
 ```
 
@@ -83,13 +83,13 @@ checkout 到 /srv/golive/app
 Web 地址：
 
 ```text
-http://171.80.11.198:8080
+http://154.36.185.85
 ```
 
 OBS 推流服务器：
 
 ```text
-rtmp://171.80.11.198/live
+rtmp://154.36.185.85/live
 ```
 
 demo 用户：
