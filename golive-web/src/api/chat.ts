@@ -1,19 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
-import type { ChatMessage } from '@/types/message';
+import type { ChatMessage, Message, SuperChatMessage, SuperChatTier } from '@/types/message';
 
-interface DanmuHistoryItem {
-  type: 'chat';
+interface ChatHistoryBase {
+  type: 'chat' | 'super_chat';
   id: string;
   user: string;
   avatar?: string;
   text: string;
-  color?: string;
   ts: number;
 }
 
+interface DanmuHistoryItem extends ChatHistoryBase {
+  type: 'chat';
+  color?: string;
+}
+
+interface SuperChatHistoryItem extends ChatHistoryBase {
+  type: 'super_chat';
+  amount: string;
+  tier?: SuperChatTier;
+}
+
+type ChatHistoryItem = DanmuHistoryItem | SuperChatHistoryItem;
+
 interface DanmuHistoryResponse {
-  items: DanmuHistoryItem[];
+  items: ChatHistoryItem[];
 }
 
 function toChatMessage(item: DanmuHistoryItem): ChatMessage {
@@ -28,18 +40,37 @@ function toChatMessage(item: DanmuHistoryItem): ChatMessage {
   };
 }
 
+function toSuperChatMessage(item: SuperChatHistoryItem): SuperChatMessage {
+  return {
+    id: item.id,
+    kind: 'super_chat',
+    user: item.user,
+    avatar: item.avatar,
+    amount: item.amount,
+    tier: item.tier ?? 0,
+    text: item.text,
+    ts: item.ts,
+  };
+}
+
+function toMessage(item: ChatHistoryItem): Message {
+  if (item.type === 'super_chat') return toSuperChatMessage(item);
+  return toChatMessage(item);
+}
+
 export function useDanmuHistory(roomId: string, enabled = true, limit = 20) {
-  return useQuery<ChatMessage[], Error>({
+  return useQuery<Message[], Error>({
     queryKey: ['danmu-history', roomId, limit],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<DanmuHistoryResponse>(
         `/chat/rooms/${encodeURIComponent(roomId)}/danmus`,
         { params: { limit }, signal },
       );
-      return data.items.slice().reverse().map(toChatMessage);
+      return data.items.slice().reverse().map(toMessage);
     },
     enabled: enabled && !!roomId,
-    staleTime: 5_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: 1,
   });
 }

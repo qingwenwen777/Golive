@@ -5,7 +5,6 @@ import { useDanmuStore } from '@/stores/useDanmuStore';
 import { useDanmuHistory } from '@/api/chat';
 import type { ChatMessage, Message, SuperChatTier } from '@/types/message';
 import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
-import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 
@@ -106,14 +105,6 @@ export function useRoomRealtime(
     return () => resetRoom(roomId);
   }, [roomId, ensureRoom, resetRoom]);
 
-  useEffect(() => {
-    if (!enabled || !roomId) return;
-    const cachedMessages = loadRecentChatMessages(roomId);
-    if (cachedMessages.length > 0) {
-      mergeMessages(roomId, cachedMessages);
-    }
-  }, [enabled, mergeMessages, roomId]);
-
   const history = useDanmuHistory(roomId, enabled, 20);
 
   useEffect(() => {
@@ -182,7 +173,6 @@ export function useRoomRealtime(
           .getState()
           .rooms[roomId]?.messages.some((x) => x.id === msg.id);
         appendMessage(roomId, msg);
-        saveRecentChatMessage(roomId, msg);
         if (!alreadySeen && danmuOnRef.current) {
           appendBullet(roomId, {
             id: genId('b'),
@@ -302,7 +292,6 @@ export function useRoomRealtime(
       ts: now,
     };
     appendMessage(roomId, msg);
-    saveRecentChatMessage(roomId, msg);
     if (danmuOnRef.current) {
       appendBullet(roomId, {
         id: genId('b'),

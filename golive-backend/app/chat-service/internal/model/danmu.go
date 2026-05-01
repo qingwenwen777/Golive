@@ -18,15 +18,17 @@ type Danmu struct {
 }
 
 // Public is the wire-shape served via GET /rooms/:id/danmus and Redis pub/sub.
-// Mirrors hub.ChatMsg in im-gateway.
+// History can also include SuperChat fields.
 type Public struct {
-	Type     string `json:"type"`           // "chat"
-	ID       string `json:"id"`
-	User     string `json:"user"`
-	Avatar   string `json:"avatar,omitempty"`
-	Text     string `json:"text"`
-	Color    string `json:"color,omitempty"`
-	Ts       int64  `json:"ts"`
+	Type   string `json:"type"` // "chat" or "super_chat"
+	ID     string `json:"id"`
+	User   string `json:"user"`
+	Avatar string `json:"avatar,omitempty"`
+	Text   string `json:"text"`
+	Color  string `json:"color,omitempty"`
+	Amount string `json:"amount,omitempty"`
+	Tier   *int   `json:"tier,omitempty"`
+	Ts     int64  `json:"ts"`
 }
 
 func (d *Danmu) ToPublic() Public {

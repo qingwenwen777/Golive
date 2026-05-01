@@ -26,6 +26,16 @@ type DanmuRepo struct {
 	shards int
 }
 
+type SuperChatHistoryRow struct {
+	ID     string
+	User   string
+	Avatar string
+	Amount int64
+	Tier   int
+	Text   string
+	Ts     int64
+}
+
 func NewDanmuRepo(db *gorm.DB, shards int) *DanmuRepo {
 	if shards <= 0 {
 		shards = 8
@@ -71,6 +81,34 @@ func (r *DanmuRepo) History(ctx context.Context, roomID string, before int64, li
 	}
 	var out []model.Danmu
 	if err := q.Order("ts DESC").Limit(limit).Find(&out).Error; err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SuperChatHistory returns successful SuperChats for the same room so the
+// public history endpoint can restore paid messages when a viewer enters.
+func (r *DanmuRepo) SuperChatHistory(ctx context.Context, roomID string, before int64, limit int) ([]SuperChatHistoryRow, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	q := r.db.WithContext(ctx).Table("super_chat_orders AS sc").
+		Select(`
+sc.order_id AS id,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), sc.user_id) AS user,
+COALESCE(u.avatar, '') AS avatar,
+sc.amount AS amount,
+sc.tier AS tier,
+sc.text AS text,
+CAST(UNIX_TIMESTAMP(sc.created_at) * 1000 AS SIGNED) AS ts
+`).
+		Joins("LEFT JOIN users AS u ON u.id = sc.user_id").
+		Where("sc.room_id = ? AND sc.status = ?", roomID, "success")
+	if before > 0 {
+		q = q.Where("sc.created_at < FROM_UNIXTIME(?)", float64(before)/1000)
+	}
+	var out []SuperChatHistoryRow
+	if err := q.Order("sc.created_at DESC").Limit(limit).Scan(&out).Error; err != nil {
 		return nil, err
 	}
 	return out, nil

@@ -3,11 +3,11 @@
 // The orchestration is intentionally linear so the cost of each stage is
 // obvious in pprof traces:
 //
-//	Process(event) →
-//	  rate-limit  → drop ?
-//	  sanitize    → mask sensitive words
-//	  persist     → MySQL shard
-//	  publish     → redis room:<id>
+//	Process(event)
+//	  rate-limit -> drop ?
+//	  sanitize   -> mask sensitive words
+//	  persist    -> MySQL shard
+//	  publish    -> redis room:<id>
 package service
 
 import (
@@ -15,6 +15,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 
 	"github.com/google/uuid"
 
@@ -119,9 +121,52 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 	if err != nil {
 		return nil, err
 	}
-	out := make([]model.Public, len(rows))
+	superChats, err := s.danmus.SuperChatHistory(ctx, roomID, before, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]model.Public, 0, len(rows)+len(superChats))
 	for i := range rows {
-		out[i] = rows[i].ToPublic()
+		out = append(out, rows[i].ToPublic())
+	}
+	for i := range superChats {
+		tier := superChats[i].Tier
+		out = append(out, model.Public{
+			Type:   "super_chat",
+			ID:     superChats[i].ID,
+			User:   superChats[i].User,
+			Avatar: superChats[i].Avatar,
+			Amount: formatCoinAmount(superChats[i].Amount),
+			Tier:   &tier,
+			Text:   superChats[i].Text,
+			Ts:     superChats[i].Ts,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Ts > out[j].Ts
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
 	}
 	return out, nil
+}
+
+func formatCoinAmount(amount int64) string {
+	raw := strconv.FormatInt(amount, 10)
+	n := len(raw)
+	if n <= 3 {
+		return "\u697c" + raw
+	}
+	out := make([]byte, 0, n+(n-1)/3)
+	head := n % 3
+	if head == 0 {
+		head = 3
+	}
+	out = append(out, raw[:head]...)
+	for i := head; i < n; i += 3 {
+		out = append(out, ',')
+		out = append(out, raw[i:i+3]...)
+	}
+	return "\u697c" + string(out)
 }
