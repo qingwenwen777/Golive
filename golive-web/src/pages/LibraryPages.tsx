@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Crown,
   Heart,
   History,
   Play,
@@ -20,6 +21,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useMe, useTopupCoins } from '@/api/auth';
+import { useFanBadges } from '@/api/gift';
 import { useRooms, useSubscriptions } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LiveCard } from '@/components/LiveCard';
@@ -39,6 +41,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
+import type { FanBadge } from '@/types/gift';
 import type { Stream } from '@/types/stream';
 import { userDisplayName } from '@/types/user';
 
@@ -145,6 +148,7 @@ export function YouPage() {
   const me = useMe();
   const topup = useTopupCoins();
   const rooms = useRooms({ size: 100 });
+  const fanBadges = useFanBadges(isAuthed);
   const liveStreams = rooms.data?.items;
   const history = useMemo(
     () =>
@@ -241,6 +245,15 @@ export function YouPage() {
         </Shelf>
       )}
 
+      <Shelf title="Fan badges">
+        <FanBadgeShelf
+          badges={fanBadges.data ?? []}
+          isPending={fanBadges.isPending && isAuthed}
+          isAuthed={isAuthed}
+          onLogin={openLogin}
+        />
+      </Shelf>
+
       <Shelf title="History" actionLabel="View all" actionTo="/history">
         <HorizontalShelf items={history.slice(0, 8)} emptyText="No watch history yet." />
       </Shelf>
@@ -269,6 +282,61 @@ export function YouPage() {
           />
         </div>
       </Shelf>
+    </div>
+  );
+}
+
+function FanBadgeShelf({
+  badges,
+  isPending,
+  isAuthed,
+  onLogin,
+}: {
+  badges: FanBadge[];
+  isPending: boolean;
+  isAuthed: boolean;
+  onLogin: () => void;
+}) {
+  if (!isAuthed) {
+    return (
+      <button type="button" className="gl-fan-badge-empty" onClick={onLogin}>
+        Sign in to view your fan badges.
+      </button>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="gl-fan-badge-grid">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="gl-fan-badge-card is-loading" />
+        ))}
+      </div>
+    );
+  }
+
+  if (badges.length === 0) {
+    return <div className="gl-fan-badge-empty">Send a Fan Light to unlock a creator badge.</div>;
+  }
+
+  return (
+    <div className="gl-fan-badge-grid">
+      {badges.slice(0, 12).map((badge) => (
+        <div key={`${badge.creatorId}:${badge.level}`} className="gl-fan-badge-card">
+          <div className="gl-fan-badge-avatar">
+            <Avatar name={badge.creatorName} src={badge.creatorAvatar} size={42} />
+          </div>
+          <div className="gl-fan-badge-copy">
+            <div className="gl-fan-badge-name">{badge.creatorName}</div>
+            <div className="gl-fan-badge-meta">
+              <span>
+                <Crown size={13} strokeWidth={2.4} /> #{badge.level}
+              </span>
+              <span>{badge.totalContribution.toLocaleString()} contribution</span>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

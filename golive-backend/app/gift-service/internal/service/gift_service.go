@@ -45,6 +45,10 @@ func (s *GiftService) List(ctx context.Context) ([]model.Gift, error) {
 	return s.gifts.List(ctx)
 }
 
+func (s *GiftService) ListFanBadges(ctx context.Context, userID string) ([]model.FanBadge, error) {
+	return s.orders.ListFanBadges(ctx, userID)
+}
+
 // Send is the canonical send path.
 //
 // Pre-conditions checked here (assumes HTTP-level validation already ran):
@@ -123,7 +127,11 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 		CreatedAt: now,
 	}
 
-	placed, replayed, err := s.orders.PlaceGiftOrder(ctx, order, payload)
+	badgeMode := repo.FanBadgeIfExists
+	if gift.ID == "fan_light" {
+		badgeMode = repo.FanBadgeCreate
+	}
+	placed, replayed, err := s.orders.PlaceGiftOrder(ctx, order, payload, badgeMode)
 	if err == nil {
 		span.SetAttributes(
 			attribute.Bool("idempotent.replayed", replayed),

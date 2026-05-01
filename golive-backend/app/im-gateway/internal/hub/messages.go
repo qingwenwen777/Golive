@@ -14,14 +14,20 @@ type SystemMsg struct {
 }
 
 type ChatMsg struct {
-	Type   string `json:"type"` // "chat"
-	ID     string `json:"id"`
-	UserID string `json:"userId,omitempty"`
-	User   string `json:"user"`
-	Avatar string `json:"avatar,omitempty"`
-	Text   string `json:"text"`
-	Color  string `json:"color,omitempty"`
-	Ts     int64  `json:"ts"`
+	Type     string           `json:"type"` // "chat"
+	ID       string           `json:"id"`
+	UserID   string           `json:"userId,omitempty"`
+	User     string           `json:"user"`
+	Avatar   string           `json:"avatar,omitempty"`
+	Text     string           `json:"text"`
+	Color    string           `json:"color,omitempty"`
+	FanBadge *FanBadgePayload `json:"fanBadge,omitempty"`
+	Ts       int64            `json:"ts"`
+}
+
+type FanBadgePayload struct {
+	CreatorID string `json:"creatorId"`
+	Level     int    `json:"level"`
 }
 
 type ViewerProfile struct {
@@ -81,6 +87,7 @@ type Inbound struct {
 	Text          string `json:"text,omitempty"`
 	ClientID      string `json:"clientId,omitempty"`
 	LastMessageID string `json:"lastMessageId,omitempty"`
+	FanBadge      *FanBadgePayload `json:"fanBadge,omitempty"`
 }
 
 // EncodeSystem builds a welcome / notice message.
@@ -89,15 +96,16 @@ func EncodeSystem(text string) []byte {
 	return b
 }
 
-func EncodeChat(id, userID, user, avatar, text string, ts int64) []byte {
+func EncodeChat(id, userID, user, avatar, text string, ts int64, fanBadge *FanBadgePayload) []byte {
 	b, _ := json.Marshal(ChatMsg{
-		Type:   "chat",
-		ID:     id,
-		UserID: userID,
-		User:   user,
-		Avatar: avatar,
-		Text:   text,
-		Ts:     ts,
+		Type:     "chat",
+		ID:       id,
+		UserID:   userID,
+		User:     user,
+		Avatar:   avatar,
+		Text:     text,
+		FanBadge: fanBadge,
+		Ts:       ts,
 	})
 	return b
 }

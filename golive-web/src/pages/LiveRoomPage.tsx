@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
+import { useFanBadges } from '@/api/gift';
 import { copyText } from '@/lib/clipboard';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
 import {
@@ -54,6 +55,13 @@ export default function LiveRoomPage() {
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
+  const fanBadges = useFanBadges(isAuthed);
+  const activeFanBadge = useMemo(() => {
+    if (!stream?.ownerId) return null;
+    const badge = fanBadges.data?.find((item) => item.creatorId === stream.ownerId);
+    if (!badge) return null;
+    return { creatorId: badge.creatorId, level: badge.level };
+  }, [fanBadges.data, stream?.ownerId]);
 
   const handleLiveEnded = useCallback(() => {
     if (liveEndedRef.current) return;
@@ -74,7 +82,7 @@ export default function LiveRoomPage() {
   }, [id, queryClient, stream]);
 
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
-    useRoomRealtime(id, roomIsLive, { onLiveEnded: handleLiveEnded });
+    useRoomRealtime(id, roomIsLive, { onLiveEnded: handleLiveEnded, activeFanBadge });
 
   useEffect(() => {
     liveEndedRef.current = false;

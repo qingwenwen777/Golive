@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
-import type { ChatMessage, Message, SuperChatMessage, SuperChatTier } from '@/types/message';
+import type {
+  ChatFanBadge,
+  ChatMessage,
+  Message,
+  SuperChatMessage,
+  SuperChatTier,
+} from '@/types/message';
 
 interface ChatHistoryBase {
   type: 'chat' | 'super_chat';
@@ -15,6 +21,7 @@ interface ChatHistoryBase {
 interface DanmuHistoryItem extends ChatHistoryBase {
   type: 'chat';
   color?: string;
+  fanBadge?: ChatFanBadge;
 }
 
 interface SuperChatHistoryItem extends ChatHistoryBase {
@@ -38,6 +45,7 @@ function toChatMessage(item: DanmuHistoryItem): ChatMessage {
     avatar: item.avatar,
     text: item.text,
     color: item.color,
+    fanBadge: item.fanBadge,
     ts: item.ts,
   };
 }

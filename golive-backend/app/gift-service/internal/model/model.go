@@ -57,6 +57,22 @@ type SuperChatOrder struct {
 
 func (SuperChatOrder) TableName() string { return "super_chat_orders" }
 
+// FanBadge is a viewer's creator-specific fan plate. It is awarded by the
+// Fan Light gift, then leveled by that viewer's lifetime contribution to the
+// same creator.
+type FanBadge struct {
+	UserID            string    `gorm:"primaryKey;type:varchar(36);column:user_id" json:"userId"`
+	CreatorID         string    `gorm:"primaryKey;type:varchar(36);column:creator_id" json:"creatorId"`
+	CreatorName       string    `gorm:"type:varchar(64);not null" json:"creatorName"`
+	CreatorAvatar     string    `gorm:"type:varchar(500)" json:"creatorAvatar,omitempty"`
+	TotalContribution int64     `gorm:"not null;default:0" json:"totalContribution"`
+	Level             int       `gorm:"not null;default:1" json:"level"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
+}
+
+func (FanBadge) TableName() string { return "fan_badges" }
+
 // Outbox / "local message" topics.
 const (
 	OutboxTopicGift      = "gift"

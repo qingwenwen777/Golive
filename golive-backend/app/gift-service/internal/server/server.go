@@ -17,6 +17,7 @@ type Deps struct {
 //
 //	GET  /gifts          public catalog
 //	POST /gifts/send     auth required
+//	GET  /gifts/fan-badges/me auth required
 //	POST /super-chats    auth required
 func NewRouter(d Deps) *gin.Engine {
 	r := gin.New()
@@ -28,6 +29,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/gifts", d.Gift.List)
 
 	auth := handler.AuthRequired(d.JWTSecret)
+	r.GET("/gifts/fan-badges/me", auth, d.Gift.FanBadges)
 	r.POST("/gifts/send", auth, d.Gift.Send)
 	r.POST("/super-chats", auth, d.SuperChat.Send)
 

@@ -162,7 +162,7 @@ func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
 		c.handleViewerProfile(in.User, in.Avatar)
 		return
 	case "chat":
-		c.handleChat(ctx, in.Text, in.User, in.Avatar, in.ClientID)
+		c.handleChat(ctx, in.Text, in.User, in.Avatar, in.ClientID, in.FanBadge)
 	default:
 		metrics.MessagesDropped.WithLabelValues("unknown_type").Inc()
 	}
@@ -187,7 +187,7 @@ func (c *Conn) handleViewerProfile(username, avatar string) {
 	})
 }
 
-func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string) {
+func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string, fanBadge *hub.FanBadgePayload) {
 	if !c.identity.CanChat() {
 		_ = c.Send(hub.EncodeSystem("login required to chat"))
 		metrics.MessagesDropped.WithLabelValues("anonymous_chat").Inc()
@@ -206,6 +206,7 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 	id := safeClientID(clientID)
 	username = safeUsername(username)
 	avatar = safeAvatar(avatar)
+	hubFanBadge, producerFanBadge := safeFanBadge(fanBadge)
 	if err := c.producer.PublishChat(ctx, producer.ChatEvent{
 		RoomID:   c.roomID,
 		UserID:   c.identity.UserID,
@@ -213,6 +214,7 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		Avatar:   avatar,
 		ClientID: id,
 		Text:     text,
+		FanBadge: producerFanBadge,
 		Ts:       now,
 	}); err != nil {
 		logger.L().Warn("publish chat", zap.Error(err))
@@ -227,8 +229,24 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		if display == "" {
 			display = c.identity.UserID
 		}
-		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now))
+		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now, hubFanBadge))
 	}
+}
+
+func safeFanBadge(in *hub.FanBadgePayload) (*hub.FanBadgePayload, *producer.FanBadgePayload) {
+	if in == nil || strings.TrimSpace(in.CreatorID) == "" || in.Level < 1 {
+		return nil, nil
+	}
+	level := in.Level
+	if level > 99 {
+		level = 99
+	}
+	creatorID := strings.TrimSpace(in.CreatorID)
+	if len(creatorID) > 80 || strings.ContainsAny(creatorID, " \t\r\n") {
+		return nil, nil
+	}
+	return &hub.FanBadgePayload{CreatorID: creatorID, Level: level},
+		&producer.FanBadgePayload{CreatorID: creatorID, Level: level}
 }
 
 func safeClientID(id string) string {

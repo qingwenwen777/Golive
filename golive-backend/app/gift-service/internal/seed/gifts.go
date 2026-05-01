@@ -18,6 +18,7 @@ var defaults = []model.Gift{
 	{ID: "ramen", Name: "Ramen", NameJa: "ラーメン", Icon: "🍜", PriceCoin: 200, Category: "basic", Tier: 0},
 	// premium
 	{ID: "rocket", Name: "Rocket", NameJa: "ロケット", Icon: "🚀", PriceCoin: 500, Category: "premium", Animation: "fly", Tier: 1},
+	{ID: "fan_light", Name: "Fan Light", NameJa: "Fan Light", Icon: "\U0001F4A1", PriceCoin: 1000, Category: "premium", Animation: "rain", Tier: 2},
 	{ID: "crown", Name: "Crown", NameJa: "王冠", Icon: "👑", PriceCoin: 1000, Category: "premium", Animation: "explode", Tier: 2},
 	{ID: "gem", Name: "Gem", NameJa: "宝石", Icon: "💎", PriceCoin: 2000, Category: "premium", Animation: "rain", Tier: 2},
 	// luxury

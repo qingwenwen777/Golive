@@ -5,6 +5,7 @@ import type {
   Gift,
   GiftOrder,
   GiftSendPayload,
+  FanBadge,
   SuperChatOrder,
   SuperChatPayload,
 } from '@/types/gift';
@@ -24,6 +25,18 @@ export function useGifts() {
       return data;
     },
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useFanBadges(enabled = true) {
+  return useQuery<FanBadge[], Error>({
+    queryKey: ['fan-badges', 'me'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<FanBadge[]>('/gifts/fan-badges/me', { signal });
+      return data;
+    },
+    enabled,
+    staleTime: 60_000,
   });
 }
 
@@ -70,6 +83,7 @@ export function useSendGift() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
     },
   });
 }
@@ -101,6 +115,7 @@ export function useSendSuperChat() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
     },
   });
 }

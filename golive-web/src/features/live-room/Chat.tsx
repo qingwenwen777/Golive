@@ -9,6 +9,7 @@ import {
   Gift,
   MessageCircle,
   Users,
+  Crown,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { tierSpec } from '@/constants/chat';
@@ -142,6 +143,7 @@ const GIFT_META: Record<string, { icon: string; tier: 0 | 1 | 2 | 3 }> = {
   cake: { icon: '\u{1f370}', tier: 0 },
   ramen: { icon: '\u{1f35c}', tier: 0 },
   rocket: { icon: '\u{1f680}', tier: 1 },
+  fan_light: { icon: '\u{1f4a1}', tier: 2 },
   crown: { icon: '\u{1f451}', tier: 2 },
   gem: { icon: '\u{1f48e}', tier: 2 },
   yacht: { icon: '\u{1f6e5}\ufe0f', tier: 3 },
@@ -149,7 +151,7 @@ const GIFT_META: Record<string, { icon: string; tier: 0 | 1 | 2 | 3 }> = {
 };
 
 function giftMeta(name: string): { icon?: string; tier: 0 | 1 | 2 | 3 } {
-  const fallback = GIFT_META[name.trim().toLowerCase()];
+  const fallback = GIFT_META[name.trim().toLowerCase().replace(/\s+/g, '_')];
   return {
     icon: fallback?.icon,
     tier: fallback?.tier ?? 0,
@@ -180,9 +182,17 @@ function isOwnerMessage(m: ChatMessage, ownerId?: string, ownerName?: string): b
   return false;
 }
 
-function ChatRow({ m, isOwner }: { m: ChatMessage; isOwner?: boolean }) {
+function ChatRow({
+  m,
+  isOwner,
+  isFan,
+}: {
+  m: ChatMessage;
+  isOwner?: boolean;
+  isFan?: boolean;
+}) {
   return (
-    <div className={cn('gl-chat-line', isOwner && 'is-owner')}>
+    <div className={cn('gl-chat-line', isOwner && 'is-owner', isFan && 'is-fan')}>
       <div className="gl-chat-avatar-wrap">
         <Avatar name={m.user} src={m.avatar} size={24} />
       </div>
@@ -195,6 +205,12 @@ function ChatRow({ m, isOwner }: { m: ChatMessage; isOwner?: boolean }) {
             {m.user}
           </span>
           {isOwner && <span className="gl-chat-owner-badge">HOST</span>}
+          {isFan && m.fanBadge && (
+            <span className="gl-chat-fan-badge" title={`Fan badge level ${m.fanBadge.level}`}>
+              <Crown size={12} strokeWidth={2.4} />
+              <span>#{m.fanBadge.level}</span>
+            </span>
+          )}
         </span>
         <span className="gl-chat-text">{m.text}</span>
       </div>
@@ -545,11 +561,17 @@ export function Chat({
             if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
             if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
             if (m.kind === 'super_chat') return <SuperChatCard key={m.id} m={m} />;
+            const chat = m as ChatMessage;
+            const isOwner = isOwnerMessage(chat, ownerId, ownerName);
+            const isFan =
+              !isOwner &&
+              Boolean(ownerId && chat.fanBadge && chat.fanBadge.creatorId === ownerId);
             return (
               <ChatRow
                 key={m.id}
-                m={m as ChatMessage}
-                isOwner={isOwnerMessage(m as ChatMessage, ownerId, ownerName)}
+                m={chat}
+                isOwner={isOwner}
+                isFan={isFan}
               />
             );
           })}

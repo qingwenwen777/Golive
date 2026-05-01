@@ -37,31 +37,35 @@ func newTestDB(t *testing.T, balance int64) *gorm.DB {
 	_ = db.Exec("DROP TABLE IF EXISTS gift_orders").Error
 	_ = db.Exec("DROP TABLE IF EXISTS super_chat_orders").Error
 	_ = db.Exec("DROP TABLE IF EXISTS local_messages").Error
+	_ = db.Exec("DROP TABLE IF EXISTS fan_badges").Error
 
 	require.NoError(t, db.Exec(`CREATE TABLE users (
 		id VARCHAR(36) PRIMARY KEY,
 		username VARCHAR(64) NOT NULL DEFAULT '',
 		display_name VARCHAR(64) NOT NULL DEFAULT '',
+		avatar VARCHAR(500) NOT NULL DEFAULT '',
 		coin_balance INTEGER NOT NULL
 	)`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE rooms (
 		id VARCHAR(64) PRIMARY KEY,
+		channel VARCHAR(128) NOT NULL DEFAULT '',
+		avatar VARCHAR(500) NOT NULL DEFAULT '',
 		owner_id VARCHAR(36) NOT NULL DEFAULT ''
 	)`).Error)
 	require.NoError(t, db.Exec(
-		"INSERT INTO users (id, username, display_name, coin_balance) VALUES (?, ?, ?, ?)",
-		"u-demo", "demo", "Xiahaobo", balance,
+		"INSERT INTO users (id, username, display_name, avatar, coin_balance) VALUES (?, ?, ?, ?, ?)",
+		"u-demo", "demo", "Xiahaobo", "", balance,
 	).Error)
 	require.NoError(t, db.Exec(
-		"INSERT INTO users (id, username, display_name, coin_balance) VALUES (?, ?, ?, ?)",
-		"u-owner", "owner", "Streamer", int64(0),
+		"INSERT INTO users (id, username, display_name, avatar, coin_balance) VALUES (?, ?, ?, ?, ?)",
+		"u-owner", "owner", "Streamer", "owner.png", int64(0),
 	).Error)
 	require.NoError(t, db.Exec(
-		"INSERT INTO rooms (id, owner_id) VALUES (?, ?), (?, ?)",
-		"r", "u-owner", "r1", "u-owner",
+		"INSERT INTO rooms (id, channel, avatar, owner_id) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
+		"r", "Streamer", "room.png", "u-owner", "r1", "Streamer", "room.png", "u-owner",
 	).Error)
 
-	require.NoError(t, db.AutoMigrate(&model.Gift{}, &model.GiftOrder{}, &model.SuperChatOrder{}, &model.LocalMessage{}))
+	require.NoError(t, db.AutoMigrate(&model.Gift{}, &model.GiftOrder{}, &model.SuperChatOrder{}, &model.LocalMessage{}, &model.FanBadge{}))
 	return db
 }
 

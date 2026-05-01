@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -28,13 +29,14 @@ import (
 
 // Event is the Kafka payload im-gateway puts on the danmu topic.
 type Event struct {
-	RoomID   string `json:"roomId"`
-	UserID   string `json:"userId"`
-	ClientID string `json:"clientId,omitempty"`
-	Username string `json:"username,omitempty"`
-	Avatar   string `json:"avatar,omitempty"`
-	Text     string `json:"text"`
-	Ts       int64  `json:"ts"`
+	RoomID   string                 `json:"roomId"`
+	UserID   string                 `json:"userId"`
+	ClientID string                 `json:"clientId,omitempty"`
+	Username string                 `json:"username,omitempty"`
+	Avatar   string                 `json:"avatar,omitempty"`
+	Text     string                 `json:"text"`
+	FanBadge *model.FanBadgePayload `json:"fanBadge,omitempty"`
+	Ts       int64                  `json:"ts"`
 }
 
 // ErrRateLimited is returned to the caller when an event is dropped by the
@@ -93,7 +95,9 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 	if err := s.danmus.Insert(ctx, d); err != nil {
 		return fmt.Errorf("persist: %w", err)
 	}
-	payload, err := json.Marshal(d.ToPublic())
+	pub := d.ToPublic()
+	pub.FanBadge = safeFanBadge(ev.FanBadge)
+	payload, err := json.Marshal(pub)
 	if err != nil {
 		return err
 	}
@@ -113,6 +117,21 @@ func safeClientID(id string) string {
 		}
 	}
 	return id
+}
+
+func safeFanBadge(in *model.FanBadgePayload) *model.FanBadgePayload {
+	if in == nil || strings.TrimSpace(in.CreatorID) == "" || in.Level < 1 {
+		return nil
+	}
+	creatorID := strings.TrimSpace(in.CreatorID)
+	if len(creatorID) > 80 || strings.ContainsAny(creatorID, " \t\r\n") {
+		return nil
+	}
+	level := in.Level
+	if level > 99 {
+		level = 99
+	}
+	return &model.FanBadgePayload{CreatorID: creatorID, Level: level}
 }
 
 // History serves GET /rooms/:id/danmus.

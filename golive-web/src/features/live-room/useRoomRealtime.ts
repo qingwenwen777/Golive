@@ -3,7 +3,7 @@ import { useWebSocket, type ReadyState } from '@/hooks/useWebSocket';
 import { useRealtimeStore, useRoomSlice } from '@/stores/useRealtimeStore';
 import { useDanmuStore } from '@/stores/useDanmuStore';
 import { useDanmuHistory } from '@/api/chat';
-import type { ChatMessage, Message, SuperChatTier } from '@/types/message';
+import type { ChatFanBadge, ChatMessage, Message, SuperChatTier } from '@/types/message';
 import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
 import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -17,6 +17,7 @@ interface ServerChat {
   avatar?: string;
   text: string;
   color?: string;
+  fanBadge?: ChatFanBadge;
   ts?: number;
 }
 interface ServerSuperChat {
@@ -102,7 +103,7 @@ export interface UseRoomRealtimeReturn {
 export function useRoomRealtime(
   roomId: string,
   enabled = true,
-  opts: { onLiveEnded?: () => void } = {},
+  opts: { onLiveEnded?: () => void; activeFanBadge?: ChatFanBadge | null } = {},
 ): UseRoomRealtimeReturn {
   const ensureRoom = useRealtimeStore((s) => s.ensureRoom);
   const resetRoom = useRealtimeStore((s) => s.resetRoom);
@@ -117,9 +118,11 @@ export function useRoomRealtime(
   const logout = useAuthStore((s) => s.logout);
   const danmuOnRef = useRef(danmuOn);
   const onLiveEndedRef = useRef(opts.onLiveEnded);
+  const activeFanBadgeRef = useRef<ChatFanBadge | null | undefined>(opts.activeFanBadge);
   const refreshedTokenRef = useRef<string | null>(null);
   danmuOnRef.current = danmuOn;
   onLiveEndedRef.current = opts.onLiveEnded;
+  activeFanBadgeRef.current = opts.activeFanBadge;
 
   useEffect(() => {
     ensureRoom(roomId);
@@ -210,6 +213,7 @@ export function useRoomRealtime(
           avatar: parsed.avatar,
           text: parsed.text,
           color: parsed.color,
+          fanBadge: parsed.fanBadge,
           ts: parsed.ts ?? now,
         };
         const alreadySeen = useRealtimeStore
@@ -342,7 +346,17 @@ export function useRoomRealtime(
     const id = genId('chat');
     const user = userDisplayName(currentUser);
     const avatar = currentUser?.avatar;
-    const ok = sendMessage({ type: 'chat', roomId, text, user, avatar, clientId: id, ts: now });
+    const fanBadge = activeFanBadgeRef.current ?? undefined;
+    const ok = sendMessage({
+      type: 'chat',
+      roomId,
+      text,
+      user,
+      avatar,
+      fanBadge,
+      clientId: id,
+      ts: now,
+    });
     if (!ok) return false;
 
     const msg: ChatMessage = {
@@ -352,6 +366,7 @@ export function useRoomRealtime(
       user,
       avatar,
       text,
+      fanBadge,
       ts: now,
     };
     appendMessage(roomId, msg);

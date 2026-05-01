@@ -34,6 +34,20 @@ func (h *GiftHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gifts)
 }
 
+func (h *GiftHandler) FanBadges(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, errcode.New(401, "Unauthorized"))
+		return
+	}
+	badges, err := h.svc.ListFanBadges(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, badges)
+}
+
 type sendGiftBody struct {
 	RoomID    string `json:"roomId"`
 	GiftID    string `json:"giftId"`

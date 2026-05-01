@@ -82,7 +82,7 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 		CreatedAt: now,
 	}
 
-	placed, replayed, err := s.orders.PlaceSuperChatOrder(ctx, order, payload)
+	placed, replayed, err := s.orders.PlaceSuperChatOrder(ctx, order, payload, repo.FanBadgeIfExists)
 	if err == nil {
 		return placed, replayed, nil
 	}

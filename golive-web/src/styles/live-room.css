@@ -907,6 +907,15 @@
   padding: 2px;
   background: conic-gradient(from 210deg, #ffcf5a, #45d483, #39c6f4, #8f7cff, #ff8bb3, #ffcf5a);
 }
+.gl-chat-line.is-fan .gl-chat-avatar-wrap {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 2px;
+  background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
+  box-shadow: 0 0 0 1px rgba(255, 139, 193, 0.2), 0 0 10px rgba(255, 139, 193, 0.2);
+}
 .gl-chat-line.is-owner .gl-chat-body {
   display: flex;
   min-height: 30px;
@@ -958,6 +967,25 @@
   font-weight: 800;
   line-height: 1;
 }
+.gl-chat-fan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  border: 1px solid rgba(255, 139, 193, 0.42);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 241, 248, 0.95), rgba(246, 235, 255, 0.92));
+  color: #7c3aed;
+  padding: 0 7px 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+}
+.gl-chat-fan-badge svg {
+  color: #111827;
+  fill: none;
+}
 .gl-chat-text {
   color: var(--gl-text);
 }
@@ -978,6 +1006,14 @@
     ),
     var(--gl-bg-card);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+}
+.dark .gl-chat-fan-badge {
+  border-color: rgba(255, 139, 193, 0.34);
+  background: linear-gradient(90deg, rgba(88, 28, 135, 0.46), rgba(190, 24, 93, 0.32));
+  color: #fce7f3;
+}
+.dark .gl-chat-fan-badge svg {
+  color: #fdf2f8;
 }
 
 .gl-sc {

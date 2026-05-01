@@ -129,6 +129,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                     }}
                     className={cn(
                       'gl-gift-card',
+                      g.id === 'fan_light' && 'is-fan-light',
                       active ? 'is-active' : 'hover:bg-bg-hover/70 bg-bg-hover',
                     )}
                   >

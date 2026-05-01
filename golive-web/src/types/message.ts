@@ -2,6 +2,11 @@ export type MessageKind = 'chat' | 'super_chat' | 'system' | 'gift';
 
 export type SuperChatTier = 0 | 1 | 2 | 3 | 4 | 5;
 
+export interface ChatFanBadge {
+  creatorId: string;
+  level: number;
+}
+
 export interface ChatMessage {
   id: string;
   kind: 'chat';
@@ -11,6 +16,7 @@ export interface ChatMessage {
   text: string;
   ts: number;
   color?: string;
+  fanBadge?: ChatFanBadge;
 }
 
 export interface SuperChatMessage {

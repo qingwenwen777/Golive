@@ -24,6 +24,17 @@ export interface GiftOrder {
   createdAt: string;
 }
 
+export interface FanBadge {
+  userId: string;
+  creatorId: string;
+  creatorName: string;
+  creatorAvatar?: string;
+  totalContribution: number;
+  level: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GiftSendPayload {
   roomId: string;
   giftId: string;

@@ -248,6 +248,32 @@ input:focus-visible,
   border-color: #1c62b9;
   background: rgba(28, 98, 185, 0.14);
 }
+.gl-gift-card.is-fan-light {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 139, 193, 0.38);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.92), transparent 24px),
+    linear-gradient(145deg, rgba(255, 241, 248, 0.95), rgba(238, 242, 255, 0.92));
+}
+.gl-gift-card.is-fan-light::after {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
+  box-shadow: 0 0 16px rgba(255, 139, 193, 0.32);
+  content: '';
+  opacity: 0.78;
+}
+.dark .gl-gift-card.is-fan-light {
+  border-color: rgba(255, 139, 193, 0.36);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.14), transparent 24px),
+    linear-gradient(145deg, rgba(88, 28, 135, 0.35), rgba(190, 24, 93, 0.22));
+}
 .dark .gl-gift-card.is-active {
   background: rgba(62, 143, 255, 0.18);
 }
@@ -1580,6 +1606,88 @@ input:focus-visible,
 .gl-feature-live {
   max-width: 520px;
 }
+.gl-fan-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.gl-fan-badge-card,
+.gl-fan-badge-empty {
+  min-height: 76px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-card);
+}
+.gl-fan-badge-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+.gl-fan-badge-card.is-loading {
+  background: linear-gradient(90deg, var(--gl-bg-hover), var(--gl-bg-card), var(--gl-bg-hover));
+  background-size: 220% 100%;
+  animation: glBreathe 1.25s ease-in-out infinite;
+}
+.gl-fan-badge-avatar {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
+  box-shadow: 0 0 14px rgba(255, 139, 193, 0.28);
+}
+.gl-fan-badge-copy {
+  min-width: 0;
+}
+.gl-fan-badge-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-fan-badge-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.gl-fan-badge-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.gl-fan-badge-meta span:first-child {
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255, 241, 248, 0.95), rgba(246, 235, 255, 0.92));
+  color: #7c3aed;
+  padding: 2px 7px;
+}
+.gl-fan-badge-empty {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--gl-text-2);
+  padding: 18px;
+  text-align: center;
+}
+button.gl-fan-badge-empty {
+  cursor: pointer;
+}
+.dark .gl-fan-badge-meta span:first-child {
+  background: linear-gradient(90deg, rgba(88, 28, 135, 0.46), rgba(190, 24, 93, 0.32));
+  color: #fce7f3;
+}
 .gl-quick-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -2500,6 +2608,9 @@ input:focus-visible,
 }
 
 @media (max-width: 1199px) {
+  .gl-fan-badge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .gl-yt-collection {
     grid-template-columns: 1fr;
   }
@@ -2517,6 +2628,9 @@ input:focus-visible,
 }
 
 @media (max-width: 767px) {
+  .gl-fan-badge-grid {
+    grid-template-columns: 1fr;
+  }
   .gl-yt-you-head {
     grid-template-columns: 1fr;
     text-align: left;

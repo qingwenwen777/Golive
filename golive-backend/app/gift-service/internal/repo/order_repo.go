@@ -38,8 +38,16 @@ type OrderRepo struct{ db *gorm.DB }
 func NewOrderRepo(db *gorm.DB) *OrderRepo { return &OrderRepo{db: db} }
 
 func (r *OrderRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.GiftOrder{}, &model.SuperChatOrder{}, &model.LocalMessage{})
+	return r.db.AutoMigrate(&model.GiftOrder{}, &model.SuperChatOrder{}, &model.LocalMessage{}, &model.FanBadge{})
 }
+
+type FanBadgeContributionMode int
+
+const (
+	FanBadgeNoChange FanBadgeContributionMode = iota
+	FanBadgeIfExists
+	FanBadgeCreate
+)
 
 func (r *OrderRepo) DisplayNameForUser(ctx context.Context, userID string) (string, error) {
 	var name string
@@ -74,6 +82,28 @@ WHERE id = ?
 		return "", err
 	}
 	return strings.TrimSpace(avatar), nil
+}
+
+func FanBadgeLevel(totalContribution int64) int {
+	if totalContribution <= 0 {
+		return 1
+	}
+	level := 1
+	threshold := int64(1000)
+	for level < 99 && totalContribution >= threshold {
+		level++
+		threshold += int64(level) * 1000
+	}
+	return level
+}
+
+func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.FanBadge, error) {
+	var badges []model.FanBadge
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("level DESC, total_contribution DESC, updated_at DESC").
+		Find(&badges).Error
+	return badges, err
 }
 
 // FindGiftByRequestID returns the existing order for a requestId, or nil.
@@ -112,6 +142,7 @@ func (r *OrderRepo) PlaceGiftOrder(
 	ctx context.Context,
 	o *model.GiftOrder,
 	outboxPayload []byte,
+	fanBadgeMode FanBadgeContributionMode,
 ) (placed *model.GiftOrder, replayed bool, err error) {
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		receiverID, err := roomOwnerID(tx, o.RoomID)
@@ -144,6 +175,9 @@ func (r *OrderRepo) PlaceGiftOrder(
 			if res.RowsAffected == 0 {
 				return ErrRoomOwnerNotFound
 			}
+		}
+		if err := applyFanBadgeContribution(tx, o.UserID, o.RoomID, receiverID, o.TotalCoin, fanBadgeMode); err != nil {
+			return err
 		}
 		msg := &model.LocalMessage{
 			BizID:   o.OrderID,
@@ -187,6 +221,7 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 	ctx context.Context,
 	o *model.SuperChatOrder,
 	outboxPayload []byte,
+	fanBadgeMode FanBadgeContributionMode,
 ) (placed *model.SuperChatOrder, replayed bool, err error) {
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		receiverID, err := roomOwnerID(tx, o.RoomID)
@@ -218,6 +253,9 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			if res.RowsAffected == 0 {
 				return ErrRoomOwnerNotFound
 			}
+		}
+		if err := applyFanBadgeContribution(tx, o.UserID, o.RoomID, receiverID, o.Amount, fanBadgeMode); err != nil {
+			return err
 		}
 		msg := &model.LocalMessage{
 			BizID:   o.OrderID,
@@ -308,6 +346,70 @@ WHERE id = ?
 		return "", ErrRoomOwnerNotFound
 	}
 	return ownerID, nil
+}
+
+func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, coin int64, mode FanBadgeContributionMode) error {
+	if mode == FanBadgeNoChange || coin <= 0 || userID == "" || creatorID == "" || userID == creatorID {
+		return nil
+	}
+
+	var badge model.FanBadge
+	err := tx.Where("user_id = ? AND creator_id = ?", userID, creatorID).Take(&badge).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if mode != FanBadgeCreate {
+			return nil
+		}
+		name, avatar, err := roomCreatorProfile(tx, roomID)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(name) == "" {
+			name = creatorID
+		}
+		badge = model.FanBadge{
+			UserID:            userID,
+			CreatorID:         creatorID,
+			CreatorName:       strings.TrimSpace(name),
+			CreatorAvatar:     strings.TrimSpace(avatar),
+			TotalContribution: coin,
+			Level:             FanBadgeLevel(coin),
+		}
+		return tx.Create(&badge).Error
+	}
+	if err != nil {
+		return err
+	}
+
+	total := badge.TotalContribution + coin
+	return tx.Model(&model.FanBadge{}).
+		Where("user_id = ? AND creator_id = ?", userID, creatorID).
+		Updates(map[string]any{
+			"total_contribution": total,
+			"level":              FanBadgeLevel(total),
+			"updated_at":         time.Now(),
+		}).Error
+}
+
+func roomCreatorProfile(tx *gorm.DB, roomID string) (string, string, error) {
+	var row struct {
+		Name   string
+		Avatar string
+	}
+	err := tx.Raw(`
+SELECT
+  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), NULLIF(r.channel, ''), r.owner_id, '') AS name,
+  COALESCE(NULLIF(u.avatar, ''), NULLIF(r.avatar, ''), '') AS avatar
+FROM rooms r
+LEFT JOIN users u ON u.id = r.owner_id
+WHERE r.id = ?
+`, roomID).Row().Scan(&row.Name, &row.Avatar)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrRoomOwnerNotFound
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return row.Name, row.Avatar, nil
 }
 
 // isDuplicateKey detects MySQL 1062 / generic unique-violation across
