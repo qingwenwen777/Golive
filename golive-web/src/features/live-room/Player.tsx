@@ -28,7 +28,6 @@ export interface PlayerProps {
   viewerCount?: number;
   bullets?: Bullet[];
   onBulletEnd?: (id: string) => void;
-  onStreamEnded?: () => void;
 }
 
 function buildFlvUrl(stream: Stream): string {
@@ -55,7 +54,6 @@ export function Player({
   viewerCount,
   bullets = [],
   onBulletEnd,
-  onStreamEnded,
 }: PlayerProps) {
   const { t } = useTranslation('pages');
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -77,17 +75,10 @@ export function Player({
   const [flvError, setFlvError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const endedRef = useRef(false);
-  const onStreamEndedRef = useRef(onStreamEnded);
-
-  useEffect(() => {
-    onStreamEndedRef.current = onStreamEnded;
-  }, [onStreamEnded]);
-
-  const notifyStreamEnded = useCallback(() => {
+  const showPlaybackEnded = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
     setFlvError('Stream ended.');
-    onStreamEndedRef.current?.();
   }, []);
 
   useEffect(() => {
@@ -109,12 +100,12 @@ export function Player({
     const onErr = (errType: string, errDetail: string) => {
       const detail = `${errType} ${errDetail}`.toLowerCase();
       if (detail.includes('eof') || detail.includes('ended') || detail.includes('loading_complete')) {
-        notifyStreamEnded();
+        showPlaybackEnded();
         return;
       }
       setFlvError(`Stream error: ${errType}${errDetail ? ' / ' + errDetail : ''}`);
     };
-    const onEnd = () => notifyStreamEnded();
+    const onEnd = () => showPlaybackEnded();
     player.on(mpegts.Events.ERROR, onErr);
     player.on(mpegts.Events.LOADING_COMPLETE, onEnd);
 
@@ -152,7 +143,7 @@ export function Player({
         /* noop */
       }
     };
-  }, [isLiveFlv, flvUrl, retryNonce, notifyStreamEnded]);
+  }, [isLiveFlv, flvUrl, retryNonce, showPlaybackEnded]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -210,7 +201,7 @@ export function Player({
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onEnded = () => {
-      if (isLiveFlv) notifyStreamEnded();
+      if (isLiveFlv) showPlaybackEnded();
     };
     const onVol = () => {
       setMuted(v.muted);
@@ -232,7 +223,7 @@ export function Player({
       v.removeEventListener('enterpictureinpicture', onEnterPip);
       v.removeEventListener('leavepictureinpicture', onLeavePip);
     };
-  }, [isLiveFlv, notifyStreamEnded]);
+  }, [isLiveFlv, showPlaybackEnded]);
 
   useEffect(() => {
     const onFsChange = () => {

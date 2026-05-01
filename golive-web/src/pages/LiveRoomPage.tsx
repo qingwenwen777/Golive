@@ -108,10 +108,10 @@ export default function LiveRoomPage() {
   }, [id]);
 
   useEffect(() => {
-    if (!stream?.streamKey) return;
+    if (!stream?.streamKey || !currentUser?.id || stream.ownerId !== currentUser.id) return;
     savePublisherSession(stream);
     setPublisherSession(publisherSessionFromStream(stream));
-  }, [stream]);
+  }, [currentUser?.id, stream]);
 
   useEffect(() => {
     if (!stream || !roomIsLive) return;
@@ -159,9 +159,10 @@ export default function LiveRoomPage() {
     readyState === 'closed' ? 'Disconnected' : `Reconnecting… (#${retryCount})`;
 
   const ownsStream = Boolean(currentUser?.id && stream.ownerId === currentUser.id);
-  const effectivePublisherSession =
-    publisherSessionFromStream(stream) ??
-    (publisherSession?.streamId === stream.id ? publisherSession : null);
+  const effectivePublisherSession = ownsStream
+    ? publisherSessionFromStream(stream) ??
+      (publisherSession?.streamId === stream.id ? publisherSession : null)
+    : null;
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
   const handleStopLive = () => {
     stopLive.mutate(undefined, {
@@ -223,7 +224,6 @@ export default function LiveRoomPage() {
         viewerCount={effectiveViewers}
         bullets={bullets}
         onBulletEnd={clearBullet}
-        onStreamEnded={handleLiveEnded}
       />
       <InfoBlock
         stream={stream}
