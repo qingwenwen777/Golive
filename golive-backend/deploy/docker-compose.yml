@@ -69,7 +69,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/user-service/cmd -config ./deploy/configs/user-service.yaml'
+    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/user-service/cmd -config ./deploy/configs/user-service.yaml'
     volumes:
       - ..:/app:ro
       - avatar_uploads:/tmp/golive/avatars
@@ -92,7 +92,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/room-service/cmd -config ./deploy/configs/room-service.yaml'
+    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/room-service/cmd -config ./deploy/configs/room-service.yaml'
     volumes:
       - ..:/app:ro
       - cover_uploads:/tmp/golive/covers
@@ -115,7 +115,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/gift-service/cmd -config ./deploy/configs/gift-service.yaml'
+    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/gift-service/cmd -config ./deploy/configs/gift-service.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/chat-service/cmd -config ./deploy/configs/chat-service.yaml'
+    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/chat-service/cmd -config ./deploy/configs/chat-service.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -161,7 +161,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/api-gateway/cmd -config ./deploy/configs/api-gateway.yaml'
+    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/api-gateway/cmd -config ./deploy/configs/api-gateway.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -185,7 +185,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/im-gateway/cmd -config ./deploy/configs/im-gateway.yaml'
+    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/im-gateway/cmd -config ./deploy/configs/im-gateway.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
