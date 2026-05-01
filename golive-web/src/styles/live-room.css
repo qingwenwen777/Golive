@@ -429,6 +429,99 @@
   font-weight: 700;
   flex-shrink: 0;
 }
+.gl-sc-pin-stack {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(220px, 32vh);
+  overflow-y: auto;
+  border-bottom: 1px solid var(--gl-border);
+  background: var(--gl-bg);
+  padding: 8px;
+  scrollbar-width: thin;
+}
+.gl-sc-pin {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+.gl-sc-pin-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 9px 12px 10px;
+}
+.gl-sc-pin-copy {
+  min-width: 0;
+  flex: 1;
+}
+.gl-sc-pin-meta,
+.gl-sc-pin-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.gl-sc-pin-meta {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.gl-sc-pin-user {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-sc-pin-amount {
+  flex: 0 0 auto;
+}
+.gl-sc-pin-hint {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.gl-sc-pin-chevron {
+  flex: 0 0 auto;
+  opacity: 0.86;
+  transition: transform 0.16s ease;
+}
+.gl-sc-pin.is-expanded .gl-sc-pin-chevron {
+  transform: rotate(180deg);
+}
+.gl-sc-pin-body {
+  margin: 0 8px 10px;
+  border-radius: 4px;
+  background: var(--sc-soft);
+  color: #0f0f0f;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  padding: 9px 10px;
+  word-break: break-word;
+}
+.gl-sc-pin-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: var(--sc-progress);
+  background: rgba(255, 255, 255, 0.9);
+  transition: width 1s linear;
+}
 .gl-chat-list {
   flex: 1;
   min-height: 0;
