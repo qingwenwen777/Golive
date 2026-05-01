@@ -174,7 +174,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
             <button
               type="button"
               onClick={() => openLogin()}
-              className="flex items-center gap-2 rounded-full border border-accent/60 px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent/10"
+              className="gl-signin-btn flex items-center gap-2 rounded-full border border-accent/60 px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent/10"
               aria-label="Sign in"
             >
               <UserIcon size={18} />

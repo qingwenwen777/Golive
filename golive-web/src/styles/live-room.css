@@ -774,3 +774,148 @@
     transform: translate(-42vw, -45vh) scale(1);
   }
 }
+
+@media (max-width: 767px) {
+  .gl-player {
+    width: calc(100% + 32px);
+    margin-right: -16px;
+    margin-left: -16px;
+    border-radius: 0;
+  }
+
+  .gl-player-top {
+    padding: 10px 12px;
+  }
+
+  .gl-player-viewers {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+
+  .gl-player-ctl {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .gl-ctl-row {
+    gap: 2px;
+  }
+
+  .gl-pbtn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .gl-vol {
+    display: none;
+  }
+
+  .gl-ctl-live {
+    padding: 0 8px;
+  }
+
+  .gl-title {
+    margin: 12px 0 10px;
+    font-size: 18px;
+  }
+
+  .gl-info-row {
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .gl-info-chan {
+    flex-basis: 100%;
+    gap: 10px;
+  }
+
+  .gl-info-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .gl-info-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gl-pill-group,
+  .gl-pg-solo {
+    flex: 0 0 auto;
+  }
+
+  .gl-pg-left,
+  .gl-pg-right,
+  .gl-pg-solo {
+    padding-inline: 12px;
+  }
+
+  .gl-sub-btn {
+    margin-left: auto;
+    padding-inline: 14px;
+  }
+
+  .gl-desc {
+    border-radius: 10px;
+  }
+
+  .gl-chat-fab {
+    right: 16px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    width: 52px;
+    height: 52px;
+  }
+
+  .gl-emoji-popover {
+    right: -88px;
+  }
+}
+
+@media (max-width: 420px) {
+  .gl-player {
+    width: calc(100% + 28px);
+    margin-right: -14px;
+    margin-left: -14px;
+  }
+
+  .gl-player-title {
+    font-size: 12px;
+  }
+
+  .gl-live-word {
+    display: none;
+  }
+
+  .gl-pbtn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .gl-title {
+    font-size: 17px;
+  }
+
+  .gl-info-chan-name {
+    font-size: 15px;
+  }
+
+  .gl-info-chan-subs,
+  .gl-desc,
+  .gl-pg-left,
+  .gl-pg-right,
+  .gl-pg-solo {
+    font-size: 13px;
+  }
+
+  .gl-chat-input {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .gl-emoji-popover {
+    right: -116px;
+  }
+}

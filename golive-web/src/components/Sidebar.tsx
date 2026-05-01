@@ -51,6 +51,8 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       <button
         key={it.key}
         type="button"
+        aria-label={it.label}
+        title={it.label}
         className={cn(
           'gl-side-item',
           active === it.key && 'is-active',
