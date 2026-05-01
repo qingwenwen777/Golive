@@ -48,6 +48,19 @@ export function useLatestBet(roomId: string, enabled = true) {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: 2_000,
+    structuralSharing: (oldData, newData) => {
+      const oldView = oldData as BetRoundView | undefined;
+      const newView = newData as BetRoundView;
+      if (
+        newView.round === null &&
+        oldView?.round &&
+        oldView.round.status !== 'settled' &&
+        oldView.round.status !== 'cancelled'
+      ) {
+        return oldView;
+      }
+      return newView;
+    },
   });
 }
 

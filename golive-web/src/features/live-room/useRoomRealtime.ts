@@ -10,7 +10,13 @@ import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatC
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 import { betQueryKey } from '@/api/bet';
-import { betOptionLabel, type BetOption } from '@/types/bet';
+import {
+  betOptionLabel,
+  type BetOption,
+  type BetOptionSummary,
+  type BetRound,
+  type BetRoundView,
+} from '@/types/bet';
 
 interface ServerChat {
   type: 'chat';
@@ -77,6 +83,8 @@ interface ServerLiveStatus {
 interface ServerBet {
   type: 'bet';
   event: 'opened' | 'wagered' | 'settled' | 'cancelled';
+  round?: BetRound;
+  summary?: BetOptionSummary[];
   option?: BetOption;
   ts?: number;
 }
@@ -336,6 +344,21 @@ export function useRoomRealtime(
         break;
       }
       case 'bet': {
+        if (parsed.round) {
+          const nextBetView = (prev?: BetRoundView): BetRoundView => ({
+            round: parsed.round ?? null,
+            summary: parsed.summary ?? prev?.summary ?? [],
+            ...(prev?.myWager ? { myWager: prev.myWager } : {}),
+          });
+          queryClient.setQueryData<BetRoundView>(betQueryKey(roomId), nextBetView);
+          if (parsed.round.roomId && parsed.round.roomId !== roomId) {
+            queryClient.setQueryData<BetRoundView>(
+              betQueryKey(parsed.round.roomId),
+              nextBetView,
+            );
+            void queryClient.invalidateQueries({ queryKey: betQueryKey(parsed.round.roomId) });
+          }
+        }
         void queryClient.invalidateQueries({ queryKey: betQueryKey(roomId) });
         if (parsed.event === 'wagered') break;
         const text =

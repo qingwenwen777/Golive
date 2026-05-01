@@ -214,17 +214,26 @@ func isMissingTable(err error) bool {
 	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
 }
 
-func (r *RoomRepo) HistoryByOwner(ctx context.Context, ownerID string, limit int) ([]model.Room, error) {
-	if limit < 1 || limit > 100 {
-		limit = 24
+func (r *RoomRepo) HistoryByOwner(ctx context.Context, ownerID string, page, size int) ([]model.Room, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 || size > 100 {
+		size = 24
+	}
+	tx := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("owner_id = ? AND status = ?", ownerID, model.StatusEnded)
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 	var rooms []model.Room
-	err := r.db.WithContext(ctx).
-		Where("owner_id = ? AND status = ?", ownerID, model.StatusEnded).
+	err := tx.
 		Order("COALESCE(ended_at, updated_at) DESC").
-		Limit(limit).
+		Offset((page - 1) * size).
+		Limit(size).
 		Find(&rooms).Error
-	return rooms, err
+	return rooms, total, err
 }
 
 func (r *RoomRepo) EndedRoomByOwner(ctx context.Context, ownerID, roomID string) (*model.Room, error) {

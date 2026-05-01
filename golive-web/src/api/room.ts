@@ -247,6 +247,9 @@ export interface LiveHistoryItem {
 
 export interface LiveHistoryResp {
   items: LiveHistoryItem[];
+  total: number;
+  page: number;
+  size: number;
 }
 
 export interface MonthlyCreatorMetric {
@@ -276,18 +279,19 @@ export interface LiveAnalysisResp {
   superChatRevenue: number;
 }
 
-export function useChannelLiveHistory(channelKey: string, size = 12) {
+export function useChannelLiveHistory(channelKey: string, page = 1, size = 4) {
   return useQuery<LiveHistoryResp, Error>({
-    queryKey: ['channel-live-history', channelKey, size],
+    queryKey: ['channel-live-history', channelKey, page, size],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<LiveHistoryResp>(
         `/rooms/channels/${encodeURIComponent(channelKey)}/history`,
-        { params: { size }, signal },
+        { params: { page, size }, signal },
       );
       return data;
     },
     enabled: !!channelKey,
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
     retry: 1,
   });
 }

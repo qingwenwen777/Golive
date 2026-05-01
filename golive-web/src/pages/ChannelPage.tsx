@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Bell,
   BarChart3,
   Camera,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   CalendarDays,
   Clock3,
   Radio,
@@ -35,6 +37,8 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
+const HISTORY_PAGE_SIZE = 4;
+
 export default function ChannelPage() {
   const navigate = useNavigate();
   const { name = '' } = useParams<{ name: string }>();
@@ -47,6 +51,7 @@ export default function ChannelPage() {
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
 
   const profile = useMemo(
     () => resolveProfile(profileLookupKey, publicUser.data, authUser),
@@ -66,12 +71,25 @@ export default function ChannelPage() {
   const followState = useFollowState(channelId, !!channelId);
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
-  const liveHistory = useChannelLiveHistory(channelKey, 12);
+  const liveHistory = useChannelLiveHistory(channelKey, historyPage, HISTORY_PAGE_SIZE);
+  const historyTotal = liveHistory.data?.total ?? 0;
+  const historyPageSize = liveHistory.data?.size ?? HISTORY_PAGE_SIZE;
+  const historyPageCount = Math.max(1, Math.ceil(historyTotal / historyPageSize));
 
   const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
   const primaryCategory = primary?.category ?? 'Just Chatting';
   const subscriberCount = followState.data?.subscriberCount ?? primary?.subscriberCount ?? 0;
   const isUnknown = !profile && !primary && !publicUser.isPending && !rooms.isPending;
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [channelKey]);
+
+  useEffect(() => {
+    if (historyPage > historyPageCount) {
+      setHistoryPage(historyPageCount);
+    }
+  }, [historyPage, historyPageCount]);
 
   const handleSubscribe = () => {
     if (!isAuthed) {
@@ -246,16 +264,27 @@ export default function ChannelPage() {
             ))}
           </div>
         ) : liveHistory.data?.items.length ? (
-          <div className="gl-history-list">
-            {liveHistory.data.items.map((record) => (
-              <ChannelHistoryRow
-                key={record.id}
-                record={record}
-                channelKey={channelKey}
-                isOwner={isOwner}
+          <>
+            <div className="gl-history-list">
+              {liveHistory.data.items.map((record) => (
+                <ChannelHistoryRow
+                  key={record.id}
+                  record={record}
+                  channelKey={channelKey}
+                  isOwner={isOwner}
+                />
+              ))}
+            </div>
+            {historyPageCount > 1 && (
+              <HistoryPager
+                page={historyPage}
+                pageCount={historyPageCount}
+                pageSize={historyPageSize}
+                total={historyTotal}
+                onPageChange={setHistoryPage}
               />
-            ))}
-          </div>
+            )}
+          </>
         ) : (
           <div className="gl-channel-empty">
             <Clock3 size={34} />
@@ -275,6 +304,83 @@ export default function ChannelPage() {
       <CreateLiveDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
+}
+
+function HistoryPager({
+  page,
+  pageCount,
+  pageSize,
+  total,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  const pages = visibleHistoryPages(page, pageCount);
+  return (
+    <div className="gl-history-pager" aria-label="Live history pagination">
+      <div className="gl-history-pager-count">
+        {start}-{end} of {total}
+      </div>
+      <div className="gl-history-pager-controls">
+        <button
+          type="button"
+          aria-label="Previous history page"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        {pages.map((item, index) =>
+          item === 'gap' ? (
+            <span key={`gap-${index}`} className="gl-history-pager-gap">
+              ...
+            </span>
+          ) : (
+            <button
+              key={item}
+              type="button"
+              className={item === page ? 'is-active' : undefined}
+              aria-current={item === page ? 'page' : undefined}
+              onClick={() => onPageChange(item)}
+            >
+              {item}
+            </button>
+          ),
+        )}
+        <button
+          type="button"
+          aria-label="Next history page"
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function visibleHistoryPages(page: number, pageCount: number): Array<number | 'gap'> {
+  if (pageCount <= 5) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1);
+  }
+  const pages = new Set([1, pageCount, page - 1, page, page + 1]);
+  const sorted = [...pages]
+    .filter((item) => item >= 1 && item <= pageCount)
+    .sort((a, b) => a - b);
+  return sorted.flatMap((item, index) => {
+    const prev = sorted[index - 1];
+    if (index > 0 && prev !== undefined && item - prev > 1) {
+      return ['gap' as const, item];
+    }
+    return [item];
+  });
 }
 
 function ChannelHistoryRow({

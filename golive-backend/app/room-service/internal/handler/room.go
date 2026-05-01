@@ -40,8 +40,15 @@ func (h *RoomHandler) Get(c *gin.Context) {
 }
 
 func (h *RoomHandler) ChannelHistory(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
-	resp, err := h.svc.HistoryByChannel(c.Request.Context(), c.Param("channel"), size)
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 || size > 100 {
+		size = 24
+	}
+	resp, err := h.svc.HistoryByChannel(c.Request.Context(), c.Param("channel"), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

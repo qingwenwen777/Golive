@@ -15,6 +15,9 @@ var ErrForbiddenAnalytics = errcode.New(403, "Forbidden")
 
 type LiveHistoryResp struct {
 	Items []LiveHistoryItem `json:"items"`
+	Total int64             `json:"total"`
+	Page  int               `json:"page"`
+	Size  int               `json:"size"`
 }
 
 type LiveHistoryItem struct {
@@ -69,19 +72,19 @@ type LiveAnalysisResp struct {
 	SuperChatRevenue int64             `json:"superChatRevenue"`
 }
 
-func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey string, limit int) (*LiveHistoryResp, error) {
+func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey string, page, size int) (*LiveHistoryResp, error) {
 	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelKey)
 	if err != nil {
 		if errors.Is(err, repo.ErrRoomNotFound) {
-			return &LiveHistoryResp{Items: []LiveHistoryItem{}}, nil
+			return &LiveHistoryResp{Items: []LiveHistoryItem{}, Total: 0, Page: page, Size: size}, nil
 		}
 		return nil, err
 	}
-	items, _, err := s.historyItemsForOwner(ctx, ownerID, limit)
+	items, _, total, err := s.historyItemsForOwner(ctx, ownerID, page, size)
 	if err != nil {
 		return nil, err
 	}
-	return &LiveHistoryResp{Items: items}, nil
+	return &LiveHistoryResp{Items: items, Total: total, Page: page, Size: size}, nil
 }
 
 func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID string) (*CreatorAnalyticsResp, error) {
@@ -97,7 +100,7 @@ func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID
 		return nil, ErrForbiddenAnalytics
 	}
 
-	history, rooms, err := s.historyItemsForOwner(ctx, ownerID, 100)
+	history, rooms, _, err := s.historyItemsForOwner(ctx, ownerID, 1, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -163,10 +166,10 @@ func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, view
 	}, nil
 }
 
-func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, limit int) ([]LiveHistoryItem, []model.Room, error) {
-	rooms, err := s.rooms.HistoryByOwner(ctx, ownerID, limit)
+func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, page, size int) ([]LiveHistoryItem, []model.Room, int64, error) {
+	rooms, total, err := s.rooms.HistoryByOwner(ctx, ownerID, page, size)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	roomIDs := make([]string, 0, len(rooms))
 	for _, room := range rooms {
@@ -174,7 +177,7 @@ func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, 
 	}
 	rows, err := s.revenueRows(ctx, roomIDs)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, 0, err
 	}
 	rowsByRoom := map[string][]repo.RevenueRow{}
 	for _, row := range rows {
@@ -187,7 +190,7 @@ func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, 
 		item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
 		items = append(items, item)
 	}
-	return items, rooms, nil
+	return items, rooms, total, nil
 }
 
 func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow) LiveHistoryItem {
