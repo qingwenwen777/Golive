@@ -22,6 +22,7 @@ interface ServerSuperChat {
   type: 'super_chat';
   id?: string;
   user: string;
+  avatar?: string;
   amount: string;
   tier: SuperChatTier;
   text: string;
@@ -203,6 +204,7 @@ export function useRoomRealtime(
           id: parsed.id ?? genId('sc'),
           kind: 'super_chat',
           user: parsed.user,
+          avatar: parsed.avatar,
           amount: parsed.amount,
           tier: parsed.tier,
           text: parsed.text,

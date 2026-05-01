@@ -57,6 +57,25 @@ WHERE id = ?
 	return strings.TrimSpace(name), nil
 }
 
+// AvatarForUser returns the user's avatar URL, or "" if unknown. Used so the
+// SuperChat broadcast payload carries the sender's avatar — without it, other
+// viewers fall back to the default avatar in the SC card.
+func (r *OrderRepo) AvatarForUser(ctx context.Context, userID string) (string, error) {
+	var avatar string
+	err := r.db.WithContext(ctx).Raw(`
+SELECT COALESCE(avatar, '')
+FROM users
+WHERE id = ?
+`, userID).Row().Scan(&avatar)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(avatar), nil
+}
+
 // FindGiftByRequestID returns the existing order for a requestId, or nil.
 func (r *OrderRepo) FindGiftByRequestID(ctx context.Context, userID, reqID string) (*model.GiftOrder, error) {
 	var o model.GiftOrder
@@ -251,8 +270,8 @@ func MarshalGiftOutbox(id, requestID, username, giftName, giftIcon string, count
 	})
 }
 
-func MarshalSuperChatOutbox(id, user, amount string, tier int, text string, ts int64) ([]byte, error) {
-	return json.Marshal(map[string]any{
+func MarshalSuperChatOutbox(id, user, avatar, amount string, tier int, text string, ts int64) ([]byte, error) {
+	payload := map[string]any{
 		"type":   "super_chat",
 		"id":     id,
 		"user":   user,
@@ -260,7 +279,11 @@ func MarshalSuperChatOutbox(id, user, amount string, tier int, text string, ts i
 		"tier":   tier,
 		"text":   text,
 		"ts":     ts,
-	})
+	}
+	if avatar != "" {
+		payload["avatar"] = avatar
+	}
+	return json.Marshal(payload)
 }
 
 func roomOwnerID(tx *gorm.DB, roomID string) (string, error) {

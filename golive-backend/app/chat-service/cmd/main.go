@@ -21,6 +21,7 @@ import (
 	"github.com/qingwenwen777/golive/app/chat-service/internal/filter"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/handler"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/ratelimit"
+	"github.com/qingwenwen777/golive/app/chat-service/internal/redissub"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/server"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/service"
@@ -105,6 +106,28 @@ func main() {
 			zap.Int("workers", cfg.Kafka.Workers))
 		if err := cons.Run(consumerCtx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Fatal("consumer exit", zap.Error(err))
+		}
+	}()
+
+	// Redis pub/sub subscriber for live-chat persistence. This is what
+	// actually writes danmus to MySQL in the current deployment, because
+	// im-gateway runs with kafka.enabled=false and broadcasts directly to
+	// "room:<id>" Redis channels. Unlike a Fatal on the kafka consumer,
+	// failures here are logged and retried — the live broadcast path keeps
+	// working even if persistence is briefly unavailable.
+	subscriber := redissub.New(rdb, danmuRepo)
+	go func() {
+		for {
+			err := subscriber.Run(consumerCtx)
+			if err == nil || errors.Is(err, context.Canceled) {
+				return
+			}
+			log.Warn("redis chat subscriber exited; retrying", zap.Error(err))
+			select {
+			case <-consumerCtx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
 		}
 	}()
 

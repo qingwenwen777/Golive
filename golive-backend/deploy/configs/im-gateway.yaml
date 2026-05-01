@@ -21,13 +21,14 @@ jwt:
   secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
 
 kafka:
-  # Must be true so chat-service consumer persists danmus to MySQL.
-  # When false, im-gateway uses the no-op producer + LocalEcho path: live
-  # broadcast still works via Redis pub/sub, but nothing is persisted, so
-  # the GET /chat/rooms/:id/danmus history endpoint returns 0 chats and
-  # viewers who re-enter the room see no chat history (only SuperChats,
-  # because gift-service persists those directly).
-  enabled: true
+  # Disabled on purpose: im-gateway uses the noop producer + LocalEcho path so
+  # chat broadcast goes directly via Redis pub/sub (im-gateway → Redis → all
+  # WS clients). Persistence is handled separately by chat-service, which
+  # subscribes to the SAME Redis room:* channels as a passive listener and
+  # writes chats to MySQL. Turning this on routes live broadcast through
+  # Kafka → chat-service → Redis instead, which adds Kafka as a hard failure
+  # point for live chat — keep it false unless that pipeline is verified.
+  enabled: false
   brokers: ["kafka:9092"]
   chat_topic: "danmu"
 
