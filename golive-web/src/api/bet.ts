@@ -14,6 +14,7 @@ export interface BetError {
     | 'bet_closed'
     | 'bet_already_placed'
     | 'bet_no_winners'
+    | 'bad_bet_question'
     | 'forbidden'
     | 'unknown'
     | 'network';
@@ -52,10 +53,10 @@ export function useLatestBet(roomId: string, enabled = true) {
 
 export function useOpenBet(roomId: string) {
   const qc = useQueryClient();
-  return useMutation<BetRoundView, BetError, { amount: number }>({
-    mutationFn: async ({ amount }) => {
+  return useMutation<BetRoundView, BetError, { amount: number; question: string }>({
+    mutationFn: async ({ amount, question }) => {
       try {
-        const { data } = await http.post<BetRoundView>('/bets', { roomId, amount });
+        const { data } = await http.post<BetRoundView>('/bets', { roomId, amount, question });
         return data;
       } catch (err) {
         throw toBetError(err);

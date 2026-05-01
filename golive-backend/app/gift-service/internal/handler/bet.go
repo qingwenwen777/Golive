@@ -20,8 +20,9 @@ func NewBetHandler(s *service.BetService) *BetHandler {
 }
 
 type openBetBody struct {
-	RoomID string `json:"roomId"`
-	Amount int64  `json:"amount"`
+	RoomID   string `json:"roomId"`
+	Amount   int64  `json:"amount"`
+	Question string `json:"question"`
 }
 
 type wagerBetBody struct {
@@ -62,11 +63,13 @@ func (h *BetHandler) Open(c *gin.Context) {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "Bad request"))
 		return
 	}
-	if strings.TrimSpace(body.RoomID) == "" || body.Amount <= 0 {
+	roomID := strings.TrimSpace(body.RoomID)
+	question := strings.TrimSpace(body.Question)
+	if roomID == "" || body.Amount <= 0 || question == "" || len([]rune(question)) > service.MaxBetQuestionRunes {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "Bad request"))
 		return
 	}
-	view, err := h.svc.Open(c.Request.Context(), uid, strings.TrimSpace(body.RoomID), body.Amount)
+	view, err := h.svc.Open(c.Request.Context(), uid, roomID, body.Amount, question)
 	if err != nil {
 		respondBetError(c, err)
 		return
@@ -158,6 +161,8 @@ func respondBetError(c *gin.Context, err error) {
 		errcode.Respond(c, errcode.New(http.StatusNotFound, "Bet not found").WithReason("bet_not_found"))
 	case errors.Is(err, service.ErrBetBadOption):
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "Bad bet option").WithReason("bad_bet_option"))
+	case errors.Is(err, service.ErrBetBadQuestion):
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "Bad bet question").WithReason("bad_bet_question"))
 	default:
 		errcode.Respond(c, err)
 	}

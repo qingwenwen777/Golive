@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { CloudOff, Copy, MessageSquare, Radio, Square } from 'lucide-react';
+import { CloudOff, Copy, MessageSquare, Radio, Square, Trophy } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Player } from '@/features/live-room/Player';
@@ -17,6 +17,7 @@ import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
+import { useLatestBet } from '@/api/bet';
 import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
 import { copyText } from '@/lib/clipboard';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
@@ -63,11 +64,14 @@ export default function LiveRoomPage() {
   const incrementViewerContribution = useRealtimeStore((s) => s.incrementViewerContribution);
   const stopLive = useStopLive();
   const liveEndedRef = useRef(false);
+  const betAnchorRef = useRef<HTMLDivElement | null>(null);
   const [publisherSession, setPublisherSession] = useState<PublisherSession | null>(() =>
     loadPublisherSession(),
   );
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
+  const roomId = stream?.id ?? id;
+  const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
   const fanBadges = useFanBadges(isAuthed, currentUser?.id);
   const activeFanBadge = useMemo(() => {
@@ -96,7 +100,7 @@ export default function LiveRoomPage() {
   }, [id, queryClient, stream]);
 
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
-    useRoomRealtime(id, roomIsLive, { onLiveEnded: handleLiveEnded, activeFanBadge });
+    useRoomRealtime(roomId, roomIsLive, { onLiveEnded: handleLiveEnded, activeFanBadge });
 
   useEffect(() => {
     liveEndedRef.current = false;
@@ -105,10 +109,10 @@ export default function LiveRoomPage() {
   // Connection state toasts.
   const prevStateRef = useRef(readyState);
   useEffect(() => {
-    const connectionToastId = `live-room-connection:${id || 'unknown'}`;
+    const connectionToastId = `live-room-connection:${roomId || 'unknown'}`;
     const prev = prevStateRef.current;
     prevStateRef.current = readyState;
-    if (!id) return;
+    if (!roomId) return;
     if (readyState === prev) return;
 
     if (readyState === 'connecting' && prev === 'closed') {
@@ -121,13 +125,13 @@ export default function LiveRoomPage() {
     } else if (readyState === 'closed' && prev !== 'closed') {
       toast.error('Disconnected', { id: connectionToastId });
     }
-  }, [readyState, retryCount, id]);
+  }, [readyState, retryCount, roomId]);
 
   useEffect(() => {
     return () => {
-      toast.dismiss(`live-room-connection:${id || 'unknown'}`);
+      toast.dismiss(`live-room-connection:${roomId || 'unknown'}`);
     };
-  }, [id]);
+  }, [roomId]);
 
   useEffect(() => {
     setPublisherSession(loadPublisherSession());
@@ -188,6 +192,16 @@ export default function LiveRoomPage() {
     readyState === 'closed' ? 'Disconnected' : `Reconnecting… (#${retryCount})`;
 
   const ownsStream = Boolean(currentUser?.id && stream.ownerId === currentUser.id);
+  const activeBetRound =
+    !ownsStream &&
+    latestBet.data?.round &&
+    latestBet.data.round.status !== 'settled' &&
+    latestBet.data.round.status !== 'cancelled'
+      ? latestBet.data.round
+      : null;
+  const scrollToBetPanel = () => {
+    betAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const effectivePublisherSession = ownsStream
     ? (publisherSessionFromStream(stream) ??
       (publisherSession?.streamId === stream.id ? publisherSession : null))
@@ -314,7 +328,9 @@ export default function LiveRoomPage() {
           setGiftOpen(true);
         }}
       />
-      <BettingPanel roomId={id} ownsStream={ownsStream} />
+      <div ref={betAnchorRef}>
+        <BettingPanel roomId={roomId} ownsStream={ownsStream} />
+      </div>
       {ownsStream && (
         <div className="gl-owner-live-actions">
           <div>
@@ -342,6 +358,9 @@ export default function LiveRoomPage() {
       )}
       {isMobile && (
         <div className="gl-mobile-chat">
+          {activeBetRound && (
+            <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
+          )}
           <Chat
             messages={messages}
             viewers={viewers}
@@ -373,7 +392,10 @@ export default function LiveRoomPage() {
       >
         {Left}
         {!isNarrow && (
-          <div className="sticky top-20 self-start">
+          <div className="gl-side-rail sticky top-20 self-start">
+            {activeBetRound && (
+              <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
+            )}
             <Chat
               messages={messages}
               viewers={viewers}
@@ -403,6 +425,9 @@ export default function LiveRoomPage() {
               <SheetHeader className="sr-only">
                 <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
               </SheetHeader>
+              {activeBetRound && (
+                <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
+              )}
               <Chat
                 messages={messages}
                 viewers={viewers}
@@ -423,13 +448,13 @@ export default function LiveRoomPage() {
       <GiftPanel
         open={giftOpen}
         onOpenChange={setGiftOpen}
-        roomId={id}
+        roomId={roomId}
         onSent={({ gift, count, requestId }) => {
           const totalCoin = gift.priceCoin * count;
           const currentName = currentUser ? userDisplayName(currentUser) : 'You';
           if (currentUser) {
             incrementViewerContribution(
-              id,
+              roomId,
               {
                 userId: currentUser.id,
                 user: currentName,
@@ -448,7 +473,7 @@ export default function LiveRoomPage() {
               label: `${gift.name} ×${count}`,
             },
           ]);
-          appendMessage(id, {
+          appendMessage(roomId, {
             id: `gift:${requestId}`,
             kind: 'gift',
             requestId,
@@ -466,13 +491,28 @@ export default function LiveRoomPage() {
         }}
       />
 
-      <SuperChatDialog open={superChatOpen} onOpenChange={setSuperChatOpen} roomId={id} />
+      <SuperChatDialog open={superChatOpen} onOpenChange={setSuperChatOpen} roomId={roomId} />
 
       <FlyingGiftLayer
         items={flying}
         onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
       />
     </>
+  );
+}
+
+function BetEntryNotice({ question, onClick }: { question: string; onClick: () => void }) {
+  return (
+    <button type="button" className="gl-bet-entry" onClick={onClick}>
+      <span className="gl-bet-entry-icon" aria-hidden="true">
+        <Trophy size={16} />
+      </span>
+      <span className="gl-bet-entry-copy">
+        <span>竞猜进行中</span>
+        <strong>{question}</strong>
+      </span>
+      <span className="gl-bet-entry-action">查看</span>
+    </button>
   );
 }
 

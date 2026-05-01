@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,7 +13,7 @@ import (
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
 )
 
-const betQuestion = "这把能不能赢"
+const MaxBetQuestionRunes = 80
 
 var (
 	ErrBetActive       = errors.New("active bet round exists")
@@ -22,6 +23,7 @@ var (
 	ErrBetUnauthorized = errors.New("bet unauthorized")
 	ErrBetNoWinners    = errors.New("bet has no winners")
 	ErrBetBadOption    = errors.New("bad bet option")
+	ErrBetBadQuestion  = errors.New("bad bet question")
 )
 
 type BetService struct {
@@ -49,9 +51,13 @@ func (s *BetService) Latest(ctx context.Context, roomID, userID string) (*BetRou
 	return &BetRoundView{Round: round, Summary: summary, MyWager: wager}, nil
 }
 
-func (s *BetService) Open(ctx context.Context, ownerID, roomID string, amount int64) (*BetRoundView, error) {
+func (s *BetService) Open(ctx context.Context, ownerID, roomID string, amount int64, question string) (*BetRoundView, error) {
 	if amount <= 0 {
 		return nil, fmt.Errorf("amount must be positive")
+	}
+	question = strings.TrimSpace(question)
+	if question == "" || len([]rune(question)) > MaxBetQuestionRunes {
+		return nil, ErrBetBadQuestion
 	}
 	actualOwner, err := s.orders.RoomOwner(ctx, roomID)
 	if err != nil {
@@ -65,7 +71,7 @@ func (s *BetService) Open(ctx context.Context, ownerID, roomID string, amount in
 		ID:       "bet-" + uuid.NewString(),
 		RoomID:   roomID,
 		OwnerID:  ownerID,
-		Question: betQuestion,
+		Question: question,
 		Amount:   amount,
 		Status:   model.BetRoundOpen,
 		CloseAt:  now.Add(60 * time.Second),

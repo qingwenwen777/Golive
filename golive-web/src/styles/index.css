@@ -1297,6 +1297,69 @@ input:focus-visible,
   background: var(--gl-bg-card);
   padding: 16px;
 }
+.gl-side-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gl-bet-entry {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(14, 165, 164, 0.3);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(240, 253, 250, 0.96), rgba(255, 251, 235, 0.92));
+  color: var(--gl-text);
+  padding: 10px 12px;
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(14, 165, 164, 0.12);
+}
+.gl-bet-entry-icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(14, 165, 164, 0.14);
+  color: #0f8f8e;
+}
+.gl-bet-entry-copy {
+  min-width: 0;
+}
+.gl-bet-entry-copy span {
+  display: block;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+.gl-bet-entry-copy strong {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-bet-entry-action {
+  border-radius: 999px;
+  background: var(--gl-text);
+  color: var(--gl-bg);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.dark .gl-bet-entry {
+  border-color: rgba(45, 212, 191, 0.24);
+  background: linear-gradient(135deg, rgba(19, 78, 74, 0.56), rgba(113, 63, 18, 0.24));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
 .gl-bet-head {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
@@ -1347,7 +1410,7 @@ input:focus-visible,
 }
 .gl-bet-open {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(136px, 180px) auto;
   gap: 10px;
 }
 .gl-bet-open label {
@@ -1360,6 +1423,9 @@ input:focus-visible,
   border-radius: 8px;
   padding: 0 10px;
 }
+.gl-bet-open label.is-title {
+  grid-template-columns: 42px minmax(0, 1fr);
+}
 .gl-bet-open label span {
   color: var(--gl-text-2);
   font-size: 12px;
@@ -1367,6 +1433,7 @@ input:focus-visible,
 }
 .gl-bet-open input {
   width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   color: var(--gl-text);
@@ -1477,6 +1544,19 @@ input:focus-visible,
 .gl-bet-host-actions button.is-cancel {
   background: var(--gl-bg-hover);
   color: var(--gl-text);
+}
+@media (max-width: 767px) {
+  .gl-bet-open {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-bet-open button {
+    width: 100%;
+  }
+
+  .gl-bet-entry {
+    margin-bottom: 10px;
+  }
 }
 .gl-publisher-value {
   display: grid;
