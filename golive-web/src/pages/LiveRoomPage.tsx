@@ -26,6 +26,7 @@ import {
   type PublisherSession,
 } from '@/features/creator/CreateLiveDialog';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { userDisplayName } from '@/types/user';
 
 export default function LiveRoomPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -120,9 +121,12 @@ export default function LiveRoomPage() {
 
   useEffect(() => {
     if (!stream) return;
-    const timer = window.setInterval(() => {
-      void refetch();
-    }, roomIsLive ? 5000 : 3000);
+    const timer = window.setInterval(
+      () => {
+        void refetch();
+      },
+      roomIsLive ? 5000 : 3000,
+    );
     return () => window.clearInterval(timer);
   }, [refetch, roomIsLive, stream]);
 
@@ -160,8 +164,8 @@ export default function LiveRoomPage() {
 
   const ownsStream = Boolean(currentUser?.id && stream.ownerId === currentUser.id);
   const effectivePublisherSession = ownsStream
-    ? publisherSessionFromStream(stream) ??
-      (publisherSession?.streamId === stream.id ? publisherSession : null)
+    ? (publisherSessionFromStream(stream) ??
+      (publisherSession?.streamId === stream.id ? publisherSession : null))
     : null;
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
   const handleStopLive = () => {
@@ -338,8 +342,12 @@ export default function LiveRoomPage() {
           ]);
           appendMessage(id, {
             id: `sys-gift-${Date.now()}`,
-            kind: 'system',
-            text: `You sent ${gift.name} ×${count}`,
+            kind: 'gift',
+            user: currentUser ? userDisplayName(currentUser) : 'You',
+            giftName: gift.name,
+            giftIcon: gift.icon,
+            count,
+            self: true,
             ts: Date.now(),
           });
         }}

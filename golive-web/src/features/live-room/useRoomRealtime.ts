@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useWebSocket, type ReadyState } from '@/hooks/useWebSocket';
 import { useRealtimeStore, useRoomSlice } from '@/stores/useRealtimeStore';
 import { useDanmuStore } from '@/stores/useDanmuStore';
+import { useDanmuHistory } from '@/api/chat';
 import type { Message, SuperChatTier } from '@/types/message';
 import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -29,6 +30,8 @@ interface ServerGift {
   type: 'gift';
   user: string;
   giftName: string;
+  giftIcon?: string;
+  count?: number;
   ts?: number;
 }
 interface ServerViewerCount {
@@ -77,6 +80,7 @@ export function useRoomRealtime(
   const ensureRoom = useRealtimeStore((s) => s.ensureRoom);
   const resetRoom = useRealtimeStore((s) => s.resetRoom);
   const appendMessage = useRealtimeStore((s) => s.appendMessage);
+  const mergeMessages = useRealtimeStore((s) => s.mergeMessages);
   const appendBullet = useRealtimeStore((s) => s.appendBullet);
   const clearBulletFn = useRealtimeStore((s) => s.clearBullet);
   const setViewerCount = useRealtimeStore((s) => s.setViewerCount);
@@ -93,6 +97,13 @@ export function useRoomRealtime(
     ensureRoom(roomId);
     return () => resetRoom(roomId);
   }, [roomId, ensureRoom, resetRoom]);
+
+  const history = useDanmuHistory(roomId, enabled, 20);
+
+  useEffect(() => {
+    if (!history.data) return;
+    mergeMessages(roomId, history.data);
+  }, [history.data, mergeMessages, roomId]);
 
   const url = useMemo(() => {
     if (!enabled || !roomId) return null;
@@ -181,8 +192,11 @@ export function useRoomRealtime(
       case 'gift': {
         appendMessage(roomId, {
           id: genId('sys'),
-          kind: 'system',
-          text: `${parsed.user} sent Gift ${parsed.giftName}`,
+          kind: 'gift',
+          user: parsed.user,
+          giftName: parsed.giftName,
+          giftIcon: parsed.giftIcon,
+          count: parsed.count,
           ts: parsed.ts ?? now,
         });
         break;

@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { ChevronDown, MoreVertical, X, Smile, CircleDollarSign, Send } from 'lucide-react';
+import { ChevronDown, MoreVertical, X, Smile, CircleDollarSign, Send, Gift } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { tierSpec } from '@/constants/chat';
-import type { Message, ChatMessage, SuperChatMessage, SystemMessage } from '@/types/message';
+import type {
+  Message,
+  ChatMessage,
+  SuperChatMessage,
+  SystemMessage,
+  GiftMessage,
+} from '@/types/message';
 import { cn } from '@/lib/cn';
 import { useIsAuthed, useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
@@ -97,6 +103,26 @@ function SystemNotice({ m }: { m: SystemMessage }) {
   return (
     <div className="gl-chat-notice">
       <div className="gl-chat-notice-body">{m.text}</div>
+    </div>
+  );
+}
+
+function GiftNotice({ m }: { m: GiftMessage }) {
+  return (
+    <div className="gl-gift-notice">
+      <div className="gl-gift-notice-icon" aria-hidden="true">
+        {m.giftIcon ? <span>{m.giftIcon}</span> : <Gift size={18} />}
+      </div>
+      <div className="gl-gift-notice-body">
+        <div className="gl-gift-notice-title">
+          <span className="gl-gift-notice-user">{m.self ? 'You' : m.user}</span>
+          <span>sent</span>
+        </div>
+        <div className="gl-gift-notice-meta">
+          <span className="gl-gift-notice-name">{m.giftName}</span>
+          {m.count && <span className="gl-gift-notice-count">x{m.count}</span>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -194,8 +220,6 @@ export function Chat({
     };
   }, [emojiOpen]);
 
-  const notices = messages.filter((m): m is SystemMessage => m.kind === 'system');
-  const flow = messages.filter((m) => m.kind !== 'system');
   const activeEmojiGroup = EMOJI_GROUPS.find((group) => group.id === emojiGroup) ?? EMOJI_GROUPS[0];
 
   return (
@@ -217,16 +241,12 @@ export function Chat({
       </div>
 
       <div className="gl-chat-list" ref={listRef}>
-        {notices.map((m) => (
-          <SystemNotice key={m.id} m={m} />
-        ))}
-        {flow.map((m) =>
-          m.kind === 'super_chat' ? (
-            <SuperChatCard key={m.id} m={m} />
-          ) : (
-            <ChatRow key={m.id} m={m as ChatMessage} />
-          ),
-        )}
+        {messages.map((m) => {
+          if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
+          if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
+          if (m.kind === 'super_chat') return <SuperChatCard key={m.id} m={m} />;
+          return <ChatRow key={m.id} m={m as ChatMessage} />;
+        })}
       </div>
 
       {reconnecting && (

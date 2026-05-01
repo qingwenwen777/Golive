@@ -18,5 +18,8 @@ func NewRouter(h *handler.HistoryHandler) *gin.Engine {
 	rooms := r.Group("/rooms")
 	rooms.GET("/:id/danmus", h.Get)
 
+	chat := r.Group("/chat")
+	chat.GET("/rooms/:id/danmus", h.Get)
+
 	return r
 }

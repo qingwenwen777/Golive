@@ -8,6 +8,7 @@ upstreams:
   user_service: "http://user-service:8090"
   room_service: "http://room-service:8091"
   gift_service: "http://gift-service:8092"
+  chat_service: "http://chat-service:8093"
 
 proxy:
   timeout: 10s

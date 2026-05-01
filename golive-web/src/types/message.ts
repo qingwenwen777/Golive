@@ -1,4 +1,4 @@
-export type MessageKind = 'chat' | 'super_chat' | 'system';
+export type MessageKind = 'chat' | 'super_chat' | 'system' | 'gift';
 
 export type SuperChatTier = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -32,4 +32,15 @@ export interface SystemMessage {
   ts: number;
 }
 
-export type Message = ChatMessage | SuperChatMessage | SystemMessage;
+export interface GiftMessage {
+  id: string;
+  kind: 'gift';
+  user: string;
+  giftName: string;
+  giftIcon?: string;
+  count?: number;
+  ts: number;
+  self?: boolean;
+}
+
+export type Message = ChatMessage | SuperChatMessage | SystemMessage | GiftMessage;

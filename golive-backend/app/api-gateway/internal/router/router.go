@@ -37,6 +37,10 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	chatURL, err := url.Parse(cfg.Upstreams.ChatService)
+	if err != nil {
+		return nil, err
+	}
 	popts := proxy.Options{
 		Timeout:             cfg.Proxy.Timeout,
 		MaxIdleConns:        cfg.Proxy.MaxIdleConns,
@@ -45,6 +49,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	userProxy := proxy.New(userURL, popts)
 	roomProxy := proxy.New(roomURL, popts)
 	giftProxy := proxy.New(giftURL, popts)
+	chatProxy := proxy.New(chatURL, popts)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -74,6 +79,9 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		api.Any("/gifts", gin.WrapH(giftProxy))
 		api.Any("/gifts/*action", gin.WrapH(giftProxy))
 		api.Any("/super-chats", gin.WrapH(giftProxy))
+
+		// chat-service
+		api.Any("/chat/*action", gin.WrapH(chatProxy))
 	}
 
 	return r, nil
@@ -91,6 +99,8 @@ func publicRoutes() []middleware.PublicRoute {
 		{Method: http.MethodGet, Path: "/api/rooms/*action"},
 		// Gifts catalog is public.
 		{Method: http.MethodGet, Path: "/api/gifts"},
+		// Chat history is public for viewers entering a live room.
+		{Method: http.MethodGet, Path: "/api/chat/*action"},
 		// SRS callbacks come server-to-server.
 		{Method: http.MethodPost, Path: "/api/srs/*action"},
 		// Uploaded live covers and avatars are public assets.

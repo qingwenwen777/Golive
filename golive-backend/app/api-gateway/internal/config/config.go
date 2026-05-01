@@ -27,6 +27,7 @@ type UpstreamsCfg struct {
 	UserService string `mapstructure:"user_service"`
 	RoomService string `mapstructure:"room_service"`
 	GiftService string `mapstructure:"gift_service"`
+	ChatService string `mapstructure:"chat_service"`
 }
 
 type ProxyCfg struct {

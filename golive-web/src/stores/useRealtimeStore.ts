@@ -28,6 +28,7 @@ interface RealtimeState {
   ensureRoom: (roomId: string) => void;
   resetRoom: (roomId: string) => void;
   appendMessage: (roomId: string, m: Message) => void;
+  mergeMessages: (roomId: string, messages: Message[]) => void;
   replaceMessage: (roomId: string, id: string, m: Message) => void;
   removeMessage: (roomId: string, id: string) => void;
   appendBullet: (roomId: string, b: Bullet) => void;
@@ -51,8 +52,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
       if (state.rooms[roomId]) return state;
       return { rooms: { ...state.rooms, [roomId]: emptySlice() } };
     }),
-  resetRoom: (roomId) =>
-    set((state) => ({ rooms: { ...state.rooms, [roomId]: emptySlice() } })),
+  resetRoom: (roomId) => set((state) => ({ rooms: { ...state.rooms, [roomId]: emptySlice() } })),
   appendMessage: (roomId, m) =>
     set((state) =>
       updateRoom(state, roomId, (slice) => {
@@ -66,7 +66,30 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
         return {
           ...slice,
           messages: next.length > MESSAGE_CAP ? next.slice(next.length - MESSAGE_CAP) : next,
-          lastServerTs: m.ts,
+          lastServerTs: Math.max(slice.lastServerTs, m.ts),
+        };
+      }),
+    ),
+  mergeMessages: (roomId, messages) =>
+    set((state) =>
+      updateRoom(state, roomId, (slice) => {
+        if (messages.length === 0) return slice;
+        const byID = new Map<string, Message>();
+        for (const message of slice.messages) {
+          byID.set(message.id, message);
+        }
+        for (const message of messages) {
+          byID.set(message.id, message);
+        }
+        const next = Array.from(byID.values()).sort((a, b) => a.ts - b.ts);
+        const capped = next.length > MESSAGE_CAP ? next.slice(next.length - MESSAGE_CAP) : next;
+        return {
+          ...slice,
+          messages: capped,
+          lastServerTs: capped.reduce(
+            (max, message) => Math.max(max, message.ts),
+            slice.lastServerTs,
+          ),
         };
       }),
     ),

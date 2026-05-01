@@ -441,6 +441,97 @@
   flex: 1;
   line-height: 1.5;
 }
+.gl-gift-notice {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin: 6px 14px 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(246, 177, 57, 0.34);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 227, 0.96), rgba(255, 240, 243, 0.92)), var(--gl-bg);
+  box-shadow: 0 8px 22px rgba(122, 74, 0, 0.08);
+  animation: glGiftNoticeIn 0.22s ease-out;
+}
+.dark .gl-gift-notice {
+  border-color: rgba(246, 177, 57, 0.28);
+  background:
+    linear-gradient(135deg, rgba(92, 62, 14, 0.5), rgba(83, 38, 51, 0.36)), var(--gl-bg-hover);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+.gl-gift-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #d97706;
+  font-size: 22px;
+  box-shadow: inset 0 0 0 1px rgba(246, 177, 57, 0.2);
+}
+.dark .gl-gift-notice-icon {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fbbf24;
+}
+.gl-gift-notice-body {
+  min-width: 0;
+}
+.gl-gift-notice-title,
+.gl-gift-notice-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.gl-gift-notice-title {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.25;
+}
+.gl-gift-notice-user {
+  max-width: 150px;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-gift-notice-meta {
+  margin-top: 2px;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.gl-gift-notice-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-gift-notice-count {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+@keyframes glGiftNoticeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
 .gl-chat-line {
   display: flex;
   gap: 10px;
@@ -636,8 +727,20 @@
 }
 
 @keyframes gl-gift-fly {
-  0%   { transform: translate(0, 0) scale(0.6); opacity: 0; }
-  15%  { opacity: 1; transform: translate(-20vw, -10vh) scale(1); }
-  60%  { opacity: 1; transform: translate(-40vw, -40vh) scale(1.15); }
-  100% { opacity: 0; transform: translate(-42vw, -45vh) scale(1); }
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-20vw, -10vh) scale(1);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-40vw, -40vh) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-42vw, -45vh) scale(1);
+  }
 }

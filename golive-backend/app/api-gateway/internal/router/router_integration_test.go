@@ -73,7 +73,12 @@ func sign(t *testing.T, secret, uid string) string {
 
 func baseCfg(user, room, gift string) *config.Config {
 	return &config.Config{
-		Upstreams: config.UpstreamsCfg{UserService: user, RoomService: room, GiftService: gift},
+		Upstreams: config.UpstreamsCfg{
+			UserService: user,
+			RoomService: room,
+			GiftService: gift,
+			ChatService: gift,
+		},
 		Proxy:     config.ProxyCfg{Timeout: 2 * time.Second, MaxIdleConns: 10, MaxIdleConnsPerHost: 5},
 		JWT:       config.JWTCfg{Secret: "secret"},
 		CORS:      config.CORSCfg{AllowedOrigins: []string{"http://localhost:5173"}, MaxAge: 600},
@@ -107,6 +112,24 @@ func TestRoute_UploadAvatarsForwardToUserService(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/uploads/avatars/u.png", nil))
 	require.Equal(t, 200, w.Code)
 	require.Equal(t, "/uploads/avatars/u.png", user.last.URL.Path)
+	require.Nil(t, room.last)
+}
+
+func TestRoute_PublicChatHistoryNoAuth(t *testing.T) {
+	user := newUpstreamSpy(t, 200, `{}`)
+	room := newUpstreamSpy(t, 200, `{}`)
+	gift := newUpstreamSpy(t, 200, `{}`)
+	chat := newUpstreamSpy(t, 200, `{"items":[]}`)
+	cfg := baseCfg(user.srv.URL, room.srv.URL, gift.srv.URL)
+	cfg.Upstreams.ChatService = chat.srv.URL
+
+	r := newGateway(t, cfg)
+
+	w := newRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/chat/rooms/r1/danmus?limit=12", nil))
+	require.Equal(t, 200, w.Code)
+	require.Equal(t, "/chat/rooms/r1/danmus", chat.last.URL.Path)
+	require.Equal(t, "limit=12", chat.last.URL.RawQuery)
 	require.Nil(t, room.last)
 }
 
