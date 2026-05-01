@@ -36,6 +36,7 @@ export default function LiveRoomPage() {
   const isNarrow = useMediaQuery('(max-width: 1279px)');
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [mobileComposerFocused, setMobileComposerFocused] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [superChatOpen, setSuperChatOpen] = useState(false);
   const [flying, setFlying] = useState<FlyingGift[]>([]);
@@ -282,6 +283,7 @@ export default function LiveRoomPage() {
             onSendSuperChat={openSuperChat}
             reconnecting={reconnecting}
             reconnectingLabel={reconnectingLabel}
+            onComposerFocusChange={setMobileComposerFocused}
           />
         </div>
       )}
@@ -291,11 +293,14 @@ export default function LiveRoomPage() {
   return (
     <>
       <div
-        className={
+        className={[
           isNarrow
             ? 'grid grid-cols-1 gap-6 px-4 pb-20'
-            : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20'
-        }
+            : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
+          isMobile && mobileComposerFocused ? 'gl-live-room-chatting' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
       >
         {Left}
         {!isNarrow && (

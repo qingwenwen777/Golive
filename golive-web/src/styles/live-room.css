@@ -418,6 +418,17 @@
 .gl-chat-tab:hover {
   background: var(--gl-bg-hover);
 }
+.gl-chat-title {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 0 16px;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
 .gl-chat-list {
   flex: 1;
   min-height: 0;
@@ -926,6 +937,31 @@
 
   .gl-mobile-chat .gl-chat-input {
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .gl-mobile-chat .gl-emoji-popover {
+    position: fixed;
+    right: auto;
+    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    width: min(340px, calc(100vw - 32px));
+    transform: translateX(-50%);
+  }
+
+  .gl-live-room-chatting .gl-player {
+    position: fixed;
+    top: 54px;
+    right: 0;
+    left: 0;
+    z-index: 60;
+    width: 100vw;
+    margin-right: 0;
+    margin-left: 0;
+    border-radius: 0;
+  }
+
+  .gl-live-room-chatting .gl-mobile-chat {
+    padding-top: calc(56.25vw + 12px);
   }
 
   .gl-chat-fab {

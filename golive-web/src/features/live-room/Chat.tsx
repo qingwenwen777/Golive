@@ -23,6 +23,7 @@ export interface ChatProps {
   reconnecting?: boolean;
   reconnectingLabel?: string;
   onSendChat?: (text: string) => boolean | void;
+  onComposerFocusChange?: (focused: boolean) => void;
 }
 
 const EMOJI_GROUPS = [
@@ -159,6 +160,7 @@ export function Chat({
   reconnecting,
   reconnectingLabel,
   onSendChat,
+  onComposerFocusChange,
 }: ChatProps) {
   const { t } = useTranslation('pages');
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -248,6 +250,7 @@ export function Chat({
 
   return (
     <aside className={cn('gl-chat', sheetMode && 'is-sheet')} aria-label={t('liveRoom.chat')}>
+      <div className="gl-chat-title">Chat</div>
       <div className="gl-chat-list" ref={listRef}>
         {messages.map((m) => {
           if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
@@ -284,8 +287,10 @@ export function Chat({
               setInput(e.target.value);
             }}
             onFocus={() => {
+              onComposerFocusChange?.(true);
               if (!isAuthed) openLogin();
             }}
+            onBlur={() => onComposerFocusChange?.(false)}
             onCompositionStart={() => {
               composingRef.current = true;
             }}
