@@ -309,8 +309,10 @@ export function Chat({
     setInput('');
     inputValueRef.current = '';
     setEmojiOpen(false);
-    inputRef.current?.blur();
-    onComposerFocusChange?.(false);
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      onComposerFocusChange?.(true);
+    });
   };
 
   const insertEmoji = (emoji: string) => {

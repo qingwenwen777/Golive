@@ -1,19 +1,25 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Inbox, CloudOff } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { useRooms } from '@/api/room';
 import { useAuthStore } from '@/stores/useAuthStore';
-import type { Stream } from '@/types/stream';
+import { streamChannelName, type Stream } from '@/types/stream';
 
 export default function HomePage() {
   const { t } = useTranslation('pages');
+  const [searchParams] = useSearchParams();
   const [activeCat, setActiveCat] = useState<string>('All');
+  const searchQuery = searchParams.get('q')?.trim() ?? '';
 
   const categoryParam = activeCat === 'All' ? undefined : activeCat;
-  const { data, isPending, isError, isFetching, refetch } = useRooms({ category: categoryParam });
+  const { data, isPending, isError, isFetching, refetch } = useRooms({
+    category: categoryParam,
+    size: 100,
+  });
   const userId = useAuthStore((s) => s.user?.id);
 
   // Pin the current user's own active stream to the front, then sort by
@@ -31,6 +37,29 @@ export default function HomePage() {
     return [...own, ...rest];
   }, [data?.items, userId]);
 
+  const visibleItems = useMemo<Stream[]>(() => {
+    const q = searchQuery.toLowerCase();
+    if (!q) return sortedItems;
+
+    return sortedItems.filter((stream) => {
+      const haystack = [
+        stream.title,
+        stream.titleJa,
+        stream.description,
+        stream.category,
+        stream.categoryJa,
+        stream.channel,
+        stream.channelId,
+        streamChannelName(stream),
+        stream.id,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [searchQuery, sortedItems]);
+
   return (
     <>
       <div className="gl-chips-wrap">
@@ -38,7 +67,14 @@ export default function HomePage() {
       </div>
       <div className="gl-page">
         <div className="gl-home-head">
-          <div className="gl-home-h2">{t('home.liveNow')}</div>
+          <div className="gl-home-h2">
+            {searchQuery
+              ? t('home.searchResults', {
+                  query: searchQuery,
+                  defaultValue: `Search results for "${searchQuery}"`,
+                })
+              : t('home.liveNow')}
+          </div>
         </div>
 
         {isPending ? (
@@ -62,12 +98,22 @@ export default function HomePage() {
             <div className="gl-empty-title">{t('home.empty')}</div>
             <div className="gl-empty-sub">{t('home.emptySub')}</div>
           </div>
+        ) : visibleItems.length === 0 ? (
+          <div className="gl-empty">
+            <Inbox size={64} strokeWidth={1.5} />
+            <div className="gl-empty-title">
+              {t('home.searchEmpty', { defaultValue: 'No matching live rooms' })}
+            </div>
+            <div className="gl-empty-sub">
+              {t('home.searchEmptySub', { defaultValue: 'Try another keyword.' })}
+            </div>
+          </div>
         ) : (
           <div
             className="gl-grid"
             style={{ opacity: isFetching ? 0.7 : 1, transition: 'opacity .15s' }}
           >
-            {sortedItems.map((s, i) => (
+            {visibleItems.map((s, i) => (
               <LiveCard key={s.id} stream={s} priority={i < 4} />
             ))}
           </div>

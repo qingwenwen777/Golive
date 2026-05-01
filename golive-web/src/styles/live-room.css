@@ -708,11 +708,18 @@
 .gl-chat-line.is-owner {
   position: relative;
   margin: 4px 10px;
-  padding: 9px 10px 9px 12px;
-  border: 1px solid color-mix(in srgb, var(--gl-red) 22%, var(--gl-border));
+  align-items: center;
+  padding: 9px 12px 9px 14px;
+  border: 1px solid rgba(125, 118, 255, 0.24);
   border-radius: 10px;
   background:
-    linear-gradient(135deg, rgba(255, 0, 51, 0.09), rgba(28, 98, 185, 0.08)), var(--gl-bg);
+    linear-gradient(
+      120deg,
+      rgba(255, 214, 102, 0.16),
+      rgba(86, 204, 242, 0.14) 42%,
+      rgba(187, 107, 217, 0.14)
+    ),
+    var(--gl-bg);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
 .gl-chat-line.is-owner::before {
@@ -722,7 +729,7 @@
   left: 0;
   width: 3px;
   border-radius: 0 999px 999px 0;
-  background: linear-gradient(180deg, var(--gl-red), #1c62b9);
+  background: linear-gradient(180deg, #ffcf5a, #39c6f4 48%, #b46cff);
   content: '';
 }
 .gl-chat-avatar-wrap {
@@ -730,8 +737,18 @@
   border-radius: 50%;
 }
 .gl-chat-line.is-owner .gl-chat-avatar-wrap {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
   padding: 2px;
-  background: linear-gradient(135deg, var(--gl-red), #1c62b9);
+  background: conic-gradient(from 210deg, #ffcf5a, #45d483, #39c6f4, #8f7cff, #ff8bb3, #ffcf5a);
+}
+.gl-chat-line.is-owner .gl-chat-body {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 @keyframes glFadeIn {
   from {
@@ -771,7 +788,7 @@
   align-items: center;
   height: 17px;
   border-radius: 999px;
-  background: var(--gl-red);
+  background: linear-gradient(90deg, #ffb84d, #34c98f 35%, #32b8f0 68%, #9b6dff);
   color: #fff;
   padding: 0 7px;
   font-size: 10px;
@@ -788,9 +805,15 @@
   color: #e7e7e7;
 }
 .dark .gl-chat-line.is-owner {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(160, 154, 255, 0.28);
   background:
-    linear-gradient(135deg, rgba(255, 0, 51, 0.2), rgba(62, 143, 255, 0.15)), var(--gl-bg-card);
+    linear-gradient(
+      120deg,
+      rgba(255, 207, 90, 0.16),
+      rgba(57, 198, 244, 0.14) 45%,
+      rgba(180, 108, 255, 0.16)
+    ),
+    var(--gl-bg-card);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
 }
 

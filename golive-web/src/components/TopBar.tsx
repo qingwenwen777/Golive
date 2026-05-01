@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Coins, Plus, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { logout as doLogout, useMe, useTopupCoins } from '@/api/auth';
@@ -30,6 +30,7 @@ export interface TopBarProps {
 export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useThemeStore();
   const { lang, toggleLang } = useLangStore();
   const isDark = theme === 'dark';
@@ -40,8 +41,13 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const topup = useTopupCoins();
   const [createOpen, setCreateOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('q') ?? '');
   const currentUser = me.data ?? user;
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
+
+  useEffect(() => {
+    setSearch(new URLSearchParams(location.search).get('q') ?? '');
+  }, [location.search]);
 
   const handleTopup = () => {
     topup.mutate(
@@ -52,6 +58,12 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
         onError: (err) => toast.error(err.message || 'Could not add coins.'),
       },
     );
+  };
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const q = search.trim();
+    navigate(q ? `/?q=${encodeURIComponent(q)}` : '/');
   };
 
   return (
@@ -73,21 +85,20 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           </button>
         </div>
 
-        <div className="gl-topbar-search">
+        <form className="gl-topbar-search" onSubmit={handleSearchSubmit} role="search">
           <div className="gl-search-pill">
             <input
               className="gl-search-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder={t('searchPlaceholder')}
               aria-label={t('search')}
             />
-            <button type="button" className="gl-search-btn" aria-label={t('search')}>
+            <button type="submit" className="gl-search-btn" aria-label={t('search')}>
               <Icons.Search size={22} />
             </button>
           </div>
-          <button type="button" className="gl-icon-btn gl-mic" aria-label={t('voiceSearch')}>
-            <Icons.Mic size={22} />
-          </button>
-        </div>
+        </form>
 
         <div className="gl-topbar-right">
           <button

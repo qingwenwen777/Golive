@@ -350,13 +350,6 @@ input:focus-visible,
 .dark .gl-search-btn:hover {
   background: #303030;
 }
-.gl-mic {
-  background: var(--gl-bg-hover);
-}
-.dark .gl-mic {
-  background: #272727;
-}
-
 .gl-create-btn {
   display: inline-flex;
   align-items: center;
@@ -1946,7 +1939,6 @@ input:focus-visible,
     justify-content: flex-end;
   }
   .gl-search-pill,
-  .gl-mic,
   .gl-lang-toggle {
     display: none;
   }
