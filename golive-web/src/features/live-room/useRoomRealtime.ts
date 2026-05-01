@@ -360,6 +360,9 @@ export function useRoomRealtime(
           }
         }
         void queryClient.invalidateQueries({ queryKey: betQueryKey(roomId) });
+        if (parsed.event === 'settled' || parsed.event === 'cancelled') {
+          void queryClient.invalidateQueries({ queryKey: ['me'] });
+        }
         if (parsed.event === 'wagered') break;
         const text =
           parsed.event === 'opened'
