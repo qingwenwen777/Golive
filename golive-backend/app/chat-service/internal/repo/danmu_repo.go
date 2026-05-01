@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -34,6 +35,12 @@ type SuperChatHistoryRow struct {
 	Tier   int
 	Text   string
 	Ts     int64
+}
+
+type fanBadgeHistoryRow struct {
+	UserID    string
+	CreatorID string
+	Level     int
 }
 
 func NewDanmuRepo(db *gorm.DB, shards int) *DanmuRepo {
@@ -82,6 +89,57 @@ func (r *DanmuRepo) History(ctx context.Context, roomID string, before int64, li
 	var out []model.Danmu
 	if err := q.Order("ts DESC").Limit(limit).Find(&out).Error; err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+// FanBadgesForRoomUsers returns each chat user's current fan badge for the
+// room owner. History rendering uses the current membership state so viewers
+// entering later still see badges earned while they were away.
+func (r *DanmuRepo) FanBadgesForRoomUsers(ctx context.Context, roomID string, userIDs []string) (map[string]*model.FanBadgePayload, error) {
+	unique := make([]string, 0, len(userIDs))
+	seen := make(map[string]struct{}, len(userIDs))
+	for _, userID := range userIDs {
+		userID = strings.TrimSpace(userID)
+		if userID == "" {
+			continue
+		}
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+		unique = append(unique, userID)
+	}
+	if roomID == "" || len(unique) == 0 {
+		return map[string]*model.FanBadgePayload{}, nil
+	}
+
+	var rows []fanBadgeHistoryRow
+	err := r.db.WithContext(ctx).
+		Table("fan_badges AS fb").
+		Select("fb.user_id AS user_id, fb.creator_id AS creator_id, fb.level AS level").
+		Joins("JOIN rooms AS r ON r.owner_id = fb.creator_id").
+		Where("r.id = ? AND fb.user_id IN ? AND fb.level > 0", roomID, unique).
+		Scan(&rows).Error
+	if err != nil {
+		// Older local/dev databases may not have gift fan-badge tables yet.
+		// History should still load; it will simply omit badge decoration.
+		msg := err.Error()
+		if strings.Contains(msg, "doesn't exist") || strings.Contains(msg, "no such table") {
+			return map[string]*model.FanBadgePayload{}, nil
+		}
+		return nil, err
+	}
+
+	out := make(map[string]*model.FanBadgePayload, len(rows))
+	for _, row := range rows {
+		if row.UserID == "" || row.CreatorID == "" || row.Level <= 0 {
+			continue
+		}
+		out[row.UserID] = &model.FanBadgePayload{
+			CreatorID: row.CreatorID,
+			Level:     row.Level,
+		}
 	}
 	return out, nil
 }

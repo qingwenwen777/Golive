@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { http } from '@/lib/axios';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import type { LoginResp, User } from '@/types/user';
@@ -48,7 +49,7 @@ export function useRegisterMutation() {
 
 export function useMe() {
   const isAuthed = useIsAuthed();
-  return useQuery<User, Error>({
+  const query = useQuery<User, Error>({
     queryKey: ['me'],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<User>('/users/me', { signal });
@@ -57,6 +58,14 @@ export function useMe() {
     enabled: isAuthed,
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (query.data) {
+      useAuthStore.getState().setUser(query.data);
+    }
+  }, [query.data]);
+
+  return query;
 }
 
 export function usePublicUser(id: string) {

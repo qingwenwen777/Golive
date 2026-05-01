@@ -1,8 +1,9 @@
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { ImagePlus, Radio, Send, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMe } from '@/api/auth';
 import { useSubmitCreatorApplication } from '@/api/creator';
 import { useGoLive, useUploadLiveCover } from '@/api/room';
 import {
@@ -96,6 +97,7 @@ function permissionCopy(status: string) {
 export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const { data: meUser, refetch: refetchMe } = useMe();
   const goLive = useGoLive();
   const uploadCover = useUploadLiveCover();
   const apply = useSubmitCreatorApplication();
@@ -105,13 +107,20 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const channelName = useMemo(() => userDisplayName(user), [user]);
+  const currentUser = meUser ?? user;
+  const channelName = useMemo(() => userDisplayName(currentUser), [currentUser]);
   const categories = CATEGORIES_EN.filter((c) => c !== 'All' && c !== 'Live Now');
-  const livePermissionStatus = user?.livePermissionStatus ?? 'none';
+  const livePermissionStatus = currentUser?.livePermissionStatus ?? 'none';
   const canGoLive = livePermissionStatus === 'approved';
 
   const isPending = goLive.isPending || uploadCover.isPending;
   const perm = permissionCopy(livePermissionStatus);
+
+  useEffect(() => {
+    if (open && user) {
+      void refetchMe();
+    }
+  }, [open, user, refetchMe]);
 
   const submitApplication = () => {
     apply.mutate(undefined, {
@@ -133,7 +142,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
           category,
           cover: uploadedCover,
           channelName,
-          avatar: user?.avatar,
+          avatar: currentUser?.avatar,
         },
         {
           onSuccess: (stream) => {

@@ -148,10 +148,22 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 	if err != nil {
 		return nil, err
 	}
+	userIDs := make([]string, 0, len(rows))
+	for i := range rows {
+		userIDs = append(userIDs, rows[i].UserID)
+	}
+	fanBadges, err := s.danmus.FanBadgesForRoomUsers(ctx, roomID, userIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]model.Public, 0, len(rows)+len(superChats))
 	for i := range rows {
-		out = append(out, rows[i].ToPublic())
+		item := rows[i].ToPublic()
+		if badge := fanBadges[item.UserID]; badge != nil {
+			item.FanBadge = badge
+		}
+		out = append(out, item)
 	}
 	for i := range superChats {
 		tier := superChats[i].Tier
