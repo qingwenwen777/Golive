@@ -63,7 +63,11 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   }, [stream.id]);
 
   const subscribed = followState.data?.following ?? false;
-  const subscriberCount = followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
+  const subscriberCount =
+    followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
+  const displaySubscriberCount = followState.isPending
+    ? (stream.subscriberCount ?? subscriberCount)
+    : subscriberCount;
   const likeInfo = likeState.data;
   const baseLikes = Math.floor(stream.viewers * 0.3);
   const likes = likeInfo?.likes ?? baseLikes;
@@ -144,7 +148,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
               {stream.verified && <Icons.BadgeCheck size={14} className="text-text-secondary" />}
             </div>
             <div className="gl-info-chan-subs">
-              {t('liveRoom.subscribers', { count: subscriberCount })}
+              {t('liveRoom.subscribers', { count: displaySubscriberCount })}
             </div>
           </div>
           <button

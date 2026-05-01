@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
@@ -100,6 +101,7 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 		}
 		if room, ok := latest[channelID]; ok {
 			stream := room.ToStream(time.Now())
+			stream.SubscriberCount = count
 			item.Key = room.ChannelID
 			item.Name = fallbackStreamChannelName(room)
 			item.Avatar = room.Avatar
@@ -107,6 +109,22 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 			item.Live = room.Status == model.StatusLive
 			item.Status = room.Status
 			item.Stream = &stream
+		}
+		if strings.TrimSpace(item.Avatar) == "" {
+			item.Avatar = generatedAvatar(item.Name)
+		}
+		if item.Stream == nil {
+			item.Stream = &model.Stream{
+				ID:              channelID,
+				Channel:         item.Name,
+				ChannelID:       channelID,
+				Avatar:          item.Avatar,
+				Status:          model.StatusEnded,
+				IsLive:          false,
+				SubscriberCount: count,
+			}
+		} else if strings.TrimSpace(item.Stream.Avatar) == "" {
+			item.Stream.Avatar = item.Avatar
 		}
 		items = append(items, item)
 	}
@@ -122,6 +140,14 @@ func fallbackChannelName(channelID string) string {
 		return "Creator"
 	}
 	return "Creator " + id
+}
+
+func generatedAvatar(name string) string {
+	seed := strings.TrimSpace(name)
+	if seed == "" {
+		seed = "Creator"
+	}
+	return "https://api.dicebear.com/7.x/initials/svg?seed=" + url.QueryEscape(seed)
 }
 
 func fallbackStreamChannelName(room model.Room) string {

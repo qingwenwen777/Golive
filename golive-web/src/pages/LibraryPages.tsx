@@ -48,7 +48,27 @@ export function SubscriptionsPage() {
   const subscriptions = useSubscriptions(isAuthed);
   const channels = subscriptions.data?.items ?? [];
   const streams = useMemo(
-    () => channels.map((channel) => channel.stream).filter((stream): stream is Stream => Boolean(stream)),
+    () =>
+      channels.map(
+        (channel): Stream =>
+          channel.stream ??
+          ({
+            id: channel.channelId,
+            title: channel.name,
+            channel: channel.name,
+            channelId: channel.channelId,
+            verified: channel.verified,
+            avatar: channel.avatar,
+            cover: '',
+            viewers: 0,
+            duration: '',
+            category: '',
+            startedAt: '',
+            isLive: false,
+            status: channel.status || 'ended',
+            subscriberCount: channel.subscriberCount,
+          } as Stream),
+      ),
     [channels],
   );
 
@@ -85,7 +105,6 @@ export function SubscriptionsPage() {
               >
                 <div className="gl-yt-channel-avatar">
                   <Avatar name={channel.name} src={channel.avatar} size={64} />
-                  {channel.live && <span className="gl-yt-live-dot" aria-hidden />}
                 </div>
                 <div className="gl-yt-channel-name" title={channel.name}>
                   <span>{channel.name}</span>

@@ -23,7 +23,9 @@
       "PowerShell(go build *)",
       "Bash(npx tsc *)",
       "PowerShell(Get-ChildItem *)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(go vet *)",
+      "Bash(go test *)"
     ]
   }
 }
