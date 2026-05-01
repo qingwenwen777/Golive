@@ -366,7 +366,12 @@ export function Player({
   return (
     <div
       ref={containerRef}
-      className="gl-player group"
+      className={cn(
+        'gl-player group',
+        fullscreen && 'is-fullscreen',
+        fullscreen && !controlsVisible && 'is-idle',
+      )}
+      onMouseEnter={showControlsTemporarily}
       onMouseMove={showControlsTemporarily}
       onPointerDown={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}

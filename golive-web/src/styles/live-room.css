@@ -104,10 +104,13 @@
   pointer-events: none;
   z-index: 4;
 }
-.gl-player:hover .gl-player-ctl,
+.gl-player:not(.is-fullscreen):hover .gl-player-ctl,
 .gl-player-ctl.is-on {
   opacity: 1;
   pointer-events: auto;
+}
+.gl-player.is-idle {
+  cursor: none;
 }
 .gl-progress {
   position: relative;

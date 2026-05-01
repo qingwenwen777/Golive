@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   mysql:
     image: mysql:8.0
     container_name: golive-mysql
     restart: unless-stopped
+    logging: *default-logging
     environment:
       MYSQL_ROOT_PASSWORD: golive_root_1718011198
       MYSQL_DATABASE: golive
@@ -24,6 +31,7 @@ services:
     image: redis:7-alpine
     container_name: golive-redis
     restart: unless-stopped
+    logging: *default-logging
     volumes: [redis_data:/data]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -35,6 +43,7 @@ services:
     image: bitnamilegacy/zookeeper:3.9
     container_name: golive-zookeeper
     restart: unless-stopped
+    logging: *default-logging
     environment:
       ALLOW_ANONYMOUS_LOGIN: "yes"
 
@@ -42,6 +51,7 @@ services:
     image: bitnamilegacy/kafka:3.7
     container_name: golive-kafka
     restart: unless-stopped
+    logging: *default-logging
     depends_on: [zookeeper]
     environment:
       KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -57,8 +67,9 @@ services:
     image: golang:1.22
     container_name: golive-user-service
     restart: unless-stopped
+    logging: *default-logging
     working_dir: /app
-    command: go run ./app/user-service/cmd -config ./deploy/configs/user-service.yaml
+    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/user-service/cmd -config ./deploy/configs/user-service.yaml'
     volumes:
       - ..:/app:ro
       - avatar_uploads:/tmp/golive/avatars
@@ -79,8 +90,9 @@ services:
     image: golang:1.22
     container_name: golive-room-service
     restart: unless-stopped
+    logging: *default-logging
     working_dir: /app
-    command: go run ./app/room-service/cmd -config ./deploy/configs/room-service.yaml
+    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/room-service/cmd -config ./deploy/configs/room-service.yaml'
     volumes:
       - ..:/app:ro
       - cover_uploads:/tmp/golive/covers
@@ -101,8 +113,9 @@ services:
     image: golang:1.22
     container_name: golive-gift-service
     restart: unless-stopped
+    logging: *default-logging
     working_dir: /app
-    command: go run ./app/gift-service/cmd -config ./deploy/configs/gift-service.yaml
+    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/gift-service/cmd -config ./deploy/configs/gift-service.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -122,8 +135,9 @@ services:
     image: golang:1.22
     container_name: golive-chat-service
     restart: unless-stopped
+    logging: *default-logging
     working_dir: /app
-    command: go run ./app/chat-service/cmd -config ./deploy/configs/chat-service.yaml
+    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/chat-service/cmd -config ./deploy/configs/chat-service.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -145,8 +159,9 @@ services:
     image: golang:1.22
     container_name: golive-api-gateway
     restart: unless-stopped
+    logging: *default-logging
     working_dir: /app
-    command: go run ./app/api-gateway/cmd -config ./deploy/configs/api-gateway.yaml
+    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/api-gateway/cmd -config ./deploy/configs/api-gateway.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -168,8 +183,9 @@ services:
     image: golang:1.22
     container_name: golive-im-gateway
     restart: unless-stopped
+    logging: *default-logging
     working_dir: /app
-    command: go run ./app/im-gateway/cmd -config ./deploy/configs/im-gateway.yaml
+    command: sh -lc 'rm -rf /tmp/go-build* /tmp/go-run* && exec go run ./app/im-gateway/cmd -config ./deploy/configs/im-gateway.yaml'
     volumes:
       - ..:/app:ro
       - go_mod_cache:/go/pkg/mod
@@ -184,6 +200,7 @@ services:
     image: bitnamilegacy/etcd:3.5
     container_name: golive-etcd
     restart: unless-stopped
+    logging: *default-logging
     environment:
       ALLOW_NONE_AUTHENTICATION: "yes"
       ETCD_ADVERTISE_CLIENT_URLS: http://0.0.0.0:2379
@@ -192,6 +209,7 @@ services:
     image: ossrs/srs:5
     container_name: golive-srs
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "1935:1935"
     volumes: [./srs.conf:/usr/local/srs/conf/srs.conf:ro]
@@ -201,6 +219,7 @@ services:
     image: minio/minio:latest
     container_name: golive-minio
     restart: unless-stopped
+    logging: *default-logging
     environment:
       MINIO_ROOT_USER: golive
       MINIO_ROOT_PASSWORD: golive_minio_1718011198
@@ -213,6 +232,7 @@ services:
     image: nginx:1.27-alpine
     container_name: golive-nginx
     restart: unless-stopped
+    logging: *default-logging
     depends_on: [srs, api-gateway, im-gateway]
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -227,6 +247,7 @@ services:
     image: jaegertracing/all-in-one:1.60
     container_name: golive-jaeger
     restart: unless-stopped
+    logging: *default-logging
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
@@ -238,6 +259,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.108.0
     container_name: golive-otel
     restart: unless-stopped
+    logging: *default-logging
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
@@ -247,6 +269,7 @@ services:
     image: prom/prometheus:v2.55.0
     container_name: golive-prometheus
     restart: unless-stopped
+    logging: *default-logging
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
@@ -261,6 +284,7 @@ services:
     image: grafana/grafana:11.2.0
     container_name: golive-grafana
     restart: unless-stopped
+    logging: *default-logging
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: golive_grafana_1718011198
