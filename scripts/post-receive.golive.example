@@ -49,6 +49,20 @@ deploy_ref() {
   cd "${WORK_TREE}/golive-backend/deploy"
   docker compose up -d --remove-orphans
 
+  # Go services run via `go run` with the source bind-mounted. `up -d` is a
+  # no-op for already-running containers, so without an explicit restart they
+  # would keep executing the previously-compiled binary from memory and the
+  # newly-pushed Go code would never take effect. Restart them so the in-
+  # container `go run` recompiles from the updated source tree.
+  log "restarting go services to pick up new source"
+  docker compose restart \
+    api-gateway \
+    user-service \
+    room-service \
+    chat-service \
+    gift-service \
+    im-gateway
+
   log "current service status"
   docker compose ps
 }

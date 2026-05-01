@@ -21,6 +21,35 @@ func newSocialSvc(t *testing.T) (*service.SocialService, *miniredis.Miniredis) {
 	return service.NewSocialService(repo.NewSocialRepo(rdb)), mr
 }
 
+func TestFollow_PopulatesSubscriberCountAndListing(t *testing.T) {
+	svc, _ := newSocialSvc(t)
+	ctx := context.Background()
+
+	// Two viewers follow the same channel.
+	st, err := svc.Follow(ctx, "viewer-A", "ch-creator")
+	require.NoError(t, err)
+	require.True(t, st.Following)
+	require.Equal(t, int64(1), st.SubscriberCount, "Follow should report fresh count")
+
+	st, err = svc.Follow(ctx, "viewer-B", "ch-creator")
+	require.NoError(t, err)
+	require.Equal(t, int64(2), st.SubscriberCount)
+
+	// GetFollow from a third viewer (not following) sees count=2 but following=false.
+	st, err = svc.GetFollow(ctx, "viewer-C", "ch-creator")
+	require.NoError(t, err)
+	require.False(t, st.Following)
+	require.Equal(t, int64(2), st.SubscriberCount)
+
+	// ListSubscriptions for viewer-A returns ch-creator.
+	resp, err := svc.ListSubscriptions(ctx, "viewer-A")
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "ch-creator", resp.Items[0].ChannelID)
+	require.Equal(t, int64(2), resp.Items[0].SubscriberCount)
+	require.NotNil(t, resp.Items[0].Stream, "stream placeholder must be set so the grid can render the channel")
+}
+
 func TestFollow_Toggle(t *testing.T) {
 	svc, _ := newSocialSvc(t)
 	ctx := context.Background()
