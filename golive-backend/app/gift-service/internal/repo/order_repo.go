@@ -130,6 +130,19 @@ func (r *OrderRepo) RoomOwner(ctx context.Context, roomID string) (string, error
 	return roomOwnerID(r.db.WithContext(ctx), roomID)
 }
 
+// GetBetRound loads a bet round by id. Returns ErrBetRoundNotFound if absent.
+func (r *OrderRepo) GetBetRound(ctx context.Context, roundID string) (*model.BetRound, error) {
+	var round model.BetRound
+	err := r.db.WithContext(ctx).Where("id = ?", roundID).Take(&round).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrBetRoundNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &round, nil
+}
+
 func (r *OrderRepo) LatestBetRound(ctx context.Context, roomID, userID string) (*model.BetRound, []BetOptionSummary, *model.BetWager, error) {
 	var round model.BetRound
 	err := r.db.WithContext(ctx).

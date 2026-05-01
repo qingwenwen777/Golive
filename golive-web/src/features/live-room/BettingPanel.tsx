@@ -66,6 +66,14 @@ export function BettingPanel({
       openLogin();
       return;
     }
+    if (!accepting) {
+      toast.error('竞猜已封盘。');
+      return;
+    }
+    if (myWager) {
+      toast.error('你已经下注了。');
+      return;
+    }
     if (round.amount > balance) {
       toast.error('余额不足，无法下注。');
       return;
@@ -172,7 +180,7 @@ export function BettingPanel({
             </div>
           )}
 
-          {ownsStream && (effectiveStatus === 'closed' || round.status === 'open') && (
+          {ownsStream && round.status !== 'settled' && round.status !== 'cancelled' && (
             <div className="gl-bet-host-actions">
               {OPTIONS.map((option) => {
                 const count = optionMap.get(option)?.count ?? 0;
@@ -181,8 +189,8 @@ export function BettingPanel({
                     key={option}
                     type="button"
                     onClick={() => handleSettle(option)}
-                    disabled={settleBet.isPending || count === 0}
-                    title={count === 0 ? '没有赢家时请流盘' : undefined}
+                    disabled={settleBet.isPending}
+                    title={count === 0 ? '该选项无人下注，若需退币请改为流盘' : undefined}
                   >
                     <Trophy size={14} />
                     <span>{option === 'win' ? '能赢' : '不能赢'}</span>

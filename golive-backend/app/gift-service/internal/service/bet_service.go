@@ -111,7 +111,18 @@ func (s *BetService) Settle(ctx context.Context, ownerID, roundID, option string
 		return nil, ErrBetBadOption
 	}
 	now := time.Now().UTC()
-	payload, err := repo.MarshalBetOutbox("settled", &model.BetRound{ID: roundID, WinningOption: option, Status: model.BetRoundSettled}, nil, "", option, now.UnixMilli())
+	// Probe the round so the outbox payload carries the correct roomId; the
+	// authoritative status check still happens inside SettleBetRound.
+	probe, err := s.orders.GetBetRound(ctx, roundID)
+	if err != nil {
+		return nil, mapBetErr(err)
+	}
+	if probe.OwnerID != ownerID {
+		return nil, ErrBetUnauthorized
+	}
+	probe.Status = model.BetRoundSettled
+	probe.WinningOption = option
+	payload, err := repo.MarshalBetOutbox("settled", probe, nil, "", option, now.UnixMilli())
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +139,15 @@ func (s *BetService) Settle(ctx context.Context, ownerID, roundID, option string
 
 func (s *BetService) Cancel(ctx context.Context, ownerID, roundID string) (*BetRoundView, error) {
 	now := time.Now().UTC()
-	payload, err := repo.MarshalBetOutbox("cancelled", &model.BetRound{ID: roundID, Status: model.BetRoundCancelled}, nil, "", "", now.UnixMilli())
+	probe, err := s.orders.GetBetRound(ctx, roundID)
+	if err != nil {
+		return nil, mapBetErr(err)
+	}
+	if probe.OwnerID != ownerID {
+		return nil, ErrBetUnauthorized
+	}
+	probe.Status = model.BetRoundCancelled
+	payload, err := repo.MarshalBetOutbox("cancelled", probe, nil, "", "", now.UnixMilli())
 	if err != nil {
 		return nil, err
 	}

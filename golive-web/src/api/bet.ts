@@ -43,8 +43,10 @@ export function useLatestBet(roomId: string, enabled = true) {
       return data;
     },
     enabled: enabled && !!roomId,
-    staleTime: 2_000,
-    refetchInterval: 5_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 2_000,
   });
 }
 
@@ -61,6 +63,8 @@ export function useOpenBet(roomId: string) {
     },
     onSuccess: (data) => {
       qc.setQueryData(betQueryKey(roomId), data);
+      void qc.invalidateQueries({ queryKey: betQueryKey(roomId) });
+      void qc.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
