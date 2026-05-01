@@ -31,6 +31,17 @@ function emptySlice(): RoomSlice {
   return { messages: [], bullets: [], viewerCount: 0, viewers: [], lastServerTs: 0 };
 }
 
+function mergeMessageFields(current: Message | undefined, incoming: Message): Message {
+  if (!current || current.kind !== incoming.kind) return incoming;
+  if (current.kind !== 'chat' || incoming.kind !== 'chat') return incoming;
+  return {
+    ...incoming,
+    avatar: incoming.avatar ?? current.avatar,
+    color: incoming.color ?? current.color,
+    fanBadge: incoming.fanBadge ?? current.fanBadge,
+  };
+}
+
 interface RealtimeState {
   rooms: Record<string, RoomSlice>;
   ensureRoom: (roomId: string) => void;
@@ -88,7 +99,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
           byID.set(message.id, message);
         }
         for (const message of messages) {
-          byID.set(message.id, message);
+          byID.set(message.id, mergeMessageFields(byID.get(message.id), message));
         }
         const next = Array.from(byID.values()).sort((a, b) => a.ts - b.ts);
         const capped = next.length > MESSAGE_CAP ? next.slice(next.length - MESSAGE_CAP) : next;

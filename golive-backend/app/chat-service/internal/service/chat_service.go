@@ -82,6 +82,7 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 	if id == "" {
 		id = uuid.NewString()
 	}
+	fanBadge := safeFanBadge(ev.FanBadge)
 
 	d := &model.Danmu{
 		ID:       id,
@@ -92,11 +93,14 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 		Text:     cleanText,
 		Ts:       ev.Ts,
 	}
+	if fanBadge != nil {
+		d.FanBadgeCreatorID = fanBadge.CreatorID
+		d.FanBadgeLevel = fanBadge.Level
+	}
 	if err := s.danmus.Insert(ctx, d); err != nil {
 		return fmt.Errorf("persist: %w", err)
 	}
 	pub := d.ToPublic()
-	pub.FanBadge = safeFanBadge(ev.FanBadge)
 	payload, err := json.Marshal(pub)
 	if err != nil {
 		return err

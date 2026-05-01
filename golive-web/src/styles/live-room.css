@@ -916,6 +916,12 @@
   background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
   box-shadow: 0 0 0 1px rgba(255, 139, 193, 0.2), 0 0 10px rgba(255, 139, 193, 0.2);
 }
+.gl-chat-line.is-fan {
+  align-items: center;
+}
+.gl-chat-line.is-fan .gl-chat-body {
+  padding-top: 1px;
+}
 .gl-chat-line.is-owner .gl-chat-body {
   display: flex;
   min-height: 30px;
