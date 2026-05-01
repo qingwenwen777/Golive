@@ -70,6 +70,8 @@ export function Player({
   const [volume, setVolume] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
   const [pip, setPip] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideControlsTimerRef = useRef<number | null>(null);
 
   const danmuOn = useDanmuStore((s) => s.on);
   const toggleDanmu = useDanmuStore((s) => s.toggle);
@@ -318,10 +320,38 @@ export function Player({
     }
   };
 
+  const showControlsTemporarily = useCallback(() => {
+    setControlsVisible(true);
+    if (hideControlsTimerRef.current) {
+      window.clearTimeout(hideControlsTimerRef.current);
+    }
+    hideControlsTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      hideControlsTimerRef.current = null;
+    }, 2600);
+  }, []);
+
+  useEffect(() => {
+    showControlsTemporarily();
+    return () => {
+      if (hideControlsTimerRef.current) {
+        window.clearTimeout(hideControlsTimerRef.current);
+        hideControlsTimerRef.current = null;
+      }
+    };
+  }, [showControlsTemporarily]);
+
   const viewers = viewerCount ?? stream.viewers + extraViewers;
 
   return (
-    <div ref={containerRef} className="gl-player group">
+    <div
+      ref={containerRef}
+      className="gl-player group"
+      onMouseMove={showControlsTemporarily}
+      onPointerDown={showControlsTemporarily}
+      onTouchStart={showControlsTemporarily}
+      onFocusCapture={showControlsTemporarily}
+    >
       <video
         ref={videoRef}
         className="gl-video"
@@ -362,7 +392,10 @@ export function Player({
 
       <DanmuLayer bullets={bullets} onBulletEnd={onBulletEnd} />
 
-      <div className={cn('gl-player-ctl', 'is-on')}>
+      <div
+        className={cn('gl-player-ctl', controlsVisible && 'is-on')}
+        onPointerDown={showControlsTemporarily}
+      >
         <div className="gl-progress" aria-label={t('player.liveProgress')}>
           <div className="gl-progress-fill" style={{ width: '100%' }} />
         </div>

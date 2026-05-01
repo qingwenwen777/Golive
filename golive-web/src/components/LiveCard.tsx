@@ -1,8 +1,19 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Icons } from '@/components/Icons';
 import { Avatar } from '@/components/Avatar';
 import { LiveBadge } from '@/components/LiveBadge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { copyText } from '@/lib/clipboard';
+import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
 import { useLangStore } from '@/stores/useLangStore';
 import { streamChannelName, type Stream } from '@/types/stream';
 
@@ -36,11 +47,44 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
   const channelName = streamChannelName(stream);
   const isLive = stream.isLive === true || stream.status === 'live';
+  const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
+
+  useEffect(() => {
+    setSaved(isInLibrary(WATCH_LATER_KEY, stream.id));
+  }, [stream.id]);
 
   const handleOpen = () => {
     if (!isLive) return;
     if (onClick) onClick(stream);
     else navigate(`/live/${stream.id}`);
+  };
+
+  const toggleWatchLater = () => {
+    if (saved) {
+      removeFromLibrary(WATCH_LATER_KEY, stream.id);
+      setSaved(false);
+      toast.success('Removed from Watch later.');
+      return;
+    }
+    saveToLibrary(WATCH_LATER_KEY, stream);
+    setSaved(true);
+    toast.success('Saved to Watch later.');
+  };
+
+  const copyLink = async () => {
+    const href = `${window.location.origin}/live/${stream.id}`;
+    try {
+      const method = await copyText(href, 'live room link');
+      if (method === 'manual') toast.info('Live room link opened for manual copy.');
+      else toast.success('Live room link copied.');
+    } catch {
+      toast.error('Could not copy the live room link.');
+    }
+  };
+
+  const openChannel = () => {
+    const key = stream.channelId || channelName || stream.channel;
+    navigate(`/channel/${encodeURIComponent(key)}`);
   };
 
   return (
@@ -112,13 +156,29 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             <span className="truncate">{category}</span>
           </div>
         </div>
-        <button
-          className="gl-icon-btn gl-card-more"
-          aria-label="More"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Icons.More size={18} />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="gl-icon-btn gl-card-more"
+              aria-label="More actions"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Icons.More size={18} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-48"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem onSelect={toggleWatchLater}>
+              {saved ? 'Remove from Watch later' : 'Save to Watch later'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={copyLink}>Copy live link</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={openChannel}>Open channel</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

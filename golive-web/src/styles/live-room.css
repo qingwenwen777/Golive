@@ -723,7 +723,8 @@
 }
 @media (max-width: 480px) {
   .gl-emoji-popover {
-    right: -104px;
+    right: 0;
+    width: min(320px, calc(100vw - 48px));
   }
 }
 
@@ -822,10 +823,14 @@
 
 @media (max-width: 767px) {
   .gl-player {
+    position: sticky;
+    top: 54px;
+    z-index: 30;
     width: calc(100% + 32px);
     margin-right: -16px;
     margin-left: -16px;
     border-radius: 0;
+    box-shadow: 0 1px 0 var(--gl-border);
   }
 
   .gl-player-top {
@@ -931,7 +936,8 @@
   }
 
   .gl-emoji-popover {
-    right: -88px;
+    right: 0;
+    width: min(320px, calc(100vw - 48px));
   }
 
   .gl-sc-dialog.is-mobile {
@@ -1039,6 +1045,7 @@
   }
 
   .gl-emoji-popover {
-    right: -116px;
+    right: 0;
+    width: min(312px, calc(100vw - 40px));
   }
 }

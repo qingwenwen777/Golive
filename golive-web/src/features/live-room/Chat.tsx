@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { ChevronDown, MoreVertical, X, Smile, CircleDollarSign, Send, Gift } from 'lucide-react';
+import { Smile, CircleDollarSign, Send, Gift } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { tierSpec } from '@/constants/chat';
 import type {
@@ -20,7 +20,6 @@ export interface ChatProps {
   messages: Message[];
   onSendSuperChat?: () => void;
   sheetMode?: boolean;
-  onClose?: () => void;
   reconnecting?: boolean;
   reconnectingLabel?: string;
   onSendChat?: (text: string) => boolean | void;
@@ -157,7 +156,6 @@ export function Chat({
   messages,
   onSendSuperChat,
   sheetMode,
-  onClose,
   reconnecting,
   reconnectingLabel,
   onSendChat,
@@ -250,22 +248,6 @@ export function Chat({
 
   return (
     <aside className={cn('gl-chat', sheetMode && 'is-sheet')} aria-label={t('liveRoom.chat')}>
-      <div className="gl-chat-head">
-        <button className="gl-chat-tab" aria-label={t('liveRoom.topChat')}>
-          <span>{t('liveRoom.topChat')}</span>
-          <ChevronDown size={16} />
-        </button>
-        <div className="flex-1" />
-        <button className="gl-icon-btn sm" aria-label={t('liveRoom.more')}>
-          <MoreVertical size={18} />
-        </button>
-        {sheetMode && (
-          <button className="gl-icon-btn sm" aria-label={t('liveRoom.close')} onClick={onClose}>
-            <X size={18} />
-          </button>
-        )}
-      </div>
-
       <div className="gl-chat-list" ref={listRef}>
         {messages.map((m) => {
           if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
@@ -420,10 +402,6 @@ export function Chat({
             <CircleDollarSign size={18} />
           </button>
         </div>
-      </div>
-
-      <div className="gl-chat-foot">
-        <span>{t('liveRoom.liveChat')}</span>
       </div>
     </aside>
   );
