@@ -256,24 +256,28 @@ func (r *OrderRepo) PersistSuperChatFailure(ctx context.Context, o *model.SuperC
 // MarshalGiftOutbox / MarshalSuperChatOutbox build the payload that downstream
 // (kafka consumer → Redis publish) will broadcast. Field names match
 // im-gateway/internal/hub/messages.go.
-func MarshalGiftOutbox(id, requestID, username, giftName, giftIcon string, count, tier int, ts int64) ([]byte, error) {
+func MarshalGiftOutbox(id, requestID, userID, username, avatar, giftName, giftIcon string, count, tier int, totalCoin, ts int64) ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"type":      "gift",
 		"id":        id,
 		"requestId": requestID,
+		"userId":    userID,
 		"user":      username,
+		"avatar":    avatar,
 		"giftName":  giftName,
 		"giftIcon":  giftIcon,
 		"count":     count,
 		"tier":      tier,
+		"totalCoin": totalCoin,
 		"ts":        ts,
 	})
 }
 
-func MarshalSuperChatOutbox(id, user, avatar, amount string, tier int, text string, ts int64) ([]byte, error) {
+func MarshalSuperChatOutbox(id, userID, user, avatar, amount string, tier int, text string, ts int64) ([]byte, error) {
 	payload := map[string]any{
 		"type":   "super_chat",
 		"id":     id,
+		"userId": userID,
 		"user":   user,
 		"amount": amount,
 		"tier":   tier,

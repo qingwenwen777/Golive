@@ -158,11 +158,33 @@ func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
 		// the client can clear its reconnect spinner.
 		_ = c.Send(hub.EncodeSystem("resumed"))
 		return
+	case "viewer_profile":
+		c.handleViewerProfile(in.User, in.Avatar)
+		return
 	case "chat":
 		c.handleChat(ctx, in.Text, in.User, in.Avatar, in.ClientID)
 	default:
 		metrics.MessagesDropped.WithLabelValues("unknown_type").Inc()
 	}
+}
+
+func (c *Conn) handleViewerProfile(username, avatar string) {
+	if c.hub == nil {
+		return
+	}
+	username = safeUsername(username)
+	avatar = safeAvatar(avatar)
+	if username == "" {
+		username = "Guest"
+		if c.identity.UserID != "" {
+			username = c.identity.UserID
+		}
+	}
+	c.hub.UpdateViewer(c.roomID, c.id, hub.ViewerProfile{
+		UserID: c.identity.UserID,
+		User:   username,
+		Avatar: avatar,
+	})
 }
 
 func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string) {

@@ -9,10 +9,18 @@ export interface Bullet {
   ts: number;
 }
 
+export interface RoomViewer {
+  userId?: string;
+  user: string;
+  avatar?: string;
+  contribution: number;
+}
+
 interface RoomSlice {
   messages: Message[];
   bullets: Bullet[];
   viewerCount: number;
+  viewers: RoomViewer[];
   lastServerTs: number;
 }
 
@@ -20,7 +28,7 @@ const MESSAGE_CAP = 500;
 const BULLET_CAP = 40;
 
 function emptySlice(): RoomSlice {
-  return { messages: [], bullets: [], viewerCount: 0, lastServerTs: 0 };
+  return { messages: [], bullets: [], viewerCount: 0, viewers: [], lastServerTs: 0 };
 }
 
 interface RealtimeState {
@@ -34,6 +42,7 @@ interface RealtimeState {
   appendBullet: (roomId: string, b: Bullet) => void;
   clearBullet: (roomId: string, id: string) => void;
   setViewerCount: (roomId: string, n: number) => void;
+  setViewers: (roomId: string, viewers: RoomViewer[], total?: number) => void;
 }
 
 function updateRoom(
@@ -126,6 +135,14 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
     ),
   setViewerCount: (roomId, n) =>
     set((state) => updateRoom(state, roomId, (slice) => ({ ...slice, viewerCount: n }))),
+  setViewers: (roomId, viewers, total) =>
+    set((state) =>
+      updateRoom(state, roomId, (slice) => ({
+        ...slice,
+        viewers,
+        viewerCount: total ?? slice.viewerCount,
+      })),
+    ),
 }));
 
 export function useRoomSlice(roomId: string): RoomSlice {

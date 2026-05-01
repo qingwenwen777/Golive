@@ -64,7 +64,7 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 	username := s.broadcastName(ctx, req)
 	avatar, _ := s.orders.AvatarForUser(ctx, req.UserID)
 
-	payload, err := repo.MarshalSuperChatOutbox(orderID, username, avatar,
+	payload, err := repo.MarshalSuperChatOutbox(orderID, req.UserID, username, avatar,
 		strconv.FormatInt(req.Amount, 10), tier, req.Text, now.UnixMilli())
 	if err != nil {
 		return nil, false, err

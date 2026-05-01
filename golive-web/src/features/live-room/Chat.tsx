@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { ChevronDown, Smile, CircleDollarSign, Send, Gift } from 'lucide-react';
+import {
+  ChevronDown,
+  Smile,
+  CircleDollarSign,
+  Send,
+  Gift,
+  MessageCircle,
+  Users,
+} from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { tierSpec } from '@/constants/chat';
 import type {
@@ -15,9 +23,12 @@ import { cn } from '@/lib/cn';
 import { useIsAuthed, useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
+import type { RoomViewer } from '@/stores/useRealtimeStore';
 
 export interface ChatProps {
   messages: Message[];
+  viewers?: RoomViewer[];
+  viewerTotal?: number;
   ownerId?: string;
   ownerName?: string;
   onSendSuperChat?: () => void;
@@ -31,21 +42,60 @@ export interface ChatProps {
 const EMOJI_GROUPS = [
   {
     id: 'faces',
-    icon: '😀',
+    icon: '\u{1f600}',
     label: 'Faces',
-    items: ['😀', '😄', '😂', '😊', '😍', '🥳', '😎', '🤔', '😭', '😡', '😴', '🤯'],
+    items: [
+      '\u{1f600}',
+      '\u{1f604}',
+      '\u{1f602}',
+      '\u{1f60a}',
+      '\u{1f60d}',
+      '\u{1f973}',
+      '\u{1f60e}',
+      '\u{1f914}',
+      '\u{1f62d}',
+      '\u{1f621}',
+      '\u{1f634}',
+      '\u{1f92f}',
+    ],
   },
   {
     id: 'gestures',
-    icon: '👍',
+    icon: '\u{1f44d}',
     label: 'Gestures',
-    items: ['👍', '👎', '👏', '🙌', '🙏', '🤝', '💪', '👀', '✌️', '🤘', '👌', '🫶'],
+    items: [
+      '\u{1f44d}',
+      '\u{1f44e}',
+      '\u{1f44f}',
+      '\u{1f64c}',
+      '\u{1f64f}',
+      '\u{1f91d}',
+      '\u{1f4aa}',
+      '\u{1f440}',
+      '\u{270c}\ufe0f',
+      '\u{1f918}',
+      '\u{1f44c}',
+      '\u{1faf6}',
+    ],
   },
   {
     id: 'stream',
-    icon: '❤️',
+    icon: '\u{2764}\ufe0f',
     label: 'Stream',
-    items: ['❤️', '🔥', '✨', '🎉', '💯', '⭐', '🌟', '⚡', '🎵', '🎮', '🏆', '💎'],
+    items: [
+      '\u{2764}\ufe0f',
+      '\u{1f525}',
+      '\u{2728}',
+      '\u{1f389}',
+      '\u{1f4af}',
+      '\u{2b50}',
+      '\u{1f31f}',
+      '\u{26a1}',
+      '\u{1f3b5}',
+      '\u{1f3ae}',
+      '\u{1f3c6}',
+      '\u{1f48e}',
+    ],
   },
 ] as const;
 
@@ -53,19 +103,19 @@ const MAX_CHAT_CHARS = 200;
 
 const SC_PIN_REFRESH_MS = 1000;
 
+type ChatPanelTab = 'chat' | 'viewers';
+
 function parseAmountValue(amount: string): number {
   const raw = amount.replace(/[^\d]/g, '');
   const value = Number(raw);
   return Number.isFinite(value) ? value : 0;
 }
 
-// formatYenAmount normalises a wire amount (raw "1000", "1,000", or "¥1,000")
-// to a single canonical "¥1,000" rendering. Keeping ¥ on the client side
-// avoids encoding surprises (Safari has been seen to render a server-side ¥
-// as 楼 when something in the pipeline misroutes the byte sequence).
+// formatYenAmount normalises a wire amount (raw "1000", "1,000", or "JPY1,000")
+// to a single canonical yen rendering while keeping the source ASCII-safe.
 function formatYenAmount(amount: string): string {
   const n = parseAmountValue(amount);
-  return `¥${n.toLocaleString('en-US')}`;
+  return `\u00a5${n.toLocaleString('en-US')}`;
 }
 
 function superChatPinDurationMs(m: SuperChatMessage): number {
@@ -261,8 +311,63 @@ function GiftNotice({ m }: { m: GiftMessage }) {
   );
 }
 
+function formatContribution(value: number): string {
+  return Math.max(0, Math.floor(value)).toLocaleString('en-US');
+}
+
+function ViewerRankList({ viewers, total }: { viewers: RoomViewer[]; total: number }) {
+  const sorted = viewers
+    .slice()
+    .sort((a, b) => {
+      if (a.contribution !== b.contribution) return b.contribution - a.contribution;
+      return a.user.localeCompare(b.user);
+    })
+    .slice(0, 100);
+
+  return (
+    <div className="gl-viewer-panel">
+      <div className="gl-viewer-summary">
+        <span>
+          {total.toLocaleString('en-US')} {'\u4eba\u5728\u770b'}
+        </span>
+        <span>{'\u65e5\u8d21\u732e\u503c'}</span>
+      </div>
+      {sorted.length === 0 ? (
+        <div className="gl-viewer-empty">
+          <Users size={34} strokeWidth={1.6} />
+          <span>{'\u6682\u65e0\u5728\u7ebf\u89c2\u4f17'}</span>
+        </div>
+      ) : (
+        <div className="gl-viewer-list">
+          {sorted.map((viewer, index) => {
+            const rank = index + 1;
+            return (
+              <div key={`${viewer.userId ?? viewer.user}-${index}`} className="gl-viewer-row">
+                <span className={cn('gl-viewer-rank', rank <= 3 && `top-${rank}`)}>
+                  {rank <= 3 ? `\u699c${rank}` : rank}
+                </span>
+                <Avatar name={viewer.user} src={viewer.avatar} size={34} />
+                <div className="gl-viewer-main">
+                  <span className="gl-viewer-name">{viewer.user}</span>
+                  <span className="gl-viewer-sub">{'\u5728\u7ebf'}</span>
+                </div>
+                <div className="gl-viewer-score">
+                  <span>{formatContribution(viewer.contribution)}</span>
+                  <small>{'\u8d21\u732e\u503c'}</small>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Chat({
   messages,
+  viewers = [],
+  viewerTotal,
   ownerId,
   ownerName,
   onSendSuperChat,
@@ -281,6 +386,7 @@ export function Chat({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [emojiGroup, setEmojiGroup] = useState<(typeof EMOJI_GROUPS)[number]['id']>('faces');
   const [now, setNow] = useState(() => Date.now());
+  const [activeTab, setActiveTab] = useState<ChatPanelTab>('chat');
   const [expandedPinnedId, setExpandedPinnedId] = useState<string | null>(null);
   // Track IME composition so Enter during candidate selection (CJK input
   // methods) does not submit a half-finished message.
@@ -392,8 +498,32 @@ export function Chat({
 
   return (
     <aside className={cn('gl-chat', sheetMode && 'is-sheet')} aria-label={t('liveRoom.chat')}>
-      <div className="gl-chat-title">Chat</div>
-      {pinnedSuperChats.length > 0 && (
+      <div className="gl-chat-tabs" role="tablist" aria-label={t('liveRoom.chat')}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'chat'}
+          className={cn('gl-chat-tab-btn', activeTab === 'chat' && 'is-active')}
+          onClick={() => setActiveTab('chat')}
+        >
+          <MessageCircle size={16} />
+          <span>{'\u804a\u5929'}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'viewers'}
+          className={cn('gl-chat-tab-btn', activeTab === 'viewers' && 'is-active')}
+          onClick={() => setActiveTab('viewers')}
+        >
+          <Users size={16} />
+          <span>{'\u623f\u95f4\u89c2\u4f17'}</span>
+          <span className="gl-chat-tab-count">
+            {(viewerTotal ?? viewers.length).toLocaleString('en-US')}
+          </span>
+        </button>
+      </div>
+      {activeTab === 'chat' && pinnedSuperChats.length > 0 && (
         <div className="gl-sc-pin-stack" aria-label="Pinned SuperChats">
           {pinnedSuperChats.map(({ message, remainingMs, durationMs }) => (
             <PinnedSuperChatCard
@@ -409,168 +539,174 @@ export function Chat({
           ))}
         </div>
       )}
-      <div className="gl-chat-list" ref={listRef}>
-        {messages.map((m) => {
-          if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
-          if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
-          if (m.kind === 'super_chat') return <SuperChatCard key={m.id} m={m} />;
-          return (
-            <ChatRow
-              key={m.id}
-              m={m as ChatMessage}
-              isOwner={isOwnerMessage(m as ChatMessage, ownerId, ownerName)}
-            />
-          );
-        })}
-      </div>
+      {activeTab === 'chat' ? (
+        <div className="gl-chat-list" ref={listRef}>
+          {messages.map((m) => {
+            if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
+            if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
+            if (m.kind === 'super_chat') return <SuperChatCard key={m.id} m={m} />;
+            return (
+              <ChatRow
+                key={m.id}
+                m={m as ChatMessage}
+                isOwner={isOwnerMessage(m as ChatMessage, ownerId, ownerName)}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <ViewerRankList viewers={viewers} total={viewerTotal ?? viewers.length} />
+      )}
 
-      {reconnecting && (
+      {activeTab === 'chat' && reconnecting && (
         <div
           className="gl-chat-reconnect-bar flex items-center justify-center gap-2 bg-bg-hover px-3 py-1 text-xs text-text-secondary"
           role="status"
           aria-live="polite"
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-text-secondary" />
-          <span>{reconnectingLabel ?? 'Reconnecting…'}</span>
+          <span>{reconnectingLabel ?? 'Reconnecting...'}</span>
         </div>
       )}
 
-      <div className="gl-chat-input">
-        <Avatar
-          name={currentUser ? userDisplayName(currentUser) : 'You Viewer'}
-          src={currentUser?.avatar}
-          size={24}
-        />
-        <div className="gl-chat-input-row">
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => {
-              if (!isAuthed) return;
-              inputValueRef.current = e.target.value;
-              setInput(e.target.value);
-            }}
-            onFocus={() => {
-              onComposerFocusChange?.(true);
-              if (!isAuthed) openLogin();
-            }}
-            onBlur={() => onComposerFocusChange?.(false)}
-            onCompositionStart={() => {
-              composingRef.current = true;
-            }}
-            onCompositionEnd={() => {
-              composingRef.current = false;
-            }}
-            onKeyDown={(e) => {
-              if (!isAuthed) {
-                e.preventDefault();
-                openLogin();
-                return;
-              }
-              if (e.key !== 'Enter') return;
-              // Skip Enter while an IME composition is active. Some browsers
-              // also fire Enter with keyCode 229 during composition — guard
-              // both to be safe.
-              if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
-                return;
-              }
-              e.preventDefault();
-              trySend();
-            }}
-            placeholder={isAuthed ? t('liveRoom.sayHi') : 'Sign in to chat'}
-            aria-label={t('liveRoom.chatInput')}
-            readOnly={!isAuthed}
+      {activeTab === 'chat' && (
+        <div className="gl-chat-input">
+          <Avatar
+            name={currentUser ? userDisplayName(currentUser) : 'You Viewer'}
+            src={currentUser?.avatar}
+            size={24}
           />
-          <div className="gl-emoji-wrap" ref={emojiWrapRef}>
+          <div className="gl-chat-input-row">
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => {
+                if (!isAuthed) return;
+                inputValueRef.current = e.target.value;
+                setInput(e.target.value);
+              }}
+              onFocus={() => {
+                onComposerFocusChange?.(true);
+                if (!isAuthed) openLogin();
+              }}
+              onBlur={() => onComposerFocusChange?.(false)}
+              onCompositionStart={() => {
+                composingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                composingRef.current = false;
+              }}
+              onKeyDown={(e) => {
+                if (!isAuthed) {
+                  e.preventDefault();
+                  openLogin();
+                  return;
+                }
+                if (e.key !== 'Enter') return;
+                // Skip Enter while an IME composition is active. Some browsers
+                // also fire Enter with keyCode 229 during composition 鈥?guard
+                // both to be safe.
+                if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
+                  return;
+                }
+                e.preventDefault();
+                trySend();
+              }}
+              placeholder={isAuthed ? t('liveRoom.sayHi') : 'Sign in to chat'}
+              aria-label={t('liveRoom.chatInput')}
+              readOnly={!isAuthed}
+            />
+            <div className="gl-emoji-wrap" ref={emojiWrapRef}>
+              <button
+                type="button"
+                className={cn('gl-icon-btn sm', emojiOpen && 'is-active')}
+                aria-label={t('liveRoom.emoji')}
+                aria-haspopup="dialog"
+                aria-expanded={emojiOpen}
+                onClick={() => {
+                  if (!isAuthed) {
+                    openLogin();
+                    return;
+                  }
+                  setEmojiOpen((open) => !open);
+                }}
+              >
+                <Smile size={18} />
+              </button>
+              {emojiOpen && (
+                <div
+                  className="gl-emoji-popover"
+                  role="dialog"
+                  aria-label={t('liveRoom.emoji')}
+                  onPointerDown={(event) => event.preventDefault()}
+                >
+                  <div className="gl-emoji-tabs" role="tablist" aria-label={t('liveRoom.emoji')}>
+                    {EMOJI_GROUPS.map((group) => (
+                      <button
+                        key={group.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={emojiGroup === group.id}
+                        aria-label={group.label}
+                        title={group.label}
+                        className={cn('gl-emoji-tab', emojiGroup === group.id && 'is-active')}
+                        onClick={() => setEmojiGroup(group.id)}
+                      >
+                        {group.icon}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="gl-emoji-grid" role="group" aria-label={activeEmojiGroup.label}>
+                    {activeEmojiGroup.items.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className="gl-emoji-item"
+                        aria-label={emoji}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          insertEmoji(emoji);
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <button
-              type="button"
-              className={cn('gl-icon-btn sm', emojiOpen && 'is-active')}
-              aria-label={t('liveRoom.emoji')}
-              aria-haspopup="dialog"
-              aria-expanded={emojiOpen}
+              className="gl-icon-btn sm"
+              aria-label={t('liveRoom.send')}
+              title={t('liveRoom.send')}
+              disabled={isAuthed && (!input.trim() || charCount(input.trim()) > MAX_CHAT_CHARS)}
               onClick={() => {
                 if (!isAuthed) {
                   openLogin();
                   return;
                 }
-                setEmojiOpen((open) => !open);
+                trySend();
               }}
             >
-              <Smile size={18} />
+              <Send size={18} />
             </button>
-            {emojiOpen && (
-              <div
-                className="gl-emoji-popover"
-                role="dialog"
-                aria-label={t('liveRoom.emoji')}
-                onPointerDown={(event) => event.preventDefault()}
-              >
-                <div className="gl-emoji-tabs" role="tablist" aria-label={t('liveRoom.emoji')}>
-                  {EMOJI_GROUPS.map((group) => (
-                    <button
-                      key={group.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={emojiGroup === group.id}
-                      aria-label={group.label}
-                      title={group.label}
-                      className={cn('gl-emoji-tab', emojiGroup === group.id && 'is-active')}
-                      onClick={() => setEmojiGroup(group.id)}
-                    >
-                      {group.icon}
-                    </button>
-                  ))}
-                </div>
-                <div className="gl-emoji-grid" role="group" aria-label={activeEmojiGroup.label}>
-                  {activeEmojiGroup.items.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className="gl-emoji-item"
-                      aria-label={emoji}
-                      onPointerDown={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        insertEmoji(emoji);
-                      }}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button
+              className="gl-icon-btn sm"
+              aria-label={t('liveRoom.superChat')}
+              onClick={() => {
+                if (!isAuthed) {
+                  openLogin(() => onSendSuperChat?.());
+                  return;
+                }
+                onSendSuperChat?.();
+              }}
+            >
+              <CircleDollarSign size={18} />
+            </button>
           </div>
-          <button
-            className="gl-icon-btn sm"
-            aria-label={t('liveRoom.send')}
-            title={t('liveRoom.send')}
-            disabled={isAuthed && (!input.trim() || charCount(input.trim()) > MAX_CHAT_CHARS)}
-            onClick={() => {
-              if (!isAuthed) {
-                openLogin();
-                return;
-              }
-              trySend();
-            }}
-          >
-            <Send size={18} />
-          </button>
-          <button
-            className="gl-icon-btn sm"
-            aria-label={t('liveRoom.superChat')}
-            onClick={() => {
-              if (!isAuthed) {
-                openLogin(() => onSendSuperChat?.());
-                return;
-              }
-              onSendSuperChat?.();
-            }}
-          >
-            <CircleDollarSign size={18} />
-          </button>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

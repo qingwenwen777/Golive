@@ -16,6 +16,7 @@ export interface ChatMessage {
 export interface SuperChatMessage {
   id: string;
   kind: 'super_chat';
+  userId?: string;
   user: string;
   avatar?: string;
   amount: string;
@@ -37,11 +38,14 @@ export interface GiftMessage {
   id: string;
   kind: 'gift';
   requestId?: string;
+  userId?: string;
   user: string;
+  avatar?: string;
   giftName: string;
   giftIcon?: string;
   count?: number;
   tier?: 0 | 1 | 2 | 3;
+  totalCoin?: number;
   ts: number;
   self?: boolean;
 }

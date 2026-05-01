@@ -22,6 +22,7 @@ interface ServerChat {
 interface ServerSuperChat {
   type: 'super_chat';
   id?: string;
+  userId?: string;
   user: string;
   avatar?: string;
   amount: string;
@@ -33,16 +34,30 @@ interface ServerGift {
   type: 'gift';
   id?: string;
   requestId?: string;
+  userId?: string;
   user: string;
+  avatar?: string;
   giftName: string;
   giftIcon?: string;
   count?: number;
   tier?: 0 | 1 | 2 | 3;
+  totalCoin?: number;
   ts?: number;
 }
 interface ServerViewerCount {
   type: 'viewer_count';
   count: number;
+}
+interface ServerViewerList {
+  type: 'viewer_list';
+  total: number;
+  viewers: Array<{
+    userId?: string;
+    user: string;
+    avatar?: string;
+    contribution?: number;
+  }>;
+  ts?: number;
 }
 interface ServerSystem {
   type: 'system';
@@ -60,6 +75,7 @@ type ServerMessage =
   | ServerSuperChat
   | ServerGift
   | ServerViewerCount
+  | ServerViewerList
   | ServerSystem
   | ServerLiveStatus;
 
@@ -76,6 +92,7 @@ export interface UseRoomRealtimeReturn {
   retryCount: number;
   messages: Message[];
   viewerCount: number;
+  viewers: ReturnType<typeof useRoomSlice>['viewers'];
   bullets: ReturnType<typeof useRoomSlice>['bullets'];
   sendChat: (text: string) => boolean;
   sendSuperChat: (payload: { amount: string; tier: SuperChatTier; text: string }) => boolean;
@@ -94,6 +111,7 @@ export function useRoomRealtime(
   const appendBullet = useRealtimeStore((s) => s.appendBullet);
   const clearBulletFn = useRealtimeStore((s) => s.clearBullet);
   const setViewerCount = useRealtimeStore((s) => s.setViewerCount);
+  const setViewers = useRealtimeStore((s) => s.setViewers);
   const danmuOn = useDanmuStore((s) => s.on);
   const currentUser = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -151,6 +169,15 @@ export function useRoomRealtime(
   });
 
   useEffect(() => {
+    if (readyState !== 'open') return;
+    sendMessage({
+      type: 'viewer_profile',
+      user: currentUser ? userDisplayName(currentUser) : 'Guest',
+      avatar: currentUser?.avatar,
+    });
+  }, [readyState, sendMessage, currentUser]);
+
+  useEffect(() => {
     if (readyState !== 'reconnecting' || !authToken) return;
     if (refreshedTokenRef.current === authToken) return;
     refreshedTokenRef.current = authToken;
@@ -205,6 +232,7 @@ export function useRoomRealtime(
         appendMessage(roomId, {
           id: parsed.id ?? genId('sc'),
           kind: 'super_chat',
+          userId: parsed.userId,
           user: parsed.user,
           avatar: parsed.avatar,
           amount: parsed.amount,
@@ -241,17 +269,33 @@ export function useRoomRealtime(
           id: giftMessageId(parsed),
           kind: 'gift',
           requestId: parsed.requestId,
+          userId: parsed.userId,
           user: parsed.user,
+          avatar: parsed.avatar,
           giftName: parsed.giftName,
           giftIcon: parsed.giftIcon,
           count,
           tier: parsed.tier,
+          totalCoin: parsed.totalCoin,
           ts: parsed.ts ?? now,
         });
         break;
       }
       case 'viewer_count': {
         setViewerCount(roomId, parsed.count);
+        break;
+      }
+      case 'viewer_list': {
+        setViewers(
+          roomId,
+          parsed.viewers.map((viewer) => ({
+            userId: viewer.userId,
+            user: viewer.user,
+            avatar: viewer.avatar,
+            contribution: viewer.contribution ?? 0,
+          })),
+          parsed.total,
+        );
         break;
       }
       case 'system': {
@@ -277,7 +321,7 @@ export function useRoomRealtime(
         break;
       }
     }
-  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount, currentUser]);
+  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount, setViewers, currentUser]);
 
   // On reconnect (retryCount reset to 0 after open), send resume with lastTs.
   const prevReadyStateRef = useRef<ReadyState>('closed');
@@ -333,6 +377,7 @@ export function useRoomRealtime(
     retryCount,
     messages: slice.messages,
     viewerCount: slice.viewerCount,
+    viewers: slice.viewers,
     bullets: slice.bullets,
     sendChat,
     sendSuperChat,

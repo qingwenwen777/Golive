@@ -68,7 +68,8 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := newConn(ws, roomID, identity, h.hub, h.producer, h.cfg)
-	if _, err := h.hub.Join(roomID, c); err != nil {
+	room, err := h.hub.Join(roomID, c)
+	if err != nil {
 		logger.L().Error("hub join", zap.Error(err))
 		_ = ws.Close()
 		return
@@ -77,7 +78,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Greet exactly like ws-server.ts: welcome + initial viewer_count. We
 	// SendDirect so other instances don't echo the welcome.
 	c.Send(hub.EncodeSystem(h.welcome))
-	c.Send(hub.EncodeViewerCount(1))
+	c.Send(hub.EncodeViewerCount(room.Size()))
 
 	// Each conn gets its own pumps. readPump exits on disconnect → leave hub.
 	go c.writePump()

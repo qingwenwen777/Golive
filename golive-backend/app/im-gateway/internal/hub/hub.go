@@ -91,6 +91,16 @@ func (h *Hub) Leave(roomID, connID string) {
 	h.mu.Unlock()
 }
 
+func (h *Hub) UpdateViewer(roomID, connID string, profile ViewerProfile) {
+	h.mu.RLock()
+	r, ok := h.rooms[roomID]
+	h.mu.RUnlock()
+	if !ok {
+		return
+	}
+	r.updateViewer(connID, profile)
+}
+
 // Broadcast publishes a payload to a room's broker channel. The hub itself
 // receives this back via its subscription and fans out — this keeps the
 // fan-out path uniform whether the message originated locally or from

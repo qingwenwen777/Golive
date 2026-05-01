@@ -66,6 +66,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
     const pendingMsg: SuperChatMessage = {
       id: pendingId,
       kind: 'super_chat',
+      userId: user.id,
       user: displayName,
       avatar,
       amount: String(amount),
@@ -90,6 +91,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
           replaceMessage(roomId, pendingId, {
             id: order.orderId,
             kind: 'super_chat',
+            userId: user.id,
             user: displayName,
             avatar,
             amount: String(amount),

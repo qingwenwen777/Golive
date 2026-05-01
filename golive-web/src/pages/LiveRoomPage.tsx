@@ -73,7 +73,7 @@ export default function LiveRoomPage() {
     toast.info('Live has ended.');
   }, [id, queryClient, stream]);
 
-  const { readyState, retryCount, messages, bullets, viewerCount, sendChat, clearBullet } =
+  const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
     useRoomRealtime(id, roomIsLive, { onLiveEnded: handleLiveEnded });
 
   useEffect(() => {
@@ -281,6 +281,8 @@ export default function LiveRoomPage() {
         <div className="gl-mobile-chat">
           <Chat
             messages={messages}
+            viewers={viewers}
+            viewerTotal={effectiveViewers}
             ownerId={stream.ownerId}
             ownerName={ownerName}
             onSendChat={sendChat}
@@ -311,6 +313,8 @@ export default function LiveRoomPage() {
           <div className="sticky top-20 self-start">
             <Chat
               messages={messages}
+              viewers={viewers}
+              viewerTotal={effectiveViewers}
               ownerId={stream.ownerId}
               ownerName={ownerName}
               onSendChat={sendChat}
@@ -338,6 +342,8 @@ export default function LiveRoomPage() {
               </SheetHeader>
               <Chat
                 messages={messages}
+                viewers={viewers}
+                viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
                 ownerName={ownerName}
                 onSendChat={sendChat}
@@ -368,11 +374,14 @@ export default function LiveRoomPage() {
             id: `gift:${requestId}`,
             kind: 'gift',
             requestId,
+            userId: currentUser?.id,
             user: currentUser ? userDisplayName(currentUser) : 'You',
+            avatar: currentUser?.avatar,
             giftName: gift.name,
             giftIcon: gift.icon,
             count,
             tier: gift.tier,
+            totalCoin: gift.priceCoin * count,
             self: true,
             ts: Date.now(),
           });

@@ -24,9 +24,30 @@ type ChatMsg struct {
 	Ts     int64  `json:"ts"`
 }
 
+type ViewerProfile struct {
+	UserID string `json:"userId,omitempty"`
+	User   string `json:"user"`
+	Avatar string `json:"avatar,omitempty"`
+}
+
+type ViewerListItem struct {
+	UserID       string `json:"userId,omitempty"`
+	User         string `json:"user"`
+	Avatar       string `json:"avatar,omitempty"`
+	Contribution int64  `json:"contribution"`
+}
+
+type ViewerListMsg struct {
+	Type    string           `json:"type"` // "viewer_list"
+	Total   int              `json:"total"`
+	Viewers []ViewerListItem `json:"viewers"`
+	Ts      int64            `json:"ts"`
+}
+
 type SuperChatMsg struct {
 	Type   string `json:"type"` // "super_chat"
 	ID     string `json:"id"`
+	UserID string `json:"userId,omitempty"`
 	User   string `json:"user"`
 	Avatar string `json:"avatar,omitempty"`
 	Amount string `json:"amount"`
@@ -39,11 +60,14 @@ type GiftMsg struct {
 	Type      string `json:"type"` // "gift"
 	ID        string `json:"id,omitempty"`
 	RequestID string `json:"requestId,omitempty"`
+	UserID    string `json:"userId,omitempty"`
 	User      string `json:"user"`
+	Avatar    string `json:"avatar,omitempty"`
 	GiftName  string `json:"giftName"`
 	GiftIcon  string `json:"giftIcon,omitempty"`
 	Count     int    `json:"count,omitempty"`
 	Tier      int    `json:"tier,omitempty"`
+	TotalCoin int64  `json:"totalCoin,omitempty"`
 	Ts        int64  `json:"ts"`
 }
 
@@ -51,6 +75,7 @@ type GiftMsg struct {
 
 type Inbound struct {
 	Type          string `json:"type"`
+	UserID        string `json:"userId,omitempty"`
 	User          string `json:"user,omitempty"`
 	Avatar        string `json:"avatar,omitempty"`
 	Text          string `json:"text,omitempty"`
@@ -73,6 +98,16 @@ func EncodeChat(id, userID, user, avatar, text string, ts int64) []byte {
 		Avatar: avatar,
 		Text:   text,
 		Ts:     ts,
+	})
+	return b
+}
+
+func EncodeViewerList(total int, viewers []ViewerListItem) []byte {
+	b, _ := json.Marshal(ViewerListMsg{
+		Type:    "viewer_list",
+		Total:   total,
+		Viewers: viewers,
+		Ts:      time.Now().UnixMilli(),
 	})
 	return b
 }
