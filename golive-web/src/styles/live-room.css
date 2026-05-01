@@ -953,33 +953,27 @@
     transform: translateX(-50%);
   }
 
-  /* Composer-focused mode on mobile: the chat overlays the entire viewport
-     below the top bar, sized to 100dvh so the on-screen keyboard naturally
-     shrinks the panel from below. The video / info / page chrome stay in the
-     normal flow underneath; we don't try to keep the player visible while
-     typing — that fight with the keyboard caused the title-above-player and
-     "info ran below the player" layout glitches. */
-  .gl-live-room-chatting .gl-mobile-chat {
+  /* Composer-focused mode on mobile: keep the video pinned above the chat
+     so viewers can continue watching while the keyboard is open. The spacer
+     below preserves the normal page flow while the player is fixed. */
+  .gl-live-room-chatting .gl-player {
     position: fixed;
-    inset: 54px 0 0 0;
-    margin-top: 0;
+    top: 54px;
+    right: 0;
+    left: 0;
     z-index: 60;
-    background: var(--gl-bg);
-  }
-
-  .gl-live-room-chatting .gl-mobile-chat .gl-chat {
-    width: 100%;
-    height: calc(100dvh - 54px);
-    min-height: 0;
-    max-height: none;
-    border: 0;
+    width: 100vw;
+    margin-right: 0;
+    margin-left: 0;
     border-radius: 0;
   }
 
-  /* Lock background scroll while the chat overlay is up so the page beneath
-     doesn't slide around when the keyboard opens/closes. */
-  .gl-live-room-chatting {
-    overflow: hidden;
+  .gl-live-room-chatting > div:first-child {
+    padding-top: 56.25vw;
+  }
+
+  .gl-live-room-chatting .gl-mobile-chat {
+    scroll-margin-top: calc(56.25vw + 66px);
   }
 
   .gl-chat-fab {
