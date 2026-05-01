@@ -61,11 +61,13 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
     const now = Date.now();
     const payloadText = canText ? text.trim() : '';
     const displayName = userDisplayName(user);
+    const avatar = user.avatar;
 
     const pendingMsg: SuperChatMessage = {
       id: pendingId,
       kind: 'super_chat',
       user: displayName,
+      avatar,
       amount: String(amount),
       tier,
       text: payloadText,
@@ -89,6 +91,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             id: order.orderId,
             kind: 'super_chat',
             user: displayName,
+            avatar,
             amount: String(amount),
             tier,
             text: payloadText,
