@@ -39,6 +39,7 @@ export interface GiftMessage {
   giftName: string;
   giftIcon?: string;
   count?: number;
+  tier?: 0 | 1 | 2 | 3;
   ts: number;
   self?: boolean;
 }

@@ -347,6 +347,7 @@ export default function LiveRoomPage() {
             giftName: gift.name,
             giftIcon: gift.icon,
             count,
+            tier: gift.tier,
             self: true,
             ts: Date.now(),
           });

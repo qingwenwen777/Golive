@@ -108,8 +108,10 @@ function SystemNotice({ m }: { m: SystemMessage }) {
 }
 
 function GiftNotice({ m }: { m: GiftMessage }) {
+  const count = m.count ?? 1;
+  const tier = m.tier ?? 0;
   return (
-    <div className="gl-gift-notice">
+    <div className={cn('gl-gift-notice', `tier-${tier}`)}>
       <div className="gl-gift-notice-icon" aria-hidden="true">
         {m.giftIcon ? <span>{m.giftIcon}</span> : <Gift size={18} />}
       </div>
@@ -120,7 +122,7 @@ function GiftNotice({ m }: { m: GiftMessage }) {
         </div>
         <div className="gl-gift-notice-meta">
           <span className="gl-gift-notice-name">{m.giftName}</span>
-          {m.count && <span className="gl-gift-notice-count">x{m.count}</span>}
+          <span className="gl-gift-notice-count">x{count}</span>
         </div>
       </div>
     </div>

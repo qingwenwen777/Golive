@@ -93,7 +93,7 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 	orderID := "gift-" + uuid.NewString()
 	username := s.broadcastName(ctx, req)
 
-	payload, err := repo.MarshalGiftOutbox(username, gift.Name, now.UnixMilli())
+	payload, err := repo.MarshalGiftOutbox(username, gift.Name, gift.Icon, req.Count, gift.Tier, now.UnixMilli())
 	if err != nil {
 		return nil, false, err
 	}

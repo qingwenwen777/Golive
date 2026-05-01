@@ -3,8 +3,9 @@ import { useWebSocket, type ReadyState } from '@/hooks/useWebSocket';
 import { useRealtimeStore, useRoomSlice } from '@/stores/useRealtimeStore';
 import { useDanmuStore } from '@/stores/useDanmuStore';
 import { useDanmuHistory } from '@/api/chat';
-import type { Message, SuperChatTier } from '@/types/message';
+import type { ChatMessage, Message, SuperChatTier } from '@/types/message';
 import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
+import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 
@@ -32,6 +33,7 @@ interface ServerGift {
   giftName: string;
   giftIcon?: string;
   count?: number;
+  tier?: 0 | 1 | 2 | 3;
   ts?: number;
 }
 interface ServerViewerCount {
@@ -98,6 +100,14 @@ export function useRoomRealtime(
     return () => resetRoom(roomId);
   }, [roomId, ensureRoom, resetRoom]);
 
+  useEffect(() => {
+    if (!enabled || !roomId) return;
+    const cachedMessages = loadRecentChatMessages(roomId);
+    if (cachedMessages.length > 0) {
+      mergeMessages(roomId, cachedMessages);
+    }
+  }, [enabled, mergeMessages, roomId]);
+
   const history = useDanmuHistory(roomId, enabled, 20);
 
   useEffect(() => {
@@ -153,7 +163,7 @@ export function useRoomRealtime(
     const now = Date.now();
     switch (parsed.type) {
       case 'chat': {
-        const msg: Message = {
+        const msg: ChatMessage = {
           id: parsed.id ?? genId('m'),
           kind: 'chat',
           user: parsed.user,
@@ -166,6 +176,7 @@ export function useRoomRealtime(
           .getState()
           .rooms[roomId]?.messages.some((x) => x.id === msg.id);
         appendMessage(roomId, msg);
+        saveRecentChatMessage(roomId, msg);
         if (!alreadySeen && danmuOnRef.current) {
           appendBullet(roomId, {
             id: genId('b'),
@@ -197,6 +208,7 @@ export function useRoomRealtime(
           giftName: parsed.giftName,
           giftIcon: parsed.giftIcon,
           count: parsed.count,
+          tier: parsed.tier,
           ts: parsed.ts ?? now,
         });
         break;
@@ -252,14 +264,16 @@ export function useRoomRealtime(
     const ok = sendMessage({ type: 'chat', roomId, text, user, avatar, clientId: id, ts: now });
     if (!ok) return false;
 
-    appendMessage(roomId, {
+    const msg: ChatMessage = {
       id,
       kind: 'chat',
       user,
       avatar,
       text,
       ts: now,
-    });
+    };
+    appendMessage(roomId, msg);
+    saveRecentChatMessage(roomId, msg);
     if (danmuOnRef.current) {
       appendBullet(roomId, {
         id: genId('b'),

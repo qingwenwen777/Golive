@@ -38,6 +38,9 @@ type GiftMsg struct {
 	Type     string `json:"type"` // "gift"
 	User     string `json:"user"`
 	GiftName string `json:"giftName"`
+	GiftIcon string `json:"giftIcon,omitempty"`
+	Count    int    `json:"count,omitempty"`
+	Tier     int    `json:"tier,omitempty"`
 	Ts       int64  `json:"ts"`
 }
 

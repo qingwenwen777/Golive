@@ -442,23 +442,53 @@
   line-height: 1.5;
 }
 .gl-gift-notice {
+  --gift-border: rgba(246, 177, 57, 0.34);
+  --gift-bg-a: rgba(255, 248, 227, 0.96);
+  --gift-bg-b: rgba(255, 240, 243, 0.92);
+  --gift-accent: #f59e0b;
+  --gift-ink: #92400e;
   display: grid;
   grid-template-columns: 38px 1fr;
   gap: 10px;
   align-items: center;
   margin: 6px 14px 12px;
   padding: 10px 12px;
-  border: 1px solid rgba(246, 177, 57, 0.34);
+  border: 1px solid var(--gift-border);
   border-radius: 10px;
-  background:
-    linear-gradient(135deg, rgba(255, 248, 227, 0.96), rgba(255, 240, 243, 0.92)), var(--gl-bg);
-  box-shadow: 0 8px 22px rgba(122, 74, 0, 0.08);
+  background: linear-gradient(135deg, var(--gift-bg-a), var(--gift-bg-b)), var(--gl-bg);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--gift-accent) 16%, transparent);
   animation: glGiftNoticeIn 0.22s ease-out;
 }
+.gl-gift-notice.tier-1 {
+  --gift-border: rgba(34, 197, 94, 0.36);
+  --gift-bg-a: rgba(236, 253, 245, 0.96);
+  --gift-bg-b: rgba(240, 253, 250, 0.92);
+  --gift-accent: #10b981;
+  --gift-ink: #047857;
+}
+.gl-gift-notice.tier-2 {
+  --gift-border: rgba(59, 130, 246, 0.36);
+  --gift-bg-a: rgba(239, 246, 255, 0.96);
+  --gift-bg-b: rgba(238, 242, 255, 0.92);
+  --gift-accent: #3b82f6;
+  --gift-ink: #1d4ed8;
+}
+.gl-gift-notice.tier-3 {
+  --gift-border: rgba(168, 85, 247, 0.38);
+  --gift-bg-a: rgba(250, 245, 255, 0.97);
+  --gift-bg-b: rgba(255, 241, 242, 0.92);
+  --gift-accent: #a855f7;
+  --gift-ink: #7e22ce;
+}
 .dark .gl-gift-notice {
-  border-color: rgba(246, 177, 57, 0.28);
+  border-color: color-mix(in srgb, var(--gift-accent) 40%, transparent);
   background:
-    linear-gradient(135deg, rgba(92, 62, 14, 0.5), rgba(83, 38, 51, 0.36)), var(--gl-bg-hover);
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--gift-accent) 18%, transparent),
+      rgba(255, 255, 255, 0.04)
+    ),
+    var(--gl-bg-hover);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 .gl-gift-notice-icon {
@@ -468,13 +498,13 @@
   height: 38px;
   border-radius: 9px;
   background: #ffffff;
-  color: #d97706;
+  color: var(--gift-ink);
   font-size: 22px;
-  box-shadow: inset 0 0 0 1px rgba(246, 177, 57, 0.2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gift-accent) 22%, transparent);
 }
 .dark .gl-gift-notice-icon {
   background: rgba(255, 255, 255, 0.1);
-  color: #fbbf24;
+  color: var(--gift-accent);
 }
 .gl-gift-notice-body {
   min-width: 0;
@@ -515,7 +545,7 @@
 .gl-gift-notice-count {
   flex: 0 0 auto;
   border-radius: 999px;
-  background: #f59e0b;
+  background: var(--gift-accent);
   color: #fff;
   padding: 2px 8px;
   font-size: 11px;
