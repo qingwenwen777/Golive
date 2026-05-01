@@ -38,3 +38,31 @@ func (h *RoomHandler) Get(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, st)
 }
+
+func (h *RoomHandler) ChannelHistory(c *gin.Context) {
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
+	resp, err := h.svc.HistoryByChannel(c.Request.Context(), c.Param("channel"), size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) ChannelAnalytics(c *gin.Context) {
+	resp, err := h.svc.CreatorAnalytics(c.Request.Context(), c.Param("channel"), UserIDFromCtx(c))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) LiveAnalysis(c *gin.Context) {
+	resp, err := h.svc.LiveAnalysis(c.Request.Context(), c.Param("channel"), c.Param("recordID"), UserIDFromCtx(c))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}

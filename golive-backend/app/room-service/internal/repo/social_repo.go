@@ -55,6 +55,18 @@ func (s *SocialRepo) FollowerCount(ctx context.Context, channelID string) (int64
 	return s.rdb.ZCard(ctx, channelFansKey(channelID)).Result()
 }
 
+func (s *SocialRepo) FollowerCountBetween(ctx context.Context, channelID string, start, end time.Time) (int64, error) {
+	if channelID == "" {
+		return 0, nil
+	}
+	return s.rdb.ZCount(
+		ctx,
+		channelFansKey(channelID),
+		strconv.FormatInt(start.UnixMilli(), 10),
+		strconv.FormatInt(end.UnixMilli(), 10),
+	).Result()
+}
+
 func (s *SocialRepo) Following(ctx context.Context, uid string) ([]string, error) {
 	if uid == "" {
 		return nil, nil

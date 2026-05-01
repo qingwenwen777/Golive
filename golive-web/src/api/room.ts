@@ -1,9 +1,4 @@
-﻿import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  keepPreviousData,
-} from '@tanstack/react-query';
+﻿import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
 import type { PaginatedRooms, RoomsQuery, Stream } from '@/types/stream';
 
@@ -223,6 +218,110 @@ export interface LikeState {
   liked: boolean;
   disliked: boolean;
   likes: number;
+}
+
+export interface FanContribution {
+  userId: string;
+  name: string;
+  avatar?: string;
+  amount: number;
+}
+
+export interface LiveHistoryItem {
+  id: string;
+  title: string;
+  description?: string;
+  channel: string;
+  channelId: string;
+  cover: string;
+  category: string;
+  startedAt: string;
+  endedAt: string;
+  duration: string;
+  durationSeconds: number;
+  peakViewers: number;
+  revenueCoin: number;
+  newSubscribers: number;
+  topFan?: FanContribution;
+}
+
+export interface LiveHistoryResp {
+  items: LiveHistoryItem[];
+}
+
+export interface MonthlyCreatorMetric {
+  month: string;
+  revenueCoin: number;
+  subscribers: number;
+  watchHours: number;
+  streams: number;
+  peakViewers: number;
+}
+
+export interface CreatorAnalyticsResp {
+  channelId: string;
+  revenueCoin: number;
+  subscriberCount: number;
+  streams: number;
+  watchHours: number;
+  peakViewers: number;
+  monthly: MonthlyCreatorMetric[];
+  history: LiveHistoryItem[];
+}
+
+export interface LiveAnalysisResp {
+  record: LiveHistoryItem;
+  topFans: FanContribution[];
+  giftRevenue: number;
+  superChatRevenue: number;
+}
+
+export function useChannelLiveHistory(channelKey: string, size = 12) {
+  return useQuery<LiveHistoryResp, Error>({
+    queryKey: ['channel-live-history', channelKey, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<LiveHistoryResp>(
+        `/rooms/channels/${encodeURIComponent(channelKey)}/history`,
+        { params: { size }, signal },
+      );
+      return data;
+    },
+    enabled: !!channelKey,
+    staleTime: 30_000,
+    retry: 1,
+  });
+}
+
+export function useCreatorAnalytics(channelKey: string, enabled = true) {
+  return useQuery<CreatorAnalyticsResp, Error>({
+    queryKey: ['creator-analytics', channelKey],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<CreatorAnalyticsResp>(
+        `/rooms/channels/${encodeURIComponent(channelKey)}/analytics`,
+        { signal },
+      );
+      return data;
+    },
+    enabled: enabled && !!channelKey,
+    staleTime: 30_000,
+    retry: 0,
+  });
+}
+
+export function useLiveAnalysis(channelKey: string, recordId: string, enabled = true) {
+  return useQuery<LiveAnalysisResp, Error>({
+    queryKey: ['live-analysis', channelKey, recordId],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<LiveAnalysisResp>(
+        `/rooms/channels/${encodeURIComponent(channelKey)}/history/${encodeURIComponent(recordId)}/analytics`,
+        { signal },
+      );
+      return data;
+    },
+    enabled: enabled && !!channelKey && !!recordId,
+    staleTime: 30_000,
+    retry: 0,
+  });
 }
 
 export function useLikeState(streamId: string, enabled: boolean) {

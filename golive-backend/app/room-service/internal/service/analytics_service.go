@@ -1,0 +1,368 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/qingwenwen777/golive/app/room-service/internal/model"
+	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/errcode"
+)
+
+var ErrForbiddenAnalytics = errcode.New(403, "Forbidden")
+
+type LiveHistoryResp struct {
+	Items []LiveHistoryItem `json:"items"`
+}
+
+type LiveHistoryItem struct {
+	ID              string           `json:"id"`
+	Title           string           `json:"title"`
+	Description     string           `json:"description,omitempty"`
+	Channel         string           `json:"channel"`
+	ChannelID       string           `json:"channelId"`
+	Cover           string           `json:"cover"`
+	Category        string           `json:"category"`
+	StartedAt       string           `json:"startedAt"`
+	EndedAt         string           `json:"endedAt"`
+	Duration        string           `json:"duration"`
+	DurationSeconds int64            `json:"durationSeconds"`
+	PeakViewers     int64            `json:"peakViewers"`
+	RevenueCoin     int64            `json:"revenueCoin"`
+	NewSubscribers  int64            `json:"newSubscribers"`
+	TopFan          *FanContribution `json:"topFan,omitempty"`
+}
+
+type FanContribution struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
+	Amount int64  `json:"amount"`
+}
+
+type MonthlyMetric struct {
+	Month       string `json:"month"`
+	RevenueCoin int64  `json:"revenueCoin"`
+	Subscribers int64  `json:"subscribers"`
+	WatchHours  int64  `json:"watchHours"`
+	Streams     int64  `json:"streams"`
+	PeakViewers int64  `json:"peakViewers"`
+}
+
+type CreatorAnalyticsResp struct {
+	ChannelID       string            `json:"channelId"`
+	RevenueCoin     int64             `json:"revenueCoin"`
+	SubscriberCount int64             `json:"subscriberCount"`
+	Streams         int64             `json:"streams"`
+	WatchHours      int64             `json:"watchHours"`
+	PeakViewers     int64             `json:"peakViewers"`
+	Monthly         []MonthlyMetric   `json:"monthly"`
+	History         []LiveHistoryItem `json:"history"`
+}
+
+type LiveAnalysisResp struct {
+	Record           LiveHistoryItem   `json:"record"`
+	TopFans          []FanContribution `json:"topFans"`
+	GiftRevenue      int64             `json:"giftRevenue"`
+	SuperChatRevenue int64             `json:"superChatRevenue"`
+}
+
+func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey string, limit int) (*LiveHistoryResp, error) {
+	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelKey)
+	if err != nil {
+		if errors.Is(err, repo.ErrRoomNotFound) {
+			return &LiveHistoryResp{Items: []LiveHistoryItem{}}, nil
+		}
+		return nil, err
+	}
+	items, _, err := s.historyItemsForOwner(ctx, ownerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &LiveHistoryResp{Items: items}, nil
+}
+
+func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID string) (*CreatorAnalyticsResp, error) {
+	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelKey)
+	if err != nil {
+		if errors.Is(err, repo.ErrRoomNotFound) && viewerID != "" && (channelKey == viewerID || strings.TrimPrefix(channelKey, "ch-") == viewerID) {
+			ownerID = viewerID
+		} else {
+			return nil, err
+		}
+	}
+	if viewerID == "" || viewerID != ownerID {
+		return nil, ErrForbiddenAnalytics
+	}
+
+	history, rooms, err := s.historyItemsForOwner(ctx, ownerID, 100)
+	if err != nil {
+		return nil, err
+	}
+
+	channelID := "ch-" + ownerID
+	monthly, totals := s.monthlyMetrics(ctx, ownerID, channelID, rooms)
+	subscriberCount := int64(0)
+	if s.social != nil {
+		count, err := s.social.FollowerCount(ctx, channelID)
+		if err != nil {
+			return nil, err
+		}
+		subscriberCount = count
+	}
+
+	return &CreatorAnalyticsResp{
+		ChannelID:       channelID,
+		RevenueCoin:     totals.RevenueCoin,
+		SubscriberCount: subscriberCount,
+		Streams:         totals.Streams,
+		WatchHours:      totals.WatchHours,
+		PeakViewers:     totals.PeakViewers,
+		Monthly:         monthly,
+		History:         history,
+	}, nil
+}
+
+func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, viewerID string) (*LiveAnalysisResp, error) {
+	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelKey)
+	if err != nil {
+		return nil, err
+	}
+	if viewerID == "" || viewerID != ownerID {
+		return nil, ErrForbiddenAnalytics
+	}
+	room, err := s.rooms.EndedRoomByOwner(ctx, ownerID, roomID)
+	if err != nil {
+		if errors.Is(err, repo.ErrRoomNotFound) {
+			return nil, ErrRoomNotFound
+		}
+		return nil, err
+	}
+	rows, err := s.revenueRows(ctx, []string{room.ID})
+	if err != nil {
+		return nil, err
+	}
+	item := s.historyItem(*room, rows)
+	item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(*room))
+	topFans := topFans(rows, 8)
+	giftRevenue, scRevenue := int64(0), int64(0)
+	for _, row := range rows {
+		if row.Kind == "super_chat" {
+			scRevenue += row.Amount
+		} else {
+			giftRevenue += row.Amount
+		}
+	}
+	return &LiveAnalysisResp{
+		Record:           item,
+		TopFans:          topFans,
+		GiftRevenue:      giftRevenue,
+		SuperChatRevenue: scRevenue,
+	}, nil
+}
+
+func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, limit int) ([]LiveHistoryItem, []model.Room, error) {
+	rooms, err := s.rooms.HistoryByOwner(ctx, ownerID, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	roomIDs := make([]string, 0, len(rooms))
+	for _, room := range rooms {
+		roomIDs = append(roomIDs, room.ID)
+	}
+	rows, err := s.revenueRows(ctx, roomIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	rowsByRoom := map[string][]repo.RevenueRow{}
+	for _, row := range rows {
+		rowsByRoom[row.RoomID] = append(rowsByRoom[row.RoomID], row)
+	}
+
+	items := make([]LiveHistoryItem, 0, len(rooms))
+	for _, room := range rooms {
+		item := s.historyItem(room, rowsByRoom[room.ID])
+		item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
+		items = append(items, item)
+	}
+	return items, rooms, nil
+}
+
+func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow) LiveHistoryItem {
+	endedAt := endedAtOf(room)
+	duration := endedAt.Sub(room.StartedAt)
+	if duration < 0 {
+		duration = 0
+	}
+	revenue := int64(0)
+	for _, row := range rows {
+		revenue += row.Amount
+	}
+	fans := topFans(rows, 1)
+	var topFan *FanContribution
+	if len(fans) > 0 {
+		topFan = &fans[0]
+	}
+	peak := room.PeakViewers
+	if room.Viewers > peak {
+		peak = room.Viewers
+	}
+
+	return LiveHistoryItem{
+		ID:              room.ID,
+		Title:           room.Title,
+		Description:     room.Description,
+		Channel:         room.Channel,
+		ChannelID:       room.ChannelID,
+		Cover:           room.Cover,
+		Category:        room.Category,
+		StartedAt:       room.StartedAt.UTC().Format(time.RFC3339),
+		EndedAt:         endedAt.UTC().Format(time.RFC3339),
+		Duration:        model.FormatDuration(duration),
+		DurationSeconds: int64(duration.Seconds()),
+		PeakViewers:     peak,
+		RevenueCoin:     revenue,
+		TopFan:          topFan,
+	}
+}
+
+func (s *RoomService) monthlyMetrics(ctx context.Context, ownerID, channelID string, rooms []model.Room) ([]MonthlyMetric, CreatorAnalyticsResp) {
+	now := s.now()
+	startMonth := time.Date(now.Year(), now.Month()-5, 1, 0, 0, 0, 0, now.Location())
+	rows, err := s.rooms.RevenueRowsByOwnerSince(ctx, ownerID, startMonth)
+	if err != nil && isMissingAnalyticsTable(err) {
+		rows = nil
+	}
+	months := make([]MonthlyMetric, 6)
+	for i := range months {
+		monthStart := time.Date(startMonth.Year(), startMonth.Month()+time.Month(i), 1, 0, 0, 0, 0, now.Location())
+		monthEnd := monthStart.AddDate(0, 1, 0)
+		months[i].Month = monthStart.Format("2006-01")
+		if s.social != nil {
+			count, err := s.social.FollowerCountBetween(ctx, channelID, monthStart, monthEnd)
+			if err == nil {
+				months[i].Subscribers = count
+			}
+		}
+	}
+	for _, row := range rows {
+		idx := monthIndex(startMonth, row.CreatedAt)
+		if idx >= 0 && idx < len(months) {
+			months[idx].RevenueCoin += row.Amount
+		}
+	}
+	for _, room := range rooms {
+		idx := monthIndex(startMonth, room.StartedAt)
+		if idx < 0 || idx >= len(months) {
+			continue
+		}
+		months[idx].Streams++
+		endedAt := endedAtOf(room)
+		dur := endedAt.Sub(room.StartedAt)
+		if dur > 0 {
+			months[idx].WatchHours += int64(dur.Hours())
+		}
+		peak := room.PeakViewers
+		if room.Viewers > peak {
+			peak = room.Viewers
+		}
+		if peak > months[idx].PeakViewers {
+			months[idx].PeakViewers = peak
+		}
+	}
+	totals := CreatorAnalyticsResp{}
+	for _, month := range months {
+		totals.RevenueCoin += month.RevenueCoin
+		totals.Streams += month.Streams
+		totals.WatchHours += month.WatchHours
+		if month.PeakViewers > totals.PeakViewers {
+			totals.PeakViewers = month.PeakViewers
+		}
+	}
+	return months, totals
+}
+
+func (s *RoomService) revenueRows(ctx context.Context, roomIDs []string) ([]repo.RevenueRow, error) {
+	rows, err := s.rooms.RevenueRowsByRooms(ctx, roomIDs)
+	if err != nil && isMissingAnalyticsTable(err) {
+		return nil, nil
+	}
+	return rows, err
+}
+
+func (s *RoomService) subscribersBetween(ctx context.Context, channelID string, start, end time.Time) int64 {
+	if s.social == nil {
+		return 0
+	}
+	count, err := s.social.FollowerCountBetween(ctx, channelID, start, end)
+	if err != nil {
+		return 0
+	}
+	return count
+}
+
+func topFans(rows []repo.RevenueRow, limit int) []FanContribution {
+	type agg struct {
+		userID string
+		name   string
+		avatar string
+		amount int64
+	}
+	byUser := map[string]*agg{}
+	for _, row := range rows {
+		key := row.UserID
+		if key == "" {
+			key = row.UserName
+		}
+		if key == "" {
+			continue
+		}
+		item := byUser[key]
+		if item == nil {
+			item = &agg{userID: row.UserID, name: row.UserName, avatar: row.Avatar}
+			byUser[key] = item
+		}
+		item.amount += row.Amount
+	}
+	out := make([]FanContribution, 0, len(byUser))
+	for _, item := range byUser {
+		out = append(out, FanContribution{
+			UserID: item.userID,
+			Name:   item.name,
+			Avatar: item.avatar,
+			Amount: item.amount,
+		})
+	}
+	for i := 0; i < len(out); i++ {
+		for j := i + 1; j < len(out); j++ {
+			if out[j].Amount > out[i].Amount {
+				out[i], out[j] = out[j], out[i]
+			}
+		}
+	}
+	if limit > 0 && len(out) > limit {
+		return out[:limit]
+	}
+	return out
+}
+
+func endedAtOf(room model.Room) time.Time {
+	if room.EndedAt != nil {
+		return *room.EndedAt
+	}
+	return room.UpdatedAt
+}
+
+func monthIndex(start time.Time, value time.Time) int {
+	return (value.Year()-start.Year())*12 + int(value.Month()-start.Month())
+}
+
+func isMissingAnalyticsTable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
+}

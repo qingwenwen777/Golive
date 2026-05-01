@@ -64,16 +64,21 @@ type GoLiveReq struct {
 // Stream WITH streamKey populated — only the publisher ever sees this.
 func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq) (*model.Stream, error) {
 	now := s.now()
-	roomID := "live-" + ownerID
-	channelID := "ch-" + ownerID
-	ownerName := cleanDisplayName(req.ChannelName, ownerID)
-
-	var oldStreamKey string
-	if existing, err := s.rooms.GetByID(ctx, roomID); err == nil {
-		oldStreamKey = existing.StreamKey
+	if active, err := s.rooms.ActiveByOwner(ctx, ownerID); err == nil {
+		if err := s.endRoom(ctx, active, now); err != nil {
+			return nil, err
+		}
+		if active.StreamKey != "" {
+			_ = s.live.Delete(ctx, active.StreamKey)
+		}
+		_ = s.broadcastEnded(ctx, active.ID, now)
 	} else if !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
 	}
+
+	roomID := "live-" + ownerID + "-" + strconv.FormatInt(now.UnixNano(), 36)
+	channelID := "ch-" + ownerID
+	ownerName := cleanDisplayName(req.ChannelName, ownerID)
 
 	streamKey := s.generateKey(roomID, ownerID, now)
 
@@ -88,6 +93,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		Verified:    false,
 		Avatar:      cleanAvatar(req.Avatar, ownerName),
 		Viewers:     0,
+		PeakViewers: 0,
 		StartedAt:   now,
 		Status:      model.StatusPublishing,
 		OwnerID:     ownerID,
@@ -98,9 +104,6 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	}
 	if err := s.live.Save(ctx, streamKey, roomID, s.keyTTL); err != nil {
 		return nil, err
-	}
-	if oldStreamKey != "" && oldStreamKey != streamKey {
-		_ = s.live.Delete(ctx, oldStreamKey)
 	}
 
 	st := room.ToStream(now)
@@ -154,25 +157,26 @@ func trimRunes(s string, max int) string {
 // StopLive marks the owner's room as ended. Used by the publisher to end a
 // session without waiting for SRS on_unpublish.
 func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
-	roomID := "live-" + ownerID
-	room, err := s.rooms.GetByID(ctx, roomID)
-	if errors.Is(err, repo.ErrRoomNotFound) {
-		return nil
-	}
+	endedAt := s.now()
+	rooms, err := s.rooms.ActiveRoomsByOwner(ctx, ownerID)
 	if err != nil {
 		return err
 	}
-	if room.Status != model.StatusEnded {
-		endedAt := s.now()
-		if err := s.rooms.SetEnded(ctx, roomID, endedAt); err != nil {
-			return err
-		}
-		if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
-			return err
-		}
+	if len(rooms) == 0 {
+		return nil
 	}
-	if room.StreamKey != "" {
-		return s.live.Delete(ctx, room.StreamKey)
+	for _, room := range rooms {
+		if err := s.endRoom(ctx, &room, endedAt); err != nil {
+			return err
+		}
+		if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
+			return err
+		}
+		if room.StreamKey != "" {
+			if err := s.live.Delete(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -243,13 +247,31 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		return s.live.Delete(ctx, req.Stream)
 	}
 	endedAt := s.now()
-	if err := s.rooms.SetEnded(ctx, roomID, endedAt); err != nil {
+	if err := s.endRoom(ctx, room, endedAt); err != nil {
 		return err
 	}
 	if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
 		return err
 	}
 	return s.live.Delete(ctx, req.Stream)
+}
+
+func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt time.Time) error {
+	viewers, peak := int64(-1), int64(-1)
+	if metrics, err := s.live.ViewerMetrics(ctx, room.ID); err == nil && metrics != nil {
+		viewers = metrics.Viewers
+		peak = metrics.Peak
+	}
+	if peak < room.PeakViewers {
+		peak = room.PeakViewers
+	}
+	if viewers < 0 {
+		viewers = room.Viewers
+	}
+	if peak < viewers {
+		peak = viewers
+	}
+	return s.rooms.SetEndedWithMetrics(ctx, room.ID, endedAt, viewers, peak)
 }
 
 func (s *LiveService) broadcastEnded(ctx context.Context, roomID string, endedAt time.Time) error {

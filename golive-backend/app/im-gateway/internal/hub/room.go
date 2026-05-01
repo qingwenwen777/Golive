@@ -73,6 +73,7 @@ func (r *Room) add(c Sink) {
 	n := int64(len(r.conns))
 	r.mu.Unlock()
 	r.viewers.Store(n)
+	r.persistViewerCount(n)
 	r.broadcastViewerList()
 }
 
@@ -88,6 +89,7 @@ func (r *Room) remove(connID string) bool {
 	n := int64(len(r.conns))
 	r.mu.Unlock()
 	r.viewers.Store(n)
+	r.persistViewerCount(n)
 	r.broadcastViewerList()
 	return n == 0
 }
@@ -214,6 +216,14 @@ func (r *Room) broadcastViewerList() {
 	r.fanout(EncodeViewerList(total, viewers))
 }
 
+func (r *Room) persistViewerCount(count int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := r.hub.broker.RecordViewerCount(ctx, r.id, count); err != nil {
+		logger.L().Debug("record viewer count", zap.String("room", r.id), zap.Error(err))
+	}
+}
+
 func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 	r.mu.Lock()
 	r.resetContributionIfNeededLocked()
@@ -299,7 +309,9 @@ func (r *Room) pumpViewerCount(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			r.fanout(encodeViewerCount(r.size()))
+			size := r.size()
+			r.persistViewerCount(size)
+			r.fanout(encodeViewerCount(size))
 			r.broadcastViewerList()
 			metrics.MessagesSent.WithLabelValues("viewer_count").Inc()
 		}

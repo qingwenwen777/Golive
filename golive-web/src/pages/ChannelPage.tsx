@@ -2,17 +2,28 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Bell,
+  BarChart3,
   Camera,
   CheckCircle2,
+  CalendarDays,
+  Clock3,
   Radio,
   Settings,
   Share2,
   UserPlus,
+  Users,
   Video,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePublicUser } from '@/api/auth';
-import { useFollow, useFollowState, useRooms, useUnfollow } from '@/api/room';
+import {
+  useChannelLiveHistory,
+  useFollow,
+  useFollowState,
+  useRooms,
+  useUnfollow,
+  type LiveHistoryItem,
+} from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
@@ -49,11 +60,13 @@ export default function ChannelPage() {
   const primary = channelStreams[0];
   const channelName = resolveChannelName(profile, primary, channelKey);
   const channelAvatar = profile?.avatar || primary?.avatar || '';
-  const channelId = primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
+  const channelId =
+    primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
   const followState = useFollowState(channelId, !!channelId);
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
+  const liveHistory = useChannelLiveHistory(channelKey, 12);
 
   const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
   const primaryCategory = primary?.category ?? 'Just Chatting';
@@ -100,23 +113,41 @@ export default function ChannelPage() {
               {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
             </h1>
             <div className="gl-channel-handle">
-              {profile?.username ? <span>@{profile.username}</span> : <span>{formatChannelKey(channelKey)}</span>}
+              {profile?.username ? (
+                <span>@{profile.username}</span>
+              ) : (
+                <span>{formatChannelKey(channelKey)}</span>
+              )}
               <span>{subscriberCount.toLocaleString()} subscribers</span>
-              <span>{channelStreams.length} active room{channelStreams.length === 1 ? '' : 's'}</span>
+              <span>
+                {channelStreams.length} active room{channelStreams.length === 1 ? '' : 's'}
+              </span>
             </div>
 
             <div className="gl-channel-actions">
               {isOwner ? (
                 <>
-                  <button className="gl-retry-btn" type="button" onClick={() => setCreateOpen(true)}>
+                  <button
+                    className="gl-retry-btn"
+                    type="button"
+                    onClick={() => setCreateOpen(true)}
+                  >
                     <Radio size={16} />
                     Start live
                   </button>
-                  <button className="gl-secondary-btn" type="button" onClick={() => setAvatarOpen(true)}>
+                  <button
+                    className="gl-secondary-btn"
+                    type="button"
+                    onClick={() => setAvatarOpen(true)}
+                  >
                     <Camera size={16} />
                     Change avatar
                   </button>
-                  <button className="gl-secondary-btn" type="button" onClick={() => navigate('/settings')}>
+                  <button
+                    className="gl-secondary-btn"
+                    type="button"
+                    onClick={() => navigate('/settings')}
+                  >
                     <Settings size={16} />
                     Settings
                   </button>
@@ -151,6 +182,7 @@ export default function ChannelPage() {
         <a className="is-active" href="#live">
           Live
         </a>
+        <a href="#history">History</a>
       </nav>
 
       <section className="gl-library-section" id="live">
@@ -195,8 +227,110 @@ export default function ChannelPage() {
         )}
       </section>
 
+      <section className="gl-library-section" id="history">
+        <div className="gl-section-title-row">
+          <h2>Live history</h2>
+          {isOwner && (
+            <Link
+              className="gl-text-link"
+              to={`/studio/analytics/${encodeURIComponent(channelKey)}`}
+            >
+              Channel analytics
+            </Link>
+          )}
+        </div>
+        {liveHistory.isPending ? (
+          <div className="gl-history-list" aria-busy="true">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div className="gl-history-row is-loading" key={i} />
+            ))}
+          </div>
+        ) : liveHistory.data?.items.length ? (
+          <div className="gl-history-list">
+            {liveHistory.data.items.map((record) => (
+              <ChannelHistoryRow
+                key={record.id}
+                record={record}
+                channelKey={channelKey}
+                isOwner={isOwner}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="gl-channel-empty">
+            <Clock3 size={34} />
+            <div>
+              <strong>No completed live streams yet</strong>
+              <span>
+                {isOwner
+                  ? 'Finished broadcasts will appear here with duration, cover, title, and performance data.'
+                  : 'This creator has not finished a broadcast that can be shown here yet.'}
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={authUser} />
       <CreateLiveDialog open={createOpen} onOpenChange={setCreateOpen} />
+    </div>
+  );
+}
+
+function ChannelHistoryRow({
+  record,
+  channelKey,
+  isOwner,
+}: {
+  record: LiveHistoryItem;
+  channelKey: string;
+  isOwner: boolean;
+}) {
+  return (
+    <article className="gl-history-row">
+      <HistoryThumb record={record} />
+      <div className="gl-history-main">
+        <h3>{record.title}</h3>
+        <div className="gl-history-meta">
+          <span>
+            <CalendarDays size={14} />
+            {formatHistoryDate(record.startedAt)}
+          </span>
+          <span>
+            <Clock3 size={14} />
+            {record.duration}
+          </span>
+          <span>
+            <Users size={14} />
+            {record.peakViewers.toLocaleString()} peak
+          </span>
+        </div>
+        <div className="gl-history-sub">
+          <span>{record.category || 'Live'}</span>
+          <span>{formatCoin(record.revenueCoin)} revenue</span>
+          <span>{record.topFan ? `${record.topFan.name} top fan` : 'No fan contribution yet'}</span>
+        </div>
+      </div>
+      {isOwner && (
+        <Link
+          className="gl-secondary-btn gl-history-analysis-btn"
+          to={`/studio/analytics/${encodeURIComponent(channelKey)}/live/${encodeURIComponent(record.id)}`}
+        >
+          <BarChart3 size={16} />
+          Live analysis
+        </Link>
+      )}
+    </article>
+  );
+}
+
+function HistoryThumb({ record }: { record: LiveHistoryItem }) {
+  const initials = record.title.trim().slice(0, 2).toUpperCase() || 'GL';
+  return (
+    <div className="gl-history-thumb">
+      <div className="gl-history-thumb-fallback">{initials}</div>
+      {record.cover && <img src={record.cover} alt="" />}
+      <span>{record.duration}</span>
     </div>
   );
 }
@@ -210,7 +344,11 @@ function ChannelStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function resolveProfile(key: string, publicUser: User | undefined, authUser: User | null): User | null {
+function resolveProfile(
+  key: string,
+  publicUser: User | undefined,
+  authUser: User | null,
+): User | null {
   if (publicUser) {
     if (authUser?.id === publicUser.id) return authUser;
     return publicUser;
@@ -251,4 +389,17 @@ function formatChannelKey(key: string): string {
   if (!key) return 'Channel';
   if (!isUuidLike(key)) return key;
   return `Creator ${key.slice(0, 8)}`;
+}
+
+function formatHistoryDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatCoin(value: number): string {
+  return `${Math.round(value).toLocaleString()} coins`;
 }

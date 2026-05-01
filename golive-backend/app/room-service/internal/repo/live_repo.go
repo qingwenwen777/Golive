@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v9"
@@ -43,4 +44,36 @@ func (r *LiveRepo) Delete(ctx context.Context, key string) error {
 
 func (r *LiveRepo) PublishRoomEvent(ctx context.Context, roomID string, payload []byte) error {
 	return r.rdb.Publish(ctx, roomChannelPrefix+roomID, payload).Err()
+}
+
+type ViewerMetrics struct {
+	Viewers int64
+	Peak    int64
+}
+
+func (r *LiveRepo) ViewerMetrics(ctx context.Context, roomID string) (*ViewerMetrics, error) {
+	values, err := r.rdb.HMGet(ctx, "roommetrics:"+roomID, "viewers", "peak").Result()
+	if err != nil {
+		return nil, err
+	}
+	viewers := parseRedisInt(values[0])
+	peak := parseRedisInt(values[1])
+	if peak < viewers {
+		peak = viewers
+	}
+	return &ViewerMetrics{Viewers: viewers, Peak: peak}, nil
+}
+
+func parseRedisInt(value any) int64 {
+	switch v := value.(type) {
+	case string:
+		n, _ := strconv.ParseInt(v, 10, 64)
+		return n
+	case []byte:
+		n, _ := strconv.ParseInt(string(v), 10, 64)
+		return n
+	case int64:
+		return v
+	}
+	return 0
 }

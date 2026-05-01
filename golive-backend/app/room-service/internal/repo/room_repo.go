@@ -2,9 +2,12 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -109,13 +112,217 @@ func (r *RoomRepo) Upsert(ctx context.Context, room *model.Room) error {
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"title", "title_ja", "description", "category", "category_ja", "cover",
-			"viewers", "started_at", "status", "ended_at", "updated_at",
+			"viewers", "peak_viewers", "started_at", "status", "ended_at", "updated_at",
 			"stream_key", "owner_id", "channel", "channel_id", "avatar",
 		}),
 	}).Create(room).Error
 }
 
+func (r *RoomRepo) ActiveByOwner(ctx context.Context, ownerID string) (*model.Room, error) {
+	var room model.Room
+	err := r.db.WithContext(ctx).
+		Where("owner_id = ? AND status IN ?", ownerID, []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Order("started_at DESC, created_at DESC").
+		Take(&room).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRoomNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+func (r *RoomRepo) ActiveRoomsByOwner(ctx context.Context, ownerID string) ([]model.Room, error) {
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).
+		Where("owner_id = ? AND status IN ?", ownerID, []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Order("started_at DESC, created_at DESC").
+		Find(&rooms).Error
+	return rooms, err
+}
+
+func (r *RoomRepo) EndActiveByOwner(ctx context.Context, ownerID string, endedAt time.Time) ([]model.Room, error) {
+	var rooms []model.Room
+	if err := r.db.WithContext(ctx).
+		Where("owner_id = ? AND status IN ?", ownerID, []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Find(&rooms).Error; err != nil {
+		return nil, err
+	}
+	if len(rooms) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, 0, len(rooms))
+	for _, room := range rooms {
+		ids = append(ids, room.ID)
+	}
+	if err := r.db.WithContext(ctx).Model(&model.Room{}).Where("id IN ?", ids).Updates(map[string]any{
+		"status":   model.StatusEnded,
+		"ended_at": endedAt,
+	}).Error; err != nil {
+		return nil, err
+	}
+	return rooms, nil
+}
+
+func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", ErrRoomNotFound
+	}
+	if strings.HasPrefix(key, "ch-") {
+		key = strings.TrimPrefix(key, "ch-")
+	}
+	if IsUUIDLike(key) {
+		return key, nil
+	}
+
+	var ownerID string
+	err := r.db.WithContext(ctx).Raw(`
+SELECT id FROM users
+WHERE username = ? OR display_name = ?
+ORDER BY updated_at DESC
+LIMIT 1
+`, key, key).Row().Scan(&ownerID)
+	if err == nil && strings.TrimSpace(ownerID) != "" {
+		return ownerID, nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) && !isMissingTable(err) {
+		return "", err
+	}
+
+	err = r.db.WithContext(ctx).Raw(`
+SELECT owner_id FROM rooms
+WHERE channel_id = ? OR owner_id = ? OR channel = ?
+ORDER BY updated_at DESC
+LIMIT 1
+`, key, key, key).Row().Scan(&ownerID)
+	if errors.Is(err, sql.ErrNoRows) || strings.TrimSpace(ownerID) == "" {
+		return "", ErrRoomNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return ownerID, nil
+}
+
+func isMissingTable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
+}
+
+func (r *RoomRepo) HistoryByOwner(ctx context.Context, ownerID string, limit int) ([]model.Room, error) {
+	if limit < 1 || limit > 100 {
+		limit = 24
+	}
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).
+		Where("owner_id = ? AND status = ?", ownerID, model.StatusEnded).
+		Order("COALESCE(ended_at, updated_at) DESC").
+		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+func (r *RoomRepo) EndedRoomByOwner(ctx context.Context, ownerID, roomID string) (*model.Room, error) {
+	var room model.Room
+	err := r.db.WithContext(ctx).
+		Where("owner_id = ? AND id = ? AND status = ?", ownerID, roomID, model.StatusEnded).
+		Take(&room).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrRoomNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+type RevenueRow struct {
+	RoomID    string
+	UserID    string
+	UserName  string
+	Avatar    string
+	Amount    int64
+	CreatedAt time.Time
+	Kind      string
+}
+
+func (r *RoomRepo) RevenueRowsByRooms(ctx context.Context, roomIDs []string) ([]RevenueRow, error) {
+	if len(roomIDs) == 0 {
+		return nil, nil
+	}
+	var rows []RevenueRow
+	err := r.db.WithContext(ctx).Raw(`
+SELECT
+  o.room_id,
+  o.user_id,
+  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), o.user_id) AS user_name,
+  COALESCE(u.avatar, '') AS avatar,
+  o.total_coin AS amount,
+  o.created_at,
+  'gift' AS kind
+FROM gift_orders o
+LEFT JOIN users u ON u.id = o.user_id
+WHERE o.status = 'success' AND o.room_id IN ?
+UNION ALL
+SELECT
+  s.room_id,
+  s.user_id,
+  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), s.user_id) AS user_name,
+  COALESCE(u.avatar, '') AS avatar,
+  s.amount AS amount,
+  s.created_at,
+  'super_chat' AS kind
+FROM super_chat_orders s
+LEFT JOIN users u ON u.id = s.user_id
+WHERE s.status = 'success' AND s.room_id IN ?
+`, roomIDs, roomIDs).Scan(&rows).Error
+	return rows, err
+}
+
+func (r *RoomRepo) RevenueRowsByOwnerSince(ctx context.Context, ownerID string, since time.Time) ([]RevenueRow, error) {
+	var rows []RevenueRow
+	err := r.db.WithContext(ctx).Raw(`
+SELECT
+  o.room_id,
+  o.user_id,
+  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), o.user_id) AS user_name,
+  COALESCE(u.avatar, '') AS avatar,
+  o.total_coin AS amount,
+  o.created_at,
+  'gift' AS kind
+FROM gift_orders o
+JOIN rooms r ON r.id = o.room_id
+LEFT JOIN users u ON u.id = o.user_id
+WHERE o.status = 'success' AND r.owner_id = ? AND o.created_at >= ?
+UNION ALL
+SELECT
+  s.room_id,
+  s.user_id,
+  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), s.user_id) AS user_name,
+  COALESCE(u.avatar, '') AS avatar,
+  s.amount AS amount,
+  s.created_at,
+  'super_chat' AS kind
+FROM super_chat_orders s
+JOIN rooms r ON r.id = s.room_id
+LEFT JOIN users u ON u.id = s.user_id
+WHERE s.status = 'success' AND r.owner_id = ? AND s.created_at >= ?
+`, ownerID, since, ownerID, since).Scan(&rows).Error
+	return rows, err
+}
+
 const uuidPattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+
+var uuidPatternRe = regexp.MustCompile(uuidPattern)
+
+func IsUUIDLike(s string) bool {
+	return uuidPatternRe.MatchString(strings.TrimSpace(s))
+}
 
 // FixUUIDChannels rewrites legacy rows where rooms.channel was stored as a
 // raw user UUID. Prefer the real display name from users; fall back to a
@@ -164,6 +371,20 @@ func (r *RoomRepo) SetEnded(ctx context.Context, id string, endedAt any) error {
 		"status":   model.StatusEnded,
 		"ended_at": endedAt,
 	}).Error
+}
+
+func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt any, viewers, peakViewers int64) error {
+	updates := map[string]any{
+		"status":   model.StatusEnded,
+		"ended_at": endedAt,
+	}
+	if viewers >= 0 {
+		updates["viewers"] = viewers
+	}
+	if peakViewers >= 0 {
+		updates["peak_viewers"] = peakViewers
+	}
+	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(updates).Error
 }
 
 func roomStatusRank(status string) int {

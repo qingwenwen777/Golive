@@ -17,6 +17,8 @@ type Broker interface {
 	Subscribe(ctx context.Context, channel string) (Subscription, error)
 	// Publish is convenient for tests and for room-internal echoes.
 	Publish(ctx context.Context, channel string, payload []byte) error
+	// RecordViewerCount persists current and peak viewer counts for analytics.
+	RecordViewerCount(ctx context.Context, roomID string, count int64) error
 }
 
 // Subscription is the receive side. Channel() yields raw payload bytes.
@@ -55,6 +57,21 @@ func (b *RedisBroker) Subscribe(ctx context.Context, channel string) (Subscripti
 func (b *RedisBroker) Publish(ctx context.Context, channel string, payload []byte) error {
 	return b.rdb.Publish(ctx, channel, payload).Err()
 }
+
+func (b *RedisBroker) RecordViewerCount(ctx context.Context, roomID string, count int64) error {
+	return luaRecordViewerCount.Run(ctx, b.rdb, []string{"roommetrics:" + roomID}, count, 30*24*60*60).Err()
+}
+
+var luaRecordViewerCount = redis.NewScript(`
+local count = tonumber(ARGV[1]) or 0
+redis.call('HSET', KEYS[1], 'viewers', count)
+local peak = tonumber(redis.call('HGET', KEYS[1], 'peak') or '0')
+if count > peak then
+  redis.call('HSET', KEYS[1], 'peak', count)
+end
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]) or 2592000)
+return 1
+`)
 
 type redisSub struct {
 	ps *redis.PubSub

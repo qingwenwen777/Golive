@@ -26,6 +26,7 @@ type Room struct {
 	Avatar      string    `gorm:"type:varchar(500)"`
 	Cover       string    `gorm:"type:varchar(500)"`
 	Viewers     int64     `gorm:"not null;default:0"`
+	PeakViewers int64     `gorm:"not null;default:0"`
 	Category    string    `gorm:"type:varchar(64);index"`
 	CategoryJa  string    `gorm:"type:varchar(64)"`
 	StartedAt   time.Time `gorm:"index"`
@@ -53,6 +54,7 @@ type Stream struct {
 	Avatar          string `json:"avatar"`
 	Cover           string `json:"cover"`
 	Viewers         int64  `json:"viewers"`
+	PeakViewers     int64  `json:"peakViewers,omitempty"`
 	Duration        string `json:"duration"`
 	Category        string `json:"category"`
 	CategoryJa      string `json:"categoryJa,omitempty"`
@@ -80,6 +82,7 @@ func (r *Room) ToStream(now time.Time) Stream {
 		Avatar:      r.Avatar,
 		Cover:       r.Cover,
 		Viewers:     r.Viewers,
+		PeakViewers: r.PeakViewers,
 		Duration:    FormatDuration(now.Sub(r.StartedAt)),
 		Category:    r.Category,
 		CategoryJa:  r.CategoryJa,

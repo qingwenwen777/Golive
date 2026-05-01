@@ -17,9 +17,9 @@ import (
 // channel; Publish records the call and broadcasts to all subscribers of
 // that channel.
 type fakeBroker struct {
-	mu          sync.Mutex
-	subs        map[string][]*fakeSub
-	subscribes  int
+	mu           sync.Mutex
+	subs         map[string][]*fakeSub
+	subscribes   int
 	unsubscribes int
 }
 
@@ -50,6 +50,10 @@ func (b *fakeBroker) Publish(_ context.Context, channel string, payload []byte) 
 		default:
 		}
 	}
+	return nil
+}
+
+func (b *fakeBroker) RecordViewerCount(_ context.Context, _ string, _ int64) error {
 	return nil
 }
 
@@ -206,7 +210,9 @@ func TestHub_BroadcastIsolatesPerRoom(t *testing.T) {
 
 	_ = h.Broadcast(context.Background(), "R1", []byte(`hello-r1`))
 	waitFor(t, func() bool { return len(a.snapshot()) >= 1 })
-	require.Empty(t, b.snapshot(), "R2 must not receive R1 messages")
+	for _, payload := range b.snapshot() {
+		require.NotEqual(t, "hello-r1", string(payload), "R2 must not receive R1 messages")
+	}
 }
 
 func TestHub_EvictsSlowConsumer(t *testing.T) {

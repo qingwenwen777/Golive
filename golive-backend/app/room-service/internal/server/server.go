@@ -43,6 +43,9 @@ func NewRouter(d Deps) *gin.Engine {
 	rooms := r.Group("/rooms")
 	{
 		rooms.GET("", roomH.List)
+		rooms.GET("/channels/:channel/history", optionalAuth, roomH.ChannelHistory)
+		rooms.GET("/channels/:channel/analytics", auth, roomH.ChannelAnalytics)
+		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
 		rooms.GET("/:id", optionalAuth, roomH.Get)
 		rooms.GET("/:id/follow", optionalAuth, socialH.GetFollow)
 
