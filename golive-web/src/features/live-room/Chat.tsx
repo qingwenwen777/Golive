@@ -57,6 +57,15 @@ function parseAmountValue(amount: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+// formatYenAmount normalises a wire amount (raw "1000", "1,000", or "¥1,000")
+// to a single canonical "¥1,000" rendering. Keeping ¥ on the client side
+// avoids encoding surprises (Safari has been seen to render a server-side ¥
+// as 楼 when something in the pipeline misroutes the byte sequence).
+function formatYenAmount(amount: string): string {
+  const n = parseAmountValue(amount);
+  return `¥${n.toLocaleString('en-US')}`;
+}
+
 function superChatPinDurationMs(m: SuperChatMessage): number {
   const amount = parseAmountValue(m.amount);
   if (amount >= 20000) return 15 * 60_000;
@@ -128,13 +137,12 @@ function SuperChatCard({ m }: { m: SuperChatMessage }) {
   return (
     <div
       className={cn('gl-sc', m.pending && 'opacity-50 saturate-50')}
-      style={{ background: spec.bg }}
       aria-busy={m.pending ? 'true' : undefined}
     >
-      <div className="gl-sc-head">
-        <Avatar name={m.user} src={m.avatar} size={24} />
+      <div className="gl-sc-head" style={{ background: spec.bg }}>
+        <Avatar name={m.user} src={m.avatar} size={28} />
         <span className="gl-sc-user">{m.user}</span>
-        <span className="gl-sc-amt">{m.amount}</span>
+        <span className="gl-sc-amt">{formatYenAmount(m.amount)}</span>
       </div>
       {m.text && (
         <div className="gl-sc-body" style={{ background: spec.soft, color: '#0f0f0f' }}>
@@ -180,7 +188,7 @@ function PinnedSuperChatCard({
         <div className="gl-sc-pin-copy">
           <div className="gl-sc-pin-meta">
             <span className="gl-sc-pin-user">{m.user}</span>
-            <span className="gl-sc-pin-amount">{m.amount}</span>
+            <span className="gl-sc-pin-amount">{formatYenAmount(m.amount)}</span>
           </div>
           <div className="gl-sc-pin-hint">
             <span>{formatRemaining(remainingMs)}</span>

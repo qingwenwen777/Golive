@@ -25,7 +25,9 @@
       "PowerShell(Get-ChildItem *)",
       "Bash(echo \"EXIT=$?\")",
       "Bash(go vet *)",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(xargs grep *)",
+      "Bash(npx --no-install tsc --noEmit)"
     ]
   }
 }

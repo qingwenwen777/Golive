@@ -152,21 +152,9 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 	return out, nil
 }
 
+// formatCoinAmount returns the bare integer string. The currency symbol is
+// added by the frontend so it stays under UTF-8 control end-to-end (Safari
+// has been observed to mis-render a non-UTF-8-routed yen sign as \u697c).
 func formatCoinAmount(amount int64) string {
-	raw := strconv.FormatInt(amount, 10)
-	n := len(raw)
-	if n <= 3 {
-		return "\u697c" + raw
-	}
-	out := make([]byte, 0, n+(n-1)/3)
-	head := n % 3
-	if head == 0 {
-		head = 3
-	}
-	out = append(out, raw[:head]...)
-	for i := head; i < n; i += 3 {
-		out = append(out, ',')
-		out = append(out, raw[i:i+3]...)
-	}
-	return "\u697c" + string(out)
+	return strconv.FormatInt(amount, 10)
 }

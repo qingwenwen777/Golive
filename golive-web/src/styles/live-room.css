@@ -732,39 +732,44 @@
 }
 
 .gl-sc {
-  margin: 6px 8px;
-  border-radius: 4px;
+  margin: 8px 10px;
+  border-radius: 12px;
   overflow: hidden;
-  color: #fff;
   animation: glFadeIn 0.3s ease-out;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  background: var(--gl-bg);
 }
 .gl-sc-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 10px 14px;
+  color: #fff;
 }
 .gl-sc-user {
   flex: 1;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.1px;
 }
 .gl-sc-amt {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   color: #fff;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 .gl-sc-body {
-  padding: 10px 12px;
+  padding: 12px 14px;
   font-size: 14px;
   font-weight: 500;
-  color: #fff;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  color: #0f0f0f;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .gl-chat-input {

@@ -5,6 +5,7 @@ import { useDanmuStore } from '@/stores/useDanmuStore';
 import { useDanmuHistory } from '@/api/chat';
 import type { ChatMessage, Message, SuperChatTier } from '@/types/message';
 import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
+import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 
@@ -105,7 +106,19 @@ export function useRoomRealtime(
     return () => resetRoom(roomId);
   }, [roomId, ensureRoom, resetRoom]);
 
-  const history = useDanmuHistory(roomId, enabled, 20);
+  // Bounded history (YouTube-style): a small window of recent chat + SC
+  // entries so newcomers see what just happened without flooding the panel.
+  const history = useDanmuHistory(roomId, enabled, 12);
+
+  // Fallback: replay the user's own recent chats from localStorage so a
+  // refresh / re-entry does not blank out messages that the server-side
+  // history endpoint did not return (chat persistence may be skipped in
+  // local dev when Kafka is the no-op producer).
+  useEffect(() => {
+    if (!enabled || !roomId) return;
+    const cached = loadRecentChatMessages(roomId);
+    if (cached.length > 0) mergeMessages(roomId, cached);
+  }, [enabled, mergeMessages, roomId]);
 
   useEffect(() => {
     if (!history.data) return;
@@ -173,6 +186,7 @@ export function useRoomRealtime(
           .getState()
           .rooms[roomId]?.messages.some((x) => x.id === msg.id);
         appendMessage(roomId, msg);
+        saveRecentChatMessage(roomId, msg);
         if (!alreadySeen && danmuOnRef.current) {
           appendBullet(roomId, {
             id: genId('b'),
@@ -292,6 +306,7 @@ export function useRoomRealtime(
       ts: now,
     };
     appendMessage(roomId, msg);
+    saveRecentChatMessage(roomId, msg);
     if (danmuOnRef.current) {
       appendBullet(roomId, {
         id: genId('b'),
