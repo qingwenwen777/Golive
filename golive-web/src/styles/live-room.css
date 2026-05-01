@@ -389,6 +389,9 @@
   border: 0;
   border-radius: 0;
 }
+.gl-mobile-chat {
+  margin-top: 16px;
+}
 .gl-chat-head {
   display: flex;
   align-items: center;
@@ -902,6 +905,22 @@
 
   .gl-desc {
     border-radius: 10px;
+  }
+
+  .gl-mobile-chat .gl-chat {
+    width: 100%;
+    height: min(54vh, 480px);
+    min-height: 360px;
+    max-height: none;
+    border-radius: 12px;
+  }
+
+  .gl-mobile-chat .gl-chat-list {
+    min-height: 180px;
+  }
+
+  .gl-mobile-chat .gl-chat-input {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
   .gl-chat-fab {

@@ -34,6 +34,7 @@ export default function LiveRoomPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isNarrow = useMediaQuery('(max-width: 1279px)');
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [superChatOpen, setSuperChatOpen] = useState(false);
@@ -221,6 +222,14 @@ export default function LiveRoomPage() {
     );
   }
 
+  const openSuperChat = () => {
+    if (!isAuthed) {
+      openLogin(() => setSuperChatOpen(true));
+      return;
+    }
+    setSuperChatOpen(true);
+  };
+
   const Left = (
     <div className="min-w-0 flex-1">
       <Player
@@ -265,16 +274,19 @@ export default function LiveRoomPage() {
           onStop={handleStopLive}
         />
       )}
+      {isMobile && (
+        <div className="gl-mobile-chat">
+          <Chat
+            messages={messages}
+            onSendChat={sendChat}
+            onSendSuperChat={openSuperChat}
+            reconnecting={reconnecting}
+            reconnectingLabel={reconnectingLabel}
+          />
+        </div>
+      )}
     </div>
   );
-
-  const openSuperChat = () => {
-    if (!isAuthed) {
-      openLogin(() => setSuperChatOpen(true));
-      return;
-    }
-    setSuperChatOpen(true);
-  };
 
   return (
     <>
@@ -299,7 +311,7 @@ export default function LiveRoomPage() {
         )}
       </div>
 
-      {isNarrow && (
+      {isNarrow && !isMobile && (
         <>
           <button
             className="gl-chat-fab"
@@ -320,7 +332,6 @@ export default function LiveRoomPage() {
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
                 sheetMode
-                onClose={() => setSheetOpen(false)}
               />
             </SheetContent>
           </Sheet>

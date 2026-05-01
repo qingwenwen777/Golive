@@ -60,7 +60,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
         <div className="gl-topbar-left">
           <button
             type="button"
-            className="gl-icon-btn"
+            className="gl-icon-btn gl-menu-btn"
             onClick={onMenuClick}
             aria-label={t('menu')}
           >

@@ -10,6 +10,7 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useFollowState, useFollow, useUnfollow, useLikeState, useLike } from '@/api/room';
 import { cn } from '@/lib/cn';
+import { copyText } from '@/lib/clipboard';
 import {
   LIKED_STREAMS_KEY,
   WATCH_LATER_KEY,
@@ -130,6 +131,16 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     onOpenGifts?.();
   };
 
+  const handleShare = async () => {
+    try {
+      const method = await copyText(window.location.href, 'live room link');
+      if (method === 'manual') toast.info('Live room link opened for manual copy.');
+      else toast.success('Live room link copied.');
+    } catch {
+      toast.error('Could not copy the live room link.');
+    }
+  };
+
   const title = lang === 'ja' ? (stream.titleJa ?? stream.title) : stream.title;
   const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
 
@@ -193,7 +204,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             <Gift size={18} />
             <span>Gift</span>
           </button>
-          <button className="gl-pg-solo" aria-label={t('liveRoom.share')}>
+          <button className="gl-pg-solo" aria-label={t('liveRoom.share')} onClick={handleShare}>
             <Share2 size={18} />
             <span>{t('liveRoom.share')}</span>
           </button>

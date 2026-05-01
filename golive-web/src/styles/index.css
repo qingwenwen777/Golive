@@ -2616,6 +2616,10 @@ input:focus-visible,
     gap: 6px;
   }
 
+  .gl-menu-btn {
+    display: none;
+  }
+
   .gl-topbar-right {
     gap: 2px;
   }
