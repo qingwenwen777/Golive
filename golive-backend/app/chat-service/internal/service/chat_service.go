@@ -149,10 +149,12 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 		return nil, err
 	}
 	userIDs := make([]string, 0, len(rows))
+	names := make([]string, 0, len(rows))
 	for i := range rows {
 		userIDs = append(userIDs, rows[i].UserID)
+		names = append(names, rows[i].Username)
 	}
-	fanBadges, err := s.danmus.FanBadgesForRoomUsers(ctx, roomID, userIDs)
+	fanBadges, err := s.danmus.FanBadgesForRoomUsers(ctx, roomID, userIDs, names)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +162,9 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 	out := make([]model.Public, 0, len(rows)+len(superChats))
 	for i := range rows {
 		item := rows[i].ToPublic()
-		if badge := fanBadges[item.UserID]; badge != nil {
+		if badge := fanBadges.ByUserID[item.UserID]; badge != nil {
+			item.FanBadge = badge
+		} else if badge := fanBadges.ByName[normalizeName(item.User)]; badge != nil {
 			item.FanBadge = badge
 		}
 		out = append(out, item)
@@ -192,4 +196,8 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 // has been observed to mis-render a non-UTF-8-routed yen sign as \u697c).
 func formatCoinAmount(amount int64) string {
 	return strconv.FormatInt(amount, 10)
+}
+
+func normalizeName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }

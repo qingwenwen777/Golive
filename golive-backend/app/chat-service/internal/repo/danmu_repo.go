@@ -39,8 +39,15 @@ type SuperChatHistoryRow struct {
 
 type fanBadgeHistoryRow struct {
 	UserID    string
+	Username  string
+	Name      string
 	CreatorID string
 	Level     int
+}
+
+type FanBadgeLookup struct {
+	ByUserID map[string]*model.FanBadgePayload
+	ByName   map[string]*model.FanBadgePayload
 }
 
 func NewDanmuRepo(db *gorm.DB, shards int) *DanmuRepo {
@@ -96,7 +103,11 @@ func (r *DanmuRepo) History(ctx context.Context, roomID string, before int64, li
 // FanBadgesForRoomUsers returns each chat user's current fan badge for the
 // room owner. History rendering uses the current membership state so viewers
 // entering later still see badges earned while they were away.
-func (r *DanmuRepo) FanBadgesForRoomUsers(ctx context.Context, roomID string, userIDs []string) (map[string]*model.FanBadgePayload, error) {
+func (r *DanmuRepo) FanBadgesForRoomUsers(ctx context.Context, roomID string, userIDs []string, names []string) (FanBadgeLookup, error) {
+	empty := FanBadgeLookup{
+		ByUserID: map[string]*model.FanBadgePayload{},
+		ByName:   map[string]*model.FanBadgePayload{},
+	}
 	unique := make([]string, 0, len(userIDs))
 	seen := make(map[string]struct{}, len(userIDs))
 	for _, userID := range userIDs {
@@ -110,38 +121,80 @@ func (r *DanmuRepo) FanBadgesForRoomUsers(ctx context.Context, roomID string, us
 		seen[userID] = struct{}{}
 		unique = append(unique, userID)
 	}
-	if roomID == "" || len(unique) == 0 {
-		return map[string]*model.FanBadgePayload{}, nil
+	uniqueNames := make([]string, 0, len(names))
+	seenNames := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		key := normalizeBadgeName(name)
+		if _, ok := seenNames[key]; ok {
+			continue
+		}
+		seenNames[key] = struct{}{}
+		uniqueNames = append(uniqueNames, name)
+	}
+	if roomID == "" || (len(unique) == 0 && len(uniqueNames) == 0) {
+		return empty, nil
 	}
 
 	var rows []fanBadgeHistoryRow
-	err := r.db.WithContext(ctx).
+	q := r.db.WithContext(ctx).
 		Table("fan_badges AS fb").
-		Select("fb.user_id AS user_id, fb.creator_id AS creator_id, fb.level AS level").
+		Select(`
+fb.user_id AS user_id,
+COALESCE(u.username, '') AS username,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), fb.user_id) AS name,
+fb.creator_id AS creator_id,
+fb.level AS level
+`).
 		Joins("JOIN rooms AS r ON r.owner_id = fb.creator_id").
-		Where("r.id = ? AND fb.user_id IN ? AND fb.level > 0", roomID, unique).
-		Scan(&rows).Error
+		Joins("LEFT JOIN users AS u ON u.id = fb.user_id").
+		Where("r.id = ? AND fb.level > 0", roomID)
+	clauses := make([]string, 0, 2)
+	args := make([]any, 0, 3)
+	if len(unique) > 0 {
+		clauses = append(clauses, "fb.user_id IN ?")
+		args = append(args, unique)
+	}
+	if len(uniqueNames) > 0 {
+		clauses = append(clauses, "u.username IN ? OR u.display_name IN ?")
+		args = append(args, uniqueNames, uniqueNames)
+	}
+	err := q.Where("("+strings.Join(clauses, " OR ")+")", args...).Scan(&rows).Error
 	if err != nil {
 		// Older local/dev databases may not have gift fan-badge tables yet.
 		// History should still load; it will simply omit badge decoration.
 		msg := err.Error()
 		if strings.Contains(msg, "doesn't exist") || strings.Contains(msg, "no such table") {
-			return map[string]*model.FanBadgePayload{}, nil
+			return empty, nil
 		}
-		return nil, err
+		return empty, err
 	}
 
-	out := make(map[string]*model.FanBadgePayload, len(rows))
+	out := empty
 	for _, row := range rows {
 		if row.UserID == "" || row.CreatorID == "" || row.Level <= 0 {
 			continue
 		}
-		out[row.UserID] = &model.FanBadgePayload{
+		badge := &model.FanBadgePayload{
 			CreatorID: row.CreatorID,
 			Level:     row.Level,
 		}
+		out.ByUserID[row.UserID] = badge
+		if row.Username != "" {
+			out.ByName[normalizeBadgeName(row.Username)] = badge
+		}
+		if row.Name != "" {
+			out.ByName[normalizeBadgeName(row.Name)] = badge
+		}
 	}
 	return out, nil
+}
+
+func normalizeBadgeName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // SuperChatHistory returns successful SuperChats for the same room so the
