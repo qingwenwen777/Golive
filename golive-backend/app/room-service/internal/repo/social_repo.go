@@ -30,8 +30,8 @@ func NewSocialRepo(rdb *redis.Client) *SocialRepo { return &SocialRepo{rdb: rdb}
 
 // follow ----------------------------------------------------------------
 
-func userFollowsKey(uid string) string  { return "user:" + uid + ":follows" }
-func channelFansKey(cid string) string  { return "channel:" + cid + ":followers" }
+func userFollowsKey(uid string) string { return "user:" + uid + ":follows" }
+func channelFansKey(cid string) string { return "channel:" + cid + ":followers" }
 
 func (s *SocialRepo) IsFollowing(ctx context.Context, uid, channelID string) (bool, error) {
 	if uid == "" {

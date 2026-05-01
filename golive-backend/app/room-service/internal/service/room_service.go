@@ -15,15 +15,20 @@ var ErrRoomNotFound = errcode.New(404, "Not found")
 
 type RoomService struct {
 	rooms   *repo.RoomRepo
+	social  *repo.SocialRepo
 	flvBase string
 	now     func() time.Time
 }
 
-func NewRoomService(rooms *repo.RoomRepo, flvBase string) *RoomService {
+func NewRoomService(rooms *repo.RoomRepo, flvBase string, social ...*repo.SocialRepo) *RoomService {
 	if flvBase == "" {
 		flvBase = "http://localhost:8082/live"
 	}
-	return &RoomService{rooms: rooms, flvBase: strings.TrimRight(flvBase, "/"), now: time.Now}
+	var socialRepo *repo.SocialRepo
+	if len(social) > 0 {
+		socialRepo = social[0]
+	}
+	return &RoomService{rooms: rooms, social: socialRepo, flvBase: strings.TrimRight(flvBase, "/"), now: time.Now}
 }
 
 // playbackURL builds the public HTTP-FLV URL for a live room. Viewers receive
@@ -69,6 +74,9 @@ func (s *RoomService) List(ctx context.Context, rawCategory string, page, size i
 	for i := range rooms {
 		st := rooms[i].ToStream(now)
 		st.PlaybackURL = s.playbackURL(&rooms[i])
+		if err := s.addSubscriberCount(ctx, &st); err != nil {
+			return nil, err
+		}
 		// streamKey deliberately NOT populated here 鈥?owner-only.
 		items = append(items, st)
 	}
@@ -89,8 +97,23 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 	}
 	st := r.ToStream(s.now())
 	st.PlaybackURL = s.playbackURL(r)
+	if err := s.addSubscriberCount(ctx, &st); err != nil {
+		return nil, err
+	}
 	if isOwner {
 		st.StreamKey = r.StreamKey
 	}
 	return &st, nil
+}
+
+func (s *RoomService) addSubscriberCount(ctx context.Context, st *model.Stream) error {
+	if s.social == nil || st == nil || st.ChannelID == "" {
+		return nil
+	}
+	count, err := s.social.FollowerCount(ctx, st.ChannelID)
+	if err != nil {
+		return err
+	}
+	st.SubscriberCount = count
+	return nil
 }

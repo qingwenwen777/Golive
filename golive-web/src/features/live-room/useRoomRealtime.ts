@@ -209,12 +209,25 @@ export function useRoomRealtime(
       case 'gift': {
         const count = parsed.count ?? 1;
         const currentName = userDisplayName(currentUser);
-        const duplicateSelfEcho = useRealtimeStore
-          .getState()
-          .rooms[
-            roomId
-          ]?.messages.some((message) => message.kind === 'gift' && message.self && message.giftName === parsed.giftName && (message.count ?? 1) === count && parsed.user === currentName && now - message.ts < 15_000);
-        if (duplicateSelfEcho) break;
+        // Dedupe priority:
+        //   1) Same requestId already present (the local optimistic copy).
+        //      The server broadcast may use a different message id (orderID)
+        //      than the local optimistic one, so id-only dedupe is not enough.
+        //   2) Fallback: a recent self-flagged gift with matching name/count
+        //      from the same user (handles missing requestId).
+        const existing = useRealtimeStore.getState().rooms[roomId]?.messages ?? [];
+        const duplicate = existing.some((message) => {
+          if (message.kind !== 'gift') return false;
+          if (parsed.requestId && message.requestId === parsed.requestId) return true;
+          return (
+            message.self === true &&
+            message.giftName === parsed.giftName &&
+            (message.count ?? 1) === count &&
+            parsed.user === currentName &&
+            now - message.ts < 15_000
+          );
+        });
+        if (duplicate) break;
 
         appendMessage(roomId, {
           id: giftMessageId(parsed),

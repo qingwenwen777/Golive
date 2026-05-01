@@ -43,25 +43,26 @@ func (Room) TableName() string { return "rooms" }
 // src/types/stream.ts. StreamKey is set ONLY for the publishing owner.
 // PlaybackURL is the public HTTP-FLV URL exposed to all viewers when live.
 type Stream struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	TitleJa     string `json:"titleJa,omitempty"`
-	Description string `json:"description,omitempty"`
-	Channel     string `json:"channel"`
-	ChannelID   string `json:"channelId"`
-	Verified    bool   `json:"verified"`
-	Avatar      string `json:"avatar"`
-	Cover       string `json:"cover"`
-	Viewers     int64  `json:"viewers"`
-	Duration    string `json:"duration"`
-	Category    string `json:"category"`
-	CategoryJa  string `json:"categoryJa,omitempty"`
-	StartedAt   string `json:"startedAt"`
-	IsLive      bool   `json:"isLive"`
-	OwnerID     string `json:"ownerId,omitempty"`
-	PlaybackURL string `json:"playbackUrl,omitempty"`
-	StreamKey   string `json:"streamKey,omitempty"`
-	Status      string `json:"status,omitempty"`
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	TitleJa         string `json:"titleJa,omitempty"`
+	Description     string `json:"description,omitempty"`
+	Channel         string `json:"channel"`
+	ChannelID       string `json:"channelId"`
+	Verified        bool   `json:"verified"`
+	Avatar          string `json:"avatar"`
+	Cover           string `json:"cover"`
+	Viewers         int64  `json:"viewers"`
+	Duration        string `json:"duration"`
+	Category        string `json:"category"`
+	CategoryJa      string `json:"categoryJa,omitempty"`
+	StartedAt       string `json:"startedAt"`
+	IsLive          bool   `json:"isLive"`
+	OwnerID         string `json:"ownerId,omitempty"`
+	PlaybackURL     string `json:"playbackUrl,omitempty"`
+	StreamKey       string `json:"streamKey,omitempty"`
+	Status          string `json:"status,omitempty"`
+	SubscriberCount int64  `json:"subscriberCount"`
 }
 
 // ToStream converts a Room into the public DTO. Duration is computed live.
