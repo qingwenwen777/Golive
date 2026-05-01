@@ -371,6 +371,7 @@
 
 /* ── Chat ───────────────────────────────────────────────────────── */
 .gl-chat {
+  position: relative;
   width: 402px;
   flex-shrink: 0;
   border: 1px solid var(--gl-border);
@@ -724,6 +725,42 @@
 .dark .gl-chat-list {
   scrollbar-color: #555 transparent;
 }
+.gl-chat-new-message {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--gl-text) 8%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gl-bg) 92%, transparent);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
+  color: #e11d48;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0 10px 0 12px;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+.gl-chat-new-message:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-chat-new-message svg {
+  flex: 0 0 auto;
+}
+.dark .gl-chat-new-message {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(22, 22, 24, 0.88);
+  color: #fb7185;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+}
 .gl-chat-notice {
   display: flex;
   gap: 12px;
@@ -964,15 +1001,26 @@
   font-weight: 800;
   line-height: 1;
 }
+.gl-chat-fan-badge,
+.gl-fan-badge-level {
+  --fan-badge-border: rgba(30, 172, 106, 0.42);
+  --fan-badge-bg: linear-gradient(90deg, rgba(238, 255, 246, 0.96), rgba(227, 251, 240, 0.92));
+  --fan-badge-color: #15803d;
+  --fan-badge-icon: #14532d;
+  --fan-badge-dark-border: rgba(74, 222, 128, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(20, 83, 45, 0.48), rgba(22, 101, 52, 0.3));
+  --fan-badge-dark-color: #bbf7d0;
+  --fan-badge-dark-icon: #dcfce7;
+}
 .gl-chat-fan-badge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   height: 18px;
-  border: 1px solid rgba(255, 139, 193, 0.42);
+  border: 1px solid var(--fan-badge-border);
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 241, 248, 0.95), rgba(246, 235, 255, 0.92));
-  color: #7c3aed;
+  background: var(--fan-badge-bg);
+  color: var(--fan-badge-color);
   padding: 0 7px 0 6px;
   font-size: 11px;
   font-weight: 800;
@@ -980,8 +1028,129 @@
   vertical-align: middle;
 }
 .gl-chat-fan-badge svg {
-  color: #111827;
+  color: var(--fan-badge-icon);
   fill: none;
+}
+.gl-chat-fan-badge.is-tone-2,
+.gl-fan-badge-level.is-tone-2 {
+  --fan-badge-border: rgba(8, 145, 178, 0.4);
+  --fan-badge-bg: linear-gradient(90deg, rgba(236, 254, 255, 0.96), rgba(224, 247, 250, 0.92));
+  --fan-badge-color: #0e7490;
+  --fan-badge-icon: #164e63;
+  --fan-badge-dark-border: rgba(34, 211, 238, 0.3);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(21, 94, 117, 0.44), rgba(8, 145, 178, 0.28));
+  --fan-badge-dark-color: #cffafe;
+  --fan-badge-dark-icon: #ecfeff;
+}
+.gl-chat-fan-badge.is-tone-3,
+.gl-fan-badge-level.is-tone-3 {
+  --fan-badge-border: rgba(59, 130, 246, 0.38);
+  --fan-badge-bg: linear-gradient(90deg, rgba(239, 246, 255, 0.96), rgba(219, 234, 254, 0.92));
+  --fan-badge-color: #2563eb;
+  --fan-badge-icon: #1e3a8a;
+  --fan-badge-dark-border: rgba(96, 165, 250, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(30, 64, 175, 0.44), rgba(37, 99, 235, 0.28));
+  --fan-badge-dark-color: #dbeafe;
+  --fan-badge-dark-icon: #eff6ff;
+}
+.gl-chat-fan-badge.is-tone-4,
+.gl-fan-badge-level.is-tone-4 {
+  --fan-badge-border: rgba(139, 92, 246, 0.4);
+  --fan-badge-bg: linear-gradient(90deg, rgba(245, 243, 255, 0.96), rgba(237, 233, 254, 0.92));
+  --fan-badge-color: #7c3aed;
+  --fan-badge-icon: #4c1d95;
+  --fan-badge-dark-border: rgba(167, 139, 250, 0.34);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(91, 33, 182, 0.46), rgba(124, 58, 237, 0.3));
+  --fan-badge-dark-color: #ede9fe;
+  --fan-badge-dark-icon: #f5f3ff;
+}
+.gl-chat-fan-badge.is-tone-5,
+.gl-fan-badge-level.is-tone-5 {
+  --fan-badge-border: rgba(244, 63, 94, 0.4);
+  --fan-badge-bg: linear-gradient(90deg, rgba(255, 241, 242, 0.96), rgba(255, 228, 230, 0.92));
+  --fan-badge-color: #e11d48;
+  --fan-badge-icon: #881337;
+  --fan-badge-dark-border: rgba(251, 113, 133, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(136, 19, 55, 0.44), rgba(190, 18, 60, 0.3));
+  --fan-badge-dark-color: #ffe4e6;
+  --fan-badge-dark-icon: #fff1f2;
+}
+.gl-chat-fan-badge.is-tone-6,
+.gl-fan-badge-level.is-tone-6 {
+  --fan-badge-border: rgba(245, 158, 11, 0.46);
+  --fan-badge-bg: linear-gradient(90deg, rgba(255, 251, 235, 0.96), rgba(254, 243, 199, 0.92));
+  --fan-badge-color: #b45309;
+  --fan-badge-icon: #78350f;
+  --fan-badge-dark-border: rgba(251, 191, 36, 0.34);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(120, 53, 15, 0.44), rgba(180, 83, 9, 0.28));
+  --fan-badge-dark-color: #fef3c7;
+  --fan-badge-dark-icon: #fffbeb;
+}
+.gl-chat-fan-badge.is-tone-7,
+.gl-fan-badge-level.is-tone-7 {
+  --fan-badge-border: rgba(234, 88, 12, 0.42);
+  --fan-badge-bg: linear-gradient(90deg, rgba(255, 247, 237, 0.96), rgba(255, 237, 213, 0.92));
+  --fan-badge-color: #c2410c;
+  --fan-badge-icon: #7c2d12;
+  --fan-badge-dark-border: rgba(251, 146, 60, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(124, 45, 18, 0.44), rgba(194, 65, 12, 0.28));
+  --fan-badge-dark-color: #ffedd5;
+  --fan-badge-dark-icon: #fff7ed;
+}
+.gl-chat-fan-badge.is-tone-8,
+.gl-fan-badge-level.is-tone-8 {
+  --fan-badge-border: rgba(20, 184, 166, 0.42);
+  --fan-badge-bg: linear-gradient(90deg, rgba(240, 253, 250, 0.96), rgba(204, 251, 241, 0.92));
+  --fan-badge-color: #0f766e;
+  --fan-badge-icon: #134e4a;
+  --fan-badge-dark-border: rgba(45, 212, 191, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(19, 78, 74, 0.44), rgba(15, 118, 110, 0.3));
+  --fan-badge-dark-color: #ccfbf1;
+  --fan-badge-dark-icon: #f0fdfa;
+}
+.gl-chat-fan-badge.is-tone-9,
+.gl-fan-badge-level.is-tone-9 {
+  --fan-badge-border: rgba(99, 102, 241, 0.42);
+  --fan-badge-bg: linear-gradient(90deg, rgba(238, 242, 255, 0.96), rgba(224, 231, 255, 0.92));
+  --fan-badge-color: #4f46e5;
+  --fan-badge-icon: #312e81;
+  --fan-badge-dark-border: rgba(129, 140, 248, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(49, 46, 129, 0.46), rgba(79, 70, 229, 0.3));
+  --fan-badge-dark-color: #e0e7ff;
+  --fan-badge-dark-icon: #eef2ff;
+}
+.gl-chat-fan-badge.is-tone-10,
+.gl-fan-badge-level.is-tone-10 {
+  --fan-badge-border: rgba(217, 70, 239, 0.42);
+  --fan-badge-bg: linear-gradient(90deg, rgba(253, 244, 255, 0.96), rgba(250, 232, 255, 0.92));
+  --fan-badge-color: #c026d3;
+  --fan-badge-icon: #701a75;
+  --fan-badge-dark-border: rgba(232, 121, 249, 0.32);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(112, 26, 117, 0.46), rgba(192, 38, 211, 0.3));
+  --fan-badge-dark-color: #fae8ff;
+  --fan-badge-dark-icon: #fdf4ff;
+}
+.gl-chat-fan-badge.is-tone-11,
+.gl-fan-badge-level.is-tone-11 {
+  --fan-badge-border: rgba(202, 138, 4, 0.48);
+  --fan-badge-bg: linear-gradient(90deg, rgba(254, 252, 232, 0.96), rgba(254, 249, 195, 0.92));
+  --fan-badge-color: #a16207;
+  --fan-badge-icon: #713f12;
+  --fan-badge-dark-border: rgba(250, 204, 21, 0.36);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(113, 63, 18, 0.48), rgba(161, 98, 7, 0.3));
+  --fan-badge-dark-color: #fef9c3;
+  --fan-badge-dark-icon: #fefce8;
+}
+.gl-chat-fan-badge.is-tone-12,
+.gl-fan-badge-level.is-tone-12 {
+  --fan-badge-border: rgba(24, 24, 27, 0.42);
+  --fan-badge-bg: linear-gradient(90deg, rgba(250, 250, 250, 0.98), rgba(229, 231, 235, 0.94));
+  --fan-badge-color: #18181b;
+  --fan-badge-icon: #ca8a04;
+  --fan-badge-dark-border: rgba(250, 204, 21, 0.38);
+  --fan-badge-dark-bg: linear-gradient(90deg, rgba(24, 24, 27, 0.88), rgba(113, 63, 18, 0.42));
+  --fan-badge-dark-color: #fef9c3;
+  --fan-badge-dark-icon: #fde68a;
 }
 .gl-chat-text {
   color: var(--gl-text);
@@ -1005,12 +1174,12 @@
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
 }
 .dark .gl-chat-fan-badge {
-  border-color: rgba(255, 139, 193, 0.34);
-  background: linear-gradient(90deg, rgba(88, 28, 135, 0.46), rgba(190, 24, 93, 0.32));
-  color: #fce7f3;
+  border-color: var(--fan-badge-dark-border);
+  background: var(--fan-badge-dark-bg);
+  color: var(--fan-badge-dark-color);
 }
 .dark .gl-chat-fan-badge svg {
-  color: #fdf2f8;
+  color: var(--fan-badge-dark-icon);
 }
 
 .gl-sc {

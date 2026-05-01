@@ -1882,11 +1882,14 @@ input:focus-visible,
   align-items: center;
   gap: 3px;
 }
-.gl-fan-badge-meta span:first-child {
+.gl-fan-badge-level {
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 241, 248, 0.95), rgba(246, 235, 255, 0.92));
-  color: #7c3aed;
+  background: var(--fan-badge-bg);
+  color: var(--fan-badge-color);
   padding: 2px 7px;
+}
+.gl-fan-badge-level svg {
+  color: var(--fan-badge-icon);
 }
 .gl-fan-badge-empty {
   display: flex;
@@ -1900,9 +1903,12 @@ input:focus-visible,
 button.gl-fan-badge-empty {
   cursor: pointer;
 }
-.dark .gl-fan-badge-meta span:first-child {
-  background: linear-gradient(90deg, rgba(88, 28, 135, 0.46), rgba(190, 24, 93, 0.32));
-  color: #fce7f3;
+.dark .gl-fan-badge-level {
+  background: var(--fan-badge-dark-bg);
+  color: var(--fan-badge-dark-color);
+}
+.dark .gl-fan-badge-level svg {
+  color: var(--fan-badge-dark-icon);
 }
 .gl-quick-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));

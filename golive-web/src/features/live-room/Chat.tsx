@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
@@ -25,6 +32,7 @@ import { useIsAuthed, useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import type { RoomViewer } from '@/stores/useRealtimeStore';
+import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 
 export interface ChatProps {
   messages: Message[];
@@ -101,6 +109,7 @@ const EMOJI_GROUPS = [
 ] as const;
 
 const MAX_CHAT_CHARS = 200;
+const CHAT_BOTTOM_THRESHOLD_PX = 48;
 
 const SC_PIN_REFRESH_MS = 1000;
 
@@ -182,6 +191,10 @@ function isOwnerMessage(m: ChatMessage, ownerId?: string, ownerName?: string): b
   return false;
 }
 
+function isNearChatBottom(el: HTMLDivElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= CHAT_BOTTOM_THRESHOLD_PX;
+}
+
 function ChatRow({
   m,
   isOwner,
@@ -206,7 +219,10 @@ function ChatRow({
           </span>
           {isOwner && <span className="gl-chat-owner-badge">HOST</span>}
           {isFan && m.fanBadge && (
-            <span className="gl-chat-fan-badge" title={`Fan badge level ${m.fanBadge.level}`}>
+            <span
+              className={cn('gl-chat-fan-badge', fanBadgeToneClass(m.fanBadge.level))}
+              title={`Fan badge level ${m.fanBadge.level}`}
+            >
               <Crown size={12} strokeWidth={2.4} />
               <span>#{m.fanBadge.level}</span>
             </span>
@@ -398,12 +414,16 @@ export function Chat({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const emojiWrapRef = useRef<HTMLDivElement | null>(null);
   const inputValueRef = useRef('');
+  const lastMessageCountRef = useRef(messages.length);
+  const stickToBottomRef = useRef(true);
+  const forceScrollOnChatOpenRef = useRef(false);
   const [input, setInput] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [emojiGroup, setEmojiGroup] = useState<(typeof EMOJI_GROUPS)[number]['id']>('faces');
   const [now, setNow] = useState(() => Date.now());
   const [activeTab, setActiveTab] = useState<ChatPanelTab>('chat');
   const [expandedPinnedId, setExpandedPinnedId] = useState<string | null>(null);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   // Track IME composition so Enter during candidate selection (CJK input
   // methods) does not submit a half-finished message.
   const composingRef = useRef(false);
@@ -460,11 +480,45 @@ export function Chat({
     });
   };
 
-  useEffect(() => {
+  const scrollChatToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    stickToBottomRef.current = true;
+    setNewMessageCount(0);
+  }, []);
+
+  const handleChatScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const nearBottom = isNearChatBottom(el);
+    stickToBottomRef.current = nearBottom;
+    if (nearBottom) setNewMessageCount(0);
+  };
+
+  useLayoutEffect(() => {
+    const previousCount = lastMessageCountRef.current;
+    const nextCount = messages.length;
+    const newCount = Math.max(0, nextCount - previousCount);
+    lastMessageCountRef.current = nextCount;
+
+    if (activeTab !== 'chat') return;
+
+    if (forceScrollOnChatOpenRef.current) {
+      forceScrollOnChatOpenRef.current = false;
+      scrollChatToBottom();
+      return;
+    }
+
+    if (previousCount === 0 || nextCount <= previousCount || stickToBottomRef.current) {
+      scrollChatToBottom();
+      return;
+    }
+
+    if (newCount > 0) {
+      setNewMessageCount((count) => count + newCount);
+    }
+  }, [activeTab, messages.length, scrollChatToBottom]);
 
   useEffect(() => {
     if (!emojiOpen) return;
@@ -520,7 +574,10 @@ export function Chat({
           role="tab"
           aria-selected={activeTab === 'chat'}
           className={cn('gl-chat-tab-btn', activeTab === 'chat' && 'is-active')}
-          onClick={() => setActiveTab('chat')}
+          onClick={() => {
+            forceScrollOnChatOpenRef.current = true;
+            setActiveTab('chat');
+          }}
         >
           <MessageCircle size={16} />
           <span>{'\u804a\u5929'}</span>
@@ -556,7 +613,7 @@ export function Chat({
         </div>
       )}
       {activeTab === 'chat' ? (
-        <div className="gl-chat-list" ref={listRef}>
+        <div className="gl-chat-list" ref={listRef} onScroll={handleChatScroll}>
           {messages.map((m) => {
             if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
             if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
@@ -578,6 +635,18 @@ export function Chat({
         </div>
       ) : (
         <ViewerRankList viewers={viewers} total={viewerTotal ?? viewers.length} />
+      )}
+
+      {activeTab === 'chat' && newMessageCount > 0 && (
+        <button
+          type="button"
+          className="gl-chat-new-message"
+          onClick={() => scrollChatToBottom('smooth')}
+          aria-label={`${newMessageCount} new messages. Jump to latest.`}
+        >
+          <span>{`\u65b0\u6d88\u606f${newMessageCount}`}</span>
+          <ChevronDown size={14} strokeWidth={2.6} />
+        </button>
       )}
 
       {activeTab === 'chat' && reconnecting && (

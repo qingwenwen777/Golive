@@ -27,6 +27,7 @@ import { Avatar } from '@/components/Avatar';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
+import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import {
   LIKED_STREAMS_KEY,
   WATCH_HISTORY_KEY,
@@ -329,7 +330,7 @@ function FanBadgeShelf({
           <div className="gl-fan-badge-copy">
             <div className="gl-fan-badge-name">{badge.creatorName}</div>
             <div className="gl-fan-badge-meta">
-              <span>
+              <span className={`gl-fan-badge-level ${fanBadgeToneClass(badge.level)}`}>
                 <Crown size={13} strokeWidth={2.4} /> #{badge.level}
               </span>
               <span>{badge.totalContribution.toLocaleString()} contribution</span>
