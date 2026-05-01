@@ -5,6 +5,7 @@ import type { ChatMessage, Message, SuperChatMessage, SuperChatTier } from '@/ty
 interface ChatHistoryBase {
   type: 'chat' | 'super_chat';
   id: string;
+  userId?: string;
   user: string;
   avatar?: string;
   text: string;
@@ -32,6 +33,7 @@ function toChatMessage(item: DanmuHistoryItem): ChatMessage {
   return {
     id: item.id,
     kind: 'chat',
+    userId: item.userId,
     user: item.user,
     avatar: item.avatar,
     text: item.text,

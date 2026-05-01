@@ -12,6 +12,7 @@ import { userDisplayName } from '@/types/user';
 interface ServerChat {
   type: 'chat';
   id?: string;
+  userId?: string;
   user: string;
   avatar?: string;
   text: string;
@@ -177,6 +178,7 @@ export function useRoomRealtime(
         const msg: ChatMessage = {
           id: parsed.id ?? genId('m'),
           kind: 'chat',
+          userId: parsed.userId,
           user: parsed.user,
           avatar: parsed.avatar,
           text: parsed.text,
@@ -302,6 +304,7 @@ export function useRoomRealtime(
     const msg: ChatMessage = {
       id,
       kind: 'chat',
+      userId: currentUser?.id,
       user,
       avatar,
       text,

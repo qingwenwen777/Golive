@@ -11,15 +11,33 @@ import {
   PictureInPicture,
   MessagesSquare,
   MessageSquareOff,
+  Type,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useDanmuStore } from '@/stores/useDanmuStore';
+import {
+  type DanmuFontSize,
+  useDanmuStore,
+} from '@/stores/useDanmuStore';
 import { DanmuLayer } from './DanmuLayer';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { Stream } from '@/types/stream';
 import type { Bullet } from '@/stores/useRealtimeStore';
 
 const DEFAULT_VIDEO_SRC =
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+const DANMU_FONT_OPTIONS: Array<{ value: DanmuFontSize; label: string }> = [
+  { value: 'sm', label: 'Small' },
+  { value: 'md', label: 'Medium' },
+  { value: 'lg', label: 'Large' },
+];
 
 type WebKitVideoElement = HTMLVideoElement & {
   webkitDisplayingFullscreen?: boolean;
@@ -75,6 +93,8 @@ export function Player({
 
   const danmuOn = useDanmuStore((s) => s.on);
   const toggleDanmu = useDanmuStore((s) => s.toggle);
+  const danmuFontSize = useDanmuStore((s) => s.fontSize);
+  const setDanmuFontSize = useDanmuStore((s) => s.setFontSize);
 
   const flvUrl = buildFlvUrl(stream);
   const isLiveFlv = !!flvUrl && stream.isLive !== false;
@@ -442,6 +462,38 @@ export function Player({
           >
             {danmuOn ? <MessagesSquare size={20} /> : <MessageSquareOff size={20} />}
           </button>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (open) showControlsTemporarily();
+            }}
+          >
+            <DropdownMenuTrigger asChild>
+              <button
+                className="gl-pbtn"
+                aria-label={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+                title={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+              >
+                <Type size={20} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-36">
+              <DropdownMenuLabel>
+                {t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={danmuFontSize}
+                onValueChange={(value) => setDanmuFontSize(value as DanmuFontSize)}
+              >
+                {DANMU_FONT_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem key={option.value} value={option.value}>
+                    {t(`player.danmuFontSize.${option.value}`, {
+                      defaultValue: option.label,
+                    })}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             className="gl-pbtn"
             onClick={togglePip}

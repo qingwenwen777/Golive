@@ -22,6 +22,7 @@ type Danmu struct {
 type Public struct {
 	Type   string `json:"type"` // "chat" or "super_chat"
 	ID     string `json:"id"`
+	UserID string `json:"userId,omitempty"`
 	User   string `json:"user"`
 	Avatar string `json:"avatar,omitempty"`
 	Text   string `json:"text"`
@@ -35,6 +36,7 @@ func (d *Danmu) ToPublic() Public {
 	return Public{
 		Type:   "chat",
 		ID:     d.ID,
+		UserID: d.UserID,
 		User:   d.Username,
 		Avatar: d.Avatar,
 		Text:   d.Text,

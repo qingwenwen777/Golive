@@ -205,7 +205,7 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		if display == "" {
 			display = c.identity.UserID
 		}
-		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, display, avatar, text, now))
+		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now))
 	}
 }
 

@@ -17,6 +17,8 @@ interface RenderBullet {
 }
 
 const ROWS = 7;
+const TOP_OFFSET_PCT = 8;
+const ACTIVE_HEIGHT_PCT = 68;
 
 export interface DanmuLayerProps {
   bullets: Bullet[];
@@ -83,8 +85,8 @@ export function DanmuLayer({ bullets, onBulletEnd }: DanmuLayerProps) {
       aria-hidden="true"
     >
       {rendered.map((b) => {
-        const rowHeightPct = 70 / ROWS;
-        const top = `${b.row * rowHeightPct}%`;
+        const rowHeightPct = ACTIVE_HEIGHT_PCT / ROWS;
+        const top = `${TOP_OFFSET_PCT + b.row * rowHeightPct}%`;
         return (
           <span
             key={b.id}

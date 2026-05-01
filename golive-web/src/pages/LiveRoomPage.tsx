@@ -27,6 +27,7 @@ import {
 } from '@/features/creator/CreateLiveDialog';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { userDisplayName } from '@/types/user';
+import { streamChannelName } from '@/types/stream';
 
 export default function LiveRoomPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -170,6 +171,7 @@ export default function LiveRoomPage() {
       (publisherSession?.streamId === stream.id ? publisherSession : null))
     : null;
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
+  const ownerName = streamChannelName(stream, currentUser);
   const handleStopLive = () => {
     stopLive.mutate(undefined, {
       onSuccess: () => {
@@ -232,7 +234,7 @@ export default function LiveRoomPage() {
   };
 
   const Left = (
-    <div className="min-w-0 flex-1">
+    <div className="min-w-0 flex-1 xl:pt-6">
       <Player
         stream={stream}
         viewerCount={effectiveViewers}
@@ -279,6 +281,8 @@ export default function LiveRoomPage() {
         <div className="gl-mobile-chat">
           <Chat
             messages={messages}
+            ownerId={stream.ownerId}
+            ownerName={ownerName}
             onSendChat={sendChat}
             onSendSuperChat={openSuperChat}
             reconnecting={reconnecting}
@@ -307,6 +311,8 @@ export default function LiveRoomPage() {
           <div className="sticky top-20 self-start">
             <Chat
               messages={messages}
+              ownerId={stream.ownerId}
+              ownerName={ownerName}
               onSendChat={sendChat}
               onSendSuperChat={openSuperChat}
               reconnecting={reconnecting}
@@ -332,6 +338,8 @@ export default function LiveRoomPage() {
               </SheetHeader>
               <Chat
                 messages={messages}
+                ownerId={stream.ownerId}
+                ownerName={ownerName}
                 onSendChat={sendChat}
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}

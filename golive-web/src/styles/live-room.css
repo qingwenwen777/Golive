@@ -705,6 +705,34 @@
   font-size: 13px;
   animation: glFadeIn 0.2s ease-out;
 }
+.gl-chat-line.is-owner {
+  position: relative;
+  margin: 4px 10px;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--gl-red) 22%, var(--gl-border));
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 0, 51, 0.09), rgba(28, 98, 185, 0.08)), var(--gl-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+.gl-chat-line.is-owner::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(180deg, var(--gl-red), #1c62b9);
+  content: '';
+}
+.gl-chat-avatar-wrap {
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+.gl-chat-line.is-owner .gl-chat-avatar-wrap {
+  padding: 2px;
+  background: linear-gradient(135deg, var(--gl-red), #1c62b9);
+}
 @keyframes glFadeIn {
   from {
     opacity: 0;
@@ -720,15 +748,50 @@
   line-height: 1.4;
   word-break: break-word;
 }
+.gl-chat-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
 .gl-chat-user {
   font-weight: 500;
   margin-right: 6px;
 }
+.gl-chat-meta .gl-chat-user {
+  margin-right: 0;
+}
+.gl-chat-line.is-owner .gl-chat-user {
+  color: var(--gl-text);
+  font-weight: 800;
+}
+.gl-chat-owner-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--gl-red);
+  color: #fff;
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
 .gl-chat-text {
   color: var(--gl-text);
 }
+.gl-chat-line.is-owner .gl-chat-text {
+  font-weight: 600;
+}
 .dark .gl-chat-text {
   color: #e7e7e7;
+}
+.dark .gl-chat-line.is-owner {
+  border-color: rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(135deg, rgba(255, 0, 51, 0.2), rgba(62, 143, 255, 0.15)), var(--gl-bg-card);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
 }
 
 .gl-sc {

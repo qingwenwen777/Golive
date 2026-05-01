@@ -18,6 +18,8 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 
 export interface ChatProps {
   messages: Message[];
+  ownerId?: string;
+  ownerName?: string;
   onSendSuperChat?: () => void;
   sheetMode?: boolean;
   reconnecting?: boolean;
@@ -118,13 +120,31 @@ function userColor(name: string): string {
   return `hsl(${hashHue(name)}, 55%, 48%)`;
 }
 
-function ChatRow({ m }: { m: ChatMessage }) {
+function normalizeName(name?: string): string {
+  return (name ?? '').trim().toLowerCase();
+}
+
+function isOwnerMessage(m: ChatMessage, ownerId?: string, ownerName?: string): boolean {
+  if (ownerId && m.userId) return m.userId === ownerId;
+  if (ownerName) return normalizeName(m.user) === normalizeName(ownerName);
+  return false;
+}
+
+function ChatRow({ m, isOwner }: { m: ChatMessage; isOwner?: boolean }) {
   return (
-    <div className="gl-chat-line">
-      <Avatar name={m.user} src={m.avatar} size={24} />
+    <div className={cn('gl-chat-line', isOwner && 'is-owner')}>
+      <div className="gl-chat-avatar-wrap">
+        <Avatar name={m.user} src={m.avatar} size={24} />
+      </div>
       <div className="gl-chat-body">
-        <span className="gl-chat-user" style={{ color: m.color ?? userColor(m.user) }}>
-          {m.user}
+        <span className="gl-chat-meta">
+          <span
+            className="gl-chat-user"
+            style={{ color: isOwner ? undefined : (m.color ?? userColor(m.user)) }}
+          >
+            {m.user}
+          </span>
+          {isOwner && <span className="gl-chat-owner-badge">HOST</span>}
         </span>
         <span className="gl-chat-text">{m.text}</span>
       </div>
@@ -243,6 +263,8 @@ function GiftNotice({ m }: { m: GiftMessage }) {
 
 export function Chat({
   messages,
+  ownerId,
+  ownerName,
   onSendSuperChat,
   sheetMode,
   reconnecting,
@@ -390,7 +412,13 @@ export function Chat({
           if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
           if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
           if (m.kind === 'super_chat') return <SuperChatCard key={m.id} m={m} />;
-          return <ChatRow key={m.id} m={m as ChatMessage} />;
+          return (
+            <ChatRow
+              key={m.id}
+              m={m as ChatMessage}
+              isOwner={isOwnerMessage(m as ChatMessage, ownerId, ownerName)}
+            />
+          );
         })}
       </div>
 

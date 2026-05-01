@@ -16,6 +16,7 @@ type SystemMsg struct {
 type ChatMsg struct {
 	Type   string `json:"type"` // "chat"
 	ID     string `json:"id"`
+	UserID string `json:"userId,omitempty"`
 	User   string `json:"user"`
 	Avatar string `json:"avatar,omitempty"`
 	Text   string `json:"text"`
@@ -63,10 +64,11 @@ func EncodeSystem(text string) []byte {
 	return b
 }
 
-func EncodeChat(id, user, avatar, text string, ts int64) []byte {
+func EncodeChat(id, userID, user, avatar, text string, ts int64) []byte {
 	b, _ := json.Marshal(ChatMsg{
 		Type:   "chat",
 		ID:     id,
+		UserID: userID,
 		User:   user,
 		Avatar: avatar,
 		Text:   text,

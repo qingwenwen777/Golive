@@ -5,6 +5,7 @@ export type SuperChatTier = 0 | 1 | 2 | 3 | 4 | 5;
 export interface ChatMessage {
   id: string;
   kind: 'chat';
+  userId?: string;
   user: string;
   avatar?: string;
   text: string;
