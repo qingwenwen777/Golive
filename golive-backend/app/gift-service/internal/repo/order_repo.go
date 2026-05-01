@@ -461,9 +461,9 @@ func (r *OrderRepo) closeExpiredBetRound(ctx context.Context, round *model.BetRo
 func (r *OrderRepo) betSummaries(ctx context.Context, roundID string) ([]BetOptionSummary, error) {
 	rows, err := r.db.WithContext(ctx).
 		Model(&model.BetWager{}).
-		Select("option, COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total").
+		Select("`option`, COUNT(*) AS `count`, COALESCE(SUM(amount), 0) AS total").
 		Where("round_id = ?", roundID).
-		Group("option").
+		Group("`option`").
 		Rows()
 	if err != nil {
 		return nil, err

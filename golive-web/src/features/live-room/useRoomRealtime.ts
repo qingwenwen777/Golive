@@ -344,7 +344,7 @@ export function useRoomRealtime(
         break;
       }
       case 'bet': {
-        if (parsed.round) {
+        if (parsed.round && isCompleteBetRound(parsed.round)) {
           const nextBetView = (prev?: BetRoundView): BetRoundView => ({
             round: parsed.round ?? null,
             summary: parsed.summary ?? prev?.summary ?? [],
@@ -449,4 +449,8 @@ export function useRoomRealtime(
     sendSuperChat,
     clearBullet,
   };
+}
+
+function isCompleteBetRound(round: Partial<BetRound>): round is BetRound {
+  return Boolean(round.id && round.roomId && round.question && round.status && round.closeAt);
 }
