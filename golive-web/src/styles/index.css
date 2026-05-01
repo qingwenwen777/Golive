@@ -2144,6 +2144,11 @@ input:focus-visible,
   letter-spacing: 0.04em;
   color: var(--gl-red);
 }
+.gl-yt-channel-status.is-offline {
+  color: var(--gl-text-secondary);
+  font-weight: 700;
+  letter-spacing: 0;
+}
 .gl-yt-you-head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

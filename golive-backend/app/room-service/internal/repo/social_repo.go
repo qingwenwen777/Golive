@@ -34,6 +34,9 @@ func userFollowsKey(uid string) string  { return "user:" + uid + ":follows" }
 func channelFansKey(cid string) string  { return "channel:" + cid + ":followers" }
 
 func (s *SocialRepo) IsFollowing(ctx context.Context, uid, channelID string) (bool, error) {
+	if uid == "" {
+		return false, nil
+	}
 	score, err := s.rdb.ZScore(ctx, userFollowsKey(uid), channelID).Result()
 	_ = score
 	if err == redis.Nil {
@@ -43,6 +46,20 @@ func (s *SocialRepo) IsFollowing(ctx context.Context, uid, channelID string) (bo
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *SocialRepo) FollowerCount(ctx context.Context, channelID string) (int64, error) {
+	if channelID == "" {
+		return 0, nil
+	}
+	return s.rdb.ZCard(ctx, channelFansKey(channelID)).Result()
+}
+
+func (s *SocialRepo) Following(ctx context.Context, uid string) ([]string, error) {
+	if uid == "" {
+		return nil, nil
+	}
+	return s.rdb.ZRevRange(ctx, userFollowsKey(uid), 0, -1).Result()
 }
 
 func (s *SocialRepo) Follow(ctx context.Context, uid, channelID string) error {

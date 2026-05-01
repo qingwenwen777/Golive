@@ -49,7 +49,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   const streamId = stream.id;
   const channelName = streamChannelName(stream, currentUser);
 
-  const followState = useFollowState(channelId, isAuthed);
+  const followState = useFollowState(channelId, !!channelId);
   const likeState = useLikeState(streamId, isAuthed);
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
@@ -63,6 +63,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   }, [stream.id]);
 
   const subscribed = followState.data?.following ?? false;
+  const subscriberCount = followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
   const likeInfo = likeState.data;
   const baseLikes = Math.floor(stream.viewers * 0.3);
   const likes = likeInfo?.likes ?? baseLikes;
@@ -143,7 +144,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
               {stream.verified && <Icons.BadgeCheck size={14} className="text-text-secondary" />}
             </div>
             <div className="gl-info-chan-subs">
-              {t('liveRoom.subscribers', { count: Math.floor(stream.viewers * 12) })}
+              {t('liveRoom.subscribers', { count: subscriberCount })}
             </div>
           </div>
           <button

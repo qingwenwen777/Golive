@@ -65,7 +65,7 @@ func main() {
 	liveRepo := repo.NewLiveRepo(rdb)
 
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase)
-	socialSvc := service.NewSocialService(socialRepo)
+	socialSvc := service.NewSocialService(socialRepo, roomRepo)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 
 	r := server.NewRouter(server.Deps{

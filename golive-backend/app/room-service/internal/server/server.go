@@ -36,15 +36,17 @@ func NewRouter(d Deps) *gin.Engine {
 	auth := handler.AuthRequired(d.JWTSecret)
 	optionalAuth := handler.OptionalAuth(d.JWTSecret)
 
+	r.GET("/subscriptions", auth, socialH.ListSubscriptions)
+
 	// Public room endpoints (no auth).
 	rooms := r.Group("/rooms")
 	{
 		rooms.GET("", roomH.List)
 		rooms.GET("/:id", optionalAuth, roomH.Get)
+		rooms.GET("/:id/follow", optionalAuth, socialH.GetFollow)
 
 		// Authenticated mutations / personalized state.
 		authed := rooms.Group("", auth)
-		authed.GET("/:id/follow", socialH.GetFollow)
 		authed.POST("/:id/follow", socialH.Follow)
 		authed.DELETE("/:id/follow", socialH.Unfollow)
 

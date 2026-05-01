@@ -51,13 +51,13 @@ export default function ChannelPage() {
   const channelAvatar = profile?.avatar || primary?.avatar || '';
   const channelId = primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
-  const followState = useFollowState(channelId, isAuthed && !isOwner && !!channelId);
+  const followState = useFollowState(channelId, !!channelId);
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
 
   const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
   const primaryCategory = primary?.category ?? 'Just Chatting';
-  const subscriberCount = stableSubscriberCount(profile, channelName, totalViewers);
+  const subscriberCount = followState.data?.subscriberCount ?? primary?.subscriberCount ?? 0;
   const isUnknown = !profile && !primary && !publicUser.isPending && !rooms.isPending;
 
   const handleSubscribe = () => {
@@ -251,11 +251,4 @@ function formatChannelKey(key: string): string {
   if (!key) return 'Channel';
   if (!isUuidLike(key)) return key;
   return `Creator ${key.slice(0, 8)}`;
-}
-
-function stableSubscriberCount(profile: User | null, name: string, viewers: number): number {
-  const seed = profile?.id || profile?.username || name;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) & 0xffff;
-  return 1200 + (hash % 9000) + viewers * 12;
 }

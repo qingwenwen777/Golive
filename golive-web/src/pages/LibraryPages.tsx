@@ -20,7 +20,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useMe, useTopupCoins } from '@/api/auth';
-import { useRooms } from '@/api/room';
+import { useRooms, useSubscriptions } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
@@ -39,17 +39,18 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
-import { streamChannelName, type Stream } from '@/types/stream';
+import type { Stream } from '@/types/stream';
 import { userDisplayName } from '@/types/user';
-
-const EMPTY_STREAMS: Stream[] = [];
 
 export function SubscriptionsPage() {
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
-  const rooms = useRooms({ size: 24 });
-  const streams = rooms.data?.items ?? EMPTY_STREAMS;
-  const channels = useMemo(() => uniqueChannels(streams).slice(0, 12), [streams]);
+  const subscriptions = useSubscriptions(isAuthed);
+  const channels = subscriptions.data?.items ?? [];
+  const streams = useMemo(
+    () => channels.map((channel) => channel.stream).filter((stream): stream is Stream => Boolean(stream)),
+    [channels],
+  );
 
   return (
     <div className="gl-page gl-library-page">
@@ -77,20 +78,22 @@ export function SubscriptionsPage() {
           <div className="gl-yt-channel-rail" role="list">
             {channels.map((channel) => (
               <Link
-                key={channel.key}
-                to={`/channel/${channel.key}`}
+                key={channel.channelId}
+                to={`/channel/${encodeURIComponent(channel.key)}`}
                 className="gl-yt-channel-chip"
                 role="listitem"
               >
                 <div className="gl-yt-channel-avatar">
-                  <Avatar name={channel.name} size={64} />
+                  <Avatar name={channel.name} src={channel.avatar} size={64} />
                   {channel.live && <span className="gl-yt-live-dot" aria-hidden />}
                 </div>
                 <div className="gl-yt-channel-name" title={channel.name}>
                   <span>{channel.name}</span>
                   {channel.verified && <CheckCircle2 size={12} />}
                 </div>
-                {channel.live && <div className="gl-yt-channel-status">LIVE</div>}
+                <div className={`gl-yt-channel-status${channel.live ? '' : ' is-offline'}`}>
+                  {channel.live ? 'LIVE' : 'Offline'}
+                </div>
               </Link>
             ))}
           </div>
@@ -105,9 +108,9 @@ export function SubscriptionsPage() {
           </Link>
         </div>
         <StreamGrid
-          isPending={rooms.isPending}
+          isPending={isAuthed && subscriptions.isPending}
           streams={streams.slice(0, 12)}
-          emptyTitle="No subscribed creators are live"
+          emptyTitle={isAuthed ? 'No subscribed creators yet' : 'No subscriptions to show'}
           emptySub="Explore the live directory and follow rooms from the player page."
         />
       </section>
@@ -671,24 +674,4 @@ function SettingRow({
       </button>
     </div>
   );
-}
-
-function uniqueChannels(streams: Stream[]) {
-  const map = new Map<
-    string,
-    { key: string; name: string; verified: boolean; viewers: number; live: boolean }
-  >();
-  for (const stream of streams) {
-    const key = encodeURIComponent(stream.channelId || stream.ownerId || stream.channel);
-    const name = streamChannelName(stream);
-    const existing = map.get(key);
-    map.set(key, {
-      key,
-      name,
-      verified: stream.verified || Boolean(existing?.verified),
-      viewers: (existing?.viewers ?? 0) + stream.viewers,
-      live: true,
-    });
-  }
-  return Array.from(map.values());
 }

@@ -130,8 +130,10 @@ function SystemNotice({ m }: { m: SystemMessage }) {
 function GiftNotice({ m }: { m: GiftMessage }) {
   const count = m.count ?? 1;
   const meta = giftMeta(m.giftName);
-  const icon = m.giftIcon ?? meta.icon;
-  const tier = m.tier ?? meta.tier;
+  // Treat empty string as missing so server broadcasts that omit the icon
+  // (or send "") still render the same colored card sender sees locally.
+  const icon = m.giftIcon && m.giftIcon.length > 0 ? m.giftIcon : meta.icon;
+  const tier = (m.tier ?? meta.tier) as 0 | 1 | 2 | 3;
   return (
     <div className={cn('gl-gift-notice', `tier-${tier}`)}>
       <div className="gl-gift-notice-icon" aria-hidden="true">

@@ -105,6 +105,23 @@ function normalizeUploadedCoverUrl(url: string): string {
 export interface FollowState {
   channelId: string;
   following: boolean;
+  subscriberCount: number;
+}
+
+export interface SubscriptionChannel {
+  key: string;
+  channelId: string;
+  name: string;
+  avatar: string;
+  verified: boolean;
+  live: boolean;
+  status: string;
+  subscriberCount: number;
+  stream?: Stream;
+}
+
+export interface SubscriptionsResp {
+  items: SubscriptionChannel[];
 }
 
 export function useFollowState(channelId: string, enabled: boolean) {
@@ -120,6 +137,19 @@ export function useFollowState(channelId: string, enabled: boolean) {
   });
 }
 
+export function useSubscriptions(enabled: boolean) {
+  return useQuery<SubscriptionsResp, Error>({
+    queryKey: ['subscriptions'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<SubscriptionsResp>('/subscriptions', { signal });
+      return data;
+    },
+    enabled,
+    staleTime: 30_000,
+    retry: 0,
+  });
+}
+
 export function useFollow(channelId: string) {
   const qc = useQueryClient();
   return useMutation<FollowState, Error, void, { prev?: FollowState }>({
@@ -130,15 +160,26 @@ export function useFollow(channelId: string) {
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['follow', channelId] });
       const prev = qc.getQueryData<FollowState>(['follow', channelId]);
-      qc.setQueryData<FollowState>(['follow', channelId], { channelId, following: true });
+      qc.setQueryData<FollowState>(['follow', channelId], {
+        channelId,
+        following: true,
+        subscriberCount: (prev?.subscriberCount ?? 0) + (prev?.following ? 0 : 1),
+      });
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(['follow', channelId], ctx.prev);
-      else qc.setQueryData<FollowState>(['follow', channelId], { channelId, following: false });
+      else {
+        qc.setQueryData<FollowState>(['follow', channelId], {
+          channelId,
+          following: false,
+          subscriberCount: 0,
+        });
+      }
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['follow', channelId] });
+      void qc.invalidateQueries({ queryKey: ['subscriptions'] });
     },
   });
 }
@@ -153,15 +194,26 @@ export function useUnfollow(channelId: string) {
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['follow', channelId] });
       const prev = qc.getQueryData<FollowState>(['follow', channelId]);
-      qc.setQueryData<FollowState>(['follow', channelId], { channelId, following: false });
+      qc.setQueryData<FollowState>(['follow', channelId], {
+        channelId,
+        following: false,
+        subscriberCount: Math.max(0, (prev?.subscriberCount ?? 0) - (prev?.following ? 1 : 0)),
+      });
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(['follow', channelId], ctx.prev);
-      else qc.setQueryData<FollowState>(['follow', channelId], { channelId, following: true });
+      else {
+        qc.setQueryData<FollowState>(['follow', channelId], {
+          channelId,
+          following: true,
+          subscriberCount: 1,
+        });
+      }
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['follow', channelId] });
+      void qc.invalidateQueries({ queryKey: ['subscriptions'] });
     },
   });
 }

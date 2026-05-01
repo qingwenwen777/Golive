@@ -29,16 +29,26 @@ func (h *SocialHandler) require(c *gin.Context) (string, bool) {
 // follow ---------------------------------------------------------------
 
 func (h *SocialHandler) GetFollow(c *gin.Context) {
-	uid, ok := h.require(c)
-	if !ok {
-		return
-	}
+	uid := UserIDFromCtx(c)
 	state, err := h.svc.GetFollow(c.Request.Context(), uid, c.Param("id"))
 	if err != nil {
 		errcode.Respond(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, state)
+}
+
+func (h *SocialHandler) ListSubscriptions(c *gin.Context) {
+	uid, ok := h.require(c)
+	if !ok {
+		return
+	}
+	resp, err := h.svc.ListSubscriptions(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *SocialHandler) Follow(c *gin.Context) {

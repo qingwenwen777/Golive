@@ -20,6 +20,7 @@ export interface Stream {
   playbackUrl?: string;
   streamKey?: string;
   status?: 'publishing' | 'live' | 'ending' | 'ended' | string;
+  subscriberCount?: number;
 }
 
 export interface PaginatedRooms {

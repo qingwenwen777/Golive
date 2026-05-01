@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 
 	"gorm.io/gorm"
@@ -76,6 +77,31 @@ func (r *RoomRepo) GetByID(ctx context.Context, id string) (*model.Room, error) 
 	return &room, nil
 }
 
+func (r *RoomRepo) LatestByChannelIDs(ctx context.Context, channelIDs []string) (map[string]model.Room, error) {
+	out := make(map[string]model.Room, len(channelIDs))
+	if len(channelIDs) == 0 {
+		return out, nil
+	}
+
+	var rooms []model.Room
+	if err := r.db.WithContext(ctx).
+		Where("channel_id IN ?", channelIDs).
+		Order("updated_at DESC").
+		Find(&rooms).Error; err != nil {
+		return nil, err
+	}
+
+	sort.SliceStable(rooms, func(i, j int) bool {
+		return roomStatusRank(rooms[i].Status) < roomStatusRank(rooms[j].Status)
+	})
+	for _, room := range rooms {
+		if _, ok := out[room.ChannelID]; !ok {
+			out[room.ChannelID] = room
+		}
+	}
+	return out, nil
+}
+
 // Upsert inserts the room or updates the mutable fields if id already exists.
 // Used by POST /rooms/live and admin/import flows.
 func (r *RoomRepo) Upsert(ctx context.Context, room *model.Room) error {
@@ -138,4 +164,17 @@ func (r *RoomRepo) SetEnded(ctx context.Context, id string, endedAt any) error {
 		"status":   model.StatusEnded,
 		"ended_at": endedAt,
 	}).Error
+}
+
+func roomStatusRank(status string) int {
+	switch status {
+	case model.StatusLive:
+		return 0
+	case model.StatusPublishing:
+		return 1
+	case model.StatusEnding:
+		return 2
+	default:
+		return 3
+	}
 }
