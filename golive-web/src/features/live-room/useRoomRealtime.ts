@@ -29,6 +29,8 @@ interface ServerSuperChat {
 }
 interface ServerGift {
   type: 'gift';
+  id?: string;
+  requestId?: string;
   user: string;
   giftName: string;
   giftIcon?: string;
@@ -61,6 +63,10 @@ type ServerMessage =
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function giftMessageId(parsed: ServerGift): string {
+  return parsed.requestId ? `gift:${parsed.requestId}` : (parsed.id ?? genId('gift'));
 }
 
 export interface UseRoomRealtimeReturn {
@@ -201,13 +207,23 @@ export function useRoomRealtime(
         break;
       }
       case 'gift': {
+        const count = parsed.count ?? 1;
+        const currentName = userDisplayName(currentUser);
+        const duplicateSelfEcho = useRealtimeStore
+          .getState()
+          .rooms[
+            roomId
+          ]?.messages.some((message) => message.kind === 'gift' && message.self && message.giftName === parsed.giftName && (message.count ?? 1) === count && parsed.user === currentName && now - message.ts < 15_000);
+        if (duplicateSelfEcho) break;
+
         appendMessage(roomId, {
-          id: genId('sys'),
+          id: giftMessageId(parsed),
           kind: 'gift',
+          requestId: parsed.requestId,
           user: parsed.user,
           giftName: parsed.giftName,
           giftIcon: parsed.giftIcon,
-          count: parsed.count,
+          count,
           tier: parsed.tier,
           ts: parsed.ts ?? now,
         });
@@ -240,7 +256,7 @@ export function useRoomRealtime(
         break;
       }
     }
-  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount]);
+  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount, currentUser]);
 
   // On reconnect (retryCount reset to 0 after open), send resume with lastTs.
   const prevReadyStateRef = useRef<ReadyState>('closed');

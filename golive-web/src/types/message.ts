@@ -35,6 +35,7 @@ export interface SystemMessage {
 export interface GiftMessage {
   id: string;
   kind: 'gift';
+  requestId?: string;
   user: string;
   giftName: string;
   giftIcon?: string;

@@ -49,6 +49,26 @@ const EMOJI_GROUPS = [
 
 const MAX_CHAT_CHARS = 200;
 
+const GIFT_META: Record<string, { icon: string; tier: 0 | 1 | 2 | 3 }> = {
+  flower: { icon: '\u{1f33c}', tier: 0 },
+  donut: { icon: '\u{1f369}', tier: 0 },
+  cake: { icon: '\u{1f370}', tier: 0 },
+  ramen: { icon: '\u{1f35c}', tier: 0 },
+  rocket: { icon: '\u{1f680}', tier: 1 },
+  crown: { icon: '\u{1f451}', tier: 2 },
+  gem: { icon: '\u{1f48e}', tier: 2 },
+  yacht: { icon: '\u{1f6e5}\ufe0f', tier: 3 },
+  castle: { icon: '\u{1f3f0}', tier: 3 },
+};
+
+function giftMeta(name: string): { icon?: string; tier: 0 | 1 | 2 | 3 } {
+  const fallback = GIFT_META[name.trim().toLowerCase()];
+  return {
+    icon: fallback?.icon,
+    tier: fallback?.tier ?? 0,
+  };
+}
+
 function charCount(s: string): number {
   return Array.from(s).length;
 }
@@ -109,11 +129,13 @@ function SystemNotice({ m }: { m: SystemMessage }) {
 
 function GiftNotice({ m }: { m: GiftMessage }) {
   const count = m.count ?? 1;
-  const tier = m.tier ?? 0;
+  const meta = giftMeta(m.giftName);
+  const icon = m.giftIcon ?? meta.icon;
+  const tier = m.tier ?? meta.tier;
   return (
     <div className={cn('gl-gift-notice', `tier-${tier}`)}>
       <div className="gl-gift-notice-icon" aria-hidden="true">
-        {m.giftIcon ? <span>{m.giftIcon}</span> : <Gift size={18} />}
+        {icon ? <span>{icon}</span> : <Gift size={18} />}
       </div>
       <div className="gl-gift-notice-body">
         <div className="gl-gift-notice-title">

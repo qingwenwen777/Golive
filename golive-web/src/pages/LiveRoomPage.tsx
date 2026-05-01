@@ -331,7 +331,7 @@ export default function LiveRoomPage() {
         open={giftOpen}
         onOpenChange={setGiftOpen}
         roomId={id}
-        onSent={({ gift, count }) => {
+        onSent={({ gift, count, requestId }) => {
           setFlying((prev) => [
             ...prev,
             {
@@ -341,8 +341,9 @@ export default function LiveRoomPage() {
             },
           ]);
           appendMessage(id, {
-            id: `sys-gift-${Date.now()}`,
+            id: `gift:${requestId}`,
             kind: 'gift',
+            requestId,
             user: currentUser ? userDisplayName(currentUser) : 'You',
             giftName: gift.name,
             giftIcon: gift.icon,
