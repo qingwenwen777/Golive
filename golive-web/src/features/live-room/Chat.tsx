@@ -197,6 +197,8 @@ export function Chat({
     setInput('');
     inputValueRef.current = '';
     setEmojiOpen(false);
+    inputRef.current?.blur();
+    onComposerFocusChange?.(false);
   };
 
   const insertEmoji = (emoji: string) => {
@@ -330,7 +332,6 @@ export function Chat({
                   return;
                 }
                 setEmojiOpen((open) => !open);
-                window.requestAnimationFrame(() => inputRef.current?.focus());
               }}
             >
               <Smile size={18} />

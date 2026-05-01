@@ -647,6 +647,7 @@
 }
 
 .gl-chat-input {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -734,7 +735,7 @@
 }
 @media (max-width: 480px) {
   .gl-emoji-popover {
-    right: 0;
+    right: auto;
     width: min(320px, calc(100vw - 48px));
   }
 }
@@ -931,6 +932,10 @@
     border-radius: 12px;
   }
 
+  .gl-mobile-chat .gl-emoji-wrap {
+    position: static;
+  }
+
   .gl-mobile-chat .gl-chat-list {
     min-height: 180px;
   }
@@ -940,9 +945,9 @@
   }
 
   .gl-mobile-chat .gl-emoji-popover {
-    position: fixed;
+    position: absolute;
     right: auto;
-    bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(100% + 10px);
     left: 50%;
     width: min(340px, calc(100vw - 32px));
     transform: translateX(-50%);
@@ -961,7 +966,7 @@
   }
 
   .gl-live-room-chatting .gl-mobile-chat {
-    padding-top: calc(56.25vw + 12px);
+    scroll-margin-top: calc(56.25vw + 66px);
   }
 
   .gl-chat-fab {
@@ -972,7 +977,7 @@
   }
 
   .gl-emoji-popover {
-    right: 0;
+    right: auto;
     width: min(320px, calc(100vw - 48px));
   }
 
@@ -1081,7 +1086,7 @@
   }
 
   .gl-emoji-popover {
-    right: 0;
+    right: auto;
     width: min(312px, calc(100vw - 40px));
   }
 }
