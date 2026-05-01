@@ -1747,6 +1747,8 @@ input:focus-visible,
   font-weight: 900;
 }
 .gl-channel-profile-v2 {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 20px;
@@ -1754,6 +1756,8 @@ input:focus-visible,
   padding: 0 24px 22px;
 }
 .gl-channel-avatar {
+  position: relative;
+  z-index: 3;
   margin-top: -48px;
   border: 4px solid var(--gl-bg-card);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
@@ -2673,6 +2677,91 @@ input:focus-visible,
     gap: 20px;
   }
 
+  .gl-channel-page {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .gl-channel-hero-v2 {
+    border-radius: 10px;
+  }
+
+  .gl-channel-profile-v2 {
+    display: block;
+    padding: 0 16px 18px;
+  }
+
+  .gl-channel-avatar {
+    width: 92px !important;
+    height: 92px !important;
+    margin-top: -46px;
+  }
+
+  .gl-channel-profile-main {
+    padding-top: 12px;
+  }
+
+  .gl-channel-kicker {
+    font-size: 11px;
+  }
+
+  .gl-channel-profile-main h1 {
+    margin-top: 4px;
+    font-size: 26px;
+    line-height: 1.08;
+  }
+
+  .gl-channel-handle {
+    display: block;
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .gl-channel-handle span {
+    display: inline;
+  }
+
+  .gl-channel-handle span + span::before {
+    content: '·';
+    margin-inline: 8px;
+  }
+
+  .gl-channel-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .gl-channel-actions .gl-retry-btn,
+  .gl-channel-actions .gl-secondary-btn {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gl-channel-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-channel-stat {
+    padding: 13px 16px;
+  }
+
+  .gl-channel-tabs {
+    overflow-x: auto;
+    margin-inline: -14px;
+    padding-inline: 14px;
+    scrollbar-width: none;
+  }
+
+  .gl-channel-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
   .gl-yt-channel-rail-wrap {
     margin-inline: -14px;
   }
@@ -2778,6 +2867,24 @@ input:focus-visible,
   .gl-yt-chip,
   .gl-yt-coin-chip {
     max-width: 100%;
+  }
+
+  .gl-channel-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-channel-cover-mark {
+    font-size: 20px;
+  }
+
+  .gl-channel-avatar {
+    width: 84px !important;
+    height: 84px !important;
+    margin-top: -42px;
+  }
+
+  .gl-channel-profile-main h1 {
+    font-size: 24px;
   }
 
   .gl-gift-grid {

@@ -756,6 +756,48 @@
   background: var(--gl-btn-primary-hover);
 }
 
+.gl-sc-dialog {
+  border-color: var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg);
+}
+.gl-sc-preview {
+  overflow: hidden;
+}
+.gl-sc-amount-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  padding: 0 12px;
+}
+.gl-sc-amount-input input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 800;
+}
+.gl-sc-quick-btn {
+  min-height: 30px;
+  font-weight: 700;
+}
+.gl-sc-textarea {
+  min-height: 86px;
+  line-height: 1.45;
+}
+.gl-sc-send,
+.gl-sc-cancel {
+  min-height: 38px;
+}
+
 @keyframes gl-gift-fly {
   0% {
     transform: translate(0, 0) scale(0.6);
@@ -871,6 +913,68 @@
 
   .gl-emoji-popover {
     right: -88px;
+  }
+
+  .gl-sc-dialog.is-mobile {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 18px);
+    transform: none;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-dialog-head {
+    padding-right: 34px;
+    text-align: left;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-preview {
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-amount-input {
+    height: 46px;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-quick-btn {
+    width: 100%;
+    min-height: 36px;
+    padding-inline: 6px;
+    font-size: 12px;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-textarea {
+    min-height: 104px;
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 10px;
+  }
+
+  .gl-sc-dialog.is-mobile .gl-sc-cancel,
+  .gl-sc-dialog.is-mobile .gl-sc-send {
+    width: 100%;
+    min-height: 44px;
   }
 }
 

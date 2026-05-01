@@ -21,6 +21,12 @@ import type { Bullet } from '@/stores/useRealtimeStore';
 const DEFAULT_VIDEO_SRC =
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
+type WebKitVideoElement = HTMLVideoElement & {
+  webkitDisplayingFullscreen?: boolean;
+  webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
+};
+
 export interface PlayerProps {
   stream: Stream;
   videoSrc?: string;
@@ -176,12 +182,27 @@ export function Player({
     const node = el as HTMLDivElement & {
       webkitRequestFullscreen?: () => Promise<void>;
     };
+    const video = videoRef.current as WebKitVideoElement | null;
     const active = document.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
-    if (!active) {
-      (node.requestFullscreen?.() ?? node.webkitRequestFullscreen?.())?.catch(() => undefined);
-    } else {
+    if (active) {
       (document.exitFullscreen?.() ?? doc.webkitExitFullscreen?.())?.catch(() => undefined);
+      return;
     }
+
+    if (video?.webkitDisplayingFullscreen && video.webkitExitFullscreen) {
+      video.webkitExitFullscreen();
+      return;
+    }
+
+    const request = node.requestFullscreen?.() ?? node.webkitRequestFullscreen?.();
+    if (request) {
+      request.catch(() => {
+        video?.webkitEnterFullscreen?.();
+      });
+      return;
+    }
+
+    video?.webkitEnterFullscreen?.();
   }, []);
 
   const togglePip = useCallback(() => {
@@ -209,12 +230,16 @@ export function Player({
     };
     const onEnterPip = () => setPip(true);
     const onLeavePip = () => setPip(false);
+    const onWebkitBeginFullscreen = () => setFullscreen(true);
+    const onWebkitEndFullscreen = () => setFullscreen(false);
     v.addEventListener('play', onPlay);
     v.addEventListener('pause', onPause);
     v.addEventListener('ended', onEnded);
     v.addEventListener('volumechange', onVol);
     v.addEventListener('enterpictureinpicture', onEnterPip);
     v.addEventListener('leavepictureinpicture', onLeavePip);
+    v.addEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
+    v.addEventListener('webkitendfullscreen', onWebkitEndFullscreen);
     return () => {
       v.removeEventListener('play', onPlay);
       v.removeEventListener('pause', onPause);
@@ -222,6 +247,8 @@ export function Player({
       v.removeEventListener('volumechange', onVol);
       v.removeEventListener('enterpictureinpicture', onEnterPip);
       v.removeEventListener('leavepictureinpicture', onLeavePip);
+      v.removeEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
+      v.removeEventListener('webkitendfullscreen', onWebkitEndFullscreen);
     };
   }, [isLiveFlv, showPlaybackEnded]);
 
