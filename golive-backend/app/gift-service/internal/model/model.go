@@ -18,9 +18,13 @@ func (Gift) TableName() string { return "gifts" }
 
 // Order statuses.
 const (
-	StatusPending = "pending"
-	StatusSuccess = "success"
-	StatusFailed  = "failed"
+	StatusPending  = "pending"
+	StatusSuccess  = "success"
+	StatusFailed   = "failed"
+	StatusLocked   = "locked"
+	StatusWon      = "won"
+	StatusLost     = "lost"
+	StatusRefunded = "refunded"
 
 	FailInsufficientCoin = "insufficient_coin"
 )
@@ -57,6 +61,47 @@ type SuperChatOrder struct {
 
 func (SuperChatOrder) TableName() string { return "super_chat_orders" }
 
+const (
+	BetOptionWin  = "win"
+	BetOptionLose = "lose"
+
+	BetRoundOpen      = "open"
+	BetRoundClosed    = "closed"
+	BetRoundSettled   = "settled"
+	BetRoundCancelled = "cancelled"
+)
+
+type BetRound struct {
+	ID            string     `gorm:"primaryKey;type:varchar(64)" json:"id"`
+	RoomID        string     `gorm:"type:varchar(64);index;not null" json:"roomId"`
+	OwnerID       string     `gorm:"type:varchar(36);index;not null" json:"ownerId"`
+	Question      string     `gorm:"type:varchar(255);not null" json:"question"`
+	Amount        int64      `gorm:"not null" json:"amount"`
+	Status        string     `gorm:"type:varchar(16);index;not null" json:"status"`
+	WinningOption string     `gorm:"type:varchar(16)" json:"winningOption,omitempty"`
+	CloseAt       time.Time  `gorm:"index;not null" json:"closeAt"`
+	SettledAt     *time.Time `json:"settledAt,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
+func (BetRound) TableName() string { return "bet_rounds" }
+
+type BetWager struct {
+	ID        string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
+	RoundID   string    `gorm:"type:varchar(64);index;not null;uniqueIndex:idx_bet_round_user" json:"roundId"`
+	RoomID    string    `gorm:"type:varchar(64);index;not null" json:"roomId"`
+	UserID    string    `gorm:"type:varchar(36);index;not null;uniqueIndex:idx_bet_round_user" json:"-"`
+	Option    string    `gorm:"type:varchar(16);index;not null" json:"option"`
+	Amount    int64     `gorm:"not null" json:"amount"`
+	Payout    int64     `gorm:"not null;default:0" json:"payout"`
+	Status    string    `gorm:"type:varchar(16);index;not null" json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+func (BetWager) TableName() string { return "bet_wagers" }
+
 // FanBadge is a viewer's creator-specific fan plate. It is awarded by the
 // Fan Light gift, then leveled by that viewer's lifetime contribution to the
 // same creator.
@@ -77,6 +122,7 @@ func (FanBadge) TableName() string { return "fan_badges" }
 const (
 	OutboxTopicGift      = "gift"
 	OutboxTopicSuperChat = "super_chat"
+	OutboxTopicBet       = "bet"
 
 	OutboxStatusPending = "pending"
 	OutboxStatusSent    = "sent"

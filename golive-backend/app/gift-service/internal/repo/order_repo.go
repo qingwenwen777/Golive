@@ -19,6 +19,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -31,6 +32,12 @@ var (
 	ErrInsufficientFunds = errors.New("insufficient funds")
 	ErrDuplicateRequest  = errors.New("duplicate request")
 	ErrRoomOwnerNotFound = errors.New("room owner not found")
+	ErrActiveBetExists   = errors.New("active bet round exists")
+	ErrBetRoundNotFound  = errors.New("bet round not found")
+	ErrBetClosed         = errors.New("bet closed")
+	ErrBetAlreadyPlaced  = errors.New("bet already placed")
+	ErrBetUnauthorized   = errors.New("bet unauthorized")
+	ErrBetNoWinners      = errors.New("bet has no winners")
 )
 
 type OrderRepo struct{ db *gorm.DB }
@@ -38,7 +45,14 @@ type OrderRepo struct{ db *gorm.DB }
 func NewOrderRepo(db *gorm.DB) *OrderRepo { return &OrderRepo{db: db} }
 
 func (r *OrderRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.GiftOrder{}, &model.SuperChatOrder{}, &model.LocalMessage{}, &model.FanBadge{})
+	return r.db.AutoMigrate(
+		&model.GiftOrder{},
+		&model.SuperChatOrder{},
+		&model.BetRound{},
+		&model.BetWager{},
+		&model.LocalMessage{},
+		&model.FanBadge{},
+	)
 }
 
 type FanBadgeContributionMode int
@@ -104,6 +118,362 @@ func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.F
 		Order("level DESC, total_contribution DESC, updated_at DESC").
 		Find(&badges).Error
 	return badges, err
+}
+
+type BetOptionSummary struct {
+	Option string `json:"option"`
+	Count  int64  `json:"count"`
+	Total  int64  `json:"total"`
+}
+
+func (r *OrderRepo) RoomOwner(ctx context.Context, roomID string) (string, error) {
+	return roomOwnerID(r.db.WithContext(ctx), roomID)
+}
+
+func (r *OrderRepo) LatestBetRound(ctx context.Context, roomID, userID string) (*model.BetRound, []BetOptionSummary, *model.BetWager, error) {
+	var round model.BetRound
+	err := r.db.WithContext(ctx).
+		Where("room_id = ?", roomID).
+		Order("created_at DESC").
+		Take(&round).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := r.closeExpiredBetRound(ctx, &round); err != nil {
+		return nil, nil, nil, err
+	}
+	summaries, err := r.betSummaries(ctx, round.ID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	var wager *model.BetWager
+	if strings.TrimSpace(userID) != "" {
+		var row model.BetWager
+		err = r.db.WithContext(ctx).
+			Where("round_id = ? AND user_id = ?", round.ID, userID).
+			Take(&row).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, nil, err
+		}
+		if err == nil {
+			wager = &row
+		}
+	}
+	return &round, summaries, wager, nil
+}
+
+func (r *OrderRepo) CreateBetRound(ctx context.Context, round *model.BetRound, outboxPayload []byte) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		if err := tx.Model(&model.BetRound{}).
+			Where("room_id = ? AND status = ? AND close_at <= ?", round.RoomID, model.BetRoundOpen, now).
+			Update("status", model.BetRoundClosed).Error; err != nil {
+			return err
+		}
+		var active int64
+		if err := tx.Model(&model.BetRound{}).
+			Where("room_id = ? AND status IN ?", round.RoomID, []string{model.BetRoundOpen, model.BetRoundClosed}).
+			Count(&active).Error; err != nil {
+			return err
+		}
+		if active > 0 {
+			return ErrActiveBetExists
+		}
+		if err := tx.Create(round).Error; err != nil {
+			return err
+		}
+		return tx.Create(&model.LocalMessage{
+			BizID:   round.ID,
+			RoomID:  round.RoomID,
+			Topic:   model.OutboxTopicBet,
+			Payload: string(outboxPayload),
+			Status:  model.OutboxStatusPending,
+			NextAt:  now,
+		}).Error
+	})
+}
+
+func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, outboxPayload []byte) (*model.BetWager, error) {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var round model.BetRound
+		if err := tx.Where("id = ?", wager.RoundID).Take(&round).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrBetRoundNotFound
+			}
+			return err
+		}
+		now := time.Now().UTC()
+		if round.Status != model.BetRoundOpen || !now.Before(round.CloseAt) {
+			if round.Status == model.BetRoundOpen && !now.Before(round.CloseAt) {
+				if err := tx.Model(&model.BetRound{}).
+					Where("id = ? AND status = ?", round.ID, model.BetRoundOpen).
+					Update("status", model.BetRoundClosed).Error; err != nil {
+					return err
+				}
+			}
+			return ErrBetClosed
+		}
+		wager.RoomID = round.RoomID
+		wager.Amount = round.Amount
+		res := tx.Exec(
+			"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND coin_balance >= ?",
+			wager.Amount, wager.UserID, wager.Amount,
+		)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrInsufficientFunds
+		}
+		if err := tx.Create(wager).Error; err != nil {
+			if isDuplicateKey(err) {
+				return ErrBetAlreadyPlaced
+			}
+			return err
+		}
+		return tx.Create(&model.LocalMessage{
+			BizID:   wager.ID,
+			RoomID:  wager.RoomID,
+			Topic:   model.OutboxTopicBet,
+			Payload: string(outboxPayload),
+			Status:  model.OutboxStatusPending,
+			NextAt:  now,
+		}).Error
+	})
+	if errors.Is(err, ErrBetAlreadyPlaced) {
+		var existing model.BetWager
+		ferr := r.db.WithContext(ctx).
+			Where("round_id = ? AND user_id = ?", wager.RoundID, wager.UserID).
+			Take(&existing).Error
+		if ferr != nil {
+			return nil, ferr
+		}
+		return &existing, err
+	}
+	if err != nil {
+		return nil, err
+	}
+	return wager, nil
+}
+
+func (r *OrderRepo) SettleBetRound(ctx context.Context, roundID, ownerID, winningOption string, outboxPayload []byte) (*model.BetRound, []model.BetWager, error) {
+	var settledRound model.BetRound
+	var settledWagers []model.BetWager
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		var round model.BetRound
+		if err := tx.Where("id = ?", roundID).Take(&round).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrBetRoundNotFound
+			}
+			return err
+		}
+		if round.OwnerID != ownerID {
+			return ErrBetUnauthorized
+		}
+		if round.Status != model.BetRoundOpen && round.Status != model.BetRoundClosed {
+			return ErrBetClosed
+		}
+		var wagers []model.BetWager
+		if err := tx.Where("round_id = ? AND status = ?", roundID, model.StatusLocked).
+			Order("created_at ASC, id ASC").
+			Find(&wagers).Error; err != nil {
+			return err
+		}
+
+		var winnerPool, loserPool int64
+		for _, wager := range wagers {
+			if wager.Option == winningOption {
+				winnerPool += wager.Amount
+			} else {
+				loserPool += wager.Amount
+			}
+		}
+		if winnerPool <= 0 {
+			return ErrBetNoWinners
+		}
+		res := tx.Model(&model.BetRound{}).Where("id = ? AND status IN ?", roundID, []string{model.BetRoundOpen, model.BetRoundClosed}).
+			Updates(map[string]any{
+				"status":         model.BetRoundSettled,
+				"winning_option": winningOption,
+				"settled_at":     now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrBetClosed
+		}
+
+		var paidBonus int64
+		for i := range wagers {
+			w := &wagers[i]
+			updates := map[string]any{"status": model.StatusLost, "payout": int64(0)}
+			if w.Option == winningOption {
+				bonus := loserPool * w.Amount / winnerPool
+				paidBonus += bonus
+				payout := w.Amount + bonus
+				updates = map[string]any{"status": model.StatusWon, "payout": payout}
+				res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", payout, w.UserID)
+				if res.Error != nil {
+					return res.Error
+				}
+			}
+			if err := tx.Model(&model.BetWager{}).Where("id = ?", w.ID).Updates(updates).Error; err != nil {
+				return err
+			}
+			w.Status = updates["status"].(string)
+			w.Payout = updates["payout"].(int64)
+		}
+
+		remainder := loserPool - paidBonus
+		if remainder > 0 {
+			for i := range wagers {
+				if wagers[i].Option != winningOption {
+					continue
+				}
+				if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", remainder, wagers[i].UserID).Error; err != nil {
+					return err
+				}
+				wagers[i].Payout += remainder
+				if err := tx.Model(&model.BetWager{}).Where("id = ?", wagers[i].ID).Update("payout", wagers[i].Payout).Error; err != nil {
+					return err
+				}
+				break
+			}
+		}
+
+		if err := tx.Create(&model.LocalMessage{
+			BizID:   round.ID,
+			RoomID:  round.RoomID,
+			Topic:   model.OutboxTopicBet,
+			Payload: string(outboxPayload),
+			Status:  model.OutboxStatusPending,
+			NextAt:  now,
+		}).Error; err != nil {
+			return err
+		}
+		round.Status = model.BetRoundSettled
+		round.WinningOption = winningOption
+		round.SettledAt = &now
+		settledRound = round
+		settledWagers = wagers
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return &settledRound, settledWagers, nil
+}
+
+func (r *OrderRepo) CancelBetRound(ctx context.Context, roundID, ownerID string, outboxPayload []byte) (*model.BetRound, []model.BetWager, error) {
+	var cancelledRound model.BetRound
+	var refunded []model.BetWager
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		now := time.Now().UTC()
+		var round model.BetRound
+		if err := tx.Where("id = ?", roundID).Take(&round).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrBetRoundNotFound
+			}
+			return err
+		}
+		if round.OwnerID != ownerID {
+			return ErrBetUnauthorized
+		}
+		if round.Status != model.BetRoundOpen && round.Status != model.BetRoundClosed {
+			return ErrBetClosed
+		}
+		res := tx.Model(&model.BetRound{}).Where("id = ? AND status IN ?", roundID, []string{model.BetRoundOpen, model.BetRoundClosed}).
+			Updates(map[string]any{"status": model.BetRoundCancelled, "settled_at": now})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrBetClosed
+		}
+		if err := tx.Where("round_id = ? AND status = ?", roundID, model.StatusLocked).
+			Find(&refunded).Error; err != nil {
+			return err
+		}
+		for i := range refunded {
+			w := &refunded[i]
+			if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", w.Amount, w.UserID).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&model.BetWager{}).Where("id = ?", w.ID).
+				Updates(map[string]any{"status": model.StatusRefunded, "payout": w.Amount}).Error; err != nil {
+				return err
+			}
+			w.Status = model.StatusRefunded
+			w.Payout = w.Amount
+		}
+		if err := tx.Create(&model.LocalMessage{
+			BizID:   round.ID,
+			RoomID:  round.RoomID,
+			Topic:   model.OutboxTopicBet,
+			Payload: string(outboxPayload),
+			Status:  model.OutboxStatusPending,
+			NextAt:  now,
+		}).Error; err != nil {
+			return err
+		}
+		round.Status = model.BetRoundCancelled
+		round.SettledAt = &now
+		cancelledRound = round
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return &cancelledRound, refunded, nil
+}
+
+func (r *OrderRepo) closeExpiredBetRound(ctx context.Context, round *model.BetRound) error {
+	if round == nil || round.Status != model.BetRoundOpen || time.Now().UTC().Before(round.CloseAt) {
+		return nil
+	}
+	if err := r.db.WithContext(ctx).Model(&model.BetRound{}).
+		Where("id = ? AND status = ?", round.ID, model.BetRoundOpen).
+		Update("status", model.BetRoundClosed).Error; err != nil {
+		return err
+	}
+	round.Status = model.BetRoundClosed
+	return nil
+}
+
+func (r *OrderRepo) betSummaries(ctx context.Context, roundID string) ([]BetOptionSummary, error) {
+	rows, err := r.db.WithContext(ctx).
+		Model(&model.BetWager{}).
+		Select("option, COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total").
+		Where("round_id = ?", roundID).
+		Group("option").
+		Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	summaries := []BetOptionSummary{
+		{Option: model.BetOptionWin},
+		{Option: model.BetOptionLose},
+	}
+	byOption := map[string]*BetOptionSummary{
+		model.BetOptionWin:  &summaries[0],
+		model.BetOptionLose: &summaries[1],
+	}
+	for rows.Next() {
+		var row BetOptionSummary
+		if err := rows.Scan(&row.Option, &row.Count, &row.Total); err != nil {
+			return nil, err
+		}
+		if target := byOption[row.Option]; target != nil {
+			*target = row
+		}
+	}
+	return summaries, rows.Err()
 }
 
 // FindGiftByRequestID returns the existing order for a requestId, or nil.
@@ -324,6 +694,26 @@ func MarshalSuperChatOutbox(id, userID, user, avatar, amount string, tier int, t
 	}
 	if avatar != "" {
 		payload["avatar"] = avatar
+	}
+	return json.Marshal(payload)
+}
+
+func MarshalBetOutbox(event string, round *model.BetRound, summaries []BetOptionSummary, userID, option string, ts int64) ([]byte, error) {
+	if round == nil {
+		return nil, fmt.Errorf("round nil")
+	}
+	payload := map[string]any{
+		"type":    "bet",
+		"event":   event,
+		"round":   round,
+		"summary": summaries,
+		"ts":      ts,
+	}
+	if userID != "" {
+		payload["userId"] = userID
+	}
+	if option != "" {
+		payload["option"] = option
 	}
 	return json.Marshal(payload)
 }

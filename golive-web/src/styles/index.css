@@ -1287,6 +1287,197 @@ input:focus-visible,
   cursor: default;
   opacity: 0.65;
 }
+.gl-bet-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+  border: 1px solid color-mix(in srgb, var(--gl-border) 82%, #0ea5a4);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  padding: 16px;
+}
+.gl-bet-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.gl-bet-icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(14, 165, 164, 0.12);
+  color: #0f8f8e;
+}
+.gl-bet-head h2 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 850;
+}
+.gl-bet-head p {
+  margin: 2px 0 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+}
+.gl-bet-status {
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.gl-bet-status.is-open {
+  background: rgba(14, 165, 164, 0.12);
+  color: #0f8f8e;
+}
+.gl-bet-status.is-settled {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+.gl-bet-status.is-cancelled {
+  background: rgba(100, 116, 139, 0.14);
+  color: #475569;
+}
+.gl-bet-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+.gl-bet-open label {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  padding: 0 10px;
+}
+.gl-bet-open label span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-bet-open input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 800;
+  outline: none;
+}
+.gl-bet-open button,
+.gl-bet-host-actions button {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-text);
+  color: var(--gl-bg);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+.gl-bet-open button:disabled,
+.gl-bet-host-actions button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.gl-bet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+.gl-bet-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  padding: 0 9px;
+}
+.gl-bet-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.gl-bet-option {
+  display: flex;
+  min-height: 74px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  padding: 12px;
+  text-align: left;
+}
+.gl-bet-option.is-win {
+  border-color: rgba(14, 165, 164, 0.32);
+}
+.gl-bet-option.is-lose {
+  border-color: rgba(245, 158, 11, 0.34);
+}
+.gl-bet-option.is-active {
+  box-shadow: inset 0 0 0 2px #0ea5a4;
+}
+.gl-bet-option:disabled {
+  cursor: default;
+}
+.gl-bet-option-title {
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+.gl-bet-option-meta {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+.gl-bet-my {
+  border-radius: 8px;
+  background: rgba(14, 165, 164, 0.1);
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 9px 10px;
+}
+.gl-bet-my.is-lost {
+  background: rgba(244, 63, 94, 0.1);
+  color: #be123c;
+}
+.gl-bet-my.is-refunded {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+.gl-bet-host-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gl-bet-host-actions button.is-cancel {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
 .gl-publisher-value {
   display: grid;
   grid-template-columns: 100px minmax(0, 1fr) 34px;

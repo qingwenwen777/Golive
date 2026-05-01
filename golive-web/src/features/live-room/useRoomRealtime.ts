@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWebSocket, type ReadyState } from '@/hooks/useWebSocket';
 import { useRealtimeStore, useRoomSlice } from '@/stores/useRealtimeStore';
 import { useDanmuStore } from '@/stores/useDanmuStore';
@@ -8,6 +9,8 @@ import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
 import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
+import { betQueryKey } from '@/api/bet';
+import { betOptionLabel, type BetOption } from '@/types/bet';
 
 interface ServerChat {
   type: 'chat';
@@ -71,6 +74,12 @@ interface ServerLiveStatus {
   text?: string;
   ts?: number;
 }
+interface ServerBet {
+  type: 'bet';
+  event: 'opened' | 'wagered' | 'settled' | 'cancelled';
+  option?: BetOption;
+  ts?: number;
+}
 type ServerMessage =
   | ServerChat
   | ServerSuperChat
@@ -78,7 +87,8 @@ type ServerMessage =
   | ServerViewerCount
   | ServerViewerList
   | ServerSystem
-  | ServerLiveStatus;
+  | ServerLiveStatus
+  | ServerBet;
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -116,6 +126,7 @@ export function useRoomRealtime(
   const danmuOn = useDanmuStore((s) => s.on);
   const currentUser = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const queryClient = useQueryClient();
   const danmuOnRef = useRef(danmuOn);
   const onLiveEndedRef = useRef(opts.onLiveEnded);
   const activeFanBadgeRef = useRef<ChatFanBadge | null | undefined>(opts.activeFanBadge);
@@ -324,8 +335,25 @@ export function useRoomRealtime(
         }
         break;
       }
+      case 'bet': {
+        void queryClient.invalidateQueries({ queryKey: betQueryKey(roomId) });
+        if (parsed.event === 'wagered') break;
+        const text =
+          parsed.event === 'opened'
+            ? '竞猜已开盘。'
+            : parsed.event === 'settled'
+              ? `竞猜已结算：${parsed.option ? betOptionLabel(parsed.option) : '结果已出'}。`
+              : '竞猜已流盘，下注 coin 已退回。';
+        appendMessage(roomId, {
+          id: genId('bet'),
+          kind: 'system',
+          text,
+          ts: parsed.ts ?? now,
+        });
+        break;
+      }
     }
-  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount, setViewers, currentUser]);
+  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount, setViewers, currentUser, queryClient]);
 
   // On reconnect (retryCount reset to 0 after open), send resume with lastTs.
   const prevReadyStateRef = useRef<ReadyState>('closed');

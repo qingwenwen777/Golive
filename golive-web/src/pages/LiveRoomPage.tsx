@@ -10,6 +10,7 @@ import { Chat } from '@/features/live-room/Chat';
 import { InfoBlock } from '@/features/live-room/InfoBlock';
 import { GiftPanel } from '@/features/live-room/GiftPanel';
 import { SuperChatDialog } from '@/features/live-room/SuperChatDialog';
+import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { FlyingGiftLayer, type FlyingGift } from '@/features/live-room/FlyingGiftLayer';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
@@ -313,6 +314,7 @@ export default function LiveRoomPage() {
           setGiftOpen(true);
         }}
       />
+      <BettingPanel roomId={id} ownsStream={ownsStream} />
       {ownsStream && (
         <div className="gl-owner-live-actions">
           <div>

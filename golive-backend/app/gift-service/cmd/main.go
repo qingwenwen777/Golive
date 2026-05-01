@@ -75,6 +75,7 @@ func main() {
 	idem := service.NewIdemCache(rdb, cfg.Idempotency.TTL)
 	giftSvc := service.NewGiftService(giftRepo, orderRepo)
 	scSvc := service.NewSuperChatService(orderRepo)
+	betSvc := service.NewBetService(orderRepo)
 
 	var prod producer.Producer
 	if cfg.Kafka.Enabled {
@@ -96,11 +97,13 @@ func main() {
 
 	giftH := handler.NewGiftHandler(giftSvc, idem)
 	scH := handler.NewSuperChatHandler(scSvc, idem)
+	betH := handler.NewBetHandler(betSvc)
 
 	r := server.NewRouter(server.Deps{
 		JWTSecret: cfg.JWT.Secret,
 		Gift:      giftH,
 		SuperChat: scH,
+		Bet:       betH,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 
