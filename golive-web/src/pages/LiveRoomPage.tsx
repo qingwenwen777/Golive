@@ -16,6 +16,7 @@ import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
+import { copyText } from '@/lib/clipboard';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
 import {
   LIVE_SESSION_STORAGE_KEY,
@@ -369,8 +370,12 @@ function PublisherPanel({
 
   const copy = async (value: string, label: string) => {
     try {
-      await navigator.clipboard.writeText(value);
-      toast.success(`${label} copied.`);
+      const method = await copyText(value, label);
+      if (method === 'manual') {
+        toast.info(`${label} opened for manual copy.`);
+      } else {
+        toast.success(`${label} copied.`);
+      }
     } catch {
       toast.error(`Could not copy ${label.toLowerCase()}.`);
     }

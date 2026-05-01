@@ -18,6 +18,7 @@ import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { CreateLiveDialog } from '@/features/creator/CreateLiveDialog';
+import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { streamChannelName, type Stream } from '@/types/stream';
@@ -72,8 +73,9 @@ export default function ChannelPage() {
   const handleShare = async () => {
     const url = window.location.href;
     try {
-      await navigator.clipboard?.writeText(url);
-      toast.success('Channel link copied.');
+      const method = await copyText(url, 'channel link');
+      if (method === 'manual') toast.info('Channel link opened for manual copy.');
+      else toast.success('Channel link copied.');
     } catch {
       toast.info(url);
     }
