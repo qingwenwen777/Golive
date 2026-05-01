@@ -25,3 +25,6 @@ live:
 upload:
   cover_dir: "/tmp/golive/covers"
   cover_public_url: "/api/uploads/covers"
+
+users:
+  service_url: "http://user-service:8090"
