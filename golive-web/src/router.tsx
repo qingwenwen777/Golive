@@ -5,6 +5,7 @@ import LiveRoomPage from '@/pages/LiveRoomPage';
 import ChannelPage from '@/pages/ChannelPage';
 import LoginPage from '@/pages/LoginPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+import AdminApplicationsPage, { AdminIndexPage } from '@/pages/AdminApplicationsPage';
 import {
   HistoryPage,
   LikedPage,
@@ -29,6 +30,8 @@ export const router = createBrowserRouter([
       { path: 'watch-later', element: <WatchLaterPage /> },
       { path: 'liked', element: <LikedPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'admin', element: <AdminIndexPage /> },
+      { path: 'admin/applications', element: <AdminApplicationsPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

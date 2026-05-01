@@ -27,3 +27,6 @@ live:
 upload:
   cover_dir: "./uploads/covers"
   cover_public_url: "/api/uploads/covers"
+
+users:
+  service_url: "http://127.0.0.1:8090"

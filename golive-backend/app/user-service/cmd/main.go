@@ -64,6 +64,11 @@ func main() {
 			log.Warn("seed demo user", zap.Error(err))
 		}
 	}
+	if cfg.Bootstrap.Admin.Enabled {
+		if err := seedAdminUser(context.Background(), userRepo, cfg.Bootstrap.Admin); err != nil {
+			log.Warn("seed admin user", zap.Error(err))
+		}
+	}
 
 	tokenRepo := repo.NewTokenRepo(rdb)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
@@ -144,12 +149,44 @@ func seedDemoUser(ctx context.Context, ur *repo.UserRepo, c config.DemoUserCfg) 
 		return err
 	}
 	return ur.Create(ctx, &model.User{
-		ID:           uuid.NewString(),
-		Username:     c.Username,
-		DisplayName:  c.Username,
-		PasswordHash: hash,
-		Avatar:       "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
-		CoinBalance:  c.CoinBalance,
-		Verified:     true,
+		ID:                   uuid.NewString(),
+		Username:             c.Username,
+		DisplayName:          c.Username,
+		PasswordHash:         hash,
+		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
+		CoinBalance:          c.CoinBalance,
+		Verified:             true,
+		Role:                 model.RoleUser,
+		LivePermissionStatus: model.LivePermissionNone,
+	})
+}
+
+func seedAdminUser(ctx context.Context, ur *repo.UserRepo, c config.AdminCfg) error {
+	if c.Username == "" || c.Password == "" {
+		return nil
+	}
+	if _, err := ur.FindByUsername(ctx, c.Username); err == nil {
+		return ur.EnsureAdmin(ctx, c.Username)
+	} else if !errors.Is(err, repo.ErrUserNotFound) {
+		return err
+	}
+	displayName := c.DisplayName
+	if displayName == "" {
+		displayName = c.Username
+	}
+	hash, err := service.HashPassword(c.Password)
+	if err != nil {
+		return err
+	}
+	return ur.Create(ctx, &model.User{
+		ID:                   uuid.NewString(),
+		Username:             c.Username,
+		DisplayName:          displayName,
+		PasswordHash:         hash,
+		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=admin",
+		CoinBalance:          100000,
+		Verified:             true,
+		Role:                 model.RoleAdmin,
+		LivePermissionStatus: model.LivePermissionApproved,
 	})
 }

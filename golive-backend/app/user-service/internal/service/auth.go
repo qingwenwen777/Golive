@@ -131,13 +131,15 @@ func (s *AuthService) Register(ctx context.Context, username, password, displayN
 	}
 
 	u := &model.User{
-		ID:           uuid.NewString(),
-		Username:     username,
-		DisplayName:  displayName,
-		PasswordHash: hash,
-		Avatar:       "https://api.dicebear.com/7.x/avataaars/svg?seed=" + urlSafeSeed(displayName),
-		CoinBalance:  1200,
-		Verified:     false,
+		ID:                   uuid.NewString(),
+		Username:             username,
+		DisplayName:          displayName,
+		PasswordHash:         hash,
+		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + urlSafeSeed(displayName),
+		CoinBalance:          1200,
+		Verified:             false,
+		Role:                 model.RoleUser,
+		LivePermissionStatus: model.LivePermissionNone,
 	}
 	creator, ok := s.users.(userCreator)
 	if !ok {

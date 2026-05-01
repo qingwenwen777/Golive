@@ -67,12 +67,14 @@ func main() {
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase, socialRepo)
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
+	permission := service.NewUserPermissionClient(cfg.Users.ServiceURL)
 
 	r := server.NewRouter(server.Deps{
 		JWTSecret:      cfg.JWT.Secret,
 		Room:           roomSvc,
 		Social:         socialSvc,
 		Live:           liveSvc,
+		Permission:     permission,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,
 	})

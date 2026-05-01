@@ -14,6 +14,7 @@ type Config struct {
 	JWT     JWTCfg     `mapstructure:"jwt"`
 	Live    LiveCfg    `mapstructure:"live"`
 	Upload  UploadCfg  `mapstructure:"upload"`
+	Users   UsersCfg   `mapstructure:"users"`
 }
 
 type ServiceCfg struct {
@@ -50,6 +51,10 @@ type LiveCfg struct {
 type UploadCfg struct {
 	CoverDir       string `mapstructure:"cover_dir"`
 	CoverPublicURL string `mapstructure:"cover_public_url"`
+}
+
+type UsersCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
 }
 
 func Load(path string) (*Config, error) {

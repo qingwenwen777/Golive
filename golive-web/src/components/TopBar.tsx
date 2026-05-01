@@ -155,6 +155,11 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                     <span>{topup.isPending ? 'Adding coins...' : 'Add 1,000 coins'}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  {currentUser?.role === 'admin' && (
+                    <DropdownMenuItem onClick={() => navigate('/admin')}>
+                      Admin dashboard
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => navigate(`/channel/${user?.id ?? ''}`)}>
                     Your channel
                   </DropdownMenuItem>

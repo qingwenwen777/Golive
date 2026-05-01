@@ -5,6 +5,8 @@ export interface User {
   avatar: string;
   coinBalance: number;
   verified?: boolean;
+  role: 'user' | 'admin';
+  livePermissionStatus: 'none' | 'pending' | 'approved' | 'rejected';
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

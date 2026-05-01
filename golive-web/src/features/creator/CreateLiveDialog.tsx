@@ -1,8 +1,9 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
-import { ImagePlus, Radio, Wand2 } from 'lucide-react';
+import { ImagePlus, Radio, Send, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSubmitCreatorApplication } from '@/api/creator';
 import { useGoLive, useUploadLiveCover } from '@/api/room';
 import {
   Dialog,
@@ -61,9 +62,35 @@ export interface CreateLiveDialogProps {
 function liveErrorMessage(err: Error): string {
   if (err instanceof AxiosError) {
     if (err.response?.status === 401) return 'Please sign in again before starting a live.';
+    if (err.response?.status === 403) {
+      const data = err.response.data as { message?: string } | undefined;
+      return data?.message || 'Your live permission has not been approved yet.';
+    }
     if (err.response?.status === 400) return 'Title and category are required.';
   }
   return 'Could not start the live. Please try again.';
+}
+
+function permissionCopy(status: string) {
+  if (status === 'pending') {
+    return {
+      title: 'Application under review',
+      body: 'Your creator request is waiting for an administrator to review it.',
+      action: 'Submitted',
+    };
+  }
+  if (status === 'rejected') {
+    return {
+      title: 'Creator access was not approved',
+      body: 'You can submit a new application when your channel is ready for review.',
+      action: 'Apply again',
+    };
+  }
+  return {
+    title: 'Apply for creator access',
+    body: 'A quick admin approval is required before you can create live rooms.',
+    action: 'Submit application',
+  };
 }
 
 export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) {
@@ -71,6 +98,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const user = useAuthStore((s) => s.user);
   const goLive = useGoLive();
   const uploadCover = useUploadLiveCover();
+  const apply = useSubmitCreatorApplication();
   const [title, setTitle] = useState('Untitled live');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Just Chatting');
@@ -79,8 +107,18 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const [error, setError] = useState<string | null>(null);
   const channelName = useMemo(() => userDisplayName(user), [user]);
   const categories = CATEGORIES_EN.filter((c) => c !== 'All' && c !== 'Live Now');
+  const livePermissionStatus = user?.livePermissionStatus ?? 'none';
+  const canGoLive = livePermissionStatus === 'approved';
 
   const isPending = goLive.isPending || uploadCover.isPending;
+  const perm = permissionCopy(livePermissionStatus);
+
+  const submitApplication = () => {
+    apply.mutate(undefined, {
+      onSuccess: (resp) => toast.success(resp.message),
+      onError: (err) => toast.error(err.message || 'Could not submit application.'),
+    });
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -122,95 +160,118 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
           <DialogDescription>Create a live room and get your OBS stream key.</DialogDescription>
         </DialogHeader>
 
-        <form className="gl-live-create" onSubmit={onSubmit}>
-          <div className="gl-live-create-head">
-            <div className="gl-live-create-icon" aria-hidden="true">
-              <Radio size={20} />
+        {!canGoLive ? (
+          <div className="gl-live-create">
+            <div className="gl-live-create-head">
+              <div className="gl-live-create-icon" aria-hidden="true">
+                <Radio size={20} />
+              </div>
+              <div>
+                <h2>{perm.title}</h2>
+                <p>{perm.body}</p>
+              </div>
             </div>
-            <div>
-              <h2>Start a live</h2>
-              <p>Create a room, then publish from OBS with the stream key.</p>
+            <div className={`gl-creator-permission is-${livePermissionStatus}`}>
+              <span>Live permission</span>
+              <strong>{livePermissionStatus}</strong>
             </div>
-          </div>
-
-          <label className="gl-auth-field">
-            <span className="gl-auth-label">Title</span>
-            <span className="gl-auth-input-wrap">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={120}
-                required
-              />
-            </span>
-          </label>
-
-          <label className="gl-auth-field">
-            <span className="gl-auth-label">Category</span>
-            <select
-              className="gl-live-create-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              required
+            <button
+              type="button"
+              disabled={apply.isPending || livePermissionStatus === 'pending'}
+              className="gl-auth-submit"
+              onClick={submitApplication}
             >
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="gl-auth-field">
-            <span className="gl-auth-label">Cover</span>
-            <span className="gl-live-cover-picker">
-              {coverPreview ? (
-                <img src={coverPreview} alt="" />
-              ) : (
-                <span className="gl-live-cover-empty">
-                  <ImagePlus size={22} />
-                  <span>Add cover</span>
-                </span>
-              )}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setCoverFile(file);
-                  setCoverPreview(file ? URL.createObjectURL(file) : '');
-                }}
-              />
-            </span>
-          </label>
-
-          <label className="gl-auth-field">
-            <span className="gl-auth-label">Description</span>
-            <textarea
-              className="gl-live-create-textarea"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={2000}
-              rows={4}
-              placeholder="Optional"
-            />
-          </label>
-
-          {error && (
-            <div className="gl-auth-error" role="alert">
-              {error}
+              <Send size={18} />
+              <span>{apply.isPending ? 'Submitting...' : perm.action}</span>
+            </button>
+          </div>
+        ) : (
+          <form className="gl-live-create" onSubmit={onSubmit}>
+            <div className="gl-live-create-head">
+              <div className="gl-live-create-icon" aria-hidden="true">
+                <Radio size={20} />
+              </div>
+              <div>
+                <h2>Start a live</h2>
+                <p>Create a room, then publish from OBS with the stream key.</p>
+              </div>
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={isPending || !title.trim()}
-            className="gl-auth-submit"
-          >
-            <Wand2 size={18} />
-            <span>{isPending ? 'Starting...' : 'Create live room'}</span>
-          </button>
-        </form>
+            <label className="gl-auth-field">
+              <span className="gl-auth-label">Title</span>
+              <span className="gl-auth-input-wrap">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={120}
+                  required
+                />
+              </span>
+            </label>
+
+            <label className="gl-auth-field">
+              <span className="gl-auth-label">Category</span>
+              <select
+                className="gl-live-create-select"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                required
+              >
+                {categories.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="gl-auth-field">
+              <span className="gl-auth-label">Cover</span>
+              <span className="gl-live-cover-picker">
+                {coverPreview ? (
+                  <img src={coverPreview} alt="" />
+                ) : (
+                  <span className="gl-live-cover-empty">
+                    <ImagePlus size={22} />
+                    <span>Add cover</span>
+                  </span>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setCoverFile(file);
+                    setCoverPreview(file ? URL.createObjectURL(file) : '');
+                  }}
+                />
+              </span>
+            </label>
+
+            <label className="gl-auth-field">
+              <span className="gl-auth-label">Description</span>
+              <textarea
+                className="gl-live-create-textarea"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={2000}
+                rows={4}
+                placeholder="Optional"
+              />
+            </label>
+
+            {error && (
+              <div className="gl-auth-error" role="alert">
+                {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={isPending || !title.trim()} className="gl-auth-submit">
+              <Wand2 size={18} />
+              <span>{isPending ? 'Starting...' : 'Create live room'}</span>
+            </button>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

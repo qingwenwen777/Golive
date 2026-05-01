@@ -25,6 +25,11 @@ upload:
   avatar_public_url: "/api/uploads/avatars"
 
 bootstrap:
+  admin:
+    enabled: true
+    username: admin
+    password: admin
+    display_name: GoLive Admin
   # Auto-create + seed the demo user on startup. Frontend E2E depends on it.
   demo_user:
     enabled: true

@@ -16,7 +16,7 @@ import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
-import { useFanBadges } from '@/api/gift';
+import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
 import { copyText } from '@/lib/clipboard';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
 import {
@@ -29,6 +29,18 @@ import {
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { userDisplayName } from '@/types/user';
 import { streamChannelName } from '@/types/stream';
+import type { FanBadge } from '@/types/gift';
+
+function fanBadgeLevel(totalContribution: number): number {
+  if (totalContribution <= 0) return 1;
+  let level = 1;
+  let threshold = 1000;
+  while (level < 99 && totalContribution >= threshold) {
+    level += 1;
+    threshold += level * 1000;
+  }
+  return level;
+}
 
 export default function LiveRoomPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -47,6 +59,7 @@ export default function LiveRoomPage() {
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const appendMessage = useRealtimeStore((s) => s.appendMessage);
+  const incrementViewerContribution = useRealtimeStore((s) => s.incrementViewerContribution);
   const stopLive = useStopLive();
   const liveEndedRef = useRef(false);
   const [publisherSession, setPublisherSession] = useState<PublisherSession | null>(() =>
@@ -55,7 +68,7 @@ export default function LiveRoomPage() {
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
-  const fanBadges = useFanBadges(isAuthed);
+  const fanBadges = useFanBadges(isAuthed, currentUser?.id);
   const activeFanBadge = useMemo(() => {
     if (!stream?.ownerId) return null;
     const badge = fanBadges.data?.find((item) => item.creatorId === stream.ownerId);
@@ -180,6 +193,46 @@ export default function LiveRoomPage() {
     : null;
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
   const ownerName = streamChannelName(stream, currentUser);
+  const updateLocalFanBadge = (coin: number, createIfMissing: boolean) => {
+    if (!currentUser?.id || !stream.ownerId || currentUser.id === stream.ownerId) return;
+    const creatorId = stream.ownerId;
+    queryClient.setQueryData<FanBadge[]>(fanBadgesQueryKey(currentUser.id), (prev = []) => {
+      const now = new Date().toISOString();
+      const existing = prev.find((badge) => badge.creatorId === creatorId);
+      if (!existing && !createIfMissing) return prev;
+
+      const contribution = Math.max(0, Math.floor(coin));
+      if (existing) {
+        const totalContribution = existing.totalContribution + contribution;
+        return prev.map((badge) =>
+          badge.creatorId === creatorId
+            ? {
+                ...badge,
+                creatorName: ownerName,
+                creatorAvatar: stream.avatar || badge.creatorAvatar,
+                totalContribution,
+                level: fanBadgeLevel(totalContribution),
+                updatedAt: now,
+              }
+            : badge,
+        );
+      }
+
+      return [
+        {
+          userId: currentUser.id,
+          creatorId,
+          creatorName: ownerName,
+          creatorAvatar: stream.avatar,
+          totalContribution: contribution,
+          level: fanBadgeLevel(contribution),
+          createdAt: now,
+          updatedAt: now,
+        },
+        ...prev,
+      ];
+    });
+  };
   const handleStopLive = () => {
     stopLive.mutate(undefined, {
       onSuccess: () => {
@@ -370,6 +423,21 @@ export default function LiveRoomPage() {
         onOpenChange={setGiftOpen}
         roomId={id}
         onSent={({ gift, count, requestId }) => {
+          const totalCoin = gift.priceCoin * count;
+          const currentName = currentUser ? userDisplayName(currentUser) : 'You';
+          if (currentUser) {
+            incrementViewerContribution(
+              id,
+              {
+                userId: currentUser.id,
+                user: currentName,
+                avatar: currentUser.avatar,
+                contribution: 0,
+              },
+              totalCoin,
+            );
+          }
+          updateLocalFanBadge(totalCoin, gift.id === 'fan_light');
           setFlying((prev) => [
             ...prev,
             {
@@ -383,13 +451,13 @@ export default function LiveRoomPage() {
             kind: 'gift',
             requestId,
             userId: currentUser?.id,
-            user: currentUser ? userDisplayName(currentUser) : 'You',
+            user: currentName,
             avatar: currentUser?.avatar,
             giftName: gift.name,
             giftIcon: gift.icon,
             count,
             tier: gift.tier,
-            totalCoin: gift.priceCoin * count,
+            totalCoin,
             self: true,
             ts: Date.now(),
           });

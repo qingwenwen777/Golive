@@ -39,4 +39,34 @@ describe('useRealtimeStore', () => {
       fanBadge: badge,
     });
   });
+
+  it('optimistically updates viewer contribution ranking', () => {
+    useRealtimeStore.getState().setViewers('room-1', [
+      { userId: 'u1', user: 'aaaa', contribution: 20 },
+      { userId: 'u2', user: 'bbbb', contribution: 10 },
+    ]);
+
+    useRealtimeStore.getState().incrementViewerContribution(
+      'room-1',
+      { userId: 'u1', user: 'aaaa', avatar: '/a.png', contribution: 0 },
+      50,
+    );
+
+    expect(useRealtimeStore.getState().rooms['room-1'].viewers).toEqual([
+      { userId: 'u1', user: 'aaaa', avatar: '/a.png', contribution: 70 },
+      { userId: 'u2', user: 'bbbb', contribution: 10 },
+    ]);
+  });
+
+  it('adds the sender to viewer ranking if the server list has not arrived yet', () => {
+    useRealtimeStore.getState().incrementViewerContribution(
+      'room-1',
+      { userId: 'u1', user: 'aaaa', contribution: 0 },
+      50,
+    );
+
+    expect(useRealtimeStore.getState().rooms['room-1'].viewers).toMatchObject([
+      { userId: 'u1', user: 'aaaa', contribution: 50 },
+    ]);
+  });
 });

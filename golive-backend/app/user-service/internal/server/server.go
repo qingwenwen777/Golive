@@ -30,6 +30,9 @@ func NewRouter(d Deps) *gin.Engine {
 
 	authH := handler.NewAuthHandler(d.Auth)
 	userH := handler.NewUserHandler(d.Users)
+	creatorH := handler.NewCreatorHandler(d.Users)
+	adminH := handler.NewAdminHandler(d.Users)
+	internalH := handler.NewInternalHandler(d.Users)
 	avatarH := handler.NewAvatarUploadHandler(d.Users, d.AvatarDir, d.AvatarPublicURL)
 
 	auth := r.Group("/auth")
@@ -38,6 +41,7 @@ func NewRouter(d Deps) *gin.Engine {
 		auth.POST("/register", authH.Register)
 		auth.POST("/refresh", authH.Refresh)
 		auth.POST("/logout", authH.Logout)
+		auth.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
 	}
 
 	users := r.Group("/users")
@@ -46,6 +50,24 @@ func NewRouter(d Deps) *gin.Engine {
 		users.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
 		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), userH.TopupCoins)
 		users.POST("/me/avatar", handler.AuthRequired(d.Auth), avatarH.Upload)
+	}
+
+	creator := r.Group("/creator", handler.AuthRequired(d.Auth))
+	{
+		creator.POST("/applications", creatorH.SubmitApplication)
+	}
+
+	admin := r.Group("/admin", handler.AuthRequired(d.Auth), handler.AdminRequired(d.Users))
+	{
+		admin.GET("/creator-applications", adminH.ListCreatorApplications)
+		admin.POST("/creator-applications/:id/approve", adminH.ApproveCreatorApplication)
+		admin.POST("/creator-applications/:id/reject", adminH.RejectCreatorApplication)
+		admin.POST("/admins", adminH.CreateAdmin)
+	}
+
+	internal := r.Group("/internal")
+	{
+		internal.GET("/users/:id/permission", internalH.UserPermission)
 	}
 
 	avatarDir := d.AvatarDir

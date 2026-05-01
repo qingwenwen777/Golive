@@ -863,7 +863,7 @@
 .gl-chat-line {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: center;
   padding: 4px 16px;
   font-size: 13px;
   animation: glFadeIn 0.2s ease-out;
@@ -896,31 +896,21 @@
   content: '';
 }
 .gl-chat-avatar-wrap {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
 }
 .gl-chat-line.is-owner .gl-chat-avatar-wrap {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
   padding: 2px;
   background: conic-gradient(from 210deg, #ffcf5a, #45d483, #39c6f4, #8f7cff, #ff8bb3, #ffcf5a);
 }
 .gl-chat-line.is-fan .gl-chat-avatar-wrap {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
   padding: 2px;
   background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
   box-shadow: 0 0 0 1px rgba(255, 139, 193, 0.2), 0 0 10px rgba(255, 139, 193, 0.2);
-}
-.gl-chat-line.is-fan {
-  align-items: center;
-}
-.gl-chat-line.is-fan .gl-chat-body {
-  padding-top: 1px;
 }
 .gl-chat-line.is-owner .gl-chat-body {
   display: flex;
@@ -941,6 +931,7 @@
 .gl-chat-body {
   flex: 1;
   line-height: 1.4;
+  padding-top: 1px;
   word-break: break-word;
 }
 .gl-chat-meta {
@@ -1343,7 +1334,7 @@
 
   .gl-mobile-chat .gl-chat {
     width: 100%;
-    height: min(54vh, 480px);
+    height: min(62vh, 540px);
     min-height: 360px;
     max-height: none;
     border-radius: 12px;
@@ -1355,6 +1346,47 @@
 
   .gl-mobile-chat .gl-chat-list {
     min-height: 180px;
+  }
+
+  .gl-mobile-chat .gl-chat-line {
+    gap: 8px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+
+  .gl-mobile-chat .gl-chat-meta {
+    gap: 5px;
+    margin-right: 5px;
+  }
+
+  .gl-mobile-chat .gl-chat-fan-badge {
+    height: 20px;
+    padding: 0 7px 0 6px;
+    font-size: 12px;
+  }
+
+  .gl-mobile-chat .gl-chat-fan-badge svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .gl-mobile-chat .gl-viewer-panel {
+    padding-top: 8px;
+  }
+
+  .gl-mobile-chat .gl-viewer-summary {
+    padding: 0 12px 8px;
+  }
+
+  .gl-mobile-chat .gl-viewer-row {
+    grid-template-columns: 30px 34px minmax(0, 1fr) minmax(54px, auto);
+    gap: 8px;
+    min-height: 54px;
+    padding: 8px 12px;
+  }
+
+  .gl-mobile-chat .gl-viewer-score {
+    min-width: 52px;
   }
 
   .gl-mobile-chat .gl-chat-input {

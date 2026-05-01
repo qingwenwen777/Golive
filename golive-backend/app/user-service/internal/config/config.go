@@ -48,6 +48,7 @@ type UploadCfg struct {
 
 type BootstrapCfg struct {
 	DemoUser DemoUserCfg `mapstructure:"demo_user"`
+	Admin    AdminCfg    `mapstructure:"admin"`
 }
 
 type DemoUserCfg struct {
@@ -55,6 +56,13 @@ type DemoUserCfg struct {
 	Username    string `mapstructure:"username"`
 	Password    string `mapstructure:"password"`
 	CoinBalance int64  `mapstructure:"coin_balance"`
+}
+
+type AdminCfg struct {
+	Enabled     bool   `mapstructure:"enabled"`
+	Username    string `mapstructure:"username"`
+	Password    string `mapstructure:"password"`
+	DisplayName string `mapstructure:"display_name"`
 }
 
 // Load reads config from a yaml file. Pass "" for the default search path.

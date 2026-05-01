@@ -68,6 +68,8 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		// user-service
 		api.Any("/auth/*action", gin.WrapH(userProxy))
 		api.Any("/users/*action", gin.WrapH(userProxy))
+		api.Any("/creator/*action", gin.WrapH(userProxy))
+		api.Any("/admin/*action", gin.WrapH(userProxy))
 
 		// room-service
 		api.Any("/rooms", gin.WrapH(roomProxy))

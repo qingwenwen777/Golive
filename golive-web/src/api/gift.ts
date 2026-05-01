@@ -28,14 +28,18 @@ export function useGifts() {
   });
 }
 
-export function useFanBadges(enabled = true) {
+export function fanBadgesQueryKey(userId?: string) {
+  return ['fan-badges', 'me', userId ?? 'anonymous'] as const;
+}
+
+export function useFanBadges(enabled = true, userId?: string) {
   return useQuery<FanBadge[], Error>({
-    queryKey: ['fan-badges', 'me'],
+    queryKey: fanBadgesQueryKey(userId),
     queryFn: async ({ signal }) => {
       const { data } = await http.get<FanBadge[]>('/gifts/fan-badges/me', { signal });
       return data;
     },
-    enabled,
+    enabled: enabled && !!userId,
     staleTime: 60_000,
   });
 }

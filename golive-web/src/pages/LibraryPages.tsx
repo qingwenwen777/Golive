@@ -148,7 +148,7 @@ export function YouPage() {
   const me = useMe();
   const topup = useTopupCoins();
   const rooms = useRooms({ size: 100 });
-  const fanBadges = useFanBadges(isAuthed);
+  const fanBadges = useFanBadges(isAuthed, user?.id);
   const liveStreams = rooms.data?.items;
   const history = useMemo(
     () =>

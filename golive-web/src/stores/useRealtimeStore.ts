@@ -54,6 +54,7 @@ interface RealtimeState {
   clearBullet: (roomId: string, id: string) => void;
   setViewerCount: (roomId: string, n: number) => void;
   setViewers: (roomId: string, viewers: RoomViewer[], total?: number) => void;
+  incrementViewerContribution: (roomId: string, viewer: RoomViewer, delta: number) => void;
 }
 
 function updateRoom(
@@ -153,6 +154,42 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
         viewers,
         viewerCount: total ?? slice.viewerCount,
       })),
+    ),
+  incrementViewerContribution: (roomId, viewer, delta) =>
+    set((state) =>
+      updateRoom(state, roomId, (slice) => {
+        const contributionDelta = Math.max(0, Math.floor(delta));
+        if (contributionDelta <= 0) return slice;
+
+        let matched = false;
+        const viewers = slice.viewers.map((item) => {
+          const sameViewer = viewer.userId
+            ? item.userId === viewer.userId
+            : item.user === viewer.user;
+          if (!sameViewer) return item;
+          matched = true;
+          return {
+            ...item,
+            userId: viewer.userId ?? item.userId,
+            user: viewer.user || item.user,
+            avatar: viewer.avatar ?? item.avatar,
+            contribution: item.contribution + contributionDelta,
+          };
+        });
+
+        if (!matched) {
+          viewers.push({
+            ...viewer,
+            contribution: contributionDelta,
+          });
+        }
+
+        return {
+          ...slice,
+          viewers,
+          viewerCount: Math.max(slice.viewerCount, viewers.length),
+        };
+      }),
     ),
 }));
 

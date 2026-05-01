@@ -5,12 +5,13 @@ import { BadgeCheck, KeyRound, PlayCircle, Radio, UserRound } from 'lucide-react
 import { useLoginMutation, useRegisterMutation } from '@/api/auth';
 import { GoLiveLogo } from '@/components/Logo';
 import { cn } from '@/lib/cn';
+import type { LoginResp } from '@/types/user';
 
 type AuthMode = 'signin' | 'signup';
 
 export interface AuthPanelProps {
   className?: string;
-  onAuthenticated?: () => void;
+  onAuthenticated?: (resp: LoginResp) => void;
 }
 
 function authErrorMessage(err: Error, mode: AuthMode): string {
@@ -63,8 +64,8 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     }
 
     const callbacks = {
-      onSuccess: () => {
-        onAuthenticated?.();
+      onSuccess: (resp: LoginResp) => {
+        onAuthenticated?.(resp);
       },
       onError: (err: Error) => {
         setError(authErrorMessage(err, mode));

@@ -15,6 +15,7 @@ type Deps struct {
 	Room           *service.RoomService
 	Social         *service.SocialService
 	Live           *service.LiveService
+	Permission     service.LivePermissionChecker
 	CoverDir       string
 	CoverPublicURL string
 }
@@ -29,7 +30,7 @@ func NewRouter(d Deps) *gin.Engine {
 
 	roomH := handler.NewRoomHandler(d.Room)
 	socialH := handler.NewSocialHandler(d.Social)
-	liveH := handler.NewLiveHandler(d.Live)
+	liveH := handler.NewLiveHandler(d.Live, d.Permission)
 	srsH := handler.NewSRSHandler(d.Live)
 	coverH := handler.NewCoverUploadHandler(d.CoverDir, d.CoverPublicURL)
 
