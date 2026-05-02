@@ -23,12 +23,12 @@ import { copyText } from '@/lib/clipboard';
 import { addDailyCoinWatchSeconds, markDailyCoinRoomWatched } from '@/lib/coinActivity';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
 import {
-  LIVE_SESSION_STORAGE_KEY,
+  clearPublisherSession,
   loadPublisherSession,
   publisherSessionFromStream,
   savePublisherSession,
   type PublisherSession,
-} from '@/features/creator/CreateLiveDialog';
+} from '@/features/creator/publisherSession';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { userDisplayName } from '@/types/user';
 import { streamChannelName } from '@/types/stream';
@@ -85,6 +85,7 @@ export default function LiveRoomPage() {
   const handleLiveEnded = useCallback(() => {
     if (liveEndedRef.current) return;
     liveEndedRef.current = true;
+    clearPublisherSession();
     setPublisherSession(null);
 
     if (stream) {
@@ -265,7 +266,7 @@ export default function LiveRoomPage() {
   const handleStopLive = () => {
     stopLive.mutate(undefined, {
       onSuccess: () => {
-        localStorage.removeItem(LIVE_SESSION_STORAGE_KEY);
+        clearPublisherSession();
         markStreamEndedInLibraries(stream);
         setPublisherSession(null);
         toast.success('Live ended.');

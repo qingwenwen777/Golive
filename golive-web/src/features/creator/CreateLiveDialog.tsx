@@ -15,46 +15,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CATEGORIES_EN } from '@/constants/catalog';
+import { savePublisherSession } from '@/features/creator/publisherSession';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
-import type { Stream } from '@/types/stream';
-
-export const LIVE_SESSION_STORAGE_KEY = 'golive-live-session';
-
-export interface PublisherSession {
-  streamId: string;
-  streamKey: string;
-  playbackUrl?: string;
-  rtmpServer: string;
-  createdAt: string;
-}
-
-export function publisherSessionFromStream(stream: Stream): PublisherSession | null {
-  if (!stream.streamKey) return null;
-  const rtmpServer = (import.meta.env.VITE_RTMP_BASE || 'rtmp://localhost/live').replace(/\/$/, '');
-  return {
-    streamId: stream.id,
-    streamKey: stream.streamKey,
-    playbackUrl: stream.playbackUrl,
-    rtmpServer,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-export function savePublisherSession(stream: Stream) {
-  const session = publisherSessionFromStream(stream);
-  if (!session) return;
-  localStorage.setItem(LIVE_SESSION_STORAGE_KEY, JSON.stringify(session));
-}
-
-export function loadPublisherSession(): PublisherSession | null {
-  try {
-    const raw = localStorage.getItem(LIVE_SESSION_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as PublisherSession) : null;
-  } catch {
-    return null;
-  }
-}
 
 function createCategoryKey(category: string): string {
   return category.toLowerCase().replace(/\s+/g, '');

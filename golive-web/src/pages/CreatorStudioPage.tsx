@@ -39,12 +39,13 @@ import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { Player } from '@/features/live-room/Player';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import {
-  LIVE_SESSION_STORAGE_KEY,
+  clearPublisherSession,
   loadPublisherSession,
   publisherSessionFromStream,
   savePublisherSession,
   type PublisherSession,
-} from '@/features/creator/CreateLiveDialog';
+} from '@/features/creator/publisherSession';
+import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
 import { CATEGORIES_EN } from '@/constants/catalog';
 import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
@@ -92,26 +93,8 @@ function useStudioUser() {
 }
 
 function useActiveCreatorStream(user: User | null | undefined): { stream: { id: string } | null } {
-  const liveRooms = useRooms({ size: 100 });
-  const storedSession = useMemo(() => loadPublisherSession(), []);
-
-  const stream = useMemo(() => {
-    const items = liveRooms.data?.items ?? [];
-    const byStoredSession = storedSession
-      ? items.find((item) => item.id === storedSession.streamId)
-      : undefined;
-    if (byStoredSession) return byStoredSession;
-
-    const byOwner = user?.id
-      ? items.find((item) => item.ownerId === user.id && isStreamLive(item))
-      : undefined;
-    if (byOwner) return byOwner;
-
-    if (storedSession?.streamId) return { id: storedSession.streamId };
-    return null;
-  }, [liveRooms.data?.items, storedSession, user?.id]);
-
-  return { stream };
+  const activeLiveId = useActiveCreatorLiveId(user?.id);
+  return { stream: activeLiveId ? { id: activeLiveId } : null };
 }
 
 export function CreatorStudioShell() {
@@ -510,7 +493,7 @@ export function CreatorLiveConsolePage() {
 
   useEffect(() => {
     if (!streamEnded) return;
-    localStorage.removeItem(LIVE_SESSION_STORAGE_KEY);
+    clearPublisherSession();
   }, [streamEnded]);
 
   if (room.isPending && liveRooms.isPending && !stream) {
@@ -558,7 +541,7 @@ export function CreatorLiveConsolePage() {
   const stop = () => {
     stopLive.mutate(undefined, {
       onSuccess: () => {
-        localStorage.removeItem(LIVE_SESSION_STORAGE_KEY);
+        clearPublisherSession();
         toast.success(t('studio.console.ended', { defaultValue: 'Live ended.' }));
         navigate('/studio/overview');
       },
