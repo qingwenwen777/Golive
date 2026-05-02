@@ -3584,10 +3584,12 @@ button.gl-fan-badge-empty {
   overflow: hidden;
   border: 1px solid var(--gl-border);
   border-radius: 14px;
-  background: linear-gradient(135deg, #06b6d4 0%, #2563eb 38%, #8b5cf6 68%, #f59e0b 100%), #2563eb;
-  color: #fff;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255, 255, 255, 0.42), transparent 28%),
+    linear-gradient(135deg, #ffdf6f 0%, #ff8a5c 34%, #36d399 68%, #f472b6 100%);
+  color: #111;
   padding: 34px 38px;
-  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.16);
+  box-shadow: 0 18px 48px rgba(244, 114, 182, 0.16);
 }
 .gl-coin-hero-copy {
   display: flex;
@@ -3602,14 +3604,14 @@ button.gl-fan-badge-empty {
   height: 30px;
   padding: 0 11px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.54);
+  color: rgba(17, 17, 17, 0.82);
   font-size: 12px;
   font-weight: 800;
 }
 .gl-coin-hero h1 {
   margin: 0;
-  color: #fff;
+  color: #111;
   font-size: 42px;
   font-weight: 900;
   line-height: 1.04;
@@ -3617,7 +3619,7 @@ button.gl-fan-badge-empty {
 .gl-coin-hero p {
   max-width: 620px;
   margin: 0;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(17, 17, 17, 0.72);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -3628,19 +3630,19 @@ button.gl-fan-badge-empty {
   gap: 10px;
 }
 .gl-coin-hero-actions .gl-secondary-btn {
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  border-color: rgba(17, 17, 17, 0.18);
+  background: rgba(255, 255, 255, 0.56);
+  color: #111;
 }
 .gl-coin-hero-actions .gl-secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.72);
 }
 .gl-coin-hero .gl-coin-primary {
-  background: #fff;
-  color: #1d4ed8;
+  background: #111;
+  color: #fff;
 }
 .gl-coin-hero .gl-coin-primary:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: #272727;
 }
 .gl-coin-primary {
   display: inline-flex;
@@ -3677,30 +3679,6 @@ button.gl-fan-badge-empty {
   border-radius: 12px;
   background: var(--gl-bg-card);
   padding: 14px;
-}
-.gl-coin-stat:nth-child(1) {
-  background: linear-gradient(135deg, rgba(224, 242, 254, 0.92), rgba(240, 253, 250, 0.92));
-}
-.gl-coin-stat:nth-child(2) {
-  background: linear-gradient(135deg, rgba(254, 243, 199, 0.9), rgba(255, 237, 213, 0.92));
-}
-.gl-coin-stat:nth-child(3) {
-  background: linear-gradient(135deg, rgba(220, 252, 231, 0.9), rgba(204, 251, 241, 0.92));
-}
-.gl-coin-stat:nth-child(4) {
-  background: linear-gradient(135deg, rgba(237, 233, 254, 0.92), rgba(219, 234, 254, 0.92));
-}
-.dark .gl-coin-stat:nth-child(1) {
-  background: linear-gradient(135deg, rgba(14, 116, 144, 0.3), rgba(20, 83, 45, 0.22));
-}
-.dark .gl-coin-stat:nth-child(2) {
-  background: linear-gradient(135deg, rgba(180, 83, 9, 0.25), rgba(154, 52, 18, 0.22));
-}
-.dark .gl-coin-stat:nth-child(3) {
-  background: linear-gradient(135deg, rgba(22, 101, 52, 0.28), rgba(15, 118, 110, 0.22));
-}
-.dark .gl-coin-stat:nth-child(4) {
-  background: linear-gradient(135deg, rgba(109, 40, 217, 0.26), rgba(29, 78, 216, 0.22));
 }
 .gl-coin-stat-icon {
   display: inline-flex;
@@ -3788,24 +3766,6 @@ button.gl-fan-badge-empty {
   background: var(--gl-bg);
   padding: 14px;
 }
-.gl-coin-task:nth-child(1) {
-  background: linear-gradient(135deg, rgba(240, 253, 244, 0.96), rgba(224, 242, 254, 0.9));
-}
-.gl-coin-task:nth-child(2) {
-  background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(252, 231, 243, 0.9));
-}
-.gl-coin-task:nth-child(3) {
-  background: linear-gradient(135deg, rgba(238, 242, 255, 0.96), rgba(204, 251, 241, 0.9));
-}
-.dark .gl-coin-task:nth-child(1) {
-  background: linear-gradient(135deg, rgba(20, 83, 45, 0.28), rgba(14, 116, 144, 0.18));
-}
-.dark .gl-coin-task:nth-child(2) {
-  background: linear-gradient(135deg, rgba(146, 64, 14, 0.24), rgba(157, 23, 77, 0.18));
-}
-.dark .gl-coin-task:nth-child(3) {
-  background: linear-gradient(135deg, rgba(67, 56, 202, 0.24), rgba(15, 118, 110, 0.18));
-}
 .gl-coin-task-top,
 .gl-coin-task-bottom {
   display: flex;
@@ -3855,7 +3815,7 @@ button.gl-fan-badge-empty {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #1c62b9;
+  background: #22c55e;
 }
 .gl-coin-task-bottom {
   margin-top: auto;
@@ -4136,21 +4096,6 @@ button.gl-fan-badge-empty {
   color: var(--gl-text);
   font-weight: 900;
 }
-.gl-coin-side .gl-coin-panel:nth-child(1) {
-  background: linear-gradient(135deg, rgba(240, 249, 255, 0.96), rgba(255, 255, 255, 0.96));
-  border-color: rgba(14, 165, 233, 0.24);
-}
-.gl-coin-side .gl-coin-panel:nth-child(2) {
-  background: linear-gradient(135deg, rgba(255, 251, 235, 0.96), rgba(255, 255, 255, 0.96));
-  border-color: rgba(245, 158, 11, 0.28);
-}
-.dark .gl-coin-side .gl-coin-panel:nth-child(1) {
-  background: linear-gradient(135deg, rgba(14, 116, 144, 0.22), var(--gl-bg-card));
-}
-.dark .gl-coin-side .gl-coin-panel:nth-child(2) {
-  background: linear-gradient(135deg, rgba(146, 64, 14, 0.22), var(--gl-bg-card));
-}
-
 @media (max-width: 1199px) {
   .gl-fan-badge-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
