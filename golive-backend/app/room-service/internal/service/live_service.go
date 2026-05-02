@@ -193,12 +193,27 @@ type SRSPublishReq struct {
 	Param    string `json:"param"`
 }
 
+var streamVariantSuffixes = map[string]struct{}{
+	"_q720": {},
+	"_q480": {},
+}
+
+func canonicalStreamKey(stream string) (base string, isVariant bool) {
+	for suffix := range streamVariantSuffixes {
+		if strings.HasSuffix(stream, suffix) {
+			return strings.TrimSuffix(stream, suffix), true
+		}
+	}
+	return stream, false
+}
+
 // OnPublish authorizes the incoming RTMP publish. Returns nil on accept.
 func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if req.Stream == "" {
 		return errors.New("missing stream key")
 	}
-	roomID, err := s.live.Resolve(ctx, req.Stream)
+	streamKey, isVariant := canonicalStreamKey(req.Stream)
+	roomID, err := s.live.Resolve(ctx, streamKey)
 	if err != nil {
 		return fmt.Errorf("resolve stream key: %w", err)
 	}
@@ -206,9 +221,19 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if err != nil {
 		return fmt.Errorf("load room: %w", err)
 	}
-	if room.StreamKey != req.Stream {
-		_ = s.live.Delete(ctx, req.Stream)
+	if room.StreamKey != streamKey {
+		_ = s.live.Delete(ctx, streamKey)
 		return errors.New("stream key is no longer active")
+	}
+	if isVariant {
+		switch room.Status {
+		case model.StatusPublishing, model.StatusLive:
+			return nil
+		case model.StatusEnding, model.StatusEnded:
+			return errors.New("stream has ended")
+		default:
+			return errors.New("stream is not publishable")
+		}
 	}
 	switch room.Status {
 	case model.StatusPublishing:
@@ -216,7 +241,7 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	case model.StatusLive:
 		return nil
 	case model.StatusEnding, model.StatusEnded:
-		_ = s.live.Delete(ctx, req.Stream)
+		_ = s.live.Delete(ctx, streamKey)
 		return errors.New("stream has ended")
 	default:
 		return errors.New("stream is not publishable")
@@ -227,24 +252,28 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 	if req.Stream == "" {
 		return nil
 	}
-	roomID, err := s.live.Resolve(ctx, req.Stream)
+	streamKey, isVariant := canonicalStreamKey(req.Stream)
+	roomID, err := s.live.Resolve(ctx, streamKey)
 	if err != nil {
 		// Unknown key: ignore — nothing to update.
 		return nil
 	}
 	room, err := s.rooms.GetByID(ctx, roomID)
 	if errors.Is(err, repo.ErrRoomNotFound) {
-		return s.live.Delete(ctx, req.Stream)
+		return s.live.Delete(ctx, streamKey)
 	}
 	if err != nil {
 		return err
 	}
-	if room.StreamKey != req.Stream {
-		_ = s.live.Delete(ctx, req.Stream)
+	if room.StreamKey != streamKey {
+		_ = s.live.Delete(ctx, streamKey)
+		return nil
+	}
+	if isVariant {
 		return nil
 	}
 	if room.Status == model.StatusEnded {
-		return s.live.Delete(ctx, req.Stream)
+		return s.live.Delete(ctx, streamKey)
 	}
 	endedAt := s.now()
 	if err := s.endRoom(ctx, room, endedAt); err != nil {
@@ -253,7 +282,7 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 	if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
 		return err
 	}
-	return s.live.Delete(ctx, req.Stream)
+	return s.live.Delete(ctx, streamKey)
 }
 
 func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt time.Time) error {

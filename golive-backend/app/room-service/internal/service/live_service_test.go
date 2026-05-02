@@ -96,6 +96,35 @@ func TestOnPublishIsIdempotentAndDoesNotResetStartedAt(t *testing.T) {
 	require.True(t, firstPublish.Equal(room.StartedAt))
 }
 
+func TestOnPublishAcceptsTranscodedVariants(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _ := newLiveServiceTestDeps(t)
+	base := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return base }
+	st := startTestLive(t, svc, "owner-variants")
+
+	firstPublish := base.Add(time.Minute)
+	svc.now = func() time.Time { return firstPublish }
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey}))
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q720"}))
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q480"}))
+
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusLive, room.Status)
+	require.True(t, firstPublish.Equal(room.StartedAt))
+}
+
+func TestOnPublishRejectsUnknownTranscodedVariant(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _ := newLiveServiceTestDeps(t)
+	st := startTestLive(t, svc, "owner-bad-variant")
+	publishTestLive(t, svc, st.StreamKey)
+
+	err := svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q360"})
+	require.Error(t, err)
+}
+
 func TestStopLiveDeletesStreamKeyAndEndsRoom(t *testing.T) {
 	ctx := context.Background()
 	svc, rooms, live := newLiveServiceTestDeps(t)
@@ -193,6 +222,22 @@ func TestOnUnpublishIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, room.EndedAt)
 	require.True(t, firstEnd.Equal(*room.EndedAt))
+}
+
+func TestOnUnpublishVariantDoesNotEndRoom(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, live := newLiveServiceTestDeps(t)
+	st := startTestLive(t, svc, "owner-unpublish-variant")
+	publishTestLive(t, svc, st.StreamKey)
+
+	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q720"}))
+
+	_, err := live.Resolve(ctx, st.StreamKey)
+	require.NoError(t, err)
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusLive, room.Status)
+	require.Nil(t, room.EndedAt)
 }
 
 func TestStaleUnpublishDoesNotEndNewSession(t *testing.T) {

@@ -11,6 +11,7 @@ import {
   PictureInPicture,
   MessagesSquare,
   MessageSquareOff,
+  Settings,
   Type,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -40,6 +41,19 @@ const LIVE_BUFFER_CHECK_MS = 2000;
 const LIVE_RECOVERY_BACKOFF_SECONDS = 1.5;
 const LIVE_MAX_BUFFER_LATENCY_SECONDS = 25;
 const LIVE_TARGET_LATENCY_SECONDS = 6;
+
+type PlaybackQuality = 'source' | 'q720' | 'q480';
+
+const PLAYBACK_QUALITY_OPTIONS: Array<{
+  value: PlaybackQuality;
+  labelKey: string;
+  labelDefault: string;
+  suffix: string;
+}> = [
+  { value: 'source', labelKey: 'player.qualitySource', labelDefault: 'Source', suffix: '' },
+  { value: 'q720', labelKey: 'player.quality720', labelDefault: 'HD 720p', suffix: '_q720' },
+  { value: 'q480', labelKey: 'player.quality480', labelDefault: 'Smooth 480p', suffix: '_q480' },
+];
 
 const DANMU_FONT_OPTIONS: Array<{ value: DanmuFontSize; label: string }> = [
   { value: 'sm', label: 'Small' },
@@ -84,20 +98,28 @@ export interface PlayerProps {
   onBulletEnd?: (id: string) => void;
 }
 
-function buildFlvUrl(stream: Stream): string {
-  const flvBase = ((import.meta.env.VITE_FLV_BASE as string | undefined) ?? '').replace(/\/$/, '');
+function streamPlaybackKey(stream: Stream): string {
   const source = stream.playbackUrl || '';
-  const key =
+  return (
     stream.streamKey ||
     source.match(/\/live\/([^/?#]+)\.flv(?:[?#].*)?$/)?.[1] ||
     source.match(/\/([^/?#]+)\.flv(?:[?#].*)?$/)?.[1] ||
-    '';
+    ''
+  );
+}
 
-  if (flvBase && key) {
-    return `${flvBase}/${key}.flv`;
+function buildFlvUrl(stream: Stream, quality: PlaybackQuality): string {
+  const flvBase = ((import.meta.env.VITE_FLV_BASE as string | undefined) ?? '').replace(/\/$/, '');
+  const source = stream.playbackUrl || '';
+  const key = streamPlaybackKey(stream);
+  const suffix = PLAYBACK_QUALITY_OPTIONS.find((option) => option.value === quality)?.suffix ?? '';
+  const qualityKey = key ? `${key}${suffix}` : '';
+
+  if (flvBase && qualityKey) {
+    return `${flvBase}/${qualityKey}.flv`;
   }
-  if (source) return source;
-  if (key) return `/live/${key}.flv`;
+  if (source && quality === 'source') return source;
+  if (qualityKey) return `/live/${qualityKey}.flv`;
   return '';
 }
 
@@ -128,7 +150,10 @@ export function Player({
   const danmuFontSize = useDanmuStore((s) => s.fontSize);
   const setDanmuFontSize = useDanmuStore((s) => s.setFontSize);
 
-  const flvUrl = buildFlvUrl(stream);
+  const [quality, setQuality] = useState<PlaybackQuality>('source');
+  const playbackKey = streamPlaybackKey(stream);
+  const hasVariantPlayback = Boolean(playbackKey);
+  const flvUrl = buildFlvUrl(stream, quality);
   const isLiveFlv = !!flvUrl && stream.isLive !== false;
   const fallbackSrc = videoSrc ?? DEFAULT_VIDEO_SRC;
 
@@ -161,6 +186,10 @@ export function Player({
     setBuffering(false);
     clearStallTimer();
   }, [clearStallTimer, flvUrl]);
+
+  useEffect(() => {
+    setQuality('source');
+  }, [stream.id]);
 
   useEffect(() => clearStallTimer, [clearStallTimer]);
 
@@ -604,6 +633,36 @@ export function Player({
             <span className="gl-live-word">{t('player.live')}</span>
           </button>
           <div className="gl-ctl-spacer" />
+          {isLiveFlv && hasVariantPlayback && (
+            <DropdownMenu
+              onOpenChange={(open) => {
+                if (open) showControlsTemporarily();
+              }}
+            >
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="gl-pbtn"
+                  aria-label={t('player.quality')}
+                  title={t('player.quality')}
+                >
+                  <Settings size={20} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" className="w-40">
+                <DropdownMenuLabel>{t('player.quality')}</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={quality}
+                  onValueChange={(value) => setQuality(value as PlaybackQuality)}
+                >
+                  {PLAYBACK_QUALITY_OPTIONS.map((option) => (
+                    <DropdownMenuRadioItem key={option.value} value={option.value}>
+                      {t(option.labelKey, { defaultValue: option.labelDefault })}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <button
             className="gl-pbtn"
             onClick={toggleDanmu}
