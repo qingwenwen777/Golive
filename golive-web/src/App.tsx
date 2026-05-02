@@ -1,5 +1,5 @@
-import { Suspense, useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useOutlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { TopBar } from '@/components/TopBar';
 import { Sidebar } from '@/components/Sidebar';
@@ -29,23 +29,62 @@ export default function App() {
 
 function RouteOutlet() {
   const location = useLocation();
-  const firstNavigation = useRef(true);
-  const [transitioning, setTransitioning] = useState(false);
+  const outlet = useOutlet();
+  const displayedKey = useRef(location.key);
+  const latestOutlet = useRef(outlet);
+  const timers = useRef<number[]>([]);
+  const [routeState, setRouteState] = useState<{
+    key: string;
+    outlet: ReactNode;
+    phase: 'idle' | 'leaving' | 'entering';
+  }>(() => ({
+    key: location.key,
+    outlet,
+    phase: 'idle',
+  }));
+
+  latestOutlet.current = outlet;
+
+  const clearTimers = () => {
+    timers.current.forEach((timer) => window.clearTimeout(timer));
+    timers.current = [];
+  };
 
   useEffect(() => {
-    if (firstNavigation.current) {
-      firstNavigation.current = false;
+    if (displayedKey.current === location.key) {
       return;
     }
 
-    setTransitioning(true);
-    const timer = window.setTimeout(() => setTransitioning(false), 180);
-    return () => window.clearTimeout(timer);
+    clearTimers();
+    setRouteState((current) => ({ ...current, phase: 'leaving' }));
+
+    const swapTimer = window.setTimeout(() => {
+      displayedKey.current = location.key;
+      setRouteState({
+        key: location.key,
+        outlet: latestOutlet.current,
+        phase: 'entering',
+      });
+
+      const settleTimer = window.setTimeout(() => {
+        setRouteState((current) =>
+          current.key === location.key ? { ...current, phase: 'idle' } : current,
+        );
+      }, 180);
+      timers.current = [settleTimer];
+    }, 90);
+    timers.current = [swapTimer];
+
+    return clearTimers;
   }, [location.key]);
+
+  useEffect(() => clearTimers, []);
 
   return (
     <Suspense fallback={<RouteLoading />}>
-      {transitioning ? <RouteLoading /> : <Outlet key={location.key} />}
+      <div className={`gl-route-page is-${routeState.phase}`} key={routeState.key}>
+        {routeState.outlet}
+      </div>
     </Suspense>
   );
 }

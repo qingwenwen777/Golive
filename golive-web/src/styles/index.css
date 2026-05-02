@@ -645,6 +645,16 @@ input:focus-visible,
 .gl-page {
   padding: 16px 40px 40px;
 }
+.gl-route-page {
+  min-width: 0;
+}
+.gl-route-page.is-leaving {
+  pointer-events: none;
+  animation: glRouteLeave 0.1s ease-out both;
+}
+.gl-route-page.is-entering {
+  animation: glRouteEnter 0.2s ease-out both;
+}
 .gl-route-loading {
   display: flex;
   min-height: 220px;
@@ -670,6 +680,32 @@ input:focus-visible,
   50% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+@keyframes glRouteLeave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0.82;
+    transform: translateY(3px);
+  }
+}
+@keyframes glRouteEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-route-page.is-leaving,
+  .gl-route-page.is-entering {
+    animation: none;
   }
 }
 .gl-loadable-img {
