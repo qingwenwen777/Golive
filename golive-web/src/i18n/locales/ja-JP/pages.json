@@ -110,7 +110,9 @@
     "danmuOff": "弾幕: オフ",
     "live": "ライブ",
     "jumpLive": "ライブに戻る",
-    "liveProgress": "ライブ進行"
+    "liveProgress": "ライブ進行",
+    "retry": "再試行",
+    "buffering": "バッファリング中..."
   },
   "channel": {
     "title": "チャンネル",

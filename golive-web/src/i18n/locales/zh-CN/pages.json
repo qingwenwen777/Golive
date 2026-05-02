@@ -112,7 +112,8 @@
     "live": "直播中",
     "jumpLive": "回到直播",
     "liveProgress": "直播进度",
-    "retry": "重试"
+    "retry": "重试",
+    "buffering": "正在缓冲..."
   },
   "channel": {
     "title": "频道",

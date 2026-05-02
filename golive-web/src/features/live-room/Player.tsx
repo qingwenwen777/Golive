@@ -33,6 +33,14 @@ import type { Bullet } from '@/stores/useRealtimeStore';
 const DEFAULT_VIDEO_SRC =
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
+const LIVE_STASH_INITIAL_SIZE = 2 * 1024 * 1024;
+const LIVE_RECOVERY_DELAY_MS = 2500;
+const LIVE_STUCK_RELOAD_MS = 9000;
+const LIVE_BUFFER_CHECK_MS = 2000;
+const LIVE_RECOVERY_BACKOFF_SECONDS = 1.5;
+const LIVE_MAX_BUFFER_LATENCY_SECONDS = 25;
+const LIVE_TARGET_LATENCY_SECONDS = 6;
+
 const DANMU_FONT_OPTIONS: Array<{ value: DanmuFontSize; label: string }> = [
   { value: 'sm', label: 'Small' },
   { value: 'md', label: 'Medium' },
@@ -44,6 +52,28 @@ type WebKitVideoElement = HTMLVideoElement & {
   webkitEnterFullscreen?: () => void;
   webkitExitFullscreen?: () => void;
 };
+
+function bufferedRangeAtLiveEdge(video: HTMLVideoElement): { start: number; end: number } | null {
+  const { buffered } = video;
+  if (buffered.length === 0) return null;
+  const last = buffered.length - 1;
+  return { start: buffered.start(last), end: buffered.end(last) };
+}
+
+function seekNearLiveEdge(video: HTMLVideoElement, secondsBehindLive: number): boolean {
+  const range = bufferedRangeAtLiveEdge(video);
+  if (!range) return false;
+  const nextTime = Math.max(range.start, range.end - secondsBehindLive);
+  if (!Number.isFinite(nextTime) || Math.abs(video.currentTime - nextTime) < 0.25) return false;
+  video.currentTime = nextTime;
+  return true;
+}
+
+function bufferedAhead(video: HTMLVideoElement): number {
+  const range = bufferedRangeAtLiveEdge(video);
+  if (!range) return 0;
+  return Math.max(0, range.end - video.currentTime);
+}
 
 export interface PlayerProps {
   stream: Stream;
@@ -90,6 +120,8 @@ export function Player({
   const [pip, setPip] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<number | null>(null);
+  const stallTimerRef = useRef<number | null>(null);
+  const lastPlaybackRef = useRef({ time: 0, changedAt: Date.now() });
 
   const danmuOn = useDanmuStore((s) => s.on);
   const toggleDanmu = useDanmuStore((s) => s.toggle);
@@ -101,17 +133,36 @@ export function Player({
   const fallbackSrc = videoSrc ?? DEFAULT_VIDEO_SRC;
 
   const [flvError, setFlvError] = useState<string | null>(null);
+  const [buffering, setBuffering] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const endedRef = useRef(false);
   const showPlaybackEnded = useCallback(() => {
     if (endedRef.current) return;
     endedRef.current = true;
+    setBuffering(false);
     setFlvError('Stream ended.');
   }, []);
 
+  const clearStallTimer = useCallback(() => {
+    if (!stallTimerRef.current) return;
+    window.clearTimeout(stallTimerRef.current);
+    stallTimerRef.current = null;
+  }, []);
+
+  const recoverLivePlayback = useCallback((secondsBehindLive = LIVE_RECOVERY_BACKOFF_SECONDS) => {
+    const v = videoRef.current;
+    if (!v || !isLiveFlv || endedRef.current) return;
+    seekNearLiveEdge(v, secondsBehindLive);
+    void v.play()?.catch?.(() => undefined);
+  }, [isLiveFlv]);
+
   useEffect(() => {
     endedRef.current = false;
-  }, [flvUrl]);
+    setBuffering(false);
+    clearStallTimer();
+  }, [clearStallTimer, flvUrl]);
+
+  useEffect(() => clearStallTimer, [clearStallTimer]);
 
   useEffect(() => {
     if (!isLiveFlv || !flvUrl || !videoRef.current) return;
@@ -123,7 +174,17 @@ export function Player({
 
     const player = mpegts.createPlayer(
       { type: 'flv', url: flvUrl, isLive: true, hasAudio: true, hasVideo: true },
-      { isLive: true, enableStashBuffer: false, liveBufferLatencyChasing: true },
+      {
+        isLive: true,
+        enableWorker: true,
+        enableStashBuffer: true,
+        stashInitialSize: LIVE_STASH_INITIAL_SIZE,
+        liveBufferLatencyChasing: false,
+        lazyLoad: false,
+        autoCleanupSourceBuffer: true,
+        autoCleanupMaxBackwardDuration: 60,
+        autoCleanupMinBackwardDuration: 30,
+      },
     );
     const onErr = (errType: string, errDetail: string) => {
       const detail = `${errType} ${errDetail}`.toLowerCase();
@@ -170,8 +231,10 @@ export function Player({
       } catch {
         /* noop */
       }
+      setBuffering(false);
+      clearStallTimer();
     };
-  }, [isLiveFlv, flvUrl, retryNonce, showPlaybackEnded]);
+  }, [clearStallTimer, isLiveFlv, flvUrl, retryNonce, showPlaybackEnded]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -333,7 +396,11 @@ export function Player({
     const v = videoRef.current;
     if (!v) return;
     try {
-      v.currentTime = v.duration || 0;
+      if (isLiveFlv) {
+        seekNearLiveEdge(v, LIVE_RECOVERY_BACKOFF_SECONDS);
+      } else {
+        v.currentTime = v.duration || 0;
+      }
       void v.play();
     } catch {
       /* noop */
@@ -361,6 +428,75 @@ export function Player({
     };
   }, [showControlsTemporarily]);
 
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !isLiveFlv) return;
+
+    const onBuffering = () => {
+      if (endedRef.current) return;
+      setBuffering(true);
+      showControlsTemporarily();
+      clearStallTimer();
+      stallTimerRef.current = window.setTimeout(() => {
+        stallTimerRef.current = null;
+        recoverLivePlayback();
+      }, LIVE_RECOVERY_DELAY_MS);
+    };
+    const onReady = () => {
+      setBuffering(false);
+      clearStallTimer();
+    };
+    const onTimeUpdate = () => {
+      if (!v.paused && v.readyState >= 2) onReady();
+    };
+
+    v.addEventListener('waiting', onBuffering);
+    v.addEventListener('stalled', onBuffering);
+    v.addEventListener('playing', onReady);
+    v.addEventListener('canplay', onReady);
+    v.addEventListener('timeupdate', onTimeUpdate);
+    return () => {
+      v.removeEventListener('waiting', onBuffering);
+      v.removeEventListener('stalled', onBuffering);
+      v.removeEventListener('playing', onReady);
+      v.removeEventListener('canplay', onReady);
+      v.removeEventListener('timeupdate', onTimeUpdate);
+      clearStallTimer();
+    };
+  }, [clearStallTimer, isLiveFlv, recoverLivePlayback, showControlsTemporarily]);
+
+  useEffect(() => {
+    if (!isLiveFlv || flvError) return;
+    const v = videoRef.current;
+    if (!v) return;
+    lastPlaybackRef.current = { time: v.currentTime, changedAt: Date.now() };
+
+    const timer = window.setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.paused || endedRef.current) return;
+
+      const now = Date.now();
+      const moved = Math.abs(video.currentTime - lastPlaybackRef.current.time) > 0.08;
+      if (moved) {
+        lastPlaybackRef.current = { time: video.currentTime, changedAt: now };
+        if (bufferedAhead(video) > LIVE_MAX_BUFFER_LATENCY_SECONDS) {
+          seekNearLiveEdge(video, LIVE_TARGET_LATENCY_SECONDS);
+        }
+        return;
+      }
+
+      if (now - lastPlaybackRef.current.changedAt <= LIVE_STUCK_RELOAD_MS) return;
+      if (bufferedAhead(video) > 0.5) {
+        recoverLivePlayback();
+      } else {
+        setRetryNonce((n) => n + 1);
+      }
+      lastPlaybackRef.current = { time: video.currentTime, changedAt: now };
+    }, LIVE_BUFFER_CHECK_MS);
+
+    return () => window.clearInterval(timer);
+  }, [flvError, isLiveFlv, recoverLivePlayback]);
+
   const viewers = viewerCount ?? stream.viewers + extraViewers;
 
   return (
@@ -384,6 +520,7 @@ export function Player({
         autoPlay
         muted={muted}
         playsInline
+        preload="auto"
         loop={!isLiveFlv}
         controls={false}
       />
@@ -412,6 +549,15 @@ export function Player({
           >
             {t('player.retry', { defaultValue: 'Retry' })}
           </button>
+        </div>
+      )}
+
+      {isLiveFlv && buffering && !flvError && (
+        <div className="gl-player-buffering" role="status" aria-live="polite">
+          <span>
+            <i aria-hidden="true" />
+            {t('player.buffering', { defaultValue: 'Buffering...' })}
+          </span>
         </div>
       )}
 

@@ -9,7 +9,7 @@
 .gl-video {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 .gl-player:fullscreen {
@@ -19,6 +19,41 @@
 }
 .gl-player:fullscreen .gl-video {
   object-fit: contain;
+}
+
+.gl-player-buffering {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff;
+  pointer-events: none;
+}
+.gl-player-buffering span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  padding: 8px 13px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.gl-player-buffering i {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: glSpin 0.8s linear infinite;
+}
+@keyframes glSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .gl-player-top {

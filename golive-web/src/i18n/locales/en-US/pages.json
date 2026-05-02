@@ -110,7 +110,9 @@
     "danmuOff": "Danmu: Off",
     "live": "LIVE",
     "jumpLive": "Jump to live",
-    "liveProgress": "Live progress"
+    "liveProgress": "Live progress",
+    "retry": "Retry",
+    "buffering": "Buffering..."
   },
   "channel": {
     "title": "Channel",
