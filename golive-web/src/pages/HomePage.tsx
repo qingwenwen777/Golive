@@ -169,9 +169,6 @@ function MyAppointmentsSection() {
           <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
           <span>{t('home.myAppointments.subtitle', { defaultValue: 'Your reserved live rooms appear here.' })}</span>
         </div>
-        <Link className="gl-text-link" to="/subscriptions">
-          {t('home.myAppointments.viewAll', { defaultValue: 'View all' })}
-        </Link>
       </div>
       {appointments.isPending ? (
         <div className="gl-grid" aria-busy="true">

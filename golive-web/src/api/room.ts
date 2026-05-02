@@ -1,5 +1,6 @@
 ﻿import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
+import type { QueryKey } from '@tanstack/react-query';
 import type { PaginatedRooms, RoomsQuery, Stream } from '@/types/stream';
 
 function normalizeCategory(cat?: string): string {
@@ -607,10 +608,24 @@ export function useNotifications(enabled = true, page = 1, size = 20) {
 
 export function useMarkNotificationRead() {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean }, Error, string>({
+  return useMutation<{ ok: boolean }, Error, string, { prev: Array<[QueryKey, NotificationListResp | undefined]> }>({
     mutationFn: async (id) => {
       const { data } = await http.patch<{ ok: boolean }>(`/notifications/${encodeURIComponent(id)}/read`);
       return data;
+    },
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['notifications'] });
+      const prev = qc.getQueriesData<NotificationListResp>({ queryKey: ['notifications'] });
+      const readAt = new Date().toISOString();
+      qc.setQueriesData<NotificationListResp>({ queryKey: ['notifications'] }, (old) =>
+        old ? markNotificationListItemRead(old, id, readAt) : old,
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      ctx?.prev.forEach(([queryKey, data]) => {
+        qc.setQueryData(queryKey, data);
+      });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['notifications'] });
@@ -620,15 +635,55 @@ export function useMarkNotificationRead() {
 
 export function useMarkAllNotificationsRead() {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean }, Error, void>({
+  return useMutation<{ ok: boolean }, Error, void, { prev: Array<[QueryKey, NotificationListResp | undefined]> }>({
     mutationFn: async () => {
       const { data } = await http.patch<{ ok: boolean }>('/notifications/read-all');
       return data;
+    },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ['notifications'] });
+      const prev = qc.getQueriesData<NotificationListResp>({ queryKey: ['notifications'] });
+      const readAt = new Date().toISOString();
+      qc.setQueriesData<NotificationListResp>({ queryKey: ['notifications'] }, (old) =>
+        old ? markNotificationListRead(old, readAt) : old,
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.prev.forEach(([queryKey, data]) => {
+        qc.setQueryData(queryKey, data);
+      });
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
+}
+
+function markNotificationListItemRead(
+  list: NotificationListResp,
+  id: string,
+  readAt: string,
+): NotificationListResp {
+  let newlyRead = 0;
+  const items = list.items.map((item) => {
+    if (item.id !== id || item.readAt) return item;
+    newlyRead += 1;
+    return { ...item, readAt };
+  });
+  return {
+    ...list,
+    items,
+    unread: Math.max(0, list.unread - newlyRead),
+  };
+}
+
+function markNotificationListRead(list: NotificationListResp, readAt: string): NotificationListResp {
+  return {
+    ...list,
+    unread: 0,
+    items: list.items.map((item) => (item.readAt ? item : { ...item, readAt })),
+  };
 }
 
 export function useLikeState(streamId: string, enabled: boolean) {

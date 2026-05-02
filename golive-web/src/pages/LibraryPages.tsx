@@ -185,9 +185,6 @@ export function SubscriptionsPage() {
       <section className="gl-library-section">
         <div className="gl-section-title-row">
           <h2>{t('library.latest')}</h2>
-          <Link className="gl-text-link" to="/">
-            {t('library.browseAll')}
-          </Link>
         </div>
         <StreamGrid
           isPending={isAuthed && subscriptions.isPending}

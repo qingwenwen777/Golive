@@ -247,8 +247,10 @@ function NotificationBell() {
           {unread > 0 && (
             <button
               type="button"
+              disabled={markAllRead.isPending}
               onClick={(event) => {
                 event.preventDefault();
+                event.stopPropagation();
                 markAllRead.mutate();
               }}
             >
@@ -258,23 +260,26 @@ function NotificationBell() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {notifications.isPending ? (
-          <DropdownMenuItem disabled>{t('loading', { defaultValue: 'Loading...' })}</DropdownMenuItem>
+          <div className="gl-notification-state">{t('loading', { defaultValue: 'Loading...' })}</div>
         ) : items.length === 0 ? (
-          <DropdownMenuItem disabled>{t('notificationsEmpty', { defaultValue: 'No notifications yet' })}</DropdownMenuItem>
+          <div className="gl-notification-state">{t('notificationsEmpty', { defaultValue: 'No notifications yet' })}</div>
         ) : (
-          items.map((item) => (
-            <DropdownMenuItem
-              key={item.id}
-              className={`gl-notification-item${item.readAt ? '' : ' is-unread'}`}
-              onClick={() => openNotification(item)}
-            >
-              <span>
-                <strong>{notificationTitle(item, t)}</strong>
-                {item.body && <small>{item.body}</small>}
-                <time>{formatNotificationTime(item.createdAt, i18n.language)}</time>
-              </span>
-            </DropdownMenuItem>
-          ))
+          <div className="gl-notification-list">
+            {items.map((item) => (
+              <DropdownMenuItem
+                key={item.id}
+                className={`gl-notification-item${item.readAt ? '' : ' is-unread'}`}
+                onClick={() => openNotification(item)}
+              >
+                <span className="gl-notification-dot" aria-hidden="true" />
+                <span className="gl-notification-copy">
+                  <strong>{notificationTitle(item, t)}</strong>
+                  {item.body && <small>{item.body}</small>}
+                  <time>{formatNotificationTime(item.createdAt, i18n.language)}</time>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </div>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

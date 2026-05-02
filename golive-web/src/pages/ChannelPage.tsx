@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Clock3,
   ImagePlus,
+  Plus,
   Radio,
   Settings,
   Share2,
@@ -36,7 +37,7 @@ import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadDialog';
-import { CreateLiveDialog } from '@/features/creator/CreateLiveDialog';
+import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
@@ -47,6 +48,7 @@ const HISTORY_PAGE_SIZE = 4;
 
 export default function ChannelPage() {
   const { t } = useTranslation('pages');
+  const { t: tc } = useTranslation('common');
   const navigate = useNavigate();
   const { name = '' } = useParams<{ name: string }>();
   const channelKey = decodeURIComponent(name);
@@ -58,9 +60,9 @@ export default function ChannelPage() {
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [appointmentPage, setAppointmentPage] = useState(1);
+  const activeLiveId = useActiveCreatorLiveId(authUser?.id);
 
   const profile = useMemo(
     () => resolveProfile(profileLookupKey, publicUser.data, authUser),
@@ -136,6 +138,14 @@ export default function ChannelPage() {
     }
   };
 
+  const handleOwnerLiveAction = () => {
+    navigate(activeLiveId ? `/studio/live/${encodeURIComponent(activeLiveId)}` : '/studio/prepare');
+  };
+
+  const ownerLiveLabel = activeLiveId
+    ? tc('nav.liveNow', { defaultValue: t('home.liveNow') })
+    : tc('goLive', { defaultValue: t('channel.startLive') });
+
   return (
     <div className="gl-page gl-channel-page">
       <section className="gl-channel-hero-v2">
@@ -189,10 +199,10 @@ export default function ChannelPage() {
                   <button
                     className="gl-retry-btn"
                     type="button"
-                    onClick={() => setCreateOpen(true)}
+                    onClick={handleOwnerLiveAction}
                   >
-                    <Radio size={16} />
-                    {t('channel.startLive')}
+                    {activeLiveId ? <Radio size={16} /> : <Plus size={16} />}
+                    {ownerLiveLabel}
                   </button>
                   <button
                     className="gl-secondary-btn"
@@ -314,9 +324,9 @@ export default function ChannelPage() {
               </span>
             </div>
             {isOwner && (
-              <button className="gl-retry-btn" type="button" onClick={() => setCreateOpen(true)}>
-                <Radio size={16} />
-                {t('channel.startLive')}
+              <button className="gl-retry-btn" type="button" onClick={handleOwnerLiveAction}>
+                {activeLiveId ? <Radio size={16} /> : <Plus size={16} />}
+                {ownerLiveLabel}
               </button>
             )}
           </div>
@@ -372,7 +382,6 @@ export default function ChannelPage() {
 
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={authUser} />
       <ChannelCoverUploadDialog open={coverOpen} onOpenChange={setCoverOpen} user={authUser} />
-      <CreateLiveDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }
