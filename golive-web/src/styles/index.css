@@ -2318,23 +2318,12 @@ button.gl-fan-badge-empty {
   position: relative;
   min-height: 156px;
   padding: 22px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(14, 165, 233, 0.88),
-      rgba(34, 197, 94, 0.7) 48%,
-      rgba(250, 204, 21, 0.5)
-    ),
-    url('https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1800&q=80');
-  background-position: center;
-  background-size: cover;
-  color: #fff;
+  border-bottom: 1px solid var(--gl-border);
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
 }
 .gl-channel-cover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.18));
+  content: none;
 }
 .gl-channel-cover-mark {
   position: relative;
@@ -2425,8 +2414,9 @@ button.gl-fan-badge-empty {
   align-items: flex-end;
   min-height: 180px;
   padding: 22px;
-  background: linear-gradient(135deg, #14b8a6, #38bdf8 46%, #facc15);
-  color: #fff;
+  border: 1px solid var(--gl-border);
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
 }
 .gl-channel-banner-mark {
   display: inline-flex;
@@ -2568,8 +2558,8 @@ button.gl-fan-badge-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #22c55e, #06b6d4 52%, #6366f1);
-  color: #fff;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
   font-size: 26px;
   font-weight: 900;
 }
@@ -3344,26 +3334,10 @@ button.gl-fan-badge-empty {
   flex-direction: column;
   gap: 10px;
   padding: 22px;
+  border: 1px solid var(--gl-border);
   border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(160deg, #0ea5e9, #22c55e 54%, #bef264);
-  box-shadow: 0 18px 44px rgba(14, 165, 233, 0.16);
-}
-.gl-yt-collection-side.is-history {
-  background: linear-gradient(160deg, #06b6d4, #2563eb 52%, #8b5cf6);
-  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.18);
-}
-.gl-yt-collection-side.is-watch-later {
-  background: linear-gradient(160deg, #f59e0b, #ec4899 52%, #8b5cf6);
-  box-shadow: 0 18px 44px rgba(236, 72, 153, 0.18);
-}
-.gl-yt-collection-side.is-liked {
-  background: linear-gradient(160deg, #f43f5e, #a855f7 52%, #06b6d4);
-  box-shadow: 0 18px 44px rgba(168, 85, 247, 0.18);
-}
-.gl-yt-collection-side.is-default {
-  background: linear-gradient(160deg, #10b981, #14b8a6 48%, #38bdf8);
-  box-shadow: 0 18px 44px rgba(20, 184, 166, 0.18);
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
 }
 .gl-yt-collection-art {
   display: inline-flex;
@@ -3372,19 +3346,19 @@ button.gl-fan-badge-empty {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
 }
 .gl-yt-collection-side h1 {
   margin: 6px 0 0;
-  color: #fff;
+  color: var(--gl-text);
   font-size: 28px;
   font-weight: 900;
   letter-spacing: -0.01em;
 }
 .gl-yt-collection-side p,
 .gl-yt-collection-side .gl-muted-line {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--gl-text-2);
   font-size: 13px;
   margin: 0;
 }
@@ -3392,7 +3366,7 @@ button.gl-fan-badge-empty {
   margin-top: 4px;
   font-size: 12px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--gl-text-2);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -3410,8 +3384,8 @@ button.gl-fan-badge-empty {
   padding: 0 18px;
   border: 0;
   border-radius: 999px;
-  background: #fff;
-  color: #0f0f0f;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
@@ -3421,12 +3395,12 @@ button.gl-fan-badge-empty {
   cursor: not-allowed;
 }
 .gl-yt-collection-actions .gl-secondary-btn {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: #fff;
+  background: var(--gl-bg);
+  border-color: var(--gl-border);
+  color: var(--gl-text);
 }
 .gl-yt-collection-actions .gl-secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.26);
+  background: var(--gl-bg-hover);
 }
 .gl-yt-collection-main {
   min-width: 0;
@@ -3584,12 +3558,9 @@ button.gl-fan-badge-empty {
   overflow: hidden;
   border: 1px solid var(--gl-border);
   border-radius: 14px;
-  background:
-    radial-gradient(circle at 88% 18%, rgba(255, 255, 255, 0.42), transparent 28%),
-    linear-gradient(135deg, #ffdf6f 0%, #ff8a5c 34%, #36d399 68%, #f472b6 100%);
-  color: #111;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
   padding: 34px 38px;
-  box-shadow: 0 18px 48px rgba(244, 114, 182, 0.16);
 }
 .gl-coin-hero-copy {
   display: flex;
@@ -3604,14 +3575,14 @@ button.gl-fan-badge-empty {
   height: 30px;
   padding: 0 11px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.54);
-  color: rgba(17, 17, 17, 0.82);
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
   font-size: 12px;
   font-weight: 800;
 }
 .gl-coin-hero h1 {
   margin: 0;
-  color: #111;
+  color: var(--gl-text);
   font-size: 42px;
   font-weight: 900;
   line-height: 1.04;
@@ -3619,7 +3590,7 @@ button.gl-fan-badge-empty {
 .gl-coin-hero p {
   max-width: 620px;
   margin: 0;
-  color: rgba(17, 17, 17, 0.72);
+  color: var(--gl-text-2);
   font-size: 14px;
   line-height: 1.55;
 }
@@ -3630,19 +3601,19 @@ button.gl-fan-badge-empty {
   gap: 10px;
 }
 .gl-coin-hero-actions .gl-secondary-btn {
-  border-color: rgba(17, 17, 17, 0.18);
-  background: rgba(255, 255, 255, 0.56);
-  color: #111;
+  border-color: var(--gl-border);
+  background: var(--gl-bg);
+  color: var(--gl-text);
 }
 .gl-coin-hero-actions .gl-secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--gl-bg-hover);
 }
 .gl-coin-hero .gl-coin-primary {
-  background: #111;
-  color: #fff;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
 }
 .gl-coin-hero .gl-coin-primary:hover {
-  background: #272727;
+  background: var(--gl-btn-primary-hover);
 }
 .gl-coin-primary {
   display: inline-flex;
