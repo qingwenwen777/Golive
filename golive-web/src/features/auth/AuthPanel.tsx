@@ -92,8 +92,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     <section className={cn('gl-auth-panel', className)}>
       <div className="gl-auth-head">
         <div className="gl-auth-brand" aria-hidden="true">
-          <GoLiveLogo height={22} />
-          <span>GoLive</span>
+          <GoLiveLogo height={26} />
           <span className="gl-auth-brand-region">JP</span>
         </div>
         <div className="gl-auth-live">

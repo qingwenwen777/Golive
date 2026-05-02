@@ -68,8 +68,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
             <Icons.Menu size={24} />
           </button>
           <button type="button" className="gl-logo" onClick={onLogoClick} aria-label="GoLive">
-            <GoLiveLogo height={20} />
-            <span className="gl-logo-word">GoLive</span>
+            <GoLiveLogo height={24} />
             <span className="gl-logo-country">{t(`lang.short.${lang}`)}</span>
           </button>
         </div>

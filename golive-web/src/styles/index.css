@@ -42,7 +42,7 @@
   --gl-chip-bg: #f2f2f2;
   --gl-chip-bg-active: #0f0f0f;
   --gl-chip-text-active: #ffffff;
-  --gl-red: #ff0033;
+  --gl-red: #ff3d5c;
   --gl-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   --gl-sc-body-tint: rgba(255, 255, 255, 0.3);
 }
@@ -85,7 +85,7 @@
   --gl-chip-bg: #272727;
   --gl-chip-bg-active: #ffffff;
   --gl-chip-text-active: #0f0f0f;
-  --gl-red: #ff0033;
+  --gl-red: #ff3d5c;
   --gl-shadow: 0 0 0 rgba(0, 0, 0, 0);
 }
 
@@ -327,12 +327,33 @@ input:focus-visible,
 .gl-logo {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   background: none;
   border: 0;
   cursor: pointer;
   padding: 4px;
   white-space: nowrap;
+}
+.gl-brand-logo {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  position: relative;
+}
+.gl-brand-logo-image {
+  display: block;
+  grid-area: 1 / 1;
+  height: 100%;
+  width: 100%;
+}
+.gl-brand-logo-image.is-dark {
+  display: none;
+}
+.dark .gl-brand-logo-image.is-light {
+  display: none;
+}
+.dark .gl-brand-logo-image.is-dark {
+  display: block;
 }
 .gl-logo-word {
   font-weight: 700;
@@ -341,11 +362,14 @@ input:focus-visible,
   font-family: Roboto, Arial, sans-serif;
 }
 .gl-logo-country {
+  align-self: flex-start;
   font-size: 10px;
   color: var(--gl-text-2);
   vertical-align: super;
   font-weight: 500;
+  line-height: 1;
   margin-left: 2px;
+  margin-top: 3px;
 }
 
 .gl-search-pill {

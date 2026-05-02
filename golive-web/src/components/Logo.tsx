@@ -1,15 +1,31 @@
 interface LogoProps {
   height?: number;
+  variant?: 'mark' | 'wordmark';
 }
 
-export function GoLiveLogo({ height = 20 }: LogoProps) {
-  return (
-    <svg viewBox="0 0 28 20" style={{ height, display: 'block' }} aria-hidden="true">
-      <path
-        d="M27.9 3.1a3.5 3.5 0 0 0-2.5-2.5C23.2 0 14 0 14 0S4.8 0 2.6.6A3.5 3.5 0 0 0 .1 3.1 36 36 0 0 0 0 10a36 36 0 0 0 .6 6.9 3.5 3.5 0 0 0 2.5 2.5C4.8 20 14 20 14 20s9.2 0 11.4-.6a3.5 3.5 0 0 0 2.5-2.5A36 36 0 0 0 28 10a36 36 0 0 0-.1-6.9Z"
-        fill="#FF0033"
+const WORDMARK_ASPECT = 220 / 60;
+
+export function GoLiveLogo({ height = 24, variant = 'wordmark' }: LogoProps) {
+  if (variant === 'mark') {
+    return (
+      <img
+        src="/golive-icon.svg"
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        style={{ width: height, height, display: 'block' }}
       />
-      <polygon points="11.2,14.3 18.9,10 11.2,5.7" fill="#fff" />
-    </svg>
+    );
+  }
+
+  return (
+    <span
+      className="gl-brand-logo"
+      aria-hidden="true"
+      style={{ width: height * WORDMARK_ASPECT, height }}
+    >
+      <img className="gl-brand-logo-image is-light" src="/golive-logo.svg" alt="" draggable={false} />
+      <img className="gl-brand-logo-image is-dark" src="/golive-logo-white.svg" alt="" draggable={false} />
+    </span>
   );
 }
