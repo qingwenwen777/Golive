@@ -63,22 +63,25 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
     if (saved) {
       removeFromLibrary(WATCH_LATER_KEY, stream.id);
       setSaved(false);
-      toast.success('Removed from Watch later.');
+      toast.success(t('liveRoom.removedWatchLater', { defaultValue: 'Removed from Watch later.' }));
       return;
     }
     saveToLibrary(WATCH_LATER_KEY, stream);
     setSaved(true);
-    toast.success('Saved to Watch later.');
+    toast.success(t('liveRoom.savedWatchLater', { defaultValue: 'Saved to Watch later.' }));
   };
 
   const copyLink = async () => {
     const href = `${window.location.origin}/live/${stream.id}`;
     try {
-      const method = await copyText(href, 'live room link');
-      if (method === 'manual') toast.info('Live room link opened for manual copy.');
-      else toast.success('Live room link copied.');
+      const method = await copyText(href, t('liveRoom.copyTarget', { defaultValue: 'live room link' }));
+      if (method === 'manual') {
+        toast.info(t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }));
+      } else {
+        toast.success(t('liveRoom.copySuccess', { defaultValue: 'Live room link copied.' }));
+      }
     } catch {
-      toast.error('Could not copy the live room link.');
+      toast.error(t('liveRoom.copyFailed', { defaultValue: 'Could not copy the live room link.' }));
     }
   };
 

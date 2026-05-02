@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Clock3, Coins, RotateCcw, Trophy, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLatestBet, useOpenBet, usePlaceBet, useSettleBet, useCancelBet } from '@/api/bet';
 import { useMe } from '@/api/auth';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
-import { betOptionLabel, type BetOption, type BetOptionSummary } from '@/types/bet';
+import type { BetOption, BetOptionSummary } from '@/types/bet';
 import { cn } from '@/lib/cn';
 
 const DEFAULT_AMOUNT = 1000;
@@ -19,6 +20,7 @@ export function BettingPanel({
   roomId: string;
   ownsStream: boolean;
 }) {
+  const { t } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const latest = useLatestBet(roomId, Boolean(roomId));
@@ -55,7 +57,7 @@ export function BettingPanel({
   const handleOpen = () => {
     const safeQuestion = question.trim();
     if (!safeQuestion) {
-      toast.error('请先填写竞猜标题。');
+      toast.error(t('betting.errorQuestionRequired', { defaultValue: 'Enter a bet title first.' }));
       return;
     }
     const safeAmount = Math.max(1, Math.floor(amount));
@@ -64,9 +66,9 @@ export function BettingPanel({
       {
         onSuccess: () => {
           setQuestion('');
-          toast.success('竞猜已开盘，60 秒后自动封盘。');
+          toast.success(t('betting.openSuccess', { defaultValue: 'Bet opened. It closes automatically in 60 seconds.' }));
         },
-        onError: (err) => toast.error(betErrorText(err.reason, err.message)),
+        onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
       },
     );
   };
@@ -78,22 +80,28 @@ export function BettingPanel({
       return;
     }
     if (!accepting) {
-      toast.error('竞猜已封盘。');
+      toast.error(t('betting.errorClosed', { defaultValue: 'Betting is closed.' }));
       return;
     }
     if (myWager) {
-      toast.error('你已经下注了。');
+      toast.error(t('betting.errorAlreadyPlaced', { defaultValue: 'You already placed a bet.' }));
       return;
     }
     if (round.amount > balance) {
-      toast.error('余额不足，无法下注。');
+      toast.error(t('betting.errorInsufficient', { defaultValue: 'Insufficient coin balance.' }));
       return;
     }
     placeBet.mutate(
       { roundId: round.id, option },
       {
-        onSuccess: () => toast.success(`已下注“${betOptionLabel(option)}”。`),
-        onError: (err) => toast.error(betErrorText(err.reason, err.message)),
+        onSuccess: () =>
+          toast.success(
+            t('betting.wagerSuccess', {
+              option: betOptionLabel(option, t),
+              defaultValue: 'Bet placed on "{{option}}".',
+            }),
+          ),
+        onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
       },
     );
   };
@@ -103,8 +111,14 @@ export function BettingPanel({
     settleBet.mutate(
       { roundId: round.id, option },
       {
-        onSuccess: () => toast.success(`竞猜已按“${betOptionLabel(option)}”结算。`),
-        onError: (err) => toast.error(betErrorText(err.reason, err.message)),
+        onSuccess: () =>
+          toast.success(
+            t('betting.settleSuccess', {
+              option: betOptionLabel(option, t),
+              defaultValue: 'Bet settled as "{{option}}".',
+            }),
+          ),
+        onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
       },
     );
   };
@@ -114,8 +128,8 @@ export function BettingPanel({
     cancelBet.mutate(
       { roundId: round.id },
       {
-        onSuccess: () => toast.success('已流盘，下注 coin 已退回。'),
-        onError: (err) => toast.error(betErrorText(err.reason, err.message)),
+        onSuccess: () => toast.success(t('betting.cancelSuccess', { defaultValue: 'Bet cancelled. Wagered coins were refunded.' })),
+        onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
       },
     );
   };
@@ -123,18 +137,18 @@ export function BettingPanel({
   if (!round && !ownsStream) return null;
 
   return (
-    <section className="gl-bet-panel" aria-label="竞猜">
+    <section className="gl-bet-panel" aria-label={t('betting.title', { defaultValue: 'Betting' })}>
       <div className="gl-bet-head">
         <div className="gl-bet-icon" aria-hidden="true">
           <Trophy size={17} />
         </div>
         <div>
-          <h2>竞猜</h2>
-          <p>{round?.question ?? '填写标题后开盘，观众会看到入口'}</p>
+          <h2>{t('betting.title', { defaultValue: 'Betting' })}</h2>
+          <p>{round?.question ?? t('betting.emptyHint', { defaultValue: 'Enter a title to open a bet for viewers.' })}</p>
         </div>
         {round && (
           <span className={cn('gl-bet-status', `is-${effectiveStatus}`)}>
-            {statusText(effectiveStatus)}
+            {statusText(effectiveStatus, t)}
           </span>
         )}
       </div>
@@ -144,7 +158,8 @@ export function BettingPanel({
           amount={amount}
           question={question}
           pending={openBet.isPending}
-          submitLabel="开盘"
+          submitLabel={t('betting.open', { defaultValue: 'Open bet' })}
+          reopen={false}
           onAmountChange={setAmount}
           onQuestionChange={setQuestion}
           onSubmit={handleOpen}
@@ -158,9 +173,19 @@ export function BettingPanel({
             </span>
             <span>
               <Clock3 size={14} />
-              {accepting ? `${Math.ceil(remainingMs / 1000)} 秒封盘` : '已封盘'}
+              {accepting
+                ? t('betting.closesIn', {
+                    seconds: Math.ceil(remainingMs / 1000),
+                    defaultValue: '{{seconds}}s to close',
+                  })
+                : t('betting.closed', { defaultValue: 'Closed' })}
             </span>
-            <span>池子 {totalPool.toLocaleString()}</span>
+            <span>
+              {t('betting.pool', {
+                total: totalPool.toLocaleString(),
+                defaultValue: 'Pool {{total}}',
+              })}
+            </span>
           </div>
 
           <div className="gl-bet-options">
@@ -178,9 +203,17 @@ export function BettingPanel({
 
           {myWager && (
             <div className={cn('gl-bet-my', `is-${myWager.status}`)}>
-              你已下注“{betOptionLabel(myWager.option)}”
-              {myWager.status === 'won' && `，返还 ${myWager.payout.toLocaleString()} coin`}
-              {myWager.status === 'refunded' && '，已退回'}
+              {t('betting.myWager', {
+                option: betOptionLabel(myWager.option, t),
+                defaultValue: 'You bet on "{{option}}"',
+              })}
+              {myWager.status === 'won' &&
+                t('betting.myWagerWon', {
+                  payout: myWager.payout.toLocaleString(),
+                  defaultValue: ', returned {{payout}} coin',
+                })}
+              {myWager.status === 'refunded' &&
+                t('betting.myWagerRefunded', { defaultValue: ', refunded' })}
             </div>
           )}
 
@@ -194,10 +227,16 @@ export function BettingPanel({
                     type="button"
                     onClick={() => handleSettle(option)}
                     disabled={settleBet.isPending}
-                    title={count === 0 ? '该选项无人下注，若需退币请改为流盘' : undefined}
+                    title={
+                      count === 0
+                        ? t('betting.noWagerHint', {
+                            defaultValue: 'No one picked this option. Cancel to refund coins.',
+                          })
+                        : undefined
+                    }
                   >
                     <Trophy size={14} />
-                    <span>{option === 'win' ? '能赢' : '不能赢'}</span>
+                    <span>{betOptionLabel(option, t)}</span>
                   </button>
                 );
               })}
@@ -208,7 +247,11 @@ export function BettingPanel({
                 disabled={cancelBet.isPending}
               >
                 <XCircle size={14} />
-                <span>{cancelBet.isPending ? '流盘中...' : '流盘'}</span>
+                <span>
+                  {cancelBet.isPending
+                    ? t('betting.cancelling', { defaultValue: 'Cancelling...' })
+                    : t('betting.cancel', { defaultValue: 'Cancel' })}
+                </span>
               </button>
             </div>
           )}
@@ -218,7 +261,8 @@ export function BettingPanel({
               amount={amount}
               question={question}
               pending={openBet.isPending}
-              submitLabel="再开一盘"
+              submitLabel={t('betting.reopen', { defaultValue: 'Open another' })}
+              reopen
               onAmountChange={setAmount}
               onQuestionChange={setQuestion}
               onSubmit={handleOpen}
@@ -235,6 +279,7 @@ function OpenBetForm({
   question,
   pending,
   submitLabel,
+  reopen,
   onAmountChange,
   onQuestionChange,
   onSubmit,
@@ -243,25 +288,29 @@ function OpenBetForm({
   question: string;
   pending: boolean;
   submitLabel: string;
+  reopen: boolean;
   onAmountChange: (value: number) => void;
   onQuestionChange: (value: string) => void;
   onSubmit: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const disabled = pending || question.trim().length === 0;
   return (
     <div className="gl-bet-open">
       <label className="is-title">
-        <span>标题</span>
+        <span>{t('betting.formTitle', { defaultValue: 'Title' })}</span>
         <input
           type="text"
           maxLength={MAX_QUESTION_LENGTH}
-          placeholder="例如：第一局谁能拿下？"
+          placeholder={t('betting.formTitlePlaceholder', {
+            defaultValue: 'Example: Who takes game one?',
+          })}
           value={question}
           onChange={(event) => onQuestionChange(event.target.value)}
         />
       </label>
       <label>
-        <span>下注额</span>
+        <span>{t('betting.amount', { defaultValue: 'Wager amount' })}</span>
         <input
           type="number"
           min={1}
@@ -271,8 +320,8 @@ function OpenBetForm({
         />
       </label>
       <button type="button" onClick={onSubmit} disabled={disabled}>
-        {submitLabel === '再开一盘' ? <RotateCcw size={15} /> : <Coins size={15} />}
-        <span>{pending ? '开盘中...' : submitLabel}</span>
+        {reopen ? <RotateCcw size={15} /> : <Coins size={15} />}
+        <span>{pending ? t('betting.opening', { defaultValue: 'Opening...' }) : submitLabel}</span>
       </button>
     </div>
   );
@@ -291,6 +340,7 @@ function BetOptionButton({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const total = summary?.total ?? 0;
   const count = summary?.count ?? 0;
   return (
@@ -300,29 +350,57 @@ function BetOptionButton({
       disabled={disabled}
       onClick={onClick}
     >
-      <span className="gl-bet-option-title">{betOptionLabel(option)}</span>
+      <span className="gl-bet-option-title">{betOptionLabel(option, t)}</span>
       <span className="gl-bet-option-meta">
-        {count} 人 · {total.toLocaleString()} coin
+        {t('betting.optionMeta', {
+          count,
+          total: total.toLocaleString(),
+          defaultValue: '{{count}} people · {{total}} coin',
+        })}
       </span>
     </button>
   );
 }
 
-function statusText(status?: string): string {
-  if (status === 'open') return '开盘中';
-  if (status === 'closed') return '封盘';
-  if (status === 'settled') return '已结算';
-  if (status === 'cancelled') return '流盘';
-  return '竞猜';
+function statusText(status: string | undefined, t: ReturnType<typeof useTranslation>['t']): string {
+  if (status === 'open') return t('betting.status.open', { defaultValue: 'Open' });
+  if (status === 'closed') return t('betting.status.closed', { defaultValue: 'Closed' });
+  if (status === 'settled') return t('betting.status.settled', { defaultValue: 'Settled' });
+  if (status === 'cancelled') return t('betting.status.cancelled', { defaultValue: 'Cancelled' });
+  return t('betting.title', { defaultValue: 'Betting' });
 }
 
-function betErrorText(reason: string, fallback: string): string {
-  if (reason === 'insufficient_coin') return '余额不足，无法下注。';
-  if (reason === 'active_bet_exists') return '当前还有未结算的竞猜。';
-  if (reason === 'bet_closed') return '竞猜已封盘。';
-  if (reason === 'bet_already_placed') return '你已经下注了。';
-  if (reason === 'bet_no_winners') return '这个结果没有赢家，请选择流盘退回。';
-  if (reason === 'bad_bet_question') return '竞猜标题不能为空，最多 80 个字。';
-  if (reason === 'forbidden') return '只有主播可以操作竞猜。';
-  return fallback || '操作失败。';
+function betOptionLabel(option: BetOption, t: ReturnType<typeof useTranslation>['t']): string {
+  return option === 'win'
+    ? t('betting.option.win', { defaultValue: 'Can win' })
+    : t('betting.option.lose', { defaultValue: 'Cannot win' });
+}
+
+function betErrorText(
+  reason: string,
+  fallback: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  if (reason === 'insufficient_coin') {
+    return t('betting.errorInsufficient', { defaultValue: 'Insufficient coin balance.' });
+  }
+  if (reason === 'active_bet_exists') {
+    return t('betting.errorActiveExists', { defaultValue: 'There is still an unsettled bet.' });
+  }
+  if (reason === 'bet_closed') {
+    return t('betting.errorClosed', { defaultValue: 'Betting is closed.' });
+  }
+  if (reason === 'bet_already_placed') {
+    return t('betting.errorAlreadyPlaced', { defaultValue: 'You already placed a bet.' });
+  }
+  if (reason === 'bet_no_winners') {
+    return t('betting.errorNoWinners', { defaultValue: 'No winner for this result. Cancel to refund.' });
+  }
+  if (reason === 'bad_bet_question') {
+    return t('betting.errorBadQuestion', { defaultValue: 'Bet title is required and must be 80 characters or fewer.' });
+  }
+  if (reason === 'forbidden') {
+    return t('betting.errorForbidden', { defaultValue: 'Only the streamer can manage betting.' });
+  }
+  return fallback || t('betting.errorGeneric', { defaultValue: 'Action failed.' });
 }

@@ -20,6 +20,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
+import type { AppLang } from '@/i18n';
 
 export interface TopBarProps {
   onMenuClick: () => void;
@@ -31,7 +32,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useThemeStore();
-  const { lang, toggleLang } = useLangStore();
+  const { lang, setLang } = useLangStore();
   const isDark = theme === 'dark';
   const isAuthed = useIsAuthed();
   const user = useAuthStore((s) => s.user);
@@ -68,7 +69,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           <button type="button" className="gl-logo" onClick={onLogoClick} aria-label="GoLive">
             <GoLiveLogo height={20} />
             <span className="gl-logo-word">GoLive</span>
-            <span className="gl-logo-country">JP</span>
+            <span className="gl-logo-country">{t(`lang.short.${lang}`)}</span>
           </button>
         </div>
 
@@ -88,14 +89,24 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
         </form>
 
         <div className="gl-topbar-right">
-          <button
-            type="button"
-            className="gl-lang-toggle"
-            onClick={toggleLang}
-            aria-label={t('lang.toggle')}
-          >
-            {lang === 'en' ? t('lang.en') : t('lang.ja')}
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="gl-lang-toggle" aria-label={t('lang.toggle')}>
+                {t(`lang.short.${lang}`)}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              {LANG_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  key={option}
+                  onClick={() => setLang(option)}
+                  className={option === lang ? 'font-semibold' : undefined}
+                >
+                  {t(`lang.${option}`)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             className="gl-icon-btn"
@@ -116,10 +127,10 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                   <button
                     type="button"
                     className="gl-account-menu-trigger"
-                    aria-label="Account menu"
+                    aria-label={t('account.menu')}
                   >
                     <Avatar
-                      name={currentUser?.username ?? 'You'}
+                      name={currentUser?.username ?? t('account.you')}
                       src={currentUser?.avatar}
                       size={32}
                     />
@@ -127,47 +138,56 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuLabel className="truncate">
-                    {currentUser?.username ?? 'You'}
+                    {currentUser?.username ?? t('account.you')}
                   </DropdownMenuLabel>
                   <DropdownMenuItem className="flex items-center gap-2">
                     <Coins size={14} />
-                    <span>{balance.toLocaleString()} coins</span>
+                    <span>{t('account.coins', { amount: balance.toLocaleString() })}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="flex items-center gap-2"
                     onClick={() => navigate('/coins?focus=recharge')}
                   >
                     <Plus size={14} />
-                    <span>Recharge coins</span>
+                    <span>{t('account.rechargeCoins')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {currentUser?.role === 'admin' && (
                     <DropdownMenuItem onClick={() => navigate('/admin')}>
-                      Admin dashboard
+                      {t('account.adminDashboard')}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem onClick={() => navigate(`/channel/${user?.id ?? ''}`)}>
-                    Your channel
+                    {t('account.yourChannel')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setAvatarOpen(true)}>
-                    Change avatar
+                    {t('account.changeAvatar')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    Settings
+                    {t('account.settings')}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={toggleTheme}>
-                    Appearance: {isDark ? 'Dark' : 'Light'}
+                    {t('account.appearance', {
+                      mode: isDark ? t('account.dark') : t('account.light'),
+                    })}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={toggleLang}>
-                    Language: {lang === 'en' ? 'English' : 'Japanese'}
-                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {LANG_OPTIONS.map((option) => (
+                    <DropdownMenuItem
+                      key={option}
+                      onClick={() => setLang(option)}
+                      className={option === lang ? 'font-semibold' : undefined}
+                    >
+                      {t('account.language', { language: t(`lang.${option}`) })}
+                    </DropdownMenuItem>
+                  ))}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => {
                       void doLogout();
                     }}
                   >
-                    Sign out
+                    {t('account.signOut')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -177,10 +197,10 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
               type="button"
               onClick={() => openLogin()}
               className="gl-signin-btn flex items-center gap-2 rounded-full border border-accent/60 px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent/10"
-              aria-label="Sign in"
+              aria-label={t('account.signIn')}
             >
               <UserIcon size={18} />
-              <span>Sign in</span>
+              <span>{t('account.signIn')}</span>
             </button>
           )}
         </div>
@@ -190,3 +210,5 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
     </>
   );
 }
+
+const LANG_OPTIONS: AppLang[] = ['zh', 'ja', 'en'];

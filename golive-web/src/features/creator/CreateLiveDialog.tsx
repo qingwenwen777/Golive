@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { ImagePlus, Radio, Send, Wand2 } from 'lucide-react';
@@ -55,53 +56,58 @@ export function loadPublisherSession(): PublisherSession | null {
   }
 }
 
+function createCategoryKey(category: string): string {
+  return category.toLowerCase().replace(/\s+/g, '');
+}
+
 export interface CreateLiveDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-function liveErrorMessage(err: Error): string {
+function liveErrorMessage(err: Error, t: ReturnType<typeof useTranslation>['t']): string {
   if (err instanceof AxiosError) {
-    if (err.response?.status === 401) return 'Please sign in again before starting a live.';
+    if (err.response?.status === 401) return t('createLive.errors.signInAgain');
     if (err.response?.status === 403) {
       const data = err.response.data as { message?: string } | undefined;
-      return data?.message || 'Your live permission has not been approved yet.';
+      return data?.message || t('createLive.errors.notApproved');
     }
-    if (err.response?.status === 400) return 'Title and category are required.';
+    if (err.response?.status === 400) return t('createLive.errors.required');
   }
-  return 'Could not start the live. Please try again.';
+  return t('createLive.errors.startFailed');
 }
 
-function permissionCopy(status: string) {
+function permissionCopy(status: string, t: ReturnType<typeof useTranslation>['t']) {
   if (status === 'pending') {
     return {
-      title: 'Application under review',
-      body: 'Your creator request is waiting for an administrator to review it.',
-      action: 'Submitted',
+      title: t('createLive.permission.pendingTitle'),
+      body: t('createLive.permission.pendingBody'),
+      action: t('createLive.permission.submitted'),
     };
   }
   if (status === 'rejected') {
     return {
-      title: 'Creator access was not approved',
-      body: 'You can submit a new application when your channel is ready for review.',
-      action: 'Apply again',
+      title: t('createLive.permission.rejectedTitle'),
+      body: t('createLive.permission.rejectedBody'),
+      action: t('createLive.permission.applyAgain'),
     };
   }
   return {
-    title: 'Apply for creator access',
-    body: 'A quick admin approval is required before you can create live rooms.',
-    action: 'Submit application',
+    title: t('createLive.permission.applyTitle'),
+    body: t('createLive.permission.applyBody'),
+    action: t('createLive.permission.submitApplication'),
   };
 }
 
 export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) {
+  const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const { data: meUser, refetch: refetchMe } = useMe();
   const goLive = useGoLive();
   const uploadCover = useUploadLiveCover();
   const apply = useSubmitCreatorApplication();
-  const [title, setTitle] = useState('Untitled live');
+  const [title, setTitle] = useState(() => t('createLive.defaultTitle'));
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Just Chatting');
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -114,7 +120,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const canGoLive = livePermissionStatus === 'approved';
 
   const isPending = goLive.isPending || uploadCover.isPending;
-  const perm = permissionCopy(livePermissionStatus);
+  const perm = permissionCopy(livePermissionStatus, t);
 
   useEffect(() => {
     if (open && user) {
@@ -125,7 +131,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const submitApplication = () => {
     apply.mutate(undefined, {
       onSuccess: (resp) => toast.success(resp.message),
-      onError: (err) => toast.error(err.message || 'Could not submit application.'),
+      onError: (err) => toast.error(err.message || t('createLive.errors.applicationFailed')),
     });
   };
 
@@ -147,17 +153,17 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
         {
           onSuccess: (stream) => {
             savePublisherSession(stream);
-            toast.success('Live room created. Add the stream key in OBS to publish video.');
+            toast.success(t('createLive.created'));
             onOpenChange(false);
             navigate(`/live/${stream.id}`);
           },
           onError: (err) => {
-            setError(liveErrorMessage(err));
+            setError(liveErrorMessage(err, t));
           },
         },
       );
     } catch (err) {
-      setError(err instanceof Error ? liveErrorMessage(err) : 'Could not upload the cover.');
+      setError(err instanceof Error ? liveErrorMessage(err, t) : t('createLive.errors.coverUpload'));
     }
   };
 
@@ -165,8 +171,8 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gl-live-create-dialog p-0 sm:max-w-[480px]">
         <DialogHeader className="sr-only">
-          <DialogTitle>Start a live</DialogTitle>
-          <DialogDescription>Create a live room and get your OBS stream key.</DialogDescription>
+          <DialogTitle>{t('createLive.title')}</DialogTitle>
+          <DialogDescription>{t('createLive.description')}</DialogDescription>
         </DialogHeader>
 
         {!canGoLive ? (
@@ -181,7 +187,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
               </div>
             </div>
             <div className={`gl-creator-permission is-${livePermissionStatus}`}>
-              <span>Live permission</span>
+              <span>{t('createLive.permission.label')}</span>
               <strong>{livePermissionStatus}</strong>
             </div>
             <button
@@ -191,7 +197,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
               onClick={submitApplication}
             >
               <Send size={18} />
-              <span>{apply.isPending ? 'Submitting...' : perm.action}</span>
+              <span>{apply.isPending ? t('createLive.permission.submitting') : perm.action}</span>
             </button>
           </div>
         ) : (
@@ -201,13 +207,13 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
                 <Radio size={20} />
               </div>
               <div>
-                <h2>Start a live</h2>
-                <p>Create a room, then publish from OBS with the stream key.</p>
+                <h2>{t('createLive.title')}</h2>
+                <p>{t('createLive.formSub')}</p>
               </div>
             </div>
 
             <label className="gl-auth-field">
-              <span className="gl-auth-label">Title</span>
+              <span className="gl-auth-label">{t('createLive.fields.title')}</span>
               <span className="gl-auth-input-wrap">
                 <input
                   value={title}
@@ -219,7 +225,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
             </label>
 
             <label className="gl-auth-field">
-              <span className="gl-auth-label">Category</span>
+              <span className="gl-auth-label">{t('createLive.fields.category')}</span>
               <select
                 className="gl-live-create-select"
                 value={category}
@@ -228,21 +234,21 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
               >
                 {categories.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {t(`createLive.categories.${createCategoryKey(item)}`, { defaultValue: item })}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="gl-auth-field">
-              <span className="gl-auth-label">Cover</span>
+              <span className="gl-auth-label">{t('createLive.fields.cover')}</span>
               <span className="gl-live-cover-picker">
                 {coverPreview ? (
                   <img src={coverPreview} alt="" />
                 ) : (
                   <span className="gl-live-cover-empty">
                     <ImagePlus size={22} />
-                    <span>Add cover</span>
+                    <span>{t('createLive.addCover')}</span>
                   </span>
                 )}
                 <input
@@ -258,14 +264,14 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
             </label>
 
             <label className="gl-auth-field">
-              <span className="gl-auth-label">Description</span>
+              <span className="gl-auth-label">{t('createLive.fields.description')}</span>
               <textarea
                 className="gl-live-create-textarea"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={2000}
                 rows={4}
-                placeholder="Optional"
+                placeholder={t('createLive.optional')}
               />
             </label>
 
@@ -277,7 +283,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
 
             <button type="submit" disabled={isPending || !title.trim()} className="gl-auth-submit">
               <Wand2 size={18} />
-              <span>{isPending ? 'Starting...' : 'Create live room'}</span>
+              <span>{isPending ? t('createLive.starting') : t('createLive.createRoom')}</span>
             </button>
           </form>
         )}

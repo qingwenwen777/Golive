@@ -41,5 +41,5 @@ export interface BetRoundView {
 }
 
 export function betOptionLabel(option: BetOption): string {
-  return option === 'win' ? '能' : '不能';
+  return option === 'win' ? 'Can win' : 'Cannot win';
 }

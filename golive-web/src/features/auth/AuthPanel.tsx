@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AxiosError } from 'axios';
 import { BadgeCheck, KeyRound, PlayCircle, Radio, UserRound } from 'lucide-react';
 import { useLoginMutation, useRegisterMutation } from '@/api/auth';
@@ -14,18 +15,23 @@ export interface AuthPanelProps {
   onAuthenticated?: (resp: LoginResp) => void;
 }
 
-function authErrorMessage(err: Error, mode: AuthMode): string {
+function authErrorMessage(
+  err: Error,
+  mode: AuthMode,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
   if (err instanceof AxiosError) {
-    if (err.response?.status === 401) return 'Invalid username or password.';
-    if (err.response?.status === 409) return 'That username is already taken.';
-    if (err.response?.status === 400) return 'Check the fields and try again.';
+    if (err.response?.status === 401) return t('auth.errors.invalidCredentials');
+    if (err.response?.status === 409) return t('auth.errors.usernameTaken');
+    if (err.response?.status === 400) return t('auth.errors.badFields');
   }
   return mode === 'signin'
-    ? 'Sign-in failed. Please try again.'
-    : 'Account creation failed. Please try again.';
+    ? t('auth.errors.signInFailed')
+    : t('auth.errors.signUpFailed');
 }
 
 export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
+  const { t } = useTranslation('common');
   const id = useId();
   const [mode, setMode] = useState<AuthMode>('signin');
   const [username, setUsername] = useState('');
@@ -59,7 +65,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     const cleanDisplayName = displayName.trim();
 
     if (isSigningUp && password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.errors.passwordMismatch'));
       return;
     }
 
@@ -68,7 +74,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         onAuthenticated?.(resp);
       },
       onError: (err: Error) => {
-        setError(authErrorMessage(err, mode));
+        setError(authErrorMessage(err, mode, t));
       },
     };
 
@@ -92,20 +98,20 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         </div>
         <div className="gl-auth-live">
           <span className="gl-live-dot-red" />
-          <span>Live account</span>
+          <span>{t('auth.liveAccount')}</span>
         </div>
       </div>
 
       <div className="gl-auth-copy">
-        <h1>{isSigningUp ? 'Create your GoLive account' : 'Sign in to GoLive'}</h1>
+        <h1>{isSigningUp ? t('auth.signUpTitle') : t('auth.signInTitle')}</h1>
         <p>
           {isSigningUp
-            ? 'Pick a channel name and jump into live chat, gifts, and follows.'
-            : 'Use demo / demo for the preview build, or create a local preview account.'}
+            ? t('auth.signUpSub')
+            : t('auth.signInSub')}
         </p>
       </div>
 
-      <div className="gl-auth-segment" role="tablist" aria-label="Authentication mode">
+      <div className="gl-auth-segment" role="tablist" aria-label={t('auth.mode')}>
         <button
           type="button"
           role="tab"
@@ -113,7 +119,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           className={cn('gl-auth-segment-btn', !isSigningUp && 'is-active')}
           onClick={() => setMode('signin')}
         >
-          Sign in
+          {t('auth.signIn')}
         </button>
         <button
           type="button"
@@ -122,14 +128,14 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           className={cn('gl-auth-segment-btn', isSigningUp && 'is-active')}
           onClick={() => setMode('signup')}
         >
-          Register
+          {t('auth.register')}
         </button>
       </div>
 
       <form onSubmit={onSubmit} className="gl-auth-form">
         {isSigningUp && (
           <label className="gl-auth-field" htmlFor={displayNameId}>
-            <span className="gl-auth-label">Display name</span>
+            <span className="gl-auth-label">{t('auth.displayName')}</span>
             <span className="gl-auth-input-wrap">
               <BadgeCheck size={18} />
               <input
@@ -138,7 +144,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                 autoComplete="name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your channel name"
+                placeholder={t('auth.displayNamePlaceholder')}
                 required
               />
             </span>
@@ -146,7 +152,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         )}
 
         <label className="gl-auth-field" htmlFor={usernameId}>
-          <span className="gl-auth-label">Username</span>
+          <span className="gl-auth-label">{t('auth.username')}</span>
           <span className="gl-auth-input-wrap">
             <UserRound size={18} />
             <input
@@ -155,7 +161,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder={isSigningUp ? 'Choose a username' : 'demo'}
+              placeholder={isSigningUp ? t('auth.usernamePlaceholder') : 'demo'}
               minLength={3}
               required
             />
@@ -163,7 +169,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         </label>
 
         <label className="gl-auth-field" htmlFor={passwordId}>
-          <span className="gl-auth-label">Password</span>
+          <span className="gl-auth-label">{t('auth.password')}</span>
           <span className="gl-auth-input-wrap">
             <KeyRound size={18} />
             <input
@@ -172,7 +178,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
               autoComplete={isSigningUp ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={isSigningUp ? 'At least 3 characters' : 'demo'}
+              placeholder={isSigningUp ? t('auth.passwordPlaceholder') : 'demo'}
               minLength={3}
               required
             />
@@ -181,7 +187,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
 
         {isSigningUp && (
           <label className="gl-auth-field" htmlFor={confirmPasswordId}>
-            <span className="gl-auth-label">Confirm password</span>
+            <span className="gl-auth-label">{t('auth.confirmPassword')}</span>
             <span className="gl-auth-input-wrap">
               <KeyRound size={18} />
               <input
@@ -190,7 +196,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repeat password"
+                placeholder={t('auth.confirmPasswordPlaceholder')}
                 minLength={3}
                 required
               />
@@ -209,11 +215,11 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           <span>
             {isPending
               ? isSigningUp
-                ? 'Creating...'
-                : 'Signing in...'
+                ? t('auth.creating')
+                : t('auth.signingIn')
               : isSigningUp
-                ? 'Create account'
-                : 'Sign in'}
+                ? t('auth.createAccount')
+                : t('auth.signIn')}
           </span>
         </button>
 
@@ -221,10 +227,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           type="button"
           disabled
           className="gl-auth-secondary"
-          title="Social sign-in is not available in this preview"
+          title={t('auth.socialUnavailable')}
         >
           <Radio size={18} />
-          <span>Continue with Google</span>
+          <span>{t('auth.continueGoogle')}</span>
         </button>
       </form>
     </section>

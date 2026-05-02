@@ -33,3 +33,21 @@ export const CATEGORIES_JA = [
   '料理',
   'ニュース',
 ] as const;
+
+export const CATEGORIES_ZH = [
+  '全部',
+  '正在直播',
+  '游戏',
+  'VTuber',
+  '音乐',
+  '聊天',
+  '动画',
+  'Minecraft',
+  'Valorant',
+  'Apex Legends',
+  '绘画',
+  'ASMR',
+  '播客',
+  '料理',
+  '新闻',
+] as const;

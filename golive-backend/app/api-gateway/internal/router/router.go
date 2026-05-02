@@ -117,7 +117,8 @@ func publicRoutes() []middleware.PublicRoute {
 
 func uploadProxy(userProxy, roomProxy http.Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if strings.HasPrefix(c.Param("action"), "/avatars/") {
+		action := c.Param("action")
+		if strings.HasPrefix(action, "/avatars/") || strings.HasPrefix(action, "/covers/") {
 			userProxy.ServeHTTP(c.Writer, c.Request)
 			return
 		}

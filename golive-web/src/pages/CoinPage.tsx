@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -46,46 +47,56 @@ const RECORD_PAGE_SIZE = 8;
 const DAILY_TASKS = [
   {
     id: 'daily-login-lottery',
-    title: '每日登录抽奖',
-    description: '每天抽一次，小额鼓励不伤钱包。',
+    titleKey: 'coin.tasks.dailyLogin.title',
+    titleDefault: 'Daily login lottery',
+    descriptionKey: 'coin.tasks.dailyLogin.description',
+    descriptionDefault: 'Draw once each day for a small coin bonus.',
     reward: '6-18',
-    targetLabel: '今日可抽',
+    targetLabelKey: 'coin.tasks.dailyLogin.target',
+    targetLabelDefault: 'available today',
     target: 1,
     kind: 'login',
   },
   {
     id: 'watch-3-lives',
-    title: '观看 3 个直播间',
-    description: '当天打开 3 个不同直播间后领取。',
+    titleKey: 'coin.tasks.watchRooms.title',
+    titleDefault: 'Watch 3 live rooms',
+    descriptionKey: 'coin.tasks.watchRooms.description',
+    descriptionDefault: 'Open 3 different live rooms today to claim.',
     reward: '18',
-    targetLabel: '3 个直播间',
+    targetLabelKey: 'coin.tasks.watchRooms.target',
+    targetLabelDefault: '3 live rooms',
     target: 3,
     kind: 'rooms',
   },
   {
     id: 'watch-30-minutes',
-    title: '累计观看 30 分钟',
-    description: '认真看一会儿，给一点点 coins。',
+    titleKey: 'coin.tasks.watchMinutes.title',
+    titleDefault: 'Watch 30 minutes',
+    descriptionKey: 'coin.tasks.watchMinutes.description',
+    descriptionDefault: 'Spend a little real time watching to earn coins.',
     reward: '25',
-    targetLabel: '30 分钟',
+    targetLabelKey: 'coin.tasks.watchMinutes.target',
+    targetLabelDefault: '30 minutes',
     target: 30 * 60,
     kind: 'time',
   },
 ] as const;
 
-const FILTERS: Array<{ id: RecordFilter; label: string }> = [
-  { id: 'all', label: '全部' },
-  { id: 'income', label: '获得' },
-  { id: 'spend', label: '消费' },
-  { id: 'recharge', label: '充值' },
-  { id: 'gift', label: '礼物' },
-  { id: 'sc', label: 'SC' },
-  { id: 'bet', label: '竞猜' },
-  { id: 'task', label: '任务' },
-  { id: 'creator', label: '直播收入' },
+const FILTERS: Array<{ id: RecordFilter; labelKey: string; labelDefault: string }> = [
+  { id: 'all', labelKey: 'coin.filters.all', labelDefault: 'All' },
+  { id: 'income', labelKey: 'coin.filters.income', labelDefault: 'Income' },
+  { id: 'spend', labelKey: 'coin.filters.spend', labelDefault: 'Spending' },
+  { id: 'recharge', labelKey: 'coin.filters.recharge', labelDefault: 'Top-up' },
+  { id: 'gift', labelKey: 'coin.filters.gift', labelDefault: 'Gifts' },
+  { id: 'sc', labelKey: 'coin.filters.sc', labelDefault: 'SC' },
+  { id: 'bet', labelKey: 'coin.filters.bet', labelDefault: 'Betting' },
+  { id: 'task', labelKey: 'coin.filters.task', labelDefault: 'Tasks' },
+  { id: 'creator', labelKey: 'coin.filters.creator', labelDefault: 'Live income' },
 ];
 
 export default function CoinPage() {
+  const { t, i18n } = useTranslation('pages');
   const [searchParams] = useSearchParams();
   const rechargeRef = useRef<HTMLDivElement | null>(null);
   const user = useAuthStore((s) => s.user);
@@ -167,16 +178,22 @@ export default function CoinPage() {
       return;
     }
     if (topupAmount < 1000) {
-      toast.error('充值至少 1,000 coins。');
+      toast.error(t('coin.toast.minTopup', { defaultValue: 'Top-up must be at least 1,000 coins.' }));
       return;
     }
     topup.mutate(
       { amount: topupAmount },
       {
         onSuccess: (next) => {
-          toast.success(`充值成功，当前余额 ${next.coinBalance.toLocaleString()} coins。`);
+          toast.success(
+            t('coin.toast.topupSuccess', {
+              balance: next.coinBalance.toLocaleString(),
+              defaultValue: 'Top-up complete. Current balance: {{balance}} coins.',
+            }),
+          );
         },
-        onError: (err) => toast.error(err.message || '充值失败。'),
+        onError: (err) =>
+          toast.error(err.message || t('coin.toast.topupFailed', { defaultValue: 'Top-up failed.' })),
       },
     );
   };
@@ -188,7 +205,7 @@ export default function CoinPage() {
     }
     if (claimedByTask.has(task.id)) return;
     if (progress < task.target) {
-      toast.info('任务还没完成，完成后就能领取。');
+      toast.info(t('coin.toast.taskIncomplete', { defaultValue: 'Finish the task before claiming.' }));
       return;
     }
     setClaimingTaskId(task.id);
@@ -197,12 +214,18 @@ export default function CoinPage() {
       {
         onSuccess: (resp) => {
           if (resp.alreadyClaimed) {
-            toast.info('今天已经领取过这个任务。');
+            toast.info(t('coin.toast.alreadyClaimed', { defaultValue: 'You already claimed this task today.' }));
             return;
           }
-          toast.success(`已获得 ${resp.transaction.amount.toLocaleString()} coins。`);
+          toast.success(
+            t('coin.toast.claimSuccess', {
+              amount: resp.transaction.amount.toLocaleString(),
+              defaultValue: 'Earned {{amount}} coins.',
+            }),
+          );
         },
-        onError: (err) => toast.error(err.message || '领取失败。'),
+        onError: (err) =>
+          toast.error(err.message || t('coin.toast.claimFailed', { defaultValue: 'Claim failed.' })),
         onSettled: () => setClaimingTaskId(null),
       },
     );
@@ -213,7 +236,12 @@ export default function CoinPage() {
       openLogin();
       return;
     }
-    toast.info('提现支付接口预留中，当前不会扣除 coins。');
+    toast.info(
+      t('coin.toast.withdrawPreview', {
+        defaultValue:
+          'Withdrawals are reserved for payment integration and no coins will be deducted.',
+      }),
+    );
   };
 
   return (
@@ -221,11 +249,15 @@ export default function CoinPage() {
       {!isAuthed && (
         <div className="gl-yt-banner">
           <div>
-            <strong>登录后管理 coins</strong>
-            <span>查看消费记录、充值、每日任务和提现预留信息。</span>
+            <strong>{t('coin.authTitle', { defaultValue: 'Sign in to manage coins' })}</strong>
+            <span>
+              {t('coin.authSub', {
+                defaultValue: 'View spending records, top up, daily tasks, and withdrawal previews.',
+              })}
+            </span>
           </div>
           <button className="gl-secondary-btn" type="button" onClick={() => openLogin()}>
-            登录
+            {t('login.title', { defaultValue: 'Sign in' })}
           </button>
         </div>
       )}
@@ -238,8 +270,12 @@ export default function CoinPage() {
           </div>
           <h1>{formatCoins(balance)}</h1>
           <p>
-            {currentUser ? userDisplayName(currentUser) : '游客'} 的 coin 账户， 充值比例为 1,000
-            coins = 1 人民币。
+            {t('coin.heroSub', {
+              name: currentUser
+                ? userDisplayName(currentUser)
+                : t('coin.guest', { defaultValue: 'Guest' }),
+              defaultValue: '{{name}} coin account. Top-up rate: 1,000 coins = 1 RMB.',
+            })}
           </p>
         </div>
         <div className="gl-coin-hero-actions">
@@ -249,35 +285,43 @@ export default function CoinPage() {
             onClick={() => rechargeRef.current?.scrollIntoView({ behavior: 'smooth' })}
           >
             <CreditCard size={16} />
-            去充值
+            {t('coin.goTopup', { defaultValue: 'Top up' })}
           </button>
           <Link className="gl-secondary-btn" to="/history">
             <History size={15} />
-            观看记录
+            {t('coin.watchHistory', { defaultValue: 'Watch history' })}
           </Link>
         </div>
       </section>
 
       <section className="gl-coin-stats" aria-label="Coin summary">
-        <StatPill icon={<Coins size={18} />} value={formatCoins(balance)} label="当前余额" />
+        <StatPill
+          icon={<Coins size={18} />}
+          value={formatCoins(balance)}
+          label={t('coin.stats.balance', { defaultValue: 'Current balance' })}
+        />
         <StatPill
           icon={<ArrowUpRight size={18} />}
           value={formatCoins(monthSpend)}
-          label="本月消费"
+          label={t('coin.stats.monthSpend', { defaultValue: 'Spent this month' })}
         />
         <StatPill
           icon={<ArrowDownLeft size={18} />}
           value={formatCoins(monthIncome)}
-          label="本月获得"
+          label={t('coin.stats.monthIncome', { defaultValue: 'Earned this month' })}
         />
-        <StatPill icon={<Radio size={18} />} value={formatCoins(creatorIncome)} label="直播收入" />
+        <StatPill
+          icon={<Radio size={18} />}
+          value={formatCoins(creatorIncome)}
+          label={t('coin.stats.liveIncome', { defaultValue: 'Live income' })}
+        />
       </section>
 
       <div className="gl-coin-layout">
         <div className="gl-coin-main">
           <section className="gl-coin-panel">
             <div className="gl-section-title-row">
-              <h2>每日任务</h2>
+              <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
             </div>
             <div className="gl-coin-task-grid">
               {DAILY_TASKS.map((task) => {
@@ -286,12 +330,12 @@ export default function CoinPage() {
                 return (
                   <TaskCard
                     key={task.id}
-                    title={task.title}
-                    description={task.description}
+                    title={t(task.titleKey, { defaultValue: task.titleDefault })}
+                    description={t(task.descriptionKey, { defaultValue: task.descriptionDefault })}
                     reward={claimed ? String(claimed.amount) : task.reward}
                     progress={progress}
                     target={task.target}
-                    targetLabel={task.targetLabel}
+                    targetLabel={t(task.targetLabelKey, { defaultValue: task.targetLabelDefault })}
                     claimed={Boolean(claimed)}
                     pending={claimingTaskId === task.id && claimTask.isPending}
                     onClaim={() => handleClaim(task, progress)}
@@ -301,9 +345,9 @@ export default function CoinPage() {
             </div>
           </section>
 
-          <section className="gl-coin-panel">
+          <section className="gl-coin-panel gl-coin-ledger-panel">
             <div className="gl-section-title-row">
-              <h2>Coin 流水</h2>
+              <h2>{t('coin.ledger', { defaultValue: 'Coin ledger' })}</h2>
             </div>
             <div className="gl-coin-filters" role="tablist" aria-label="Coin record filters">
               {FILTERS.map((item) => (
@@ -313,7 +357,7 @@ export default function CoinPage() {
                   className={cn('gl-coin-filter', filter === item.id && 'is-active')}
                   onClick={() => setFilter(item.id)}
                 >
-                  {item.label}
+                  {t(item.labelKey, { defaultValue: item.labelDefault })}
                 </button>
               ))}
             </div>
@@ -327,8 +371,13 @@ export default function CoinPage() {
             ) : filteredRows.length === 0 ? (
               <div className="gl-coin-empty">
                 <Sparkles size={32} />
-                <strong>暂无 coin 记录</strong>
-                <span>开始充值、送礼物、发 SC 或参与竞猜后会出现在这里。</span>
+                <strong>{t('coin.emptyTitle', { defaultValue: 'No coin records yet' })}</strong>
+                <span>
+                  {t('coin.emptySub', {
+                    defaultValue:
+                      'Top-ups, gifts, Super Chats, and betting activity will appear here.',
+                  })}
+                </span>
               </div>
             ) : (
               <>
@@ -354,13 +403,13 @@ export default function CoinPage() {
           <section className="gl-coin-panel" ref={rechargeRef}>
             <div className="gl-coin-panel-head">
               <div>
-                <h2>充值</h2>
-                <p>1,000 coins 起充，上不封顶。</p>
+                <h2>{t('coin.topup.title', { defaultValue: 'Top up' })}</h2>
+                <p>{t('coin.topup.sub', { defaultValue: 'Minimum 1,000 coins. No upper limit.' })}</p>
               </div>
               <CreditCard size={20} />
             </div>
             <label className="gl-coin-input-label">
-              <span>充值数量</span>
+              <span>{t('coin.topup.amount', { defaultValue: 'Top-up amount' })}</span>
               <div className="gl-coin-input">
                 <input
                   inputMode="numeric"
@@ -369,7 +418,7 @@ export default function CoinPage() {
                   onBlur={() => {
                     if (topupAmount < 1000) setTopupText('1000');
                   }}
-                  aria-label="充值 coins 数量"
+                  aria-label={t('coin.topup.amountAria', { defaultValue: 'Top-up coin amount' })}
                 />
                 <span>coins</span>
               </div>
@@ -382,8 +431,8 @@ export default function CoinPage() {
               ))}
             </div>
             <div className="gl-coin-exchange">
-              <span>需支付</span>
-              <strong>{formatRmb(topupAmount)}</strong>
+              <span>{t('coin.topup.pay', { defaultValue: 'Pay' })}</span>
+              <strong>{formatRmb(topupAmount, i18n.language)}</strong>
             </div>
             <button
               type="button"
@@ -392,39 +441,48 @@ export default function CoinPage() {
               disabled={topup.isPending}
             >
               <CreditCard size={16} />
-              {topup.isPending ? '充值中...' : '立即充值'}
+              {topup.isPending
+                ? t('coin.topup.pending', { defaultValue: 'Topping up...' })
+                : t('coin.topup.submit', { defaultValue: 'Top up now' })}
             </button>
           </section>
 
           <section className="gl-coin-panel">
             <div className="gl-coin-panel-head">
               <div>
-                <h2>提现预留</h2>
-                <p>手续费 35%，支付接口接入后启用。</p>
+                <h2>{t('coin.withdraw.title', { defaultValue: 'Withdrawal preview' })}</h2>
+                <p>
+                  {t('coin.withdraw.sub', {
+                    defaultValue: '35% fee. Enabled after payment integration.',
+                  })}
+                </p>
               </div>
               <Wallet size={20} />
             </div>
             <label className="gl-coin-input-label">
-              <span>提现数量</span>
+              <span>{t('coin.withdraw.amount', { defaultValue: 'Withdrawal amount' })}</span>
               <div className="gl-coin-input">
                 <input
                   inputMode="numeric"
                   value={withdrawText}
                   onChange={(event) => setWithdrawText(cleanCoinText(event.target.value))}
-                  aria-label="提现 coins 数量"
+                  aria-label={t('coin.withdraw.amountAria', { defaultValue: 'Withdrawal coin amount' })}
                 />
                 <span>coins</span>
               </div>
             </label>
             <div className="gl-coin-withdraw-lines">
               <span>
-                手续费 <strong>{formatCoins(withdrawFee)}</strong>
+                {t('coin.withdraw.fee', { defaultValue: 'Fee' })}{' '}
+                <strong>{formatCoins(withdrawFee)}</strong>
               </span>
               <span>
-                预计到账 <strong>{formatCoins(withdrawNet)}</strong>
+                {t('coin.withdraw.net', { defaultValue: 'Estimated arrival' })}{' '}
+                <strong>{formatCoins(withdrawNet)}</strong>
               </span>
               <span>
-                折合人民币 <strong>{formatRmb(withdrawNet)}</strong>
+                {t('coin.withdraw.rmb', { defaultValue: 'Approx. RMB' })}{' '}
+                <strong>{formatRmb(withdrawNet, i18n.language)}</strong>
               </span>
             </div>
             <button
@@ -432,7 +490,7 @@ export default function CoinPage() {
               className="gl-secondary-btn gl-coin-wide"
               onClick={handleWithdrawPreview}
             >
-              预览提现
+              {t('coin.withdraw.preview', { defaultValue: 'Preview withdrawal' })}
             </button>
           </section>
         </aside>
@@ -474,6 +532,7 @@ function TaskCard({
   pending: boolean;
   onClaim: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const complete = progress >= target;
   const ratio = Math.min(1, progress / target);
   return (
@@ -490,14 +549,18 @@ function TaskCard({
         <i style={{ width: `${ratio * 100}%` }} />
       </div>
       <div className="gl-coin-task-bottom">
-        <span>{formatProgress(progress, target, targetLabel)}</span>
+        <span>{formatProgress(progress, target, targetLabel, t)}</span>
         <button
           type="button"
           onClick={onClaim}
           disabled={claimed || pending || !complete}
           className={cn(complete && !claimed ? 'is-ready' : '')}
         >
-          {claimed ? '已领取' : pending ? '领取中...' : '领取'}
+          {claimed
+            ? t('coin.task.claimed', { defaultValue: 'Claimed' })
+            : pending
+              ? t('coin.task.claiming', { defaultValue: 'Claiming...' })
+              : t('coin.task.claim', { defaultValue: 'Claim' })}
         </button>
       </div>
     </article>
@@ -505,19 +568,21 @@ function TaskCard({
 }
 
 function CoinRecordRow({ item }: { item: CoinTransaction }) {
+  const { t, i18n } = useTranslation('pages');
   const meta = recordMeta(item.type);
   const Icon = meta.icon;
   const positive = item.amount > 0;
+  const metaLabel = t(meta.labelKey, { defaultValue: meta.labelDefault });
   return (
     <article className="gl-coin-record">
       <div className={cn('gl-coin-record-icon', positive ? 'is-income' : 'is-spend')}>
         <Icon size={17} />
       </div>
       <div className="gl-coin-record-main">
-        <strong>{item.title || meta.label}</strong>
+        <strong>{item.title || metaLabel}</strong>
         <span>
-          {formatTime(item.createdAt)}
-          {item.description ? ` · ${item.description}` : ` · ${meta.label}`}
+          {formatTime(item.createdAt, i18n.language)}
+          {item.description ? ` · ${item.description}` : ` · ${metaLabel}`}
         </span>
       </div>
       <div className={cn('gl-coin-record-amount', positive ? 'is-income' : 'is-spend')}>
@@ -525,7 +590,12 @@ function CoinRecordRow({ item }: { item: CoinTransaction }) {
           {positive ? '+' : ''}
           {item.amount.toLocaleString()}
         </strong>
-        <span>余额 {item.balanceAfter.toLocaleString()}</span>
+        <span>
+          {t('coin.record.balance', {
+            balance: item.balanceAfter.toLocaleString(),
+            defaultValue: 'Balance {{balance}}',
+          })}
+        </span>
       </div>
     </article>
   );
@@ -542,10 +612,16 @@ function RecordPagination({
   totalItems: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t } = useTranslation('pages');
   return (
     <div className="gl-coin-pagination" aria-label="Coin record pagination">
       <span>
-        共 {totalItems.toLocaleString()} 条 · 第 {page} / {totalPages} 页
+        {t('coin.pagination', {
+          total: totalItems.toLocaleString(),
+          page,
+          totalPages,
+          defaultValue: '{{total}} records · Page {{page}} / {{totalPages}}',
+        })}
       </span>
       <div className="gl-coin-page-controls">
         <button
@@ -553,14 +629,14 @@ function RecordPagination({
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page <= 1}
         >
-          上一页
+          {t('coin.previous', { defaultValue: 'Previous' })}
         </button>
         <button
           type="button"
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page >= totalPages}
         >
-          下一页
+          {t('coin.next', { defaultValue: 'Next' })}
         </button>
       </div>
     </div>
@@ -570,21 +646,21 @@ function RecordPagination({
 function recordMeta(type: CoinTransactionType) {
   switch (type) {
     case 'topup':
-      return { label: '充值获得', icon: CreditCard };
+      return { labelKey: 'coin.record.topup', labelDefault: 'Top-up', icon: CreditCard };
     case 'daily_task':
-      return { label: '每日任务', icon: CalendarCheck };
+      return { labelKey: 'coin.record.dailyTask', labelDefault: 'Daily task', icon: CalendarCheck };
     case 'gift_spend':
     case 'creator_gift_income':
-      return { label: '礼物', icon: Gift };
+      return { labelKey: 'coin.record.gift', labelDefault: 'Gift', icon: Gift };
     case 'super_chat_spend':
     case 'creator_super_chat_income':
-      return { label: 'SuperChat', icon: MessageSquareText };
+      return { labelKey: 'coin.record.superChat', labelDefault: 'Super Chat', icon: MessageSquareText };
     case 'bet_wager':
     case 'bet_payout':
     case 'bet_refund':
-      return { label: '竞猜', icon: Trophy };
+      return { labelKey: 'coin.record.bet', labelDefault: 'Betting', icon: Trophy };
     default:
-      return { label: 'Coin', icon: Coins };
+      return { labelKey: 'coin.record.coin', labelDefault: 'Coin', icon: Coins };
   }
 }
 
@@ -616,10 +692,19 @@ function taskProgress(
   return activity.watchSeconds;
 }
 
-function formatProgress(progress: number, target: number, targetLabel: string): string {
+function formatProgress(
+  progress: number,
+  target: number,
+  targetLabel: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
   if (target === 1) return targetLabel;
   if (target >= 60) {
-    return `${Math.min(Math.floor(progress / 60), target / 60)} / ${target / 60} 分钟`;
+    return t('coin.progressMinutes', {
+      current: Math.min(Math.floor(progress / 60), target / 60),
+      total: target / 60,
+      defaultValue: '{{current}} / {{total}} min',
+    });
   }
   return `${Math.min(progress, target)} / ${targetLabel}`;
 }
@@ -632,15 +717,15 @@ function formatCoins(value: number): string {
   return `${Math.round(value).toLocaleString()} coins`;
 }
 
-function formatRmb(coins: number): string {
+function formatRmb(coins: number, locale: string): string {
   const rmb = Math.max(0, coins) / 1000;
-  return `¥${rmb.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`;
+  return `¥${rmb.toLocaleString(locale, { maximumFractionDigits: 2 })}`;
 }
 
-function formatTime(value: string): string {
+function formatTime(value: string, locale: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(locale, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',

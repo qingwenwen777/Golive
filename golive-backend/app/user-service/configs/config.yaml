@@ -23,6 +23,8 @@ jwt:
 upload:
   avatar_dir: "./uploads/avatars"
   avatar_public_url: "/api/uploads/avatars"
+  cover_dir: "./uploads/covers"
+  cover_public_url: "/api/uploads/covers"
 
 bootstrap:
   admin:

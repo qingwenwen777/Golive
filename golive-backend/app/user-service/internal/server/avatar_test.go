@@ -66,6 +66,43 @@ func TestUploadAvatarRejectsInvalidType(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestUploadCoverReturnsRelativeURLAndPersistsUser(t *testing.T) {
+	router, users, auth := newCoinsTestRouter(t)
+	coverDir := t.TempDir()
+	router = NewRouter(Deps{
+		Auth:           auth,
+		Users:          users,
+		CoverDir:       coverDir,
+		CoverPublicURL: "/api/uploads/covers",
+	})
+
+	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
+	require.NoError(t, err)
+
+	body, contentType := multipartBody(t, "banner.webp", "image/webp", []byte("webp"))
+	req := httptest.NewRequest(http.MethodPost, "/users/me/cover", body)
+	req.Header.Set("Authorization", "Bearer "+login.Token)
+	req.Header.Set("Content-Type", contentType)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got struct {
+		URL  string `json:"url"`
+		User struct {
+			Cover string `json:"cover"`
+		} `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.True(t, strings.HasPrefix(got.URL, "/api/uploads/covers/"))
+	require.Equal(t, got.URL, got.User.Cover)
+
+	persisted, err := users.FindByID(context.Background(), login.User.ID)
+	require.NoError(t, err)
+	require.Equal(t, got.URL, persisted.Cover)
+	require.FileExists(t, filepath.Join(coverDir, filepath.Base(got.URL)))
+}
+
 func multipartBody(t *testing.T, filename, contentType string, data []byte) (*bytes.Buffer, string) {
 	t.Helper()
 	body := &bytes.Buffer{}

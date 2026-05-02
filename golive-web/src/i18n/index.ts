@@ -4,14 +4,17 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import commonEn from './locales/en-US/common.json';
 import commonJa from './locales/ja-JP/common.json';
+import commonZh from './locales/zh-CN/common.json';
 import pagesEn from './locales/en-US/pages.json';
 import pagesJa from './locales/ja-JP/pages.json';
+import pagesZh from './locales/zh-CN/pages.json';
 
 export const LANG_STORAGE_KEY = 'golive-lang';
 
-export type AppLang = 'en' | 'ja';
+export type AppLang = 'zh' | 'ja' | 'en';
 
 const I18N_CODE: Record<AppLang, string> = {
+  zh: 'zh-CN',
   en: 'en-US',
   ja: 'ja-JP',
 };
@@ -19,6 +22,7 @@ const I18N_CODE: Record<AppLang, string> = {
 export function toAppLang(code: string | undefined): AppLang {
   if (!code) return 'en';
   const lc = code.toLowerCase();
+  if (lc.startsWith('zh')) return 'zh';
   if (lc.startsWith('ja')) return 'ja';
   return 'en';
 }
@@ -34,15 +38,24 @@ void i18n
     resources: {
       'en-US': { common: commonEn, pages: pagesEn },
       'ja-JP': { common: commonJa, pages: pagesJa },
-      // Aliases so detector results like `en` / `ja` (or any en-XX/ja-XX)
+      'zh-CN': { common: commonZh, pages: pagesZh },
+      // Aliases so detector results like `en` / `ja` / `zh` (or regional variants)
       // resolve without falling through to the missing-key string.
       en: { common: commonEn, pages: pagesEn },
       ja: { common: commonJa, pages: pagesJa },
+      zh: { common: commonZh, pages: pagesZh },
     },
-    fallbackLng: { 'ja-JP': ['ja', 'en'], ja: ['en'], 'en-US': ['en'], default: ['en'] },
+    fallbackLng: {
+      'zh-CN': ['zh', 'en'],
+      zh: ['en'],
+      'ja-JP': ['ja', 'en'],
+      ja: ['en'],
+      'en-US': ['en'],
+      default: ['en'],
+    },
     defaultNS: 'common',
     ns: ['common', 'pages'],
-    supportedLngs: ['en-US', 'ja-JP', 'en', 'ja'],
+    supportedLngs: ['zh-CN', 'ja-JP', 'en-US', 'zh', 'ja', 'en'],
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
     detection: {

@@ -26,16 +26,12 @@ export interface InfoBlockProps {
   onOpenGifts?: () => void;
 }
 
-function timeAgo(startedAt: string, lang: 'en' | 'ja'): string {
+function timeAgo(startedAt: string, t: ReturnType<typeof useTranslation>['t']): string {
   const ms = Date.now() - new Date(startedAt).getTime();
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
-  if (lang === 'ja') {
-    if (h > 0) return `${h}時間${m}分前`;
-    return `${m}分前`;
-  }
-  if (h > 0) return `${h}h ${m}m ago`;
-  return `${m}m ago`;
+  if (h > 0) return t('liveRoom.timeAgo.hours', { hours: h, minutes: m });
+  return t('liveRoom.timeAgo.minutes', { minutes: Math.max(0, m) });
 }
 
 export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) {
@@ -88,7 +84,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     const nextLiked = !liked;
     if (nextLiked) {
       saveToLibrary(LIKED_STREAMS_KEY, stream);
-      toast.success('Added to liked live rooms.');
+      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
     } else {
       removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
     }
@@ -115,12 +111,12 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     if (saved) {
       removeFromLibrary(WATCH_LATER_KEY, stream.id);
       setSaved(false);
-      toast.success('Removed from Watch later.');
+      toast.success(t('liveRoom.removedWatchLater', { defaultValue: 'Removed from Watch later.' }));
       return;
     }
     saveToLibrary(WATCH_LATER_KEY, stream);
     setSaved(true);
-    toast.success('Saved to Watch later.');
+    toast.success(t('liveRoom.savedWatchLater', { defaultValue: 'Saved to Watch later.' }));
   };
 
   const handleGiftClick = () => {
@@ -133,11 +129,14 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
 
   const handleShare = async () => {
     try {
-      const method = await copyText(window.location.href, 'live room link');
-      if (method === 'manual') toast.info('Live room link opened for manual copy.');
-      else toast.success('Live room link copied.');
+      const method = await copyText(window.location.href, t('liveRoom.copyTarget'));
+      if (method === 'manual') {
+        toast.info(t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }));
+      } else {
+        toast.success(t('liveRoom.copySuccess', { defaultValue: 'Live room link copied.' }));
+      }
     } catch {
-      toast.error('Could not copy the live room link.');
+      toast.error(t('liveRoom.copyFailed', { defaultValue: 'Could not copy the live room link.' }));
     }
   };
 
@@ -200,9 +199,13 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
               <ThumbsDown size={18} />
             </button>
           </div>
-          <button className="gl-pg-solo" aria-label="Gift" onClick={handleGiftClick}>
+          <button
+            className="gl-pg-solo"
+            aria-label={t('liveRoom.gift', { defaultValue: 'Gift' })}
+            onClick={handleGiftClick}
+          >
             <Gift size={18} />
-            <span>Gift</span>
+            <span>{t('liveRoom.gift', { defaultValue: 'Gift' })}</span>
           </button>
           <button className="gl-pg-solo" aria-label={t('liveRoom.share')} onClick={handleShare}>
             <Share2 size={18} />
@@ -215,7 +218,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             onClick={handleSave}
           >
             <Bookmark size={18} />
-            <span>{saved ? 'Saved' : t('liveRoom.save')}</span>
+            <span>{saved ? t('liveRoom.saved') : t('liveRoom.save')}</span>
           </button>
         </div>
       </div>
@@ -225,9 +228,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
           <span>{t('liveRoom.watching', { count: viewerCount ?? stream.viewers })}</span>
           <span>·</span>
           <span>
-            {lang === 'ja'
-              ? `${timeAgo(stream.startedAt, 'ja')}配信開始`
-              : `started ${timeAgo(stream.startedAt, 'en')}`}
+            {t('liveRoom.startedAt', { time: timeAgo(stream.startedAt, t) })}
           </span>
           <span>·</span>
           <span className="gl-desc-tag">#{category.replace(/\s+/g, '')}</span>

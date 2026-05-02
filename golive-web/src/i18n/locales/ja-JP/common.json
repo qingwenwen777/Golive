@@ -12,17 +12,24 @@
   },
   "lang": {
     "toggle": "言語",
-    "en": "EN",
-    "ja": "日本語"
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語",
+    "short": {
+      "zh": "ZH",
+      "en": "EN",
+      "ja": "JA"
+    }
   },
   "nav": {
     "home": "ホーム",
-    "shorts": "ショート",
+    "liveNow": "ライブ中",
     "subscriptions": "登録チャンネル",
+    "coins": "コイン",
     "yourLibrary": "あなた",
     "history": "履歴",
     "watchLater": "後で見る",
-    "liked": "高く評価した動画"
+    "liked": "高評価したライブルーム"
   },
   "sidebar": {
     "subsHeading": "登録チャンネル",
@@ -31,6 +38,53 @@
       "contact": "お問い合わせ · クリエイター",
       "ads": "広告 · 開発者",
       "copyright": "© 2026 GoLive"
+    }
+  },
+  "account": {
+    "menu": "アカウントメニュー",
+    "you": "あなた",
+    "coins": "{{amount}} coins",
+    "rechargeCoins": "コインをチャージ",
+    "adminDashboard": "管理ダッシュボード",
+    "yourChannel": "あなたのチャンネル",
+    "changeAvatar": "アバターを変更",
+    "settings": "設定",
+    "appearance": "外観: {{mode}}",
+    "language": "言語: {{language}}",
+    "dark": "ダーク",
+    "light": "ライト",
+    "signIn": "ログイン",
+    "signOut": "ログアウト"
+  },
+  "auth": {
+    "liveAccount": "ライブアカウント",
+    "signInTitle": "GoLive にログイン",
+    "signUpTitle": "GoLive アカウントを作成",
+    "signInSub": "プレビュー版では demo / demo を使うか、ローカルのプレビューアカウントを作成できます。",
+    "signUpSub": "チャンネル名を決めて、ライブチャット、ギフト、フォローを始めましょう。",
+    "mode": "認証モード",
+    "signIn": "ログイン",
+    "register": "登録",
+    "displayName": "表示名",
+    "displayNamePlaceholder": "チャンネル名",
+    "username": "ユーザー名",
+    "usernamePlaceholder": "ユーザー名を選択",
+    "password": "パスワード",
+    "passwordPlaceholder": "3文字以上",
+    "confirmPassword": "パスワード確認",
+    "confirmPasswordPlaceholder": "パスワードを再入力",
+    "creating": "作成中...",
+    "signingIn": "ログイン中...",
+    "createAccount": "アカウントを作成",
+    "socialUnavailable": "このプレビューではソーシャルログインを利用できません",
+    "continueGoogle": "Google で続行",
+    "errors": {
+      "invalidCredentials": "ユーザー名またはパスワードが正しくありません。",
+      "usernameTaken": "そのユーザー名はすでに使用されています。",
+      "badFields": "入力内容を確認してもう一度お試しください。",
+      "signInFailed": "ログインに失敗しました。もう一度お試しください。",
+      "signUpFailed": "アカウント作成に失敗しました。もう一度お試しください。",
+      "passwordMismatch": "パスワードが一致しません。"
     }
   },
   "live": "LIVE",

@@ -44,6 +44,8 @@ type JWTCfg struct {
 type UploadCfg struct {
 	AvatarDir       string `mapstructure:"avatar_dir"`
 	AvatarPublicURL string `mapstructure:"avatar_public_url"`
+	CoverDir        string `mapstructure:"cover_dir"`
+	CoverPublicURL  string `mapstructure:"cover_public_url"`
 }
 
 type BootstrapCfg struct {

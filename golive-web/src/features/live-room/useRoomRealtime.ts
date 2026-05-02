@@ -10,8 +10,8 @@ import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatC
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 import { betQueryKey } from '@/api/bet';
+import i18n from '@/i18n';
 import {
-  betOptionLabel,
   type BetOption,
   type BetOptionSummary,
   type BetRound,
@@ -364,12 +364,31 @@ export function useRoomRealtime(
           void queryClient.invalidateQueries({ queryKey: ['me'] });
         }
         if (parsed.event === 'wagered') break;
+        const optionLabel = parsed.option
+          ? i18n.t(`betting.option.${parsed.option}`, {
+              ns: 'pages',
+              defaultValue: parsed.option === 'win' ? 'Can win' : 'Cannot win',
+            })
+          : i18n.t('betting.systemSettledDefault', {
+              ns: 'pages',
+              defaultValue: 'Result is in',
+            });
         const text =
           parsed.event === 'opened'
-            ? '竞猜已开盘。'
+            ? i18n.t('betting.systemOpened', {
+                ns: 'pages',
+                defaultValue: 'Betting is open.',
+              })
             : parsed.event === 'settled'
-              ? `竞猜已结算：${parsed.option ? betOptionLabel(parsed.option) : '结果已出'}。`
-              : '竞猜已流盘，下注 coin 已退回。';
+              ? i18n.t('betting.systemSettled', {
+                  ns: 'pages',
+                  option: optionLabel,
+                  defaultValue: 'Bet settled: {{option}}.',
+                })
+              : i18n.t('betting.systemCancelled', {
+                  ns: 'pages',
+                  defaultValue: 'Bet cancelled. Wagered coins were refunded.',
+                });
         appendMessage(roomId, {
           id: genId('bet'),
           kind: 'system',

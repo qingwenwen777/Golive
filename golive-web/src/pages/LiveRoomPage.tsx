@@ -512,16 +512,19 @@ export default function LiveRoomPage() {
 }
 
 function BetEntryNotice({ question, onClick }: { question: string; onClick: () => void }) {
+  const { t } = useTranslation('pages');
   return (
     <button type="button" className="gl-bet-entry" onClick={onClick}>
       <span className="gl-bet-entry-icon" aria-hidden="true">
         <Trophy size={16} />
       </span>
       <span className="gl-bet-entry-copy">
-        <span>竞猜进行中</span>
+        <span>{t('betting.entryActive', { defaultValue: 'Betting is open' })}</span>
         <strong>{question}</strong>
       </span>
-      <span className="gl-bet-entry-action">查看</span>
+      <span className="gl-bet-entry-action">
+        {t('betting.entryView', { defaultValue: 'View' })}
+      </span>
     </button>
   );
 }

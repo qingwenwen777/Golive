@@ -4,6 +4,9 @@
     "liveNow": "今ライブ配信中",
     "recommended": "おすすめ",
     "allCategory": "すべて",
+    "searchResults": "「{{query}}」の検索結果",
+    "searchEmpty": "一致するライブルームはありません",
+    "searchEmptySub": "別のキーワードをお試しください。",
     "empty": "現在ライブ配信はありません",
     "emptySub": "しばらくしてからもう一度お試しください",
     "errorTitle": "配信を読み込めませんでした",
@@ -36,7 +39,22 @@
     "like": "高評価",
     "dislike": "低評価",
     "share": "共有",
+    "gift": "ギフト",
     "save": "保存",
+    "saved": "保存済み",
+    "signInToChat": "ログインしてチャット",
+    "addedLiked": "高評価したライブルームに追加しました。",
+    "removedWatchLater": "後で見るから削除しました。",
+    "savedWatchLater": "後で見るに保存しました。",
+    "copyManual": "ライブルームのリンクを手動コピー用に開きました。",
+    "copySuccess": "ライブルームのリンクをコピーしました。",
+    "copyFailed": "ライブルームのリンクをコピーできませんでした。",
+    "copyTarget": "ライブルームのリンク",
+    "timeAgo": {
+      "hours": "{{hours}}時間{{minutes}}分前",
+      "minutes": "{{minutes}}分前"
+    },
+    "startedAt": "{{time}}配信開始",
     "showMore": "もっと見る",
     "showLess": "折りたたむ"
   },
@@ -60,7 +78,239 @@
   },
   "channel": {
     "title": "チャンネル",
-    "name": "チャンネル: {{name}}"
+    "name": "チャンネル: {{name}}",
+    "creatorFallback": "クリエイター",
+    "creatorShort": "クリエイター {{id}}",
+    "copyTarget": "チャンネルリンク",
+    "copyManual": "チャンネルリンクを手動コピー用に開きました。",
+    "copySuccess": "チャンネルリンクをコピーしました。",
+    "changeCover": "カバーを変更",
+    "yourChannel": "自分のチャンネル",
+    "liveChannel": "ライブチャンネル",
+    "subscribers": "登録者 {{count}} 人",
+    "activeRooms": "アクティブなライブルーム {{count}} 件",
+    "startLive": "配信開始",
+    "changeAvatar": "アバターを変更",
+    "settings": "設定",
+    "subscribed": "登録済み",
+    "subscribe": "登録",
+    "share": "共有",
+    "sections": "チャンネルセクション",
+    "tabs": {
+      "live": "ライブ",
+      "history": "履歴"
+    },
+    "stats": {
+      "liveRooms": "ライブルーム",
+      "watchingNow": "視聴中",
+      "mainCategory": "メインカテゴリ"
+    },
+    "liveRooms": "ライブルーム",
+    "subscriptions": "登録チャンネル",
+    "notFound": "チャンネルが見つかりません",
+    "notFoundSub": "クリエイタープロフィールが利用できないか、リンクが正しくありません。",
+    "noLiveRooms": "現在ライブ配信はありません",
+    "noLiveOwnerSub": "配信準備ができたらライブルームを開始できます。",
+    "noLiveViewerSub": "このチャンネルを登録して、クリエイターの配信開始後にまた確認してください。",
+    "liveHistory": "ライブ履歴",
+    "channelAnalytics": "チャンネル分析",
+    "noHistory": "終了したライブはまだありません",
+    "noHistoryOwnerSub": "終了した配信は、時間、カバー、タイトル、パフォーマンスデータと一緒にここへ表示されます。",
+    "noHistoryViewerSub": "このクリエイターには、まだ表示できる終了済み配信がありません。",
+    "history": {
+      "pagination": "ライブ履歴ページ",
+      "pageCount": "{{start}}-{{end}} / {{total}}",
+      "previousPage": "前の履歴ページ",
+      "nextPage": "次の履歴ページ",
+      "peakViewers": "ピーク {{amount}} 人",
+      "revenue": "収益 {{amount}}",
+      "topFan": "{{name}} がトップファン",
+      "noFan": "ファン貢献はまだありません",
+      "liveAnalysis": "ライブ分析"
+    }
+  },
+  "library": {
+    "signIn": "ログイン",
+    "latest": "最新",
+    "browseAll": "すべて見る",
+    "status": {
+      "live": "LIVE",
+      "offline": "オフライン"
+    },
+    "subscriptions": {
+      "title": "登録チャンネル",
+      "signInTitle": "ログインして登録チャンネルを見る",
+      "signInSub": "フォローしたクリエイターのライブルームがここに表示されます。",
+      "emptyAuthed": "登録済みのクリエイターはまだいません",
+      "emptyGuest": "表示できる登録チャンネルはありません",
+      "emptySub": "ライブ一覧を見て、プレイヤーページからルームをフォローしましょう。"
+    },
+    "you": {
+      "viewChannel": "チャンネルを見る",
+      "openCoinCenter": "coin センターを開く",
+      "recharge": "チャージ",
+      "watchLaterCount": "後で見る · {{count}}",
+      "likedCount": "高評価 · {{count}}",
+      "historyCount": "履歴 · {{count}}",
+      "settings": "設定",
+      "yourLiveRoom": "自分のライブルーム",
+      "openStudio": "ルームを開く",
+      "fanBadges": "ファンバッジ",
+      "history": "視聴履歴",
+      "viewAll": "すべて見る",
+      "watchLater": "後で見る",
+      "seeAll": "すべて見る",
+      "likedRooms": "高評価したルーム",
+      "liked": "高評価",
+      "quickActions": "クイック操作",
+      "startLive": "配信開始",
+      "noHistory": "視聴履歴はまだありません。",
+      "noWatchLater": "保存したライブルームがここに表示されます。",
+      "noLiked": "高評価したルームがここに表示されます。"
+    },
+    "fanBadges": {
+      "signIn": "ログインしてファンバッジを見る。",
+      "empty": "Fan Light を送るとクリエイターバッジを解除できます。",
+      "contribution": "{{amount}} 貢献"
+    },
+    "historyPage": {
+      "title": "履歴",
+      "subtitle": "この端末で開いたライブルーム。",
+      "emptyTitle": "視聴履歴はまだありません",
+      "emptySub": "ライブルームを訪問すると、GoLive が自動でここへ追加します。",
+      "primaryAction": "最新ルームを開く",
+      "clear": "履歴を消去"
+    },
+    "watchLaterPage": {
+      "title": "後で見る",
+      "subtitle": "保存した配信と後で見たいルーム。",
+      "emptyTitle": "保存済みはまだありません",
+      "emptySub": "ライブルームで保存を押すと、このリストに追加されます。",
+      "primaryAction": "保存済みルームを開く",
+      "clear": "すべて消去"
+    },
+    "likedPage": {
+      "title": "高評価したライブルーム",
+      "subtitle": "高評価した配信をまとめてすぐ戻れるようにします。",
+      "emptyTitle": "高評価したルームはまだありません",
+      "emptySub": "ライブルームで高評価するとここに追加されます。",
+      "primaryAction": "高評価したルームを開く",
+      "clear": "すべて消去"
+    },
+    "collection": {
+      "liveRoomCount": "{{count}} 件のライブルーム",
+      "remove": "削除",
+      "exploreTitle": "探索できるライブルーム",
+      "exploreEmptyTitle": "利用できるライブルームはありません",
+      "exploreEmptySub": "クリエイターが配信を開始したらもう一度お試しください。"
+    },
+    "settings": {
+      "title": "設定",
+      "sections": "設定セクション",
+      "tabs": {
+        "account": "アカウント",
+        "experience": "体験",
+        "live": "ライブ既定値"
+      },
+      "notSignedIn": "未ログイン",
+      "changeAvatar": "アバターを変更",
+      "darkTheme": "ダークテーマ",
+      "currentTheme": "現在: {{mode}}",
+      "dark": "ダーク",
+      "light": "ライト",
+      "language": "言語",
+      "languageNames": {
+        "zh": "中文",
+        "ja": "日本語",
+        "en": "English"
+      },
+      "lowLatency": "低遅延再生",
+      "lowLatencySub": "配信が対応している場合は、より短いライブ遅延を優先します。",
+      "defaultCategory": "既定カテゴリ",
+      "categories": {
+        "justchatting": "雑談",
+        "gaming": "ゲーム",
+        "music": "音楽",
+        "vtuber": "VTuber",
+        "news": "ニュース"
+      },
+      "chatAssist": "チャット安全補助",
+      "chatAssistSub": "流れの速いチャットやモデレーションの急増を目立たせます。"
+    }
+  },
+  "createLive": {
+    "title": "配信開始",
+    "description": "ライブルームを作成し、OBS のストリームキーを取得します。",
+    "formSub": "ルームを作成してから、ストリームキーで OBS から配信します。",
+    "defaultTitle": "無題のライブ",
+    "created": "ライブルームを作成しました。OBS にストリームキーを追加して配信してください。",
+    "fields": {
+      "title": "タイトル",
+      "category": "カテゴリ",
+      "cover": "カバー",
+      "description": "説明"
+    },
+    "categories": {
+      "gaming": "ゲーム",
+      "music": "音楽",
+      "justchatting": "雑談",
+      "anime": "アニメ",
+      "vtuber": "VTuber",
+      "drawing": "お絵かき",
+      "asmr": "ASMR",
+      "podcast": "ポッドキャスト",
+      "cooking": "料理",
+      "news": "ニュース"
+    },
+    "addCover": "カバーを追加",
+    "optional": "任意",
+    "starting": "開始中...",
+    "createRoom": "ライブルームを作成",
+    "permission": {
+      "label": "配信権限",
+      "pendingTitle": "申請を審査中",
+      "pendingBody": "クリエイター申請は管理者の審査待ちです。",
+      "submitted": "送信済み",
+      "rejectedTitle": "クリエイター権限は承認されませんでした",
+      "rejectedBody": "チャンネルの準備ができたら再申請できます。",
+      "applyAgain": "再申請",
+      "applyTitle": "クリエイター権限を申請",
+      "applyBody": "ライブルーム作成には管理者の簡単な承認が必要です。",
+      "submitApplication": "申請を送信",
+      "submitting": "送信中..."
+    },
+    "errors": {
+      "signInAgain": "配信開始前にもう一度ログインしてください。",
+      "notApproved": "配信権限はまだ承認されていません。",
+      "required": "タイトルとカテゴリは必須です。",
+      "startFailed": "ライブを開始できませんでした。もう一度お試しください。",
+      "applicationFailed": "申請を送信できませんでした。",
+      "coverUpload": "カバーをアップロードできませんでした。"
+    }
+  },
+  "upload": {
+    "description": "JPG、PNG、WebP、GIF 画像を最大 5MB までアップロードできます。",
+    "imageTypeError": "JPG、PNG、WebP、GIF 画像を使用してください。",
+    "chooseFirst": "先に画像を選択してください。",
+    "chooseImage": "画像を選択",
+    "saving": "保存中...",
+    "avatar": {
+      "title": "アバターを変更",
+      "sizeError": "アバターは 5MB 以下にしてください。",
+      "signInError": "アバターを変更する前にログインしてください。",
+      "success": "アバターを更新しました。",
+      "failed": "アバターを更新できませんでした。",
+      "save": "アバターを保存"
+    },
+    "cover": {
+      "title": "チャンネルカバーを変更",
+      "add": "チャンネルカバーを追加",
+      "sizeError": "カバーは 5MB 以下にしてください。",
+      "signInError": "チャンネルカバーを変更する前にログインしてください。",
+      "success": "チャンネルカバーを更新しました。",
+      "failed": "チャンネルカバーを更新できませんでした。",
+      "save": "カバーを保存"
+    }
   },
   "login": {
     "title": "ログイン",
@@ -70,5 +320,147 @@
     "title": "404",
     "subtitle": "ページが見つかりません",
     "back": "ホームに戻る"
+  },
+  "coin": {
+    "authTitle": "ログインして coins を管理",
+    "authSub": "利用履歴、チャージ、デイリータスク、出金プレビューを確認できます。",
+    "guest": "ゲスト",
+    "heroSub": "{{name}} の coin アカウント。チャージ比率は 1,000 coins = 1 人民元です。",
+    "goTopup": "チャージ",
+    "watchHistory": "視聴履歴",
+    "stats": {
+      "balance": "現在の残高",
+      "monthSpend": "今月の消費",
+      "monthIncome": "今月の獲得",
+      "liveIncome": "ライブ収益"
+    },
+    "dailyTasks": "デイリータスク",
+    "tasks": {
+      "dailyLogin": {
+        "title": "毎日ログイン抽選",
+        "description": "毎日 1 回、小さな coin ボーナスを獲得できます。",
+        "target": "本日抽選可能"
+      },
+      "watchRooms": {
+        "title": "3 つのライブルームを視聴",
+        "description": "今日 3 つの異なるライブルームを開くと受け取れます。",
+        "target": "3 つのライブルーム"
+      },
+      "watchMinutes": {
+        "title": "30 分視聴",
+        "description": "少し長めに視聴すると coins を獲得できます。",
+        "target": "30 分"
+      }
+    },
+    "ledger": "Coin 履歴",
+    "filters": {
+      "all": "すべて",
+      "income": "獲得",
+      "spend": "消費",
+      "recharge": "チャージ",
+      "gift": "ギフト",
+      "sc": "SC",
+      "bet": "予想",
+      "task": "タスク",
+      "creator": "ライブ収益"
+    },
+    "emptyTitle": "coin 記録はまだありません",
+    "emptySub": "チャージ、ギフト、SC、予想の履歴がここに表示されます。",
+    "topup": {
+      "title": "チャージ",
+      "sub": "1,000 coins からチャージできます。上限はありません。",
+      "amount": "チャージ数量",
+      "amountAria": "チャージする coins 数量",
+      "pay": "支払い",
+      "pending": "チャージ中...",
+      "submit": "今すぐチャージ"
+    },
+    "withdraw": {
+      "title": "出金プレビュー",
+      "sub": "手数料 35%。決済連携後に有効になります。",
+      "amount": "出金数量",
+      "amountAria": "出金する coins 数量",
+      "fee": "手数料",
+      "net": "受取予定",
+      "rmb": "人民元換算",
+      "preview": "出金をプレビュー"
+    },
+    "task": {
+      "claim": "受け取る",
+      "claiming": "受け取り中...",
+      "claimed": "受け取り済み"
+    },
+    "record": {
+      "balance": "残高 {{balance}}",
+      "topup": "チャージ獲得",
+      "dailyTask": "デイリータスク",
+      "gift": "ギフト",
+      "superChat": "Super Chat",
+      "bet": "予想",
+      "coin": "Coin"
+    },
+    "pagination": "全 {{total}} 件 · {{page}} / {{totalPages}} ページ",
+    "previous": "前へ",
+    "next": "次へ",
+    "progressMinutes": "{{current}} / {{total}} 分",
+    "toast": {
+      "minTopup": "チャージは 1,000 coins 以上です。",
+      "topupSuccess": "チャージ成功。現在の残高は {{balance}} coins です。",
+      "topupFailed": "チャージに失敗しました。",
+      "taskIncomplete": "タスク完了後に受け取れます。",
+      "alreadyClaimed": "今日はこのタスクを受け取り済みです。",
+      "claimSuccess": "{{amount}} coins を獲得しました。",
+      "claimFailed": "受け取りに失敗しました。",
+      "withdrawPreview": "出金は決済連携待ちです。現在 coins は差し引かれません。"
+    }
+  },
+  "betting": {
+    "title": "予想",
+    "emptyHint": "タイトルを入力すると、視聴者に予想入口が表示されます。",
+    "entryActive": "予想受付中",
+    "entryView": "見る",
+    "open": "開始",
+    "reopen": "もう一度開始",
+    "opening": "開始中...",
+    "cancel": "中止",
+    "cancelling": "中止中...",
+    "closed": "締切済み",
+    "closesIn": "締切まで {{seconds}} 秒",
+    "pool": "プール {{total}}",
+    "amount": "ベット額",
+    "formTitle": "タイトル",
+    "formTitlePlaceholder": "例: 第1試合は誰が取る？",
+    "option": {
+      "win": "勝てる",
+      "lose": "勝てない"
+    },
+    "optionMeta": "{{count}} 人 · {{total}} coin",
+    "myWager": "「{{option}}」にベット済み",
+    "myWagerWon": "、{{payout}} coin を返還",
+    "myWagerRefunded": "、返金済み",
+    "noWagerHint": "この選択肢にはベットがありません。返金する場合は中止してください。",
+    "openSuccess": "予想を開始しました。60 秒後に自動で締め切ります。",
+    "wagerSuccess": "「{{option}}」にベットしました。",
+    "settleSuccess": "「{{option}}」で精算しました。",
+    "cancelSuccess": "予想を中止しました。ベットされた coin は返金されました。",
+    "systemOpened": "予想が開始されました。",
+    "systemSettled": "予想が精算されました: {{option}}。",
+    "systemSettledDefault": "結果確定",
+    "systemCancelled": "予想は中止され、ベットされた coin は返金されました。",
+    "status": {
+      "open": "受付中",
+      "closed": "締切",
+      "settled": "精算済み",
+      "cancelled": "中止"
+    },
+    "errorQuestionRequired": "先に予想タイトルを入力してください。",
+    "errorInsufficient": "coin 残高が不足しています。",
+    "errorActiveExists": "未精算の予想がまだあります。",
+    "errorClosed": "予想は締め切られています。",
+    "errorAlreadyPlaced": "すでにベット済みです。",
+    "errorNoWinners": "この結果には勝者がいません。中止して返金してください。",
+    "errorBadQuestion": "予想タイトルは必須で、80 文字以内です。",
+    "errorForbidden": "配信者のみ予想を操作できます。",
+    "errorGeneric": "操作に失敗しました。"
   }
 }

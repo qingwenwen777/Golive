@@ -4,6 +4,9 @@
     "liveNow": "Live now",
     "recommended": "Recommended",
     "allCategory": "All",
+    "searchResults": "Search results for \"{{query}}\"",
+    "searchEmpty": "No matching live rooms",
+    "searchEmptySub": "Try another keyword.",
     "empty": "No live streams right now",
     "emptySub": "Check back in a bit",
     "errorTitle": "Couldn't load streams",
@@ -36,7 +39,22 @@
     "like": "Like",
     "dislike": "Dislike",
     "share": "Share",
+    "gift": "Gift",
     "save": "Save",
+    "saved": "Saved",
+    "signInToChat": "Sign in to chat",
+    "addedLiked": "Added to liked live rooms.",
+    "removedWatchLater": "Removed from Watch later.",
+    "savedWatchLater": "Saved to Watch later.",
+    "copyManual": "Live room link opened for manual copy.",
+    "copySuccess": "Live room link copied.",
+    "copyFailed": "Could not copy the live room link.",
+    "copyTarget": "live room link",
+    "timeAgo": {
+      "hours": "{{hours}}h {{minutes}}m ago",
+      "minutes": "{{minutes}}m ago"
+    },
+    "startedAt": "Started {{time}}",
     "showMore": "Show more",
     "showLess": "Show less"
   },
@@ -60,7 +78,239 @@
   },
   "channel": {
     "title": "Channel",
-    "name": "Channel: {{name}}"
+    "name": "Channel: {{name}}",
+    "creatorFallback": "Creator",
+    "creatorShort": "Creator {{id}}",
+    "copyTarget": "channel link",
+    "copyManual": "Channel link opened for manual copy.",
+    "copySuccess": "Channel link copied.",
+    "changeCover": "Change cover",
+    "yourChannel": "Your channel",
+    "liveChannel": "Live channel",
+    "subscribers": "{{count}} subscribers",
+    "activeRooms": "{{count}} active rooms",
+    "startLive": "Start live",
+    "changeAvatar": "Change avatar",
+    "settings": "Settings",
+    "subscribed": "Subscribed",
+    "subscribe": "Subscribe",
+    "share": "Share",
+    "sections": "Channel sections",
+    "tabs": {
+      "live": "Live",
+      "history": "History"
+    },
+    "stats": {
+      "liveRooms": "Live rooms",
+      "watchingNow": "Watching now",
+      "mainCategory": "Main category"
+    },
+    "liveRooms": "Live rooms",
+    "subscriptions": "Subscriptions",
+    "notFound": "Channel not found",
+    "notFoundSub": "This creator profile is unavailable or the link is incorrect.",
+    "noLiveRooms": "No live rooms right now",
+    "noLiveOwnerSub": "Start a live room when you are ready to broadcast.",
+    "noLiveViewerSub": "Follow this channel and check back when the creator goes live.",
+    "liveHistory": "Live history",
+    "channelAnalytics": "Channel analytics",
+    "noHistory": "No completed live streams yet",
+    "noHistoryOwnerSub": "Finished broadcasts will appear here with duration, cover, title, and performance data.",
+    "noHistoryViewerSub": "This creator has not finished a broadcast that can be shown here yet.",
+    "history": {
+      "pagination": "Live history pagination",
+      "pageCount": "{{start}}-{{end}} of {{total}}",
+      "previousPage": "Previous history page",
+      "nextPage": "Next history page",
+      "peakViewers": "{{amount}} peak",
+      "revenue": "{{amount}} revenue",
+      "topFan": "{{name}} top fan",
+      "noFan": "No fan contribution yet",
+      "liveAnalysis": "Live analysis"
+    }
+  },
+  "library": {
+    "signIn": "Sign in",
+    "latest": "Latest",
+    "browseAll": "Browse all",
+    "status": {
+      "live": "LIVE",
+      "offline": "Offline"
+    },
+    "subscriptions": {
+      "title": "Subscriptions",
+      "signInTitle": "Sign in to see your subscriptions",
+      "signInSub": "Follow creators to keep their live rooms in this feed.",
+      "emptyAuthed": "No subscribed creators yet",
+      "emptyGuest": "No subscriptions to show",
+      "emptySub": "Explore the live directory and follow rooms from the player page."
+    },
+    "you": {
+      "viewChannel": "View channel",
+      "openCoinCenter": "Open coin center",
+      "recharge": "Recharge",
+      "watchLaterCount": "Watch later · {{count}}",
+      "likedCount": "Liked · {{count}}",
+      "historyCount": "History · {{count}}",
+      "settings": "Settings",
+      "yourLiveRoom": "Your live room",
+      "openStudio": "Open studio",
+      "fanBadges": "Fan badges",
+      "history": "History",
+      "viewAll": "View all",
+      "watchLater": "Watch later",
+      "seeAll": "See all",
+      "likedRooms": "Liked rooms",
+      "liked": "Liked",
+      "quickActions": "Quick actions",
+      "startLive": "Start live",
+      "noHistory": "No watch history yet.",
+      "noWatchLater": "Save a live room to see it here.",
+      "noLiked": "Liked rooms appear here."
+    },
+    "fanBadges": {
+      "signIn": "Sign in to view your fan badges.",
+      "empty": "Send a Fan Light to unlock a creator badge.",
+      "contribution": "{{amount}} contribution"
+    },
+    "historyPage": {
+      "title": "History",
+      "subtitle": "Live rooms you opened on this device.",
+      "emptyTitle": "No watch history yet",
+      "emptySub": "When you visit a live room, GoLive adds it here automatically.",
+      "primaryAction": "Open latest room",
+      "clear": "Clear history"
+    },
+    "watchLaterPage": {
+      "title": "Watch later",
+      "subtitle": "Saved streams and rooms you want to revisit.",
+      "emptyTitle": "Nothing saved yet",
+      "emptySub": "Use Save on a live room to build this list.",
+      "primaryAction": "Open saved room",
+      "clear": "Clear all"
+    },
+    "likedPage": {
+      "title": "Liked live rooms",
+      "subtitle": "Streams you liked are collected here for quick return trips.",
+      "emptyTitle": "No liked rooms yet",
+      "emptySub": "Tap Like on a live room to collect it here.",
+      "primaryAction": "Open liked room",
+      "clear": "Clear all"
+    },
+    "collection": {
+      "liveRoomCount": "{{count}} live rooms",
+      "remove": "Remove",
+      "exploreTitle": "Live rooms to explore",
+      "exploreEmptyTitle": "No live rooms available",
+      "exploreEmptySub": "Try again when creators start broadcasting."
+    },
+    "settings": {
+      "title": "Settings",
+      "sections": "Settings sections",
+      "tabs": {
+        "account": "Account",
+        "experience": "Experience",
+        "live": "Live defaults"
+      },
+      "notSignedIn": "Not signed in",
+      "changeAvatar": "Change avatar",
+      "darkTheme": "Dark theme",
+      "currentTheme": "Current: {{mode}}",
+      "dark": "Dark",
+      "light": "Light",
+      "language": "Language",
+      "languageNames": {
+        "zh": "中文",
+        "ja": "日本語",
+        "en": "English"
+      },
+      "lowLatency": "Low latency playback",
+      "lowLatencySub": "Prefer a tighter live delay when the stream supports it.",
+      "defaultCategory": "Default category",
+      "categories": {
+        "justchatting": "Just Chatting",
+        "gaming": "Gaming",
+        "music": "Music",
+        "vtuber": "VTuber",
+        "news": "News"
+      },
+      "chatAssist": "Chat safety assist",
+      "chatAssistSub": "Highlight fast-moving chat and potential moderation spikes."
+    }
+  },
+  "createLive": {
+    "title": "Start a live",
+    "description": "Create a live room and get your OBS stream key.",
+    "formSub": "Create a room, then publish from OBS with the stream key.",
+    "defaultTitle": "Untitled live",
+    "created": "Live room created. Add the stream key in OBS to publish video.",
+    "fields": {
+      "title": "Title",
+      "category": "Category",
+      "cover": "Cover",
+      "description": "Description"
+    },
+    "categories": {
+      "gaming": "Gaming",
+      "music": "Music",
+      "justchatting": "Just Chatting",
+      "anime": "Anime",
+      "vtuber": "VTuber",
+      "drawing": "Drawing",
+      "asmr": "ASMR",
+      "podcast": "Podcast",
+      "cooking": "Cooking",
+      "news": "News"
+    },
+    "addCover": "Add cover",
+    "optional": "Optional",
+    "starting": "Starting...",
+    "createRoom": "Create live room",
+    "permission": {
+      "label": "Live permission",
+      "pendingTitle": "Application under review",
+      "pendingBody": "Your creator request is waiting for an administrator to review it.",
+      "submitted": "Submitted",
+      "rejectedTitle": "Creator access was not approved",
+      "rejectedBody": "You can submit a new application when your channel is ready for review.",
+      "applyAgain": "Apply again",
+      "applyTitle": "Apply for creator access",
+      "applyBody": "A quick admin approval is required before you can create live rooms.",
+      "submitApplication": "Submit application",
+      "submitting": "Submitting..."
+    },
+    "errors": {
+      "signInAgain": "Please sign in again before starting a live.",
+      "notApproved": "Your live permission has not been approved yet.",
+      "required": "Title and category are required.",
+      "startFailed": "Could not start the live. Please try again.",
+      "applicationFailed": "Could not submit application.",
+      "coverUpload": "Could not upload the cover."
+    }
+  },
+  "upload": {
+    "description": "Upload a JPG, PNG, WebP, or GIF image up to 5MB.",
+    "imageTypeError": "Use a JPG, PNG, WebP, or GIF image.",
+    "chooseFirst": "Choose an image first.",
+    "chooseImage": "Choose image",
+    "saving": "Saving...",
+    "avatar": {
+      "title": "Change avatar",
+      "sizeError": "Avatar must be 5MB or smaller.",
+      "signInError": "Please sign in before changing your avatar.",
+      "success": "Avatar updated.",
+      "failed": "Could not update avatar.",
+      "save": "Save avatar"
+    },
+    "cover": {
+      "title": "Change channel cover",
+      "add": "Add a channel cover",
+      "sizeError": "Cover must be 5MB or smaller.",
+      "signInError": "Please sign in before changing your channel cover.",
+      "success": "Channel cover updated.",
+      "failed": "Could not update channel cover.",
+      "save": "Save cover"
+    }
   },
   "login": {
     "title": "Login",
@@ -70,5 +320,147 @@
     "title": "404",
     "subtitle": "Page not found",
     "back": "Back to home"
+  },
+  "coin": {
+    "authTitle": "Sign in to manage coins",
+    "authSub": "View spending records, top up, daily tasks, and withdrawal previews.",
+    "guest": "Guest",
+    "heroSub": "{{name}} coin account. Top-up rate: 1,000 coins = 1 RMB.",
+    "goTopup": "Top up",
+    "watchHistory": "Watch history",
+    "stats": {
+      "balance": "Current balance",
+      "monthSpend": "Spent this month",
+      "monthIncome": "Earned this month",
+      "liveIncome": "Live income"
+    },
+    "dailyTasks": "Daily tasks",
+    "tasks": {
+      "dailyLogin": {
+        "title": "Daily login lottery",
+        "description": "Draw once each day for a small coin bonus.",
+        "target": "available today"
+      },
+      "watchRooms": {
+        "title": "Watch 3 live rooms",
+        "description": "Open 3 different live rooms today to claim.",
+        "target": "3 live rooms"
+      },
+      "watchMinutes": {
+        "title": "Watch 30 minutes",
+        "description": "Spend a little real time watching to earn coins.",
+        "target": "30 minutes"
+      }
+    },
+    "ledger": "Coin ledger",
+    "filters": {
+      "all": "All",
+      "income": "Income",
+      "spend": "Spending",
+      "recharge": "Top-up",
+      "gift": "Gifts",
+      "sc": "SC",
+      "bet": "Betting",
+      "task": "Tasks",
+      "creator": "Live income"
+    },
+    "emptyTitle": "No coin records yet",
+    "emptySub": "Top-ups, gifts, Super Chats, and betting activity will appear here.",
+    "topup": {
+      "title": "Top up",
+      "sub": "Minimum 1,000 coins. No upper limit.",
+      "amount": "Top-up amount",
+      "amountAria": "Top-up coin amount",
+      "pay": "Pay",
+      "pending": "Topping up...",
+      "submit": "Top up now"
+    },
+    "withdraw": {
+      "title": "Withdrawal preview",
+      "sub": "35% fee. Enabled after payment integration.",
+      "amount": "Withdrawal amount",
+      "amountAria": "Withdrawal coin amount",
+      "fee": "Fee",
+      "net": "Estimated arrival",
+      "rmb": "Approx. RMB",
+      "preview": "Preview withdrawal"
+    },
+    "task": {
+      "claim": "Claim",
+      "claiming": "Claiming...",
+      "claimed": "Claimed"
+    },
+    "record": {
+      "balance": "Balance {{balance}}",
+      "topup": "Top-up",
+      "dailyTask": "Daily task",
+      "gift": "Gift",
+      "superChat": "Super Chat",
+      "bet": "Betting",
+      "coin": "Coin"
+    },
+    "pagination": "{{total}} records · Page {{page}} / {{totalPages}}",
+    "previous": "Previous",
+    "next": "Next",
+    "progressMinutes": "{{current}} / {{total}} min",
+    "toast": {
+      "minTopup": "Top-up must be at least 1,000 coins.",
+      "topupSuccess": "Top-up complete. Current balance: {{balance}} coins.",
+      "topupFailed": "Top-up failed.",
+      "taskIncomplete": "Finish the task before claiming.",
+      "alreadyClaimed": "You already claimed this task today.",
+      "claimSuccess": "Earned {{amount}} coins.",
+      "claimFailed": "Claim failed.",
+      "withdrawPreview": "Withdrawals are reserved for payment integration and no coins will be deducted."
+    }
+  },
+  "betting": {
+    "title": "Betting",
+    "emptyHint": "Enter a title to open a bet for viewers.",
+    "entryActive": "Betting is open",
+    "entryView": "View",
+    "open": "Open bet",
+    "reopen": "Open another",
+    "opening": "Opening...",
+    "cancel": "Cancel",
+    "cancelling": "Cancelling...",
+    "closed": "Closed",
+    "closesIn": "{{seconds}}s to close",
+    "pool": "Pool {{total}}",
+    "amount": "Wager amount",
+    "formTitle": "Title",
+    "formTitlePlaceholder": "Example: Who takes game one?",
+    "option": {
+      "win": "Can win",
+      "lose": "Cannot win"
+    },
+    "optionMeta": "{{count}} people · {{total}} coin",
+    "myWager": "You bet on \"{{option}}\"",
+    "myWagerWon": ", returned {{payout}} coin",
+    "myWagerRefunded": ", refunded",
+    "noWagerHint": "No one picked this option. Cancel to refund coins.",
+    "openSuccess": "Bet opened. It closes automatically in 60 seconds.",
+    "wagerSuccess": "Bet placed on \"{{option}}\".",
+    "settleSuccess": "Bet settled as \"{{option}}\".",
+    "cancelSuccess": "Bet cancelled. Wagered coins were refunded.",
+    "systemOpened": "Betting is open.",
+    "systemSettled": "Bet settled: {{option}}.",
+    "systemSettledDefault": "Result is in",
+    "systemCancelled": "Bet cancelled. Wagered coins were refunded.",
+    "status": {
+      "open": "Open",
+      "closed": "Closed",
+      "settled": "Settled",
+      "cancelled": "Cancelled"
+    },
+    "errorQuestionRequired": "Enter a bet title first.",
+    "errorInsufficient": "Insufficient coin balance.",
+    "errorActiveExists": "There is still an unsettled bet.",
+    "errorClosed": "Betting is closed.",
+    "errorAlreadyPlaced": "You already placed a bet.",
+    "errorNoWinners": "No winner for this result. Cancel to refund.",
+    "errorBadQuestion": "Bet title is required and must be 80 characters or fewer.",
+    "errorForbidden": "Only the streamer can manage betting.",
+    "errorGeneric": "Action failed."
   }
 }

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import i18n, { appLangToI18nCode, LANG_STORAGE_KEY, toAppLang, type AppLang } from '@/i18n';
 
+export const APP_LANGS: AppLang[] = ['zh', 'ja', 'en'];
+
 function readStoredLang(): AppLang {
   if (typeof window === 'undefined') return 'en';
   const stored = window.localStorage.getItem(LANG_STORAGE_KEY);
@@ -23,7 +25,9 @@ export const useLangStore = create<LangState>((set, get) => ({
     set({ lang });
   },
   toggleLang: () => {
-    const next: AppLang = get().lang === 'en' ? 'ja' : 'en';
+    const current = get().lang;
+    const currentIndex = APP_LANGS.indexOf(current);
+    const next = APP_LANGS[(currentIndex + 1) % APP_LANGS.length] ?? 'zh';
     get().setLang(next);
   },
 }));

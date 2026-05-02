@@ -1,9 +1,8 @@
 import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, ImagePlus, Save } from 'lucide-react';
+import { ImagePlus, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { useUploadAvatar } from '@/api/auth';
-import { Avatar } from '@/components/Avatar';
+import { useUploadChannelCover } from '@/api/auth';
 import {
   Dialog,
   DialogContent,
@@ -14,19 +13,23 @@ import {
 import type { User } from '@/types/user';
 import { userDisplayName } from '@/types/user';
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
-const AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const AVATAR_EXT = /\.(jpe?g|png|webp|gif)$/i;
+const MAX_COVER_SIZE = 5 * 1024 * 1024;
+const COVER_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const COVER_EXT = /\.(jpe?g|png|webp|gif)$/i;
 
-export interface AvatarUploadDialogProps {
+export interface ChannelCoverUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: User | null;
 }
 
-export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDialogProps) {
+export function ChannelCoverUploadDialog({
+  open,
+  onOpenChange,
+  user,
+}: ChannelCoverUploadDialogProps) {
   const { t } = useTranslation('pages');
-  const uploadAvatar = useUploadAvatar();
+  const uploadCover = useUploadChannelCover();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +60,14 @@ export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDia
       setFile(null);
       return;
     }
-    if (!isAllowedAvatar(next)) {
+    if (!isAllowedCover(next)) {
       setFile(null);
       setError(t('upload.imageTypeError'));
       return;
     }
-    if (next.size > MAX_AVATAR_SIZE) {
+    if (next.size > MAX_COVER_SIZE) {
       setFile(null);
-      setError(t('upload.avatar.sizeError'));
+      setError(t('upload.cover.sizeError'));
       return;
     }
     setFile(next);
@@ -73,47 +76,52 @@ export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDia
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!user) {
-      setError(t('upload.avatar.signInError'));
+      setError(t('upload.cover.signInError'));
       return;
     }
     if (!file) {
       setError(t('upload.chooseFirst'));
       return;
     }
-    uploadAvatar.mutate(file, {
+    uploadCover.mutate(file, {
       onSuccess: () => {
-        toast.success(t('upload.avatar.success'));
+        toast.success(t('upload.cover.success'));
         onOpenChange(false);
       },
-      onError: (err) => setError(err.message || t('upload.avatar.failed')),
+      onError: (err) => setError(err.message || t('upload.cover.failed')),
     });
   };
 
+  const cover = preview || user?.cover || '';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gl-avatar-dialog p-0 sm:max-w-[420px]">
+      <DialogContent className="gl-avatar-dialog p-0 sm:max-w-[560px]">
         <DialogHeader className="sr-only">
-          <DialogTitle>{t('upload.avatar.title')}</DialogTitle>
+          <DialogTitle>{t('upload.cover.title')}</DialogTitle>
           <DialogDescription>{t('upload.description')}</DialogDescription>
         </DialogHeader>
 
         <form className="gl-avatar-form" onSubmit={handleSubmit}>
           <div className="gl-live-create-head">
             <div className="gl-live-create-icon" aria-hidden="true">
-              <Camera size={20} />
+              <ImagePlus size={20} />
             </div>
             <div>
-              <h2>{t('upload.avatar.title')}</h2>
+              <h2>{t('upload.cover.title')}</h2>
               <p>{displayName}</p>
             </div>
           </div>
 
-          <label className="gl-avatar-picker">
-            <span className="gl-avatar-preview">
-              {preview ? (
-                <img src={preview} alt="" />
+          <label className="gl-cover-picker">
+            <span className="gl-cover-preview">
+              {cover ? (
+                <img src={cover} alt="" />
               ) : (
-                <Avatar name={displayName} src={user?.avatar} size={116} />
+                <span>
+                  <ImagePlus size={24} />
+                  {t('upload.cover.add')}
+                </span>
               )}
             </span>
             <span className="gl-avatar-pick-btn">
@@ -133,9 +141,9 @@ export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDia
             </div>
           )}
 
-          <button type="submit" disabled={!file || uploadAvatar.isPending} className="gl-auth-submit">
+          <button type="submit" disabled={!file || uploadCover.isPending} className="gl-auth-submit">
             <Save size={18} />
-            <span>{uploadAvatar.isPending ? t('upload.saving') : t('upload.avatar.save')}</span>
+            <span>{uploadCover.isPending ? t('upload.saving') : t('upload.cover.save')}</span>
           </button>
         </form>
       </DialogContent>
@@ -143,7 +151,7 @@ export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDia
   );
 }
 
-function isAllowedAvatar(file: File): boolean {
-  if (AVATAR_TYPES.has(file.type)) return true;
-  return AVATAR_EXT.test(file.name);
+function isAllowedCover(file: File): boolean {
+  if (COVER_TYPES.has(file.type)) return true;
+  return COVER_EXT.test(file.name);
 }

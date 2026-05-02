@@ -120,6 +120,31 @@ export function useUploadAvatar() {
   });
 }
 
+export interface ChannelCoverUploadResp {
+  url: string;
+  user: User;
+}
+
+export function useUploadChannelCover() {
+  const qc = useQueryClient();
+  return useMutation<ChannelCoverUploadResp, Error, File>({
+    mutationFn: async (file) => {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await http.post<ChannelCoverUploadResp>('/users/me/cover', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: ({ user }) => {
+      qc.setQueryData(['me'], user);
+      useAuthStore.getState().setUser(user);
+      void qc.invalidateQueries({ queryKey: ['public-user', user.id] });
+      void qc.invalidateQueries({ queryKey: ['public-user', user.username] });
+    },
+  });
+}
+
 export async function logout(): Promise<void> {
   try {
     await http.post('/auth/logout').catch(() => undefined);

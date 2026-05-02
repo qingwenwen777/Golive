@@ -12,13 +12,20 @@
   },
   "lang": {
     "toggle": "Language",
-    "en": "EN",
-    "ja": "日本語"
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語",
+    "short": {
+      "zh": "ZH",
+      "en": "EN",
+      "ja": "JA"
+    }
   },
   "nav": {
     "home": "Home",
     "liveNow": "Live now",
     "subscriptions": "Subscriptions",
+    "coins": "Coins",
     "yourLibrary": "You",
     "history": "History",
     "watchLater": "Watch later",
@@ -31,6 +38,53 @@
       "contact": "Contact us · Creators",
       "ads": "Advertise · Developers",
       "copyright": "© 2026 GoLive"
+    }
+  },
+  "account": {
+    "menu": "Account menu",
+    "you": "You",
+    "coins": "{{amount}} coins",
+    "rechargeCoins": "Recharge coins",
+    "adminDashboard": "Admin dashboard",
+    "yourChannel": "Your channel",
+    "changeAvatar": "Change avatar",
+    "settings": "Settings",
+    "appearance": "Appearance: {{mode}}",
+    "language": "Language: {{language}}",
+    "dark": "Dark",
+    "light": "Light",
+    "signIn": "Sign in",
+    "signOut": "Sign out"
+  },
+  "auth": {
+    "liveAccount": "Live account",
+    "signInTitle": "Sign in to GoLive",
+    "signUpTitle": "Create your GoLive account",
+    "signInSub": "Use demo / demo for the preview build, or create a local preview account.",
+    "signUpSub": "Pick a channel name and jump into live chat, gifts, and follows.",
+    "mode": "Authentication mode",
+    "signIn": "Sign in",
+    "register": "Register",
+    "displayName": "Display name",
+    "displayNamePlaceholder": "Your channel name",
+    "username": "Username",
+    "usernamePlaceholder": "Choose a username",
+    "password": "Password",
+    "passwordPlaceholder": "At least 3 characters",
+    "confirmPassword": "Confirm password",
+    "confirmPasswordPlaceholder": "Repeat password",
+    "creating": "Creating...",
+    "signingIn": "Signing in...",
+    "createAccount": "Create account",
+    "socialUnavailable": "Social sign-in is not available in this preview",
+    "continueGoogle": "Continue with Google",
+    "errors": {
+      "invalidCredentials": "Invalid username or password.",
+      "usernameTaken": "That username is already taken.",
+      "badFields": "Check the fields and try again.",
+      "signInFailed": "Sign-in failed. Please try again.",
+      "signUpFailed": "Account creation failed. Please try again.",
+      "passwordMismatch": "Passwords do not match."
     }
   },
   "live": "LIVE",

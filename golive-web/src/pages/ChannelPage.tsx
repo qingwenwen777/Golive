@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Bell,
@@ -9,6 +10,7 @@ import {
   ChevronRight,
   CalendarDays,
   Clock3,
+  ImagePlus,
   Radio,
   Settings,
   Share2,
@@ -30,6 +32,7 @@ import { Avatar } from '@/components/Avatar';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
+import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadDialog';
 import { CreateLiveDialog } from '@/features/creator/CreateLiveDialog';
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -40,6 +43,7 @@ import { isUuidLike, userDisplayName, type User } from '@/types/user';
 const HISTORY_PAGE_SIZE = 4;
 
 export default function ChannelPage() {
+  const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const { name = '' } = useParams<{ name: string }>();
   const channelKey = decodeURIComponent(name);
@@ -50,6 +54,7 @@ export default function ChannelPage() {
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
 
@@ -63,8 +68,9 @@ export default function ChannelPage() {
     [channelKey, profile, streams],
   );
   const primary = channelStreams[0];
-  const channelName = resolveChannelName(profile, primary, channelKey);
+  const channelName = resolveChannelName(profile, primary, channelKey, t);
   const channelAvatar = profile?.avatar || primary?.avatar || '';
+  const channelCover = profile?.cover || primary?.cover || '';
   const channelId =
     primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
@@ -104,9 +110,9 @@ export default function ChannelPage() {
   const handleShare = async () => {
     const url = window.location.href;
     try {
-      const method = await copyText(url, 'channel link');
-      if (method === 'manual') toast.info('Channel link opened for manual copy.');
-      else toast.success('Channel link copied.');
+      const method = await copyText(url, t('channel.copyTarget'));
+      if (method === 'manual') toast.info(t('channel.copyManual'));
+      else toast.success(t('channel.copySuccess'));
     } catch {
       toast.info(url);
     }
@@ -115,17 +121,30 @@ export default function ChannelPage() {
   return (
     <div className="gl-page gl-channel-page">
       <section className="gl-channel-hero-v2">
-        <div className="gl-channel-cover" aria-hidden>
+        <div className={`gl-channel-cover${channelCover ? ' has-cover' : ''}`}>
+          {channelCover && <img className="gl-channel-cover-img" src={channelCover} alt="" />}
           <div className="gl-channel-cover-mark">
             <Radio size={26} />
             <span>GoLive</span>
           </div>
+          {isOwner && (
+            <button
+              className="gl-channel-cover-action"
+              type="button"
+              onClick={() => setCoverOpen(true)}
+            >
+              <ImagePlus size={16} />
+              {t('channel.changeCover')}
+            </button>
+          )}
         </div>
 
         <div className="gl-channel-profile-v2">
           <Avatar name={channelName} src={channelAvatar} size={112} className="gl-channel-avatar" />
           <div className="gl-channel-profile-main">
-            <div className="gl-channel-kicker">{isOwner ? 'Your channel' : 'Live channel'}</div>
+            <div className="gl-channel-kicker">
+              {isOwner ? t('channel.yourChannel') : t('channel.liveChannel')}
+            </div>
             <h1>
               <span>{channelName}</span>
               {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
@@ -134,11 +153,13 @@ export default function ChannelPage() {
               {profile?.username ? (
                 <span>@{profile.username}</span>
               ) : (
-                <span>{formatChannelKey(channelKey)}</span>
+                <span>{formatChannelKey(channelKey, t)}</span>
               )}
-              <span>{subscriberCount.toLocaleString()} subscribers</span>
               <span>
-                {channelStreams.length} active room{channelStreams.length === 1 ? '' : 's'}
+                {t('channel.subscribers', { count: subscriberCount })}
+              </span>
+              <span>
+                {t('channel.activeRooms', { count: channelStreams.length })}
               </span>
             </div>
 
@@ -151,7 +172,7 @@ export default function ChannelPage() {
                     onClick={() => setCreateOpen(true)}
                   >
                     <Radio size={16} />
-                    Start live
+                    {t('channel.startLive')}
                   </button>
                   <button
                     className="gl-secondary-btn"
@@ -159,7 +180,7 @@ export default function ChannelPage() {
                     onClick={() => setAvatarOpen(true)}
                   >
                     <Camera size={16} />
-                    Change avatar
+                    {t('channel.changeAvatar')}
                   </button>
                   <button
                     className="gl-secondary-btn"
@@ -167,7 +188,7 @@ export default function ChannelPage() {
                     onClick={() => navigate('/settings')}
                   >
                     <Settings size={16} />
-                    Settings
+                    {t('channel.settings')}
                   </button>
                 </>
               ) : (
@@ -178,36 +199,36 @@ export default function ChannelPage() {
                   onClick={handleSubscribe}
                 >
                   {followState.data?.following ? <Bell size={16} /> : <UserPlus size={16} />}
-                  {followState.data?.following ? 'Subscribed' : 'Subscribe'}
+                  {followState.data?.following ? t('channel.subscribed') : t('channel.subscribe')}
                 </button>
               )}
               <button className="gl-secondary-btn" type="button" onClick={handleShare}>
                 <Share2 size={16} />
-                Share
+                {t('channel.share')}
               </button>
             </div>
           </div>
         </div>
 
         <div className="gl-channel-stats">
-          <ChannelStat label="Live rooms" value={String(channelStreams.length)} />
-          <ChannelStat label="Watching now" value={totalViewers.toLocaleString()} />
-          <ChannelStat label="Main category" value={primaryCategory} />
+          <ChannelStat label={t('channel.stats.liveRooms')} value={String(channelStreams.length)} />
+          <ChannelStat label={t('channel.stats.watchingNow')} value={totalViewers.toLocaleString()} />
+          <ChannelStat label={t('channel.stats.mainCategory')} value={primaryCategory} />
         </div>
       </section>
 
-      <nav className="gl-channel-tabs" aria-label="Channel sections">
+      <nav className="gl-channel-tabs" aria-label={t('channel.sections')}>
         <a className="is-active" href="#live">
-          Live
+          {t('channel.tabs.live')}
         </a>
-        <a href="#history">History</a>
+        <a href="#history">{t('channel.tabs.history')}</a>
       </nav>
 
       <section className="gl-library-section" id="live">
         <div className="gl-section-title-row">
-          <h2>Live rooms</h2>
+          <h2>{t('channel.liveRooms')}</h2>
           <Link className="gl-text-link" to="/subscriptions">
-            Subscriptions
+            {t('channel.subscriptions')}
           </Link>
         </div>
         {rooms.isPending ? (
@@ -226,19 +247,21 @@ export default function ChannelPage() {
           <div className="gl-channel-empty">
             <Video size={34} />
             <div>
-              <strong>{isUnknown ? 'Channel not found' : 'No live rooms right now'}</strong>
+              <strong>
+                {isUnknown ? t('channel.notFound') : t('channel.noLiveRooms')}
+              </strong>
               <span>
                 {isUnknown
-                  ? 'This creator profile is unavailable or the link is incorrect.'
+                  ? t('channel.notFoundSub')
                   : isOwner
-                    ? 'Start a live room when you are ready to broadcast.'
-                    : 'Follow this channel and check back when the creator goes live.'}
+                    ? t('channel.noLiveOwnerSub')
+                    : t('channel.noLiveViewerSub')}
               </span>
             </div>
             {isOwner && (
               <button className="gl-retry-btn" type="button" onClick={() => setCreateOpen(true)}>
                 <Radio size={16} />
-                Start live
+                {t('channel.startLive')}
               </button>
             )}
           </div>
@@ -247,13 +270,13 @@ export default function ChannelPage() {
 
       <section className="gl-library-section" id="history">
         <div className="gl-section-title-row">
-          <h2>Live history</h2>
+          <h2>{t('channel.liveHistory')}</h2>
           {isOwner && (
             <Link
               className="gl-text-link"
               to={`/studio/analytics/${encodeURIComponent(channelKey)}`}
             >
-              Channel analytics
+              {t('channel.channelAnalytics')}
             </Link>
           )}
         </div>
@@ -289,11 +312,11 @@ export default function ChannelPage() {
           <div className="gl-channel-empty">
             <Clock3 size={34} />
             <div>
-              <strong>No completed live streams yet</strong>
+              <strong>{t('channel.noHistory')}</strong>
               <span>
                 {isOwner
-                  ? 'Finished broadcasts will appear here with duration, cover, title, and performance data.'
-                  : 'This creator has not finished a broadcast that can be shown here yet.'}
+                  ? t('channel.noHistoryOwnerSub')
+                  : t('channel.noHistoryViewerSub')}
               </span>
             </div>
           </div>
@@ -301,6 +324,7 @@ export default function ChannelPage() {
       </section>
 
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={authUser} />
+      <ChannelCoverUploadDialog open={coverOpen} onOpenChange={setCoverOpen} user={authUser} />
       <CreateLiveDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
@@ -319,18 +343,19 @@ function HistoryPager({
   total: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t } = useTranslation('pages');
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
   const pages = visibleHistoryPages(page, pageCount);
   return (
-    <div className="gl-history-pager" aria-label="Live history pagination">
+    <div className="gl-history-pager" aria-label={t('channel.history.pagination')}>
       <div className="gl-history-pager-count">
-        {start}-{end} of {total}
+        {t('channel.history.pageCount', { start, end, total })}
       </div>
       <div className="gl-history-pager-controls">
         <button
           type="button"
-          aria-label="Previous history page"
+          aria-label={t('channel.history.previousPage')}
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
         >
@@ -355,7 +380,7 @@ function HistoryPager({
         )}
         <button
           type="button"
-          aria-label="Next history page"
+          aria-label={t('channel.history.nextPage')}
           disabled={page >= pageCount}
           onClick={() => onPageChange(Math.min(pageCount, page + 1))}
         >
@@ -392,6 +417,8 @@ function ChannelHistoryRow({
   channelKey: string;
   isOwner: boolean;
 }) {
+  const { t, i18n } = useTranslation('pages');
+
   return (
     <article className="gl-history-row">
       <HistoryThumb record={record} />
@@ -400,7 +427,7 @@ function ChannelHistoryRow({
         <div className="gl-history-meta">
           <span>
             <CalendarDays size={14} />
-            {formatHistoryDate(record.startedAt)}
+            {formatHistoryDate(record.startedAt, i18n.language)}
           </span>
           <span>
             <Clock3 size={14} />
@@ -408,13 +435,21 @@ function ChannelHistoryRow({
           </span>
           <span>
             <Users size={14} />
-            {record.peakViewers.toLocaleString()} peak
+            {t('channel.history.peakViewers', {
+              amount: record.peakViewers.toLocaleString(),
+            })}
           </span>
         </div>
         <div className="gl-history-sub">
-          <span>{record.category || 'Live'}</span>
-          <span>{formatCoin(record.revenueCoin)} revenue</span>
-          <span>{record.topFan ? `${record.topFan.name} top fan` : 'No fan contribution yet'}</span>
+          <span>{record.category || t('channel.tabs.live')}</span>
+          <span>
+            {t('channel.history.revenue', { amount: formatCoin(record.revenueCoin) })}
+          </span>
+          <span>
+            {record.topFan
+              ? t('channel.history.topFan', { name: record.topFan.name })
+              : t('channel.history.noFan')}
+          </span>
         </div>
       </div>
       {isOwner && (
@@ -423,7 +458,7 @@ function ChannelHistoryRow({
           to={`/studio/analytics/${encodeURIComponent(channelKey)}/live/${encodeURIComponent(record.id)}`}
         >
           <BarChart3 size={16} />
-          Live analysis
+          {t('channel.history.liveAnalysis')}
         </Link>
       )}
     </article>
@@ -463,11 +498,16 @@ function resolveProfile(
   return null;
 }
 
-function resolveChannelName(profile: User | null, stream: Stream | undefined, key: string): string {
+function resolveChannelName(
+  profile: User | null,
+  stream: Stream | undefined,
+  key: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
   if (profile) return userDisplayName(profile);
   if (stream) return streamChannelName(stream);
   if (key && !isUuidLike(key)) return key;
-  return 'Creator';
+  return t('channel.creatorFallback');
 }
 
 function matchesChannel(stream: Stream, key: string, profile: User | null): boolean {
@@ -491,14 +531,14 @@ function normalizeChannelId(key: string): string {
   return `ch-${key}`;
 }
 
-function formatChannelKey(key: string): string {
-  if (!key) return 'Channel';
+function formatChannelKey(key: string, t: ReturnType<typeof useTranslation>['t']): string {
+  if (!key) return t('channel.title');
   if (!isUuidLike(key)) return key;
-  return `Creator ${key.slice(0, 8)}`;
+  return t('channel.creatorShort', { id: key.slice(0, 8) });
 }
 
-function formatHistoryDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+function formatHistoryDate(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

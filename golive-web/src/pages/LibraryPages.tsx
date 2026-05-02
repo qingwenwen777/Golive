@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -11,7 +12,6 @@ import {
   Crown,
   Heart,
   History,
-  Play,
   Radio,
   Settings,
   Sparkles,
@@ -39,13 +39,14 @@ import {
 } from '@/lib/liveLibrary';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
-import { useLangStore } from '@/stores/useLangStore';
+import { APP_LANGS, useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
 import type { FanBadge } from '@/types/gift';
 import type { Stream } from '@/types/stream';
 import { userDisplayName } from '@/types/user';
 
 export function SubscriptionsPage() {
+  const { t } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const subscriptions = useSubscriptions(isAuthed);
@@ -80,11 +81,11 @@ export function SubscriptionsPage() {
       {!isAuthed && (
         <div className="gl-yt-banner">
           <div>
-            <strong>Sign in to see your subscriptions</strong>
-            <span>Follow creators to keep their live rooms in this feed.</span>
+            <strong>{t('library.subscriptions.signInTitle')}</strong>
+            <span>{t('library.subscriptions.signInSub')}</span>
           </div>
           <button className="gl-secondary-btn" type="button" onClick={() => openLogin()}>
-            Sign in
+            {t('library.signIn')}
           </button>
         </div>
       )}
@@ -93,7 +94,7 @@ export function SubscriptionsPage() {
         <div className="gl-yt-page-icon">
           <Bell size={22} />
         </div>
-        <h1>Subscriptions</h1>
+        <h1>{t('library.subscriptions.title')}</h1>
       </header>
 
       {channels.length > 0 && (
@@ -114,7 +115,7 @@ export function SubscriptionsPage() {
                   {channel.verified && <CheckCircle2 size={12} />}
                 </div>
                 <div className={`gl-yt-channel-status${channel.live ? '' : 'is-offline'}`}>
-                  {channel.live ? 'LIVE' : 'Offline'}
+                  {channel.live ? t('library.status.live') : t('library.status.offline')}
                 </div>
               </Link>
             ))}
@@ -124,16 +125,20 @@ export function SubscriptionsPage() {
 
       <section className="gl-library-section">
         <div className="gl-section-title-row">
-          <h2>Latest</h2>
+          <h2>{t('library.latest')}</h2>
           <Link className="gl-text-link" to="/">
-            Browse all
+            {t('library.browseAll')}
           </Link>
         </div>
         <StreamGrid
           isPending={isAuthed && subscriptions.isPending}
           streams={streams.slice(0, 12)}
-          emptyTitle={isAuthed ? 'No subscribed creators yet' : 'No subscriptions to show'}
-          emptySub="Explore the live directory and follow rooms from the player page."
+          emptyTitle={
+            isAuthed
+              ? t('library.subscriptions.emptyAuthed')
+              : t('library.subscriptions.emptyGuest')
+          }
+          emptySub={t('library.subscriptions.emptySub')}
         />
       </section>
     </div>
@@ -141,6 +146,7 @@ export function SubscriptionsPage() {
 }
 
 export function YouPage() {
+  const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isAuthed = useIsAuthed();
@@ -194,11 +200,11 @@ export function YouPage() {
             {isAuthed && user?.username && <span>@{user.username}</span>}
             {isAuthed ? (
               <Link className="gl-yt-you-link" to={channelHref}>
-                View channel <ChevronRight size={14} />
+                {t('library.you.viewChannel')} <ChevronRight size={14} />
               </Link>
             ) : (
               <button className="gl-yt-you-link" type="button" onClick={() => openLogin()}>
-                Sign in <ChevronRight size={14} />
+                {t('library.signIn')} <ChevronRight size={14} />
               </button>
             )}
           </div>
@@ -207,37 +213,41 @@ export function YouPage() {
               type="button"
               className="gl-yt-coin-chip"
               onClick={handleOpenCoins}
-              title="Open coin center"
+              title={t('library.you.openCoinCenter')}
             >
               <Wallet size={14} />
               <span>{balance.toLocaleString()}</span>
-              <span className="gl-yt-coin-chip-add">Recharge</span>
+              <span className="gl-yt-coin-chip-add">{t('library.you.recharge')}</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
-              <Bookmark size={14} /> Watch later · {saved.length}
+              <Bookmark size={14} /> {t('library.you.watchLaterCount', { count: saved.length })}
             </Link>
             <Link className="gl-yt-chip" to="/liked">
-              <Heart size={14} /> Liked · {liked.length}
+              <Heart size={14} /> {t('library.you.likedCount', { count: liked.length })}
             </Link>
             <Link className="gl-yt-chip" to="/history">
-              <History size={14} /> History · {history.length}
+              <History size={14} /> {t('library.you.historyCount', { count: history.length })}
             </Link>
             <Link className="gl-yt-chip" to="/settings">
-              <Settings size={14} /> Settings
+              <Settings size={14} /> {t('library.you.settings')}
             </Link>
           </div>
         </div>
       </section>
 
       {ownLive && (
-        <Shelf title="Your live room" actionLabel="Open studio" actionTo={`/live/${ownLive.id}`}>
+        <Shelf
+          title={t('library.you.yourLiveRoom')}
+          actionLabel={t('library.you.openStudio')}
+          actionTo={`/live/${ownLive.id}`}
+        >
           <div className="gl-feature-live">
             <LiveCard stream={ownLive} priority />
           </div>
         </Shelf>
       )}
 
-      <Shelf title="Fan badges">
+      <Shelf title={t('library.you.fanBadges')}>
         <FanBadgeShelf
           badges={fanBadges.data ?? []}
           isPending={fanBadges.isPending && isAuthed}
@@ -246,30 +256,38 @@ export function YouPage() {
         />
       </Shelf>
 
-      <Shelf title="History" actionLabel="View all" actionTo="/history">
-        <HorizontalShelf items={history.slice(0, 8)} emptyText="No watch history yet." />
+      <Shelf title={t('library.you.history')} actionLabel={t('library.you.viewAll')} actionTo="/history">
+        <HorizontalShelf items={history.slice(0, 8)} emptyText={t('library.you.noHistory')} />
       </Shelf>
 
-      <Shelf title="Watch later" actionLabel="See all" actionTo="/watch-later">
-        <HorizontalShelf items={saved.slice(0, 8)} emptyText="Save a live room to see it here." />
+      <Shelf
+        title={t('library.you.watchLater')}
+        actionLabel={t('library.you.seeAll')}
+        actionTo="/watch-later"
+      >
+        <HorizontalShelf items={saved.slice(0, 8)} emptyText={t('library.you.noWatchLater')} />
       </Shelf>
 
-      <Shelf title="Liked rooms" actionLabel="See all" actionTo="/liked">
-        <HorizontalShelf items={liked.slice(0, 8)} emptyText="Liked rooms appear here." />
+      <Shelf
+        title={t('library.you.likedRooms')}
+        actionLabel={t('library.you.seeAll')}
+        actionTo="/liked"
+      >
+        <HorizontalShelf items={liked.slice(0, 8)} emptyText={t('library.you.noLiked')} />
       </Shelf>
 
-      <Shelf title="Quick actions">
+      <Shelf title={t('library.you.quickActions')}>
         <div className="gl-yt-quick-row">
-          <QuickChip icon={<Radio size={16} />} label="Start live" onClick={() => navigate('/')} />
+          <QuickChip icon={<Radio size={16} />} label={t('library.you.startLive')} onClick={() => navigate('/')} />
           <QuickChip
             icon={<Clock3 size={16} />}
-            label="Watch later"
+            label={t('library.you.watchLater')}
             onClick={() => navigate('/watch-later')}
           />
-          <QuickChip icon={<Heart size={16} />} label="Liked" onClick={() => navigate('/liked')} />
+          <QuickChip icon={<Heart size={16} />} label={t('library.you.liked')} onClick={() => navigate('/liked')} />
           <QuickChip
             icon={<Settings size={16} />}
-            label="Settings"
+            label={t('library.you.settings')}
             onClick={() => navigate('/settings')}
           />
         </div>
@@ -289,10 +307,12 @@ function FanBadgeShelf({
   isAuthed: boolean;
   onLogin: () => void;
 }) {
+  const { t } = useTranslation('pages');
+
   if (!isAuthed) {
     return (
       <button type="button" className="gl-fan-badge-empty" onClick={onLogin}>
-        Sign in to view your fan badges.
+        {t('library.fanBadges.signIn')}
       </button>
     );
   }
@@ -308,7 +328,7 @@ function FanBadgeShelf({
   }
 
   if (badges.length === 0) {
-    return <div className="gl-fan-badge-empty">Send a Fan Light to unlock a creator badge.</div>;
+    return <div className="gl-fan-badge-empty">{t('library.fanBadges.empty')}</div>;
   }
 
   return (
@@ -324,7 +344,11 @@ function FanBadgeShelf({
               <span className={`gl-fan-badge-level ${fanBadgeToneClass(badge.level)}`}>
                 <Crown size={13} strokeWidth={2.4} /> #{badge.level}
               </span>
-              <span>{badge.totalContribution.toLocaleString()} contribution</span>
+              <span>
+                {t('library.fanBadges.contribution', {
+                  amount: badge.totalContribution.toLocaleString(),
+                })}
+              </span>
             </div>
           </div>
         </div>
@@ -334,43 +358,49 @@ function FanBadgeShelf({
 }
 
 export function HistoryPage() {
+  const { t } = useTranslation('pages');
   return (
     <LibraryCollectionPage
       storageKey={WATCH_HISTORY_KEY}
       icon={<History size={22} />}
-      title="History"
-      subtitle="Live rooms you opened on this device."
-      emptyTitle="No watch history yet"
-      emptySub="When you visit a live room, GoLive adds it here automatically."
-      clearLabel="Clear history"
+      title={t('library.historyPage.title')}
+      subtitle={t('library.historyPage.subtitle')}
+      emptyTitle={t('library.historyPage.emptyTitle')}
+      emptySub={t('library.historyPage.emptySub')}
+      primaryActionLabel={t('library.historyPage.primaryAction')}
+      clearLabel={t('library.historyPage.clear')}
     />
   );
 }
 
 export function WatchLaterPage() {
+  const { t } = useTranslation('pages');
   return (
     <LibraryCollectionPage
       storageKey={WATCH_LATER_KEY}
       icon={<Bookmark size={22} />}
-      title="Watch later"
-      subtitle="Saved streams and rooms you want to revisit."
-      emptyTitle="Nothing saved yet"
-      emptySub="Use Save on a live room to build this list."
-      clearLabel="Clear all"
+      title={t('library.watchLaterPage.title')}
+      subtitle={t('library.watchLaterPage.subtitle')}
+      emptyTitle={t('library.watchLaterPage.emptyTitle')}
+      emptySub={t('library.watchLaterPage.emptySub')}
+      primaryActionLabel={t('library.watchLaterPage.primaryAction')}
+      clearLabel={t('library.watchLaterPage.clear')}
     />
   );
 }
 
 export function LikedPage() {
+  const { t } = useTranslation('pages');
   return (
     <LibraryCollectionPage
       storageKey={LIKED_STREAMS_KEY}
       icon={<Heart size={22} />}
-      title="Liked live rooms"
-      subtitle="Streams you liked are collected here for quick return trips."
-      emptyTitle="No liked rooms yet"
-      emptySub="Tap Like on a live room to collect it here."
-      clearLabel="Clear all"
+      title={t('library.likedPage.title')}
+      subtitle={t('library.likedPage.subtitle')}
+      emptyTitle={t('library.likedPage.emptyTitle')}
+      emptySub={t('library.likedPage.emptySub')}
+      primaryActionLabel={t('library.likedPage.primaryAction')}
+      clearLabel={t('library.likedPage.clear')}
     />
   );
 }
@@ -378,8 +408,9 @@ export function LikedPage() {
 type SettingsTab = 'account' | 'experience' | 'live';
 
 export function SettingsPage() {
+  const { t } = useTranslation('pages');
   const { theme, toggleTheme } = useThemeStore();
-  const { lang, toggleLang } = useLangStore();
+  const { lang, setLang } = useLangStore();
   const user = useAuthStore((s) => s.user);
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
@@ -392,9 +423,9 @@ export function SettingsPage() {
   const currentUser = me.data ?? user;
 
   const tabs: Array<{ id: SettingsTab; label: string }> = [
-    { id: 'account', label: 'Account' },
-    { id: 'experience', label: 'Experience' },
-    { id: 'live', label: 'Live defaults' },
+    { id: 'account', label: t('library.settings.tabs.account') },
+    { id: 'experience', label: t('library.settings.tabs.experience') },
+    { id: 'live', label: t('library.settings.tabs.live') },
   ];
 
   return (
@@ -403,11 +434,11 @@ export function SettingsPage() {
         <div className="gl-yt-page-icon">
           <Settings size={22} />
         </div>
-        <h1>Settings</h1>
+        <h1>{t('library.settings.title')}</h1>
       </header>
 
       <div className="gl-yt-settings">
-        <nav className="gl-yt-settings-nav" aria-label="Settings sections">
+        <nav className="gl-yt-settings-nav" aria-label={t('library.settings.sections')}>
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -423,13 +454,13 @@ export function SettingsPage() {
         <div className="gl-yt-settings-panel">
           {tab === 'account' && (
             <>
-              <h2>Account</h2>
+              <h2>{t('library.settings.tabs.account')}</h2>
               <div className="gl-account-row">
                 <Avatar name={userDisplayName(currentUser)} src={currentUser?.avatar} size={56} />
                 <div>
                   <div className="gl-account-name">{userDisplayName(currentUser)}</div>
                   <div className="gl-muted-line">
-                    {isAuthed ? currentUser?.username : 'Not signed in'}
+                    {isAuthed ? currentUser?.username : t('library.settings.notSignedIn')}
                   </div>
                 </div>
               </div>
@@ -440,11 +471,11 @@ export function SettingsPage() {
                   onClick={() => setAvatarOpen(true)}
                 >
                   <Camera size={16} />
-                  Change avatar
+                  {t('library.settings.changeAvatar')}
                 </button>
               ) : (
                 <button className="gl-retry-btn" type="button" onClick={() => openLogin()}>
-                  Sign in
+                  {t('library.signIn')}
                 </button>
               )}
             </>
@@ -452,22 +483,34 @@ export function SettingsPage() {
 
           {tab === 'experience' && (
             <>
-              <h2>Experience</h2>
+              <h2>{t('library.settings.tabs.experience')}</h2>
               <SettingRow
-                title="Dark theme"
-                sub={`Current: ${theme === 'dark' ? 'Dark' : 'Light'}`}
+                title={t('library.settings.darkTheme')}
+                sub={t('library.settings.currentTheme', {
+                  mode:
+                    theme === 'dark'
+                      ? t('library.settings.dark')
+                      : t('library.settings.light'),
+                })}
                 checked={theme === 'dark'}
                 onChange={toggleTheme}
               />
+              <label className="gl-setting-field">
+                <span>{t('library.settings.language')}</span>
+                <select
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as (typeof APP_LANGS)[number])}
+                >
+                  {APP_LANGS.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`library.settings.languageNames.${option}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <SettingRow
-                title="Language"
-                sub={`Current: ${lang === 'en' ? 'English' : 'Japanese'}`}
-                checked={lang === 'ja'}
-                onChange={toggleLang}
-              />
-              <SettingRow
-                title="Low latency playback"
-                sub="Prefer a tighter live delay when the stream supports it."
+                title={t('library.settings.lowLatency')}
+                sub={t('library.settings.lowLatencySub')}
                 checked={lowLatency}
                 onChange={() => setLowLatency((v) => !v)}
               />
@@ -476,20 +519,20 @@ export function SettingsPage() {
 
           {tab === 'live' && (
             <>
-              <h2>Live defaults</h2>
+              <h2>{t('library.settings.tabs.live')}</h2>
               <label className="gl-setting-field">
-                <span>Default category</span>
+                <span>{t('library.settings.defaultCategory')}</span>
                 <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                  <option>Just Chatting</option>
-                  <option>Gaming</option>
-                  <option>Music</option>
-                  <option>VTuber</option>
-                  <option>News</option>
+                  {SETTINGS_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`library.settings.categories.${categoryKey(option)}`)}
+                    </option>
+                  ))}
                 </select>
               </label>
               <SettingRow
-                title="Chat safety assist"
-                sub="Highlight fast-moving chat and potential moderation spikes."
+                title={t('library.settings.chatAssist')}
+                sub={t('library.settings.chatAssistSub')}
                 checked={chatAssist}
                 onChange={() => setChatAssist((v) => !v)}
               />
@@ -509,6 +552,7 @@ function LibraryCollectionPage({
   subtitle,
   emptyTitle,
   emptySub,
+  primaryActionLabel,
   clearLabel,
 }: {
   storageKey: string;
@@ -517,8 +561,10 @@ function LibraryCollectionPage({
   subtitle: string;
   emptyTitle: string;
   emptySub: string;
+  primaryActionLabel: string;
   clearLabel: string;
 }) {
+  const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const [items, setItems] = useState<LibraryStream[]>(() => readLibrary(storageKey));
   const rooms = useRooms({ size: 100 });
@@ -540,7 +586,7 @@ function LibraryCollectionPage({
     setItems([]);
   };
 
-  const handlePlayAll = () => {
+  const handleOpenFirstRoom = () => {
     if (items.length > 0) navigate(`/live/${items[0].id}`);
   };
 
@@ -555,17 +601,17 @@ function LibraryCollectionPage({
           <p className="gl-muted-line">{subtitle}</p>
           <div className="gl-yt-collection-stats">
             <span>
-              {items.length} {items.length === 1 ? 'video' : 'videos'}
+              {t('library.collection.liveRoomCount', { count: items.length })}
             </span>
           </div>
           <div className="gl-yt-collection-actions">
             <button
               type="button"
-              className="gl-yt-play-all"
-              onClick={handlePlayAll}
+              className="gl-yt-open-room"
+              onClick={handleOpenFirstRoom}
               disabled={items.length === 0}
             >
-              <Play size={16} fill="currentColor" /> Play all
+              <Radio size={16} /> {primaryActionLabel}
             </button>
             {items.length > 0 && (
               <button type="button" className="gl-secondary-btn" onClick={handleClear}>
@@ -590,7 +636,7 @@ function LibraryCollectionPage({
                     type="button"
                     className="gl-yt-vrow-remove"
                     onClick={() => handleRemove(stream.id)}
-                    aria-label="Remove"
+                    aria-label={t('library.collection.remove')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -604,13 +650,13 @@ function LibraryCollectionPage({
       {items.length === 0 && (
         <section className="gl-library-section gl-yt-explore">
           <div className="gl-section-title-row">
-            <h2>Live rooms to explore</h2>
+            <h2>{t('library.collection.exploreTitle')}</h2>
           </div>
           <StreamGrid
             isPending={rooms.isPending}
             streams={rooms.data?.items.slice(0, 4) ?? []}
-            emptyTitle="No live rooms available"
-            emptySub="Try again when creators start broadcasting."
+            emptyTitle={t('library.collection.exploreEmptyTitle')}
+            emptySub={t('library.collection.exploreEmptySub')}
           />
         </section>
       )}
@@ -708,6 +754,12 @@ function EmptyState({ icon, title, sub }: { icon: ReactNode; title: string; sub:
       <div className="gl-empty-sub">{sub}</div>
     </div>
   );
+}
+
+const SETTINGS_CATEGORY_OPTIONS = ['Just Chatting', 'Gaming', 'Music', 'VTuber', 'News'] as const;
+
+function categoryKey(category: (typeof SETTINGS_CATEGORY_OPTIONS)[number]): string {
+  return category.toLowerCase().replace(/\s+/g, '');
 }
 
 function QuickChip({

@@ -82,6 +82,8 @@ func main() {
 		Users:           userRepo,
 		AvatarDir:       cfg.Upload.AvatarDir,
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,
+		CoverDir:        cfg.Upload.CoverDir,
+		CoverPublicURL:  cfg.Upload.CoverPublicURL,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 

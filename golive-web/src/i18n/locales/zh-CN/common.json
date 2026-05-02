@@ -1,0 +1,92 @@
+{
+  "search": "搜索",
+  "searchPlaceholder": "搜索直播间",
+  "voiceSearch": "语音搜索",
+  "create": "开播",
+  "notifications": "通知",
+  "menu": "菜单",
+  "theme": {
+    "light": "浅色主题",
+    "dark": "深色主题",
+    "toggle": "切换主题"
+  },
+  "lang": {
+    "toggle": "语言",
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語",
+    "short": {
+      "zh": "中",
+      "en": "EN",
+      "ja": "日"
+    }
+  },
+  "nav": {
+    "home": "首页",
+    "liveNow": "正在直播",
+    "subscriptions": "订阅",
+    "coins": "Coins",
+    "yourLibrary": "我的",
+    "history": "观看历史",
+    "watchLater": "稍后观看",
+    "liked": "喜欢的直播间"
+  },
+  "sidebar": {
+    "subsHeading": "订阅",
+    "foot": {
+      "about": "关于 · 媒体 · 版权",
+      "contact": "联系我们 · 创作者",
+      "ads": "广告 · 开发者",
+      "copyright": "© 2026 GoLive"
+    }
+  },
+  "account": {
+    "menu": "账号菜单",
+    "you": "你",
+    "coins": "{{amount}} coins",
+    "rechargeCoins": "充值 coins",
+    "adminDashboard": "管理后台",
+    "yourChannel": "我的频道",
+    "changeAvatar": "更换头像",
+    "settings": "设置",
+    "appearance": "外观：{{mode}}",
+    "language": "语言：{{language}}",
+    "dark": "深色",
+    "light": "浅色",
+    "signIn": "登录",
+    "signOut": "退出登录"
+  },
+  "auth": {
+    "liveAccount": "直播账号",
+    "signInTitle": "登录 GoLive",
+    "signUpTitle": "创建 GoLive 账号",
+    "signInSub": "预览版本可使用 demo / demo，或创建本地预览账号。",
+    "signUpSub": "选择频道名称后即可进入聊天、礼物和关注功能。",
+    "mode": "认证模式",
+    "signIn": "登录",
+    "register": "注册",
+    "displayName": "显示名称",
+    "displayNamePlaceholder": "你的频道名称",
+    "username": "用户名",
+    "usernamePlaceholder": "选择用户名",
+    "password": "密码",
+    "passwordPlaceholder": "至少 3 个字符",
+    "confirmPassword": "确认密码",
+    "confirmPasswordPlaceholder": "再次输入密码",
+    "creating": "创建中...",
+    "signingIn": "登录中...",
+    "createAccount": "创建账号",
+    "socialUnavailable": "预览版本暂不支持第三方登录",
+    "continueGoogle": "使用 Google 继续",
+    "errors": {
+      "invalidCredentials": "用户名或密码不正确。",
+      "usernameTaken": "这个用户名已被使用。",
+      "badFields": "请检查输入后重试。",
+      "signInFailed": "登录失败，请重试。",
+      "signUpFailed": "账号创建失败，请重试。",
+      "passwordMismatch": "两次输入的密码不一致。"
+    }
+  },
+  "live": "直播中",
+  "viewersWatching": "{{count}} 人正在观看"
+}

@@ -20,6 +20,7 @@ type User struct {
 	DisplayName          string    `gorm:"type:varchar(64)" json:"displayName,omitempty"`
 	PasswordHash         string    `gorm:"type:varchar(100);not null" json:"-"`
 	Avatar               string    `gorm:"type:varchar(500)" json:"avatar"`
+	Cover                string    `gorm:"type:varchar(500)" json:"cover"`
 	CoinBalance          int64     `gorm:"not null;default:0" json:"coinBalance"`
 	Verified             bool      `gorm:"not null;default:false" json:"verified,omitempty"`
 	Role                 string    `gorm:"type:varchar(16);not null;default:user" json:"role"`
@@ -50,6 +51,7 @@ type PublicUser struct {
 	Username             string `json:"username"`
 	DisplayName          string `json:"displayName,omitempty"`
 	Avatar               string `json:"avatar"`
+	Cover                string `json:"cover"`
 	CoinBalance          int64  `json:"coinBalance"`
 	Verified             bool   `json:"verified,omitempty"`
 	Role                 string `json:"role"`
@@ -70,6 +72,7 @@ func (u *User) Public() PublicUser {
 		Username:             u.Username,
 		DisplayName:          u.DisplayName,
 		Avatar:               u.Avatar,
+		Cover:                u.Cover,
 		CoinBalance:          u.CoinBalance,
 		Verified:             u.Verified,
 		Role:                 role,

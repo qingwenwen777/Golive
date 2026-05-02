@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useLangStore } from '@/stores/useLangStore';
-import { CATEGORIES_EN, CATEGORIES_JA } from '@/constants/catalog';
+import { CATEGORIES_EN, CATEGORIES_JA, CATEGORIES_ZH } from '@/constants/catalog';
 import { cn } from '@/lib/cn';
 
 export interface CategoryChipsProps {
@@ -11,7 +11,7 @@ export interface CategoryChipsProps {
 export function CategoryChips({ active, onPick }: CategoryChipsProps) {
   const { t } = useTranslation('pages');
   const lang = useLangStore((s) => s.lang);
-  const displayList = lang === 'ja' ? CATEGORIES_JA : CATEGORIES_EN;
+  const displayList = lang === 'zh' ? CATEGORIES_ZH : lang === 'ja' ? CATEGORIES_JA : CATEGORIES_EN;
 
   const items = displayList.map((label, i) => ({
     key: CATEGORIES_EN[i] ?? label,

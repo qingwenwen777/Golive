@@ -3,6 +3,7 @@ export interface User {
   username: string;
   displayName?: string;
   avatar: string;
+  cover?: string;
   coinBalance: number;
   verified?: boolean;
   role: 'user' | 'admin';

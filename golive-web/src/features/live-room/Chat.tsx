@@ -703,7 +703,11 @@ export function Chat({
                 e.preventDefault();
                 trySend();
               }}
-              placeholder={isAuthed ? t('liveRoom.sayHi') : 'Sign in to chat'}
+              placeholder={
+                isAuthed
+                  ? t('liveRoom.sayHi')
+                  : t('liveRoom.signInToChat', { defaultValue: 'Sign in to chat' })
+              }
               aria-label={t('liveRoom.chatInput')}
               readOnly={!isAuthed}
             />

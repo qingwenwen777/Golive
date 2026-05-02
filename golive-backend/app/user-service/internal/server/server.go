@@ -16,6 +16,8 @@ type Deps struct {
 	Users           *repo.UserRepo
 	AvatarDir       string
 	AvatarPublicURL string
+	CoverDir        string
+	CoverPublicURL  string
 }
 
 // NewRouter builds a Gin engine. Logger/Recovery is wired by the caller's
@@ -34,6 +36,7 @@ func NewRouter(d Deps) *gin.Engine {
 	adminH := handler.NewAdminHandler(d.Users)
 	internalH := handler.NewInternalHandler(d.Users)
 	avatarH := handler.NewAvatarUploadHandler(d.Users, d.AvatarDir, d.AvatarPublicURL)
+	coverH := handler.NewCoverUploadHandler(d.Users, d.CoverDir, d.CoverPublicURL)
 
 	auth := r.Group("/auth")
 	{
@@ -52,6 +55,7 @@ func NewRouter(d Deps) *gin.Engine {
 		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), userH.TopupCoins)
 		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), userH.ClaimDailyCoinTask)
 		users.POST("/me/avatar", handler.AuthRequired(d.Auth), avatarH.Upload)
+		users.POST("/me/cover", handler.AuthRequired(d.Auth), coverH.Upload)
 	}
 
 	creator := r.Group("/creator", handler.AuthRequired(d.Auth))
@@ -77,6 +81,11 @@ func NewRouter(d Deps) *gin.Engine {
 		avatarDir = "./uploads/avatars"
 	}
 	r.Static("/uploads/avatars", avatarDir)
+	coverDir := d.CoverDir
+	if coverDir == "" {
+		coverDir = "./uploads/covers"
+	}
+	r.Static("/uploads/covers", coverDir)
 
 	return r
 }

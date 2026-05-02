@@ -356,6 +356,26 @@ func (r *UserRepo) UpdateAvatar(ctx context.Context, id, avatar string) (*model.
 	return &u, nil
 }
 
+func (r *UserRepo) UpdateCover(ctx context.Context, id, cover string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&u).Update("cover", cover).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", id).Take(&u).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 func newID() string {
 	return uuid.NewString()
 }
