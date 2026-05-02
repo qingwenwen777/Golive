@@ -516,7 +516,15 @@
       "gifts": "Gift summary",
       "noGifts": "No gifts yet.",
       "superChat": "Pinned SuperChat",
-      "noSuperChat": "No SuperChat pinned."
+      "noSuperChat": "No SuperChat pinned.",
+      "metadataLabel": "Room info",
+      "metadataTitle": "Live room details",
+      "metadataSave": "Save changes",
+      "metadataSaving": "Saving...",
+      "metadataSaved": "Live room info updated.",
+      "metadataFailed": "Could not update live room info.",
+      "metadataTitleRequired": "Title is required.",
+      "metadataClearCover": "Remove cover"
     }
   },
   "admin": {

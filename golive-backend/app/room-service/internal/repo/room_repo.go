@@ -142,6 +142,14 @@ func (r *RoomRepo) ActiveRoomsByOwner(ctx context.Context, ownerID string) ([]mo
 	return rooms, err
 }
 
+func (r *RoomRepo) UpdateMetadata(ctx context.Context, id, title, description, cover string) error {
+	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(map[string]any{
+		"title":       title,
+		"description": description,
+		"cover":       cover,
+	}).Error
+}
+
 func (r *RoomRepo) EndActiveByOwner(ctx context.Context, ownerID string, endedAt time.Time) ([]model.Room, error) {
 	var rooms []model.Room
 	if err := r.db.WithContext(ctx).

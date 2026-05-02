@@ -9,6 +9,7 @@ import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
 import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
+import type { Stream } from '@/types/stream';
 import { betQueryKey } from '@/api/bet';
 import i18n from '@/i18n';
 import {
@@ -80,6 +81,13 @@ interface ServerLiveStatus {
   text?: string;
   ts?: number;
 }
+interface ServerRoomUpdated {
+  type: 'room_updated';
+  title: string;
+  description?: string;
+  cover?: string;
+  ts?: number;
+}
 interface ServerBet {
   type: 'bet';
   event: 'opened' | 'wagered' | 'settled' | 'cancelled';
@@ -96,6 +104,7 @@ type ServerMessage =
   | ServerViewerList
   | ServerSystem
   | ServerLiveStatus
+  | ServerRoomUpdated
   | ServerBet;
 
 function genId(prefix: string): string {
@@ -337,6 +346,20 @@ export function useRoomRealtime(
           });
           onLiveEndedRef.current?.();
         }
+        break;
+      }
+      case 'room_updated': {
+        queryClient.setQueryData<Stream>(['room', roomId], (prev) =>
+          prev
+            ? {
+                ...prev,
+                title: parsed.title,
+                description: parsed.description ?? '',
+                cover: parsed.cover ?? '',
+              }
+            : prev,
+        );
+        void queryClient.invalidateQueries({ queryKey: ['rooms'] });
         break;
       }
       case 'bet': {

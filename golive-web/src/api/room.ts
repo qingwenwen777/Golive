@@ -62,6 +62,26 @@ export function useGoLive() {
   });
 }
 
+export interface UpdateLiveMetadataPayload {
+  title: string;
+  description?: string;
+  cover?: string;
+}
+
+export function useUpdateLiveMetadata() {
+  const qc = useQueryClient();
+  return useMutation<Stream, Error, UpdateLiveMetadataPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.patch<Stream>('/rooms/live', payload);
+      return data;
+    },
+    onSuccess: (stream) => {
+      qc.setQueryData(['room', stream.id], stream);
+      void qc.invalidateQueries({ queryKey: ['rooms'] });
+    },
+  });
+}
+
 export function useStopLive() {
   const qc = useQueryClient();
   return useMutation<{ ok: boolean }, Error, void>({

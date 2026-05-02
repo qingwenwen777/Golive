@@ -12,6 +12,7 @@ import (
 var ErrStreamKeyNotFound = errors.New("stream key not found")
 
 const streamKeyPrefix = "streamkey:"
+const streamSessionPrefix = "streamsession:"
 const roomChannelPrefix = "room:"
 
 type LiveRepo struct {
@@ -40,6 +41,28 @@ func (r *LiveRepo) Resolve(ctx context.Context, key string) (string, error) {
 
 func (r *LiveRepo) Delete(ctx context.Context, key string) error {
 	return r.rdb.Del(ctx, streamKeyPrefix+key).Err()
+}
+
+func (r *LiveRepo) SavePublishSession(ctx context.Context, key, clientID string, ttl time.Duration) error {
+	if key == "" || clientID == "" {
+		return nil
+	}
+	return r.rdb.Set(ctx, streamSessionPrefix+key, clientID, ttl).Err()
+}
+
+func (r *LiveRepo) PublishSession(ctx context.Context, key string) (string, error) {
+	v, err := r.rdb.Get(ctx, streamSessionPrefix+key).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", ErrStreamKeyNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return v, nil
+}
+
+func (r *LiveRepo) DeletePublishSession(ctx context.Context, key string) error {
+	return r.rdb.Del(ctx, streamSessionPrefix+key).Err()
 }
 
 func (r *LiveRepo) PublishRoomEvent(ctx context.Context, roomID string, payload []byte) error {

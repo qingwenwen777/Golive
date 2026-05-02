@@ -39,6 +39,7 @@ func newLiveServiceTestDepsWithRedis(t *testing.T) (*LiveService, *repo.RoomRepo
 
 	live := repo.NewLiveRepo(rdb)
 	svc := NewLiveService(rooms, live, "test-secret", time.Hour, "http://srs/live")
+	svc.unpublishGrace = 0
 	return svc, rooms, live, rdb
 }
 
@@ -61,6 +62,14 @@ func publishTestLive(t *testing.T, svc *LiveService, streamKey string) {
 	require.NoError(t, svc.OnPublish(context.Background(), SRSPublishReq{Stream: streamKey}))
 }
 
+func publishTestLiveClient(t *testing.T, svc *LiveService, streamKey, clientID string) {
+	t.Helper()
+	require.NoError(t, svc.OnPublish(context.Background(), SRSPublishReq{
+		Stream:   streamKey,
+		ClientID: clientID,
+	}))
+}
+
 func TestGoLiveCreatesPublishingSessionOnly(t *testing.T) {
 	ctx := context.Background()
 	svc, rooms, _ := newLiveServiceTestDeps(t)
@@ -73,6 +82,42 @@ func TestGoLiveCreatesPublishingSessionOnly(t *testing.T) {
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
 	require.Equal(t, model.StatusPublishing, room.Status)
+}
+
+func TestUpdateLiveMetadataEditsActiveRoomAndBroadcasts(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _, rdb := newLiveServiceTestDepsWithRedis(t)
+	st := startTestLive(t, svc, "owner-edit")
+
+	sub := rdb.Subscribe(ctx, "room:"+st.ID)
+	defer func() { require.NoError(t, sub.Close()) }()
+	_, err := sub.Receive(ctx)
+	require.NoError(t, err)
+
+	updated, err := svc.UpdateLiveMetadata(ctx, "owner-edit", UpdateLiveReq{
+		Title:       " Better title ",
+		Description: "Updated description",
+		Cover:       " /uploads/covers/live-edit.webp ",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Better title", updated.Title)
+	require.Equal(t, "Updated description", updated.Description)
+	require.Equal(t, "/uploads/covers/live-edit.webp", updated.Cover)
+	require.Equal(t, st.StreamKey, updated.StreamKey)
+
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Better title", room.Title)
+	require.Equal(t, "Updated description", room.Description)
+	require.Equal(t, "/uploads/covers/live-edit.webp", room.Cover)
+
+	select {
+	case msg := <-sub.Channel():
+		require.Contains(t, msg.Payload, `"type":"room_updated"`)
+		require.Contains(t, msg.Payload, `"title":"Better title"`)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for room_updated event")
+	}
 }
 
 func TestOnPublishIsIdempotentAndDoesNotResetStartedAt(t *testing.T) {
@@ -222,6 +267,56 @@ func TestOnUnpublishIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, room.EndedAt)
 	require.True(t, firstEnd.Equal(*room.EndedAt))
+}
+
+func TestOnUnpublishGraceAllowsPublisherReconnect(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, live := newLiveServiceTestDeps(t)
+	svc.unpublishGrace = 20 * time.Millisecond
+	st := startTestLive(t, svc, "owner-reconnect-grace")
+	publishTestLiveClient(t, svc, st.StreamKey, "old-client")
+
+	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{
+		Stream:   st.StreamKey,
+		ClientID: "old-client",
+	}))
+
+	_, err := live.Resolve(ctx, st.StreamKey)
+	require.NoError(t, err)
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusLive, room.Status)
+
+	publishTestLiveClient(t, svc, st.StreamKey, "new-client")
+	time.Sleep(60 * time.Millisecond)
+
+	_, err = live.Resolve(ctx, st.StreamKey)
+	require.NoError(t, err)
+	room, err = rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusLive, room.Status)
+	require.Nil(t, room.EndedAt)
+}
+
+func TestOnUnpublishGraceEndsWhenPublisherDoesNotReconnect(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, live := newLiveServiceTestDeps(t)
+	svc.unpublishGrace = 20 * time.Millisecond
+	st := startTestLive(t, svc, "owner-no-reconnect")
+	publishTestLiveClient(t, svc, st.StreamKey, "gone-client")
+
+	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{
+		Stream:   st.StreamKey,
+		ClientID: "gone-client",
+	}))
+	time.Sleep(60 * time.Millisecond)
+
+	_, err := live.Resolve(ctx, st.StreamKey)
+	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusEnded, room.Status)
+	require.NotNil(t, room.EndedAt)
 }
 
 func TestOnUnpublishVariantDoesNotEndRoom(t *testing.T) {

@@ -62,6 +62,7 @@ func NewRouter(d Deps) *gin.Engine {
 		authed.DELETE("/:id/dislike", socialH.Undislike)
 
 		authed.POST("/live", liveH.GoLive)
+		authed.PATCH("/live", liveH.UpdateLive)
 		authed.DELETE("/live", liveH.StopLive)
 		authed.POST("/live/cover", coverH.Upload)
 	}

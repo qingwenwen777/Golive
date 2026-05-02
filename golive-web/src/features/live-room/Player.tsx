@@ -11,7 +11,6 @@ import {
   PictureInPicture,
   MessagesSquare,
   MessageSquareOff,
-  Settings,
   Type,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -34,26 +33,14 @@ import type { Bullet } from '@/stores/useRealtimeStore';
 const DEFAULT_VIDEO_SRC =
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
 
-const LIVE_STASH_INITIAL_SIZE = 2 * 1024 * 1024;
+const LIVE_STASH_INITIAL_SIZE = 384 * 1024;
 const LIVE_RECOVERY_DELAY_MS = 2500;
-const LIVE_STUCK_RELOAD_MS = 9000;
+const LIVE_RECONNECT_DELAY_MS = 1800;
+const LIVE_STUCK_RELOAD_MS = 7000;
 const LIVE_BUFFER_CHECK_MS = 2000;
-const LIVE_RECOVERY_BACKOFF_SECONDS = 1.5;
-const LIVE_MAX_BUFFER_LATENCY_SECONDS = 25;
-const LIVE_TARGET_LATENCY_SECONDS = 6;
-
-type PlaybackQuality = 'source' | 'q720' | 'q480';
-
-const PLAYBACK_QUALITY_OPTIONS: Array<{
-  value: PlaybackQuality;
-  labelKey: string;
-  labelDefault: string;
-  suffix: string;
-}> = [
-  { value: 'source', labelKey: 'player.qualitySource', labelDefault: 'Source', suffix: '' },
-  { value: 'q720', labelKey: 'player.quality720', labelDefault: 'HD 720p', suffix: '_q720' },
-  { value: 'q480', labelKey: 'player.quality480', labelDefault: 'Smooth 480p', suffix: '_q480' },
-];
+const LIVE_RECOVERY_BACKOFF_SECONDS = 1;
+const LIVE_MAX_BUFFER_LATENCY_SECONDS = 8;
+const LIVE_TARGET_LATENCY_SECONDS = 2;
 
 const DANMU_FONT_OPTIONS: Array<{ value: DanmuFontSize; label: string }> = [
   { value: 'sm', label: 'Small' },
@@ -108,18 +95,16 @@ function streamPlaybackKey(stream: Stream): string {
   );
 }
 
-function buildFlvUrl(stream: Stream, quality: PlaybackQuality): string {
+function buildFlvUrl(stream: Stream): string {
   const flvBase = ((import.meta.env.VITE_FLV_BASE as string | undefined) ?? '').replace(/\/$/, '');
   const source = stream.playbackUrl || '';
   const key = streamPlaybackKey(stream);
-  const suffix = PLAYBACK_QUALITY_OPTIONS.find((option) => option.value === quality)?.suffix ?? '';
-  const qualityKey = key ? `${key}${suffix}` : '';
 
-  if (flvBase && qualityKey) {
-    return `${flvBase}/${qualityKey}.flv`;
+  if (flvBase && key) {
+    return `${flvBase}/${key}.flv`;
   }
-  if (source && quality === 'source') return source;
-  if (qualityKey) return `/live/${qualityKey}.flv`;
+  if (source) return source;
+  if (key) return `/live/${key}.flv`;
   return '';
 }
 
@@ -143,6 +128,7 @@ export function Player({
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<number | null>(null);
   const stallTimerRef = useRef<number | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
   const lastPlaybackRef = useRef({ time: 0, changedAt: Date.now() });
 
   const danmuOn = useDanmuStore((s) => s.on);
@@ -150,10 +136,7 @@ export function Player({
   const danmuFontSize = useDanmuStore((s) => s.fontSize);
   const setDanmuFontSize = useDanmuStore((s) => s.setFontSize);
 
-  const [quality, setQuality] = useState<PlaybackQuality>('source');
-  const playbackKey = streamPlaybackKey(stream);
-  const hasVariantPlayback = Boolean(playbackKey);
-  const flvUrl = buildFlvUrl(stream, quality);
+  const flvUrl = buildFlvUrl(stream);
   const isLiveFlv = !!flvUrl && stream.isLive !== false;
   const fallbackSrc = videoSrc ?? DEFAULT_VIDEO_SRC;
 
@@ -168,11 +151,47 @@ export function Player({
     setFlvError('Stream ended.');
   }, []);
 
+  const showControlsTemporarily = useCallback(() => {
+    setControlsVisible(true);
+    if (hideControlsTimerRef.current) {
+      window.clearTimeout(hideControlsTimerRef.current);
+    }
+    hideControlsTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      hideControlsTimerRef.current = null;
+    }, 2600);
+  }, []);
+
   const clearStallTimer = useCallback(() => {
     if (!stallTimerRef.current) return;
     window.clearTimeout(stallTimerRef.current);
     stallTimerRef.current = null;
   }, []);
+
+  const clearReconnectTimer = useCallback(() => {
+    if (!reconnectTimerRef.current) return;
+    window.clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = null;
+  }, []);
+
+  const scheduleLiveReconnect = useCallback(() => {
+    if (!isLiveFlv || stream.isLive === false || endedRef.current) return false;
+    setFlvError(null);
+    setBuffering(true);
+    showControlsTemporarily();
+
+    clearReconnectTimer();
+    reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = null;
+      setRetryNonce((n) => n + 1);
+    }, LIVE_RECONNECT_DELAY_MS);
+    return true;
+  }, [
+    clearReconnectTimer,
+    isLiveFlv,
+    showControlsTemporarily,
+    stream.isLive,
+  ]);
 
   const recoverLivePlayback = useCallback((secondsBehindLive = LIVE_RECOVERY_BACKOFF_SECONDS) => {
     const v = videoRef.current;
@@ -185,13 +204,15 @@ export function Player({
     endedRef.current = false;
     setBuffering(false);
     clearStallTimer();
-  }, [clearStallTimer, flvUrl]);
+    clearReconnectTimer();
+  }, [clearReconnectTimer, clearStallTimer, flvUrl]);
 
   useEffect(() => {
-    setQuality('source');
-  }, [stream.id]);
-
-  useEffect(() => clearStallTimer, [clearStallTimer]);
+    return () => {
+      clearStallTimer();
+      clearReconnectTimer();
+    };
+  }, [clearReconnectTimer, clearStallTimer]);
 
   useEffect(() => {
     if (!isLiveFlv || !flvUrl || !videoRef.current) return;
@@ -205,30 +226,38 @@ export function Player({
       { type: 'flv', url: flvUrl, isLive: true, hasAudio: true, hasVideo: true },
       {
         isLive: true,
-        enableWorker: true,
+        enableWorker: false,
         enableStashBuffer: true,
         stashInitialSize: LIVE_STASH_INITIAL_SIZE,
-        liveBufferLatencyChasing: false,
+        liveBufferLatencyChasing: true,
+        liveBufferLatencyMaxLatency: LIVE_MAX_BUFFER_LATENCY_SECONDS,
+        liveBufferLatencyMinRemain: LIVE_TARGET_LATENCY_SECONDS,
         lazyLoad: false,
         autoCleanupSourceBuffer: true,
-        autoCleanupMaxBackwardDuration: 60,
-        autoCleanupMinBackwardDuration: 30,
+        autoCleanupMaxBackwardDuration: 20,
+        autoCleanupMinBackwardDuration: 8,
       },
     );
     const onErr = (errType: string, errDetail: string) => {
       const detail = `${errType} ${errDetail}`.toLowerCase();
-      if (quality !== 'source' && (detail.includes('network') || detail.includes('exception'))) {
-        setQuality('source');
-        setBuffering(true);
-        return;
+      if (
+        detail.includes('eof') ||
+        detail.includes('ended') ||
+        detail.includes('loading_complete') ||
+        detail.includes('network') ||
+        detail.includes('exception')
+      ) {
+        if (scheduleLiveReconnect()) return;
       }
-      if (detail.includes('eof') || detail.includes('ended') || detail.includes('loading_complete')) {
+      if (stream.isLive === false) {
         showPlaybackEnded();
         return;
       }
       setFlvError(`Stream error: ${errType}${errDetail ? ' / ' + errDetail : ''}`);
     };
-    const onEnd = () => showPlaybackEnded();
+    const onEnd = () => {
+      if (!scheduleLiveReconnect()) showPlaybackEnded();
+    };
     player.on(mpegts.Events.ERROR, onErr);
     player.on(mpegts.Events.LOADING_COMPLETE, onEnd);
 
@@ -236,7 +265,7 @@ export function Player({
     try {
       player.load();
       void player.play()?.catch?.(() => {
-        // Autoplay blocked — surface as recoverable, user can click play.
+        // Autoplay blocked; user can click play.
       });
     } catch (e) {
       setFlvError(e instanceof Error ? e.message : 'Failed to start stream.');
@@ -267,8 +296,18 @@ export function Player({
       }
       setBuffering(false);
       clearStallTimer();
+      clearReconnectTimer();
     };
-  }, [clearStallTimer, isLiveFlv, flvUrl, quality, retryNonce, showPlaybackEnded]);
+  }, [
+    clearReconnectTimer,
+    clearStallTimer,
+    isLiveFlv,
+    flvUrl,
+    retryNonce,
+    scheduleLiveReconnect,
+    showPlaybackEnded,
+    stream.isLive,
+  ]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -341,7 +380,7 @@ export function Player({
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onEnded = () => {
-      if (isLiveFlv) showPlaybackEnded();
+      if (isLiveFlv) scheduleLiveReconnect();
     };
     const onVol = () => {
       setMuted(v.muted);
@@ -369,7 +408,7 @@ export function Player({
       v.removeEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
       v.removeEventListener('webkitendfullscreen', onWebkitEndFullscreen);
     };
-  }, [isLiveFlv, showPlaybackEnded]);
+  }, [isLiveFlv, scheduleLiveReconnect]);
 
   useEffect(() => {
     const onFsChange = () => {
@@ -440,17 +479,6 @@ export function Player({
       /* noop */
     }
   };
-
-  const showControlsTemporarily = useCallback(() => {
-    setControlsVisible(true);
-    if (hideControlsTimerRef.current) {
-      window.clearTimeout(hideControlsTimerRef.current);
-    }
-    hideControlsTimerRef.current = window.setTimeout(() => {
-      setControlsVisible(false);
-      hideControlsTimerRef.current = null;
-    }, 2600);
-  }, []);
 
   useEffect(() => {
     showControlsTemporarily();
@@ -532,6 +560,7 @@ export function Player({
   }, [flvError, isLiveFlv, recoverLivePlayback]);
 
   const viewers = viewerCount ?? stream.viewers + extraViewers;
+  const menuPortalContainer = fullscreen ? containerRef.current : undefined;
 
   return (
     <div
@@ -638,36 +667,6 @@ export function Player({
             <span className="gl-live-word">{t('player.live')}</span>
           </button>
           <div className="gl-ctl-spacer" />
-          {isLiveFlv && hasVariantPlayback && (
-            <DropdownMenu
-              onOpenChange={(open) => {
-                if (open) showControlsTemporarily();
-              }}
-            >
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="gl-pbtn"
-                  aria-label={t('player.quality')}
-                  title={t('player.quality')}
-                >
-                  <Settings size={20} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="top" className="w-40">
-                <DropdownMenuLabel>{t('player.quality')}</DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={quality}
-                  onValueChange={(value) => setQuality(value as PlaybackQuality)}
-                >
-                  {PLAYBACK_QUALITY_OPTIONS.map((option) => (
-                    <DropdownMenuRadioItem key={option.value} value={option.value}>
-                      {t(option.labelKey, { defaultValue: option.labelDefault })}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
           <button
             className="gl-pbtn"
             onClick={toggleDanmu}
@@ -691,7 +690,12 @@ export function Player({
                 <Type size={20} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-36">
+            <DropdownMenuContent
+              align="end"
+              side="top"
+              className="w-36"
+              container={menuPortalContainer}
+            >
               <DropdownMenuLabel>
                 {t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
               </DropdownMenuLabel>

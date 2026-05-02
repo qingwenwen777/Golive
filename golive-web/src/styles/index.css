@@ -4213,6 +4213,41 @@ button.gl-fan-badge-empty {
 .gl-creator-publisher-console {
   margin-top: 0;
 }
+.gl-live-metadata-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gl-live-metadata-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+  gap: 14px;
+  align-items: start;
+}
+.gl-live-metadata-fields {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+.gl-live-metadata-cover {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.gl-live-metadata-cover > span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-live-metadata-cover .gl-creator-cover-picker {
+  width: 100%;
+}
+.gl-live-metadata-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 .gl-creator-publisher-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -5511,6 +5546,13 @@ button.gl-fan-badge-empty {
     flex-direction: column;
   }
   .gl-live-console-status .gl-owner-end-live {
+    width: 100%;
+  }
+  .gl-live-metadata-grid {
+    grid-template-columns: 1fr;
+  }
+  .gl-live-metadata-actions .gl-creator-primary,
+  .gl-live-metadata-cover .gl-creator-secondary {
     width: 100%;
   }
   .gl-live-console-rail .gl-chat {

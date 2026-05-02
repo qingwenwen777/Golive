@@ -517,7 +517,15 @@
       "gifts": "礼物汇总",
       "noGifts": "暂无礼物。",
       "superChat": "SuperChat 置顶",
-      "noSuperChat": "暂无置顶 SuperChat。"
+      "noSuperChat": "暂无置顶 SuperChat。",
+      "metadataLabel": "直播间信息",
+      "metadataTitle": "直播间详情",
+      "metadataSave": "保存修改",
+      "metadataSaving": "保存中...",
+      "metadataSaved": "直播间信息已更新。",
+      "metadataFailed": "无法更新直播间信息。",
+      "metadataTitleRequired": "标题不能为空。",
+      "metadataClearCover": "移除封面"
     }
   },
   "admin": {

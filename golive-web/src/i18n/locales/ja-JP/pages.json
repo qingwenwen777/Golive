@@ -516,7 +516,15 @@
       "gifts": "ギフト集計",
       "noGifts": "ギフトはまだありません。",
       "superChat": "固定 SuperChat",
-      "noSuperChat": "固定 SuperChat はありません。"
+      "noSuperChat": "固定 SuperChat はありません。",
+      "metadataLabel": "ルーム情報",
+      "metadataTitle": "ライブ詳細",
+      "metadataSave": "変更を保存",
+      "metadataSaving": "保存中...",
+      "metadataSaved": "ライブ情報を更新しました。",
+      "metadataFailed": "ライブ情報を更新できませんでした。",
+      "metadataTitleRequired": "タイトルは必須です。",
+      "metadataClearCover": "カバーを削除"
     }
   },
   "admin": {

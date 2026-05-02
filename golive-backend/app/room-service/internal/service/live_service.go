@@ -18,15 +18,17 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/errcode"
 )
 
 type LiveService struct {
-	rooms     *repo.RoomRepo
-	live      *repo.LiveRepo
-	keySecret []byte
-	keyTTL    time.Duration
-	flvBase   string
-	now       func() time.Time
+	rooms          *repo.RoomRepo
+	live           *repo.LiveRepo
+	keySecret      []byte
+	keyTTL         time.Duration
+	flvBase        string
+	unpublishGrace time.Duration
+	now            func() time.Time
 }
 
 type liveStatusMsg struct {
@@ -36,17 +38,26 @@ type liveStatusMsg struct {
 	Ts     int64  `json:"ts"`
 }
 
+type liveMetadataMsg struct {
+	Type        string `json:"type"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Cover       string `json:"cover"`
+	Ts          int64  `json:"ts"`
+}
+
 func NewLiveService(rooms *repo.RoomRepo, live *repo.LiveRepo, secret string, ttl time.Duration, flvBase string) *LiveService {
 	if flvBase == "" {
 		flvBase = "http://localhost:8082/live"
 	}
 	return &LiveService{
-		rooms:     rooms,
-		live:      live,
-		keySecret: []byte(secret),
-		keyTTL:    ttl,
-		flvBase:   strings.TrimRight(flvBase, "/"),
-		now:       time.Now,
+		rooms:          rooms,
+		live:           live,
+		keySecret:      []byte(secret),
+		keyTTL:         ttl,
+		flvBase:        strings.TrimRight(flvBase, "/"),
+		unpublishGrace: 20 * time.Second,
+		now:            time.Now,
 	}
 }
 
@@ -60,6 +71,13 @@ type GoLiveReq struct {
 	Avatar      string `json:"avatar"`
 }
 
+// UpdateLiveReq is the body of PATCH /rooms/live.
+type UpdateLiveReq struct {
+	Title       string `json:"title" binding:"required"`
+	Description string `json:"description"`
+	Cover       string `json:"cover"`
+}
+
 // GoLive provisions or refreshes a streaming session for the user. Returns a
 // Stream WITH streamKey populated — only the publisher ever sees this.
 func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq) (*model.Stream, error) {
@@ -70,6 +88,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		}
 		if active.StreamKey != "" {
 			_ = s.live.Delete(ctx, active.StreamKey)
+			_ = s.live.DeletePublishSession(ctx, active.StreamKey)
 		}
 		_ = s.broadcastEnded(ctx, active.ID, now)
 	} else if !errors.Is(err, repo.ErrRoomNotFound) {
@@ -108,6 +127,45 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 
 	st := room.ToStream(now)
 	st.StreamKey = streamKey
+	return &st, nil
+}
+
+func (s *LiveService) playbackURL(r *model.Room) string {
+	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
+		return ""
+	}
+	return s.flvBase + "/" + r.StreamKey + ".flv"
+}
+
+// UpdateLiveMetadata changes the active live room's public metadata without
+// rotating the stream key or interrupting the publisher.
+func (s *LiveService) UpdateLiveMetadata(ctx context.Context, ownerID string, req UpdateLiveReq) (*model.Stream, error) {
+	title := trimRunes(strings.TrimSpace(req.Title), 120)
+	if title == "" {
+		return nil, errcode.New(400, "title is required")
+	}
+	description := cleanDescription(req.Description)
+	cover := trimRunes(strings.TrimSpace(req.Cover), 500)
+
+	room, err := s.rooms.ActiveByOwner(ctx, ownerID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		return nil, errcode.New(404, "active live not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	room.Title = title
+	room.Description = description
+	room.Cover = cover
+	if err := s.rooms.UpdateMetadata(ctx, room.ID, title, description, cover); err != nil {
+		return nil, err
+	}
+
+	now := s.now()
+	st := room.ToStream(now)
+	st.PlaybackURL = s.playbackURL(room)
+	st.StreamKey = room.StreamKey
+	_ = s.broadcastRoomUpdated(ctx, room, now)
 	return &st, nil
 }
 
@@ -176,6 +234,9 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 			if err := s.live.Delete(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
 				return err
 			}
+			if err := s.live.DeletePublishSession(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+				return err
+			}
 		}
 	}
 	return nil
@@ -223,6 +284,7 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	}
 	if room.StreamKey != streamKey {
 		_ = s.live.Delete(ctx, streamKey)
+		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return errors.New("stream key is no longer active")
 	}
 	if isVariant {
@@ -235,13 +297,19 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 			return errors.New("stream is not publishable")
 		}
 	}
+	if err := s.live.SavePublishSession(ctx, streamKey, req.ClientID, s.keyTTL); err != nil {
+		return err
+	}
 	switch room.Status {
 	case model.StatusPublishing:
 		return s.rooms.SetLive(ctx, roomID, s.now())
 	case model.StatusLive:
 		return nil
-	case model.StatusEnding, model.StatusEnded:
+	case model.StatusEnding:
+		return s.rooms.SetLive(ctx, roomID, s.now())
+	case model.StatusEnded:
 		_ = s.live.Delete(ctx, streamKey)
+		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return errors.New("stream has ended")
 	default:
 		return errors.New("stream is not publishable")
@@ -260,6 +328,7 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 	}
 	room, err := s.rooms.GetByID(ctx, roomID)
 	if errors.Is(err, repo.ErrRoomNotFound) {
+		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return s.live.Delete(ctx, streamKey)
 	}
 	if err != nil {
@@ -267,19 +336,75 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 	}
 	if room.StreamKey != streamKey {
 		_ = s.live.Delete(ctx, streamKey)
+		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return nil
 	}
 	if isVariant {
 		return nil
 	}
 	if room.Status == model.StatusEnded {
+		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return s.live.Delete(ctx, streamKey)
 	}
-	endedAt := s.now()
+	disconnectedAt := s.now()
+	if s.unpublishGrace > 0 {
+		go s.finalizeUnpublishAfterGrace(streamKey, roomID, req.ClientID, disconnectedAt)
+		return nil
+	}
+	return s.finalizeUnpublish(ctx, streamKey, roomID, req.ClientID, disconnectedAt)
+}
+
+func (s *LiveService) finalizeUnpublishAfterGrace(streamKey, roomID, clientID string, disconnectedAt time.Time) {
+	time.Sleep(s.unpublishGrace)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = s.finalizeUnpublish(ctx, streamKey, roomID, clientID, disconnectedAt)
+}
+
+func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID, clientID string, endedAt time.Time) error {
+	if clientID != "" {
+		activeClient, err := s.live.PublishSession(ctx, streamKey)
+		if err == nil && activeClient != clientID {
+			return nil
+		}
+		if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+			return err
+		}
+	}
+	activeRoomID, err := s.live.Resolve(ctx, streamKey)
+	if errors.Is(err, repo.ErrStreamKeyNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if activeRoomID != roomID {
+		return nil
+	}
+	room, err := s.rooms.GetByID(ctx, roomID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		_ = s.live.DeletePublishSession(ctx, streamKey)
+		return s.live.Delete(ctx, streamKey)
+	}
+	if err != nil {
+		return err
+	}
+	if room.StreamKey != streamKey {
+		_ = s.live.DeletePublishSession(ctx, streamKey)
+		_ = s.live.Delete(ctx, streamKey)
+		return nil
+	}
+	if room.Status == model.StatusEnded {
+		_ = s.live.DeletePublishSession(ctx, streamKey)
+		return s.live.Delete(ctx, streamKey)
+	}
 	if err := s.endRoom(ctx, room, endedAt); err != nil {
 		return err
 	}
 	if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
+		return err
+	}
+	if err := s.live.DeletePublishSession(ctx, streamKey); err != nil {
 		return err
 	}
 	return s.live.Delete(ctx, streamKey)
@@ -314,6 +439,20 @@ func (s *LiveService) broadcastEnded(ctx context.Context, roomID string, endedAt
 		return err
 	}
 	return s.live.PublishRoomEvent(ctx, roomID, payload)
+}
+
+func (s *LiveService) broadcastRoomUpdated(ctx context.Context, room *model.Room, updatedAt time.Time) error {
+	payload, err := json.Marshal(liveMetadataMsg{
+		Type:        "room_updated",
+		Title:       room.Title,
+		Description: room.Description,
+		Cover:       room.Cover,
+		Ts:          updatedAt.UnixMilli(),
+	})
+	if err != nil {
+		return err
+	}
+	return s.live.PublishRoomEvent(ctx, room.ID, payload)
 }
 
 // generateKey produces a deterministic-but-unpredictable HMAC tag.

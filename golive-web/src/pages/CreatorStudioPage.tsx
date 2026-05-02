@@ -13,6 +13,7 @@ import {
   MessageSquare,
   PlayCircle,
   Radio,
+  Save,
   Send,
   ShieldCheck,
   Square,
@@ -31,6 +32,7 @@ import {
   useRoom,
   useRooms,
   useStopLive,
+  useUpdateLiveMetadata,
   useUploadLiveCover,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -581,6 +583,13 @@ export function CreatorLiveConsolePage() {
           ) : (
             <WaitingPreview stream={stream} />
           )}
+          <LiveMetadataEditor
+            stream={stream}
+            onUpdated={() => {
+              void room.refetch();
+              void liveRooms.refetch();
+            }}
+          />
           {session && (
             <ConsolePublisherPanel
               session={session}
@@ -996,6 +1005,144 @@ function WaitingPreview({ stream }: { stream: Stream }) {
         <span>{t('studio.console.waitingPreviewBody', { defaultValue: 'Add the stream server and key in OBS, then start streaming.' })}</span>
       </div>
     </div>
+  );
+}
+
+function LiveMetadataEditor({
+  stream,
+  onUpdated,
+}: {
+  stream: Stream;
+  onUpdated: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  const uploadCover = useUploadLiveCover();
+  const updateLive = useUpdateLiveMetadata();
+  const [title, setTitle] = useState(stream.title);
+  const [description, setDescription] = useState(stream.description ?? '');
+  const [coverPreview, setCoverPreview] = useState(stream.cover ?? '');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+    };
+  }, [coverPreview]);
+
+  const pending = uploadCover.isPending || updateLive.isPending;
+  const normalizedTitle = title.trim();
+  const normalizedDescription = description.trim();
+  const normalizedCover = coverPreview.trim();
+  const dirty =
+    normalizedTitle !== stream.title ||
+    normalizedDescription !== (stream.description ?? '') ||
+    normalizedCover !== (stream.cover ?? '') ||
+    Boolean(coverFile);
+
+  const setCover = (file: File | null) => {
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const clearCover = () => {
+    setCoverFile(null);
+    setCoverPreview('');
+  };
+
+  const saveMetadata = async () => {
+    if (!normalizedTitle) {
+      toast.error(t('studio.console.metadataTitleRequired', { defaultValue: 'Title is required.' }));
+      return;
+    }
+    try {
+      const cover = coverFile ? (await uploadCover.mutateAsync(coverFile)).url : normalizedCover;
+      const next = await updateLive.mutateAsync({
+        title: normalizedTitle,
+        description: normalizedDescription,
+        cover,
+      });
+      setTitle(next.title);
+      setDescription(next.description ?? '');
+      setCoverFile(null);
+      setCoverPreview(next.cover ?? '');
+      toast.success(t('studio.console.metadataSaved', { defaultValue: 'Live room info updated.' }));
+      onUpdated();
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t('studio.console.metadataFailed', { defaultValue: 'Could not update live room info.' }),
+      );
+    }
+  };
+
+  return (
+    <section className="gl-creator-panel gl-live-metadata-panel">
+      <div className="gl-creator-panel-head">
+        <div>
+          <span>{t('studio.console.metadataLabel', { defaultValue: 'Room info' })}</span>
+          <h2>{t('studio.console.metadataTitle', { defaultValue: 'Live room details' })}</h2>
+        </div>
+        <ImagePlus size={22} />
+      </div>
+      <form
+        className="gl-live-metadata-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void saveMetadata();
+        }}
+      >
+        <div className="gl-live-metadata-grid">
+          <div className="gl-live-metadata-fields">
+            <label className="gl-creator-field">
+              <span>{t('createLive.fields.title')}</span>
+              <input
+                value={title}
+                maxLength={120}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
+            <label className="gl-creator-field">
+              <span>{t('createLive.fields.description')}</span>
+              <textarea
+                value={description}
+                rows={4}
+                maxLength={2000}
+                placeholder={t('studio.prepare.descriptionPlaceholder', {
+                  defaultValue: 'Tell viewers what this live is about.',
+                })}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="gl-live-metadata-cover">
+            <span>{t('createLive.fields.cover')}</span>
+            <CoverPicker preview={coverPreview} onChange={setCover} />
+            <button
+              className="gl-creator-secondary"
+              type="button"
+              disabled={!coverPreview || pending}
+              onClick={clearCover}
+            >
+              {t('studio.console.metadataClearCover', { defaultValue: 'Remove cover' })}
+            </button>
+          </div>
+        </div>
+        <div className="gl-live-metadata-actions">
+          <button
+            className="gl-creator-primary"
+            type="submit"
+            disabled={!dirty || !normalizedTitle || pending}
+          >
+            <Save size={16} />
+            {pending
+              ? t('studio.console.metadataSaving', { defaultValue: 'Saving...' })
+              : t('studio.console.metadataSave', { defaultValue: 'Save changes' })}
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 

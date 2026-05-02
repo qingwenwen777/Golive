@@ -10,11 +10,13 @@ import {
   useFollow,
   useLike,
   useUnfollow,
+  useUpdateLiveMetadata,
   useUploadLiveCover,
 } from './room';
 
 const httpMock = vi.hoisted(() => ({
   post: vi.fn(),
+  patch: vi.fn(),
   delete: vi.fn(),
   request: vi.fn(),
 }));
@@ -52,6 +54,7 @@ describe('room api hooks', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_API_BASE', '/api');
     httpMock.post.mockReset();
+    httpMock.patch.mockReset();
     httpMock.delete.mockReset();
     httpMock.request.mockReset();
   });
@@ -183,5 +186,42 @@ describe('room api hooks', () => {
       expect.any(FormData),
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
+  });
+
+  it('updates live metadata and refreshes the room cache', async () => {
+    const queryClient = makeQueryClient();
+    const stream = {
+      id: 'stream-1',
+      title: 'New title',
+      description: 'New description',
+      channel: 'Creator',
+      channelId: 'ch-owner',
+      verified: false,
+      avatar: '',
+      cover: '/uploads/covers/new.webp',
+      viewers: 0,
+      duration: '0:00:00',
+      category: 'Just Chatting',
+      startedAt: new Date().toISOString(),
+      isLive: true,
+    };
+    httpMock.patch.mockResolvedValueOnce({ data: stream });
+    const { result } = renderHook(() => useUpdateLiveMetadata(), {
+      wrapper: wrapperFor(queryClient),
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        title: 'New title',
+        description: 'New description',
+        cover: '/uploads/covers/new.webp',
+      }),
+    ).resolves.toEqual(stream);
+    expect(httpMock.patch).toHaveBeenCalledWith('/rooms/live', {
+      title: 'New title',
+      description: 'New description',
+      cover: '/uploads/covers/new.webp',
+    });
+    expect(queryClient.getQueryData(['room', 'stream-1'])).toEqual(stream);
   });
 });

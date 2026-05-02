@@ -51,6 +51,27 @@ func (h *LiveHandler) GoLive(c *gin.Context) {
 	c.JSON(http.StatusOK, st)
 }
 
+// UpdateLive: PATCH /rooms/live (auth required).
+// Lets the publisher edit the active live room's title, description, and cover.
+func (h *LiveHandler) UpdateLive(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, errcode.New(401, "Unauthorized"))
+		return
+	}
+	var req service.UpdateLiveReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(400, "invalid body"))
+		return
+	}
+	st, err := h.svc.UpdateLiveMetadata(c.Request.Context(), uid, req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, st)
+}
+
 // StopLive: DELETE /rooms/live (auth required).
 func (h *LiveHandler) StopLive(c *gin.Context) {
 	uid := UserIDFromCtx(c)
