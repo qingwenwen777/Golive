@@ -36,7 +36,7 @@ function RouteOutlet() {
   const [routeState, setRouteState] = useState<{
     key: string;
     outlet: ReactNode;
-    phase: 'idle' | 'leaving' | 'entering';
+    phase: 'idle' | 'entering';
   }>(() => ({
     key: location.key,
     outlet,
@@ -56,24 +56,19 @@ function RouteOutlet() {
     }
 
     clearTimers();
-    setRouteState((current) => ({ ...current, phase: 'leaving' }));
+    displayedKey.current = location.key;
+    setRouteState({
+      key: location.key,
+      outlet: latestOutlet.current,
+      phase: 'entering',
+    });
 
-    const swapTimer = window.setTimeout(() => {
-      displayedKey.current = location.key;
-      setRouteState({
-        key: location.key,
-        outlet: latestOutlet.current,
-        phase: 'entering',
-      });
-
-      const settleTimer = window.setTimeout(() => {
-        setRouteState((current) =>
-          current.key === location.key ? { ...current, phase: 'idle' } : current,
-        );
-      }, 180);
-      timers.current = [settleTimer];
-    }, 90);
-    timers.current = [swapTimer];
+    const settleTimer = window.setTimeout(() => {
+      setRouteState((current) =>
+        current.key === location.key ? { ...current, phase: 'idle' } : current,
+      );
+    }, 170);
+    timers.current = [settleTimer];
 
     return clearTimers;
   }, [location.key]);

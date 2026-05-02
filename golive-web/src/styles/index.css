@@ -647,13 +647,12 @@ input:focus-visible,
 }
 .gl-route-page {
   min-width: 0;
-}
-.gl-route-page.is-leaving {
-  pointer-events: none;
-  animation: glRouteLeave 0.1s ease-out both;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
 }
 .gl-route-page.is-entering {
-  animation: glRouteEnter 0.2s ease-out both;
+  will-change: opacity, transform;
+  animation: glRouteEnter 0.16s cubic-bezier(0.2, 0, 0, 1) both;
 }
 .gl-route-loading {
   display: flex;
@@ -682,28 +681,17 @@ input:focus-visible,
     transform: scale(1);
   }
 }
-@keyframes glRouteLeave {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0.82;
-    transform: translateY(3px);
-  }
-}
 @keyframes glRouteEnter {
   from {
-    opacity: 0;
-    transform: translateY(8px);
+    opacity: 0.96;
+    transform: translate3d(0, 4px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gl-route-page.is-leaving,
   .gl-route-page.is-entering {
     animation: none;
   }
