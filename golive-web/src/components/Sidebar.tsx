@@ -63,6 +63,12 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       route: '/studio/prepare',
     },
     {
+      key: 'studio-appointments',
+      icon: Icons.CalendarClock,
+      label: t('nav.studioAppointments', { defaultValue: '直播预约' }),
+      route: '/studio/appointments',
+    },
+    {
       key: 'studio-replay',
       icon: Icons.History,
       label: t('nav.studioReplay', { defaultValue: 'Data replay' }),
@@ -152,6 +158,7 @@ function isNavItemActive(key: string, active: string): boolean {
 function deriveActiveKey(pathname: string): string {
   if (pathname === '/') return 'home';
   if (pathname === '/studio' || pathname === '/studio/overview') return 'studio-overview';
+  if (pathname.startsWith('/studio/appointments')) return 'studio-appointments';
   if (pathname.startsWith('/studio/prepare') || pathname.startsWith('/studio/live')) {
     return 'studio-prepare';
   }

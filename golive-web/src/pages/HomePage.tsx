@@ -103,7 +103,7 @@ export default function HomePage() {
             </button>
           </div>
         ) : data && data.items.length === 0 ? (
-          <HomeNoLiveRecommendations />
+          <HomeNoLiveEmpty />
         ) : visibleItems.length === 0 ? (
           <div className="gl-empty">
             <Inbox size={64} strokeWidth={1.5} />
@@ -126,6 +126,7 @@ export default function HomePage() {
         )}
 
         <MyAppointmentsSection />
+        <HomeRecommendationsSection />
       </div>
     </>
   );
@@ -193,44 +194,48 @@ function MyAppointmentsSection() {
   );
 }
 
-function HomeNoLiveRecommendations() {
+function HomeNoLiveEmpty() {
+  const { t } = useTranslation('pages');
+
+  return (
+    <div className="gl-empty gl-home-empty-compact">
+      <Inbox size={56} strokeWidth={1.5} />
+      <div className="gl-empty-title">{t('home.empty')}</div>
+      <div className="gl-empty-sub">{t('home.emptySub')}</div>
+    </div>
+  );
+}
+
+function HomeRecommendationsSection() {
   const { t } = useTranslation('pages');
   const recommendations = useRecommendedCreators(8);
 
   return (
-    <div className="gl-home-empty-wrap">
-      <div className="gl-empty gl-home-empty-compact">
-        <Inbox size={56} strokeWidth={1.5} />
-        <div className="gl-empty-title">{t('home.empty')}</div>
-        <div className="gl-empty-sub">{t('home.emptySub')}</div>
-      </div>
-
-      <section className="gl-home-recs" aria-label={t('home.recommendations.title')}>
-        <div className="gl-section-title-row">
-          <div>
-            <h2>{t('home.recommendations.title')}</h2>
-            <span>{t('home.recommendations.subtitle')}</span>
-          </div>
+    <section className="gl-home-recs" aria-label={t('home.recommendations.title')}>
+      <div className="gl-section-title-row">
+        <div>
+          <h2>{t('home.recommendations.title')}</h2>
+          <span>{t('home.recommendations.subtitle')}</span>
         </div>
-        {recommendations.isPending ? (
-          <div className="gl-home-rec-grid" aria-busy="true">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div className="gl-home-rec-card is-loading" key={index} />
-            ))}
-          </div>
-        ) : recommendations.data?.items.length ? (
-          <div className="gl-home-rec-grid">
-            {recommendations.data.items.map((creator) => (
-              <RecommendedCreatorCard key={creator.channelId} creator={creator} />
-            ))}
-          </div>
-        ) : (
-          <div className="gl-creator-empty-soft">
-            {t('home.recommendations.empty')}
-          </div>
-        )}
-      </section>
-    </div>
+      </div>
+      {recommendations.isPending ? (
+        <div className="gl-home-rec-grid" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div className="gl-home-rec-card is-loading" key={index} />
+          ))}
+        </div>
+      ) : recommendations.data?.items.length ? (
+        <div className="gl-home-rec-grid">
+          {recommendations.data.items.map((creator) => (
+            <RecommendedCreatorCard key={creator.channelId} creator={creator} />
+          ))}
+        </div>
+      ) : (
+        <div className="gl-creator-empty-soft">
+          {t('home.recommendations.empty')}
+        </div>
+      )}
+    </section>
   );
 }
 

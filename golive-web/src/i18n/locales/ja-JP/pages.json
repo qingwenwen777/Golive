@@ -84,6 +84,8 @@
     "cancelReserve": "予約をキャンセル",
     "startLive": "配信開始",
     "starting": "開始中...",
+    "startingBadge": "配信が始まりました",
+    "startingHint": "ライブ映像に接続しています。このままお待ちください。",
     "appointmentReserved": "ライブを予約しました。",
     "appointmentUnreserved": "予約をキャンセルしました。",
     "appointmentReserveFailed": "予約状態を更新できませんでした。",
@@ -395,7 +397,7 @@
     "edit": "編集",
     "delete": "削除",
     "status": {
-      "scheduled": "予約済み",
+      "scheduled": "配信待ち",
       "live": "配信中",
       "completed": "完了",
       "expired": "期限切れ",

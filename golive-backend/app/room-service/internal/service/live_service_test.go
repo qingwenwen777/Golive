@@ -374,3 +374,22 @@ func TestRoomGetDoesNotExposePublishingOrEndedToViewers(t *testing.T) {
 	_, err = roomSvc.Get(ctx, st.ID, "owner-get")
 	require.ErrorIs(t, err, ErrRoomNotFound)
 }
+
+func TestRoomGetExposesStartingAppointmentToViewers(t *testing.T) {
+	ctx := context.Background()
+	liveSvc, rooms, _ := newLiveServiceTestDeps(t)
+	roomSvc := NewRoomService(rooms, "http://srs/live")
+	st := startTestLive(t, liveSvc, "owner-appt-starting")
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	room.Category = "Scheduled"
+	room.Status = model.StatusPublishing
+	require.NoError(t, rooms.Upsert(ctx, room))
+
+	viewerView, err := roomSvc.Get(ctx, st.ID, "viewer-appt-starting")
+	require.NoError(t, err)
+	require.False(t, viewerView.IsLive)
+	require.Equal(t, model.StatusPublishing, viewerView.Status)
+	require.Empty(t, viewerView.StreamKey)
+	require.Empty(t, viewerView.PlaybackURL)
+}

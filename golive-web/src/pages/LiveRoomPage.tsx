@@ -106,6 +106,7 @@ export default function LiveRoomPage() {
   const roomId = stream?.id ?? id;
   const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
+  const roomIsStarting = Boolean(stream?.status === 'publishing' && !roomIsLive);
   const roomCanWatch = Boolean(stream && stream.status !== 'ended');
   const fanBadges = useFanBadges(isAuthed, currentUser?.id);
   const reserveAppointment = useReserveAppointment(roomId);
@@ -223,7 +224,7 @@ export default function LiveRoomPage() {
     );
   }
 
-  if (isError || !stream) {
+  if ((isError && !stream) || !stream) {
     return (
       <div className="gl-empty">
         <CloudOff size={64} strokeWidth={1.5} />
@@ -319,7 +320,7 @@ export default function LiveRoomPage() {
     });
   };
 
-  if (!roomIsLive && !isScheduledRoom) {
+  if (!roomIsLive && !isScheduledRoom && !roomIsStarting) {
     if (!canShowPublisherPanel) {
       return (
         <div className="gl-empty">
@@ -356,6 +357,99 @@ export default function LiveRoomPage() {
           onStop={handleStopLive}
         />
       </div>
+    );
+  }
+
+  if (roomIsStarting && stream) {
+    return (
+      <>
+        <div
+          className={[
+            isNarrow ? 'grid grid-cols-1 gap-6 px-4 pb-20' : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
+            isMobile && mobileComposerFocused ? 'gl-live-room-chatting' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <div className="min-w-0 flex-1 xl:pt-6">
+            <StartingRoomPlayer stream={stream} />
+            <InfoBlock
+              stream={stream}
+              viewerCount={effectiveViewers}
+              onOpenGifts={() => {
+                if (!isAuthed) {
+                  openLogin(() => setGiftOpen(true));
+                  return;
+                }
+                setGiftOpen(true);
+              }}
+            />
+            {isMobile && (
+              <div className="gl-mobile-chat">
+                <Chat
+                  messages={messages}
+                  viewers={viewers}
+                  viewerTotal={effectiveViewers}
+                  ownerId={stream.ownerId}
+                  ownerName={ownerName}
+                  onSendChat={sendChat}
+                  onSendSuperChat={openSuperChat}
+                  reconnecting={reconnecting}
+                  reconnectingLabel={reconnectingLabel}
+                  onComposerFocusChange={setMobileComposerFocused}
+                />
+              </div>
+            )}
+          </div>
+
+          {!isNarrow && (
+            <div className="gl-side-rail sticky top-20 self-start">
+              <Chat
+                messages={messages}
+                viewers={viewers}
+                viewerTotal={effectiveViewers}
+                ownerId={stream.ownerId}
+                ownerName={ownerName}
+                onSendChat={sendChat}
+                onSendSuperChat={openSuperChat}
+                reconnecting={reconnecting}
+                reconnectingLabel={reconnectingLabel}
+              />
+            </div>
+          )}
+        </div>
+
+        {isNarrow && !isMobile && (
+          <>
+            <button
+              className="gl-chat-fab"
+              aria-label={t('liveRoom.openChat')}
+              onClick={() => setSheetOpen(true)}
+            >
+              <MessageSquare size={24} />
+            </button>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetContent side="right" className="w-[402px] max-w-full p-0 sm:max-w-[402px]">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
+                </SheetHeader>
+                <Chat
+                  messages={messages}
+                  viewers={viewers}
+                  viewerTotal={effectiveViewers}
+                  ownerId={stream.ownerId}
+                  ownerName={ownerName}
+                  onSendChat={sendChat}
+                  onSendSuperChat={openSuperChat}
+                  reconnecting={reconnecting}
+                  reconnectingLabel={reconnectingLabel}
+                  sheetMode
+                />
+              </SheetContent>
+            </Sheet>
+          </>
+        )}
+      </>
     );
   }
 
@@ -756,6 +850,25 @@ export default function LiveRoomPage() {
         onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
       />
     </>
+  );
+}
+
+function StartingRoomPlayer({ stream }: { stream: Stream }) {
+  const { t } = useTranslation('pages');
+  return (
+    <section className="gl-scheduled-player gl-starting-player">
+      <div className="gl-scheduled-player-cover">
+        {stream.cover ? <LoadableImage src={stream.cover} alt="" /> : <div className="gl-scheduled-player-fallback" />}
+        <div className="gl-scheduled-player-overlay">
+          <span className="gl-scheduled-player-badge">
+            <Radio size={14} />
+            {t('liveRoom.startingBadge', { defaultValue: '主播已开播' })}
+          </span>
+          <h2>{stream.title}</h2>
+          <p>{t('liveRoom.startingHint', { defaultValue: '正在连接直播画面，请留在直播间。' })}</p>
+        </div>
+      </div>
+    </section>
   );
 }
 

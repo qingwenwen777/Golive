@@ -1002,6 +1002,7 @@ input:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 14px;
+  margin-top: 26px;
 }
 .gl-home-recs .gl-section-title-row > div > span {
   display: block;
@@ -6300,6 +6301,7 @@ button.gl-fan-badge-empty {
   align-items: center;
   gap: 5px;
   border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
   background: rgba(0, 0, 0, 0.68);
   color: #fff;
   font-size: 11px;
@@ -6309,20 +6311,28 @@ button.gl-fan-badge-empty {
 }
 
 .gl-appointment-status.is-scheduled {
-  background: rgba(28, 98, 185, 0.92);
+  border-color: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
 }
 
 .gl-appointment-status.is-live {
-  background: rgba(220, 38, 38, 0.92);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(17, 17, 17, 0.88);
+  color: #fff;
 }
 
 .gl-appointment-status.is-completed {
-  background: rgba(22, 101, 52, 0.9);
+  border-color: rgba(255, 255, 255, 0.56);
+  background: rgba(244, 244, 245, 0.92);
+  color: #27272a;
 }
 
 .gl-appointment-status.is-expired,
 .gl-appointment-status.is-canceled {
+  border-color: rgba(255, 255, 255, 0.28);
   background: rgba(82, 82, 91, 0.88);
+  color: #fff;
 }
 
 .gl-appointment-copy {
@@ -6354,7 +6364,7 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-head svg {
   flex: 0 0 auto;
-  color: #1c62b9;
+  color: var(--gl-text);
 }
 
 .gl-appointment-channel,
@@ -6411,8 +6421,106 @@ button.gl-fan-badge-empty {
   padding-inline: 12px;
 }
 
+.gl-appointment-card.is-management {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  align-items: stretch;
+}
+
+.gl-appointment-card.is-management .gl-appointment-link,
+.gl-appointment-card.is-management .gl-appointment-main {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  min-height: 126px;
+}
+
+.gl-appointment-card.is-management .gl-appointment-cover,
+.gl-appointment-card.is-management .gl-appointment-cover.is-compact {
+  aspect-ratio: auto;
+  height: 100%;
+  min-height: 126px;
+}
+
+.gl-appointment-card.is-management .gl-appointment-cover-overlay {
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.gl-appointment-card.is-management .gl-appointment-copy {
+  justify-content: center;
+  padding: 14px;
+}
+
+.gl-appointment-card.is-management .gl-appointment-copy p {
+  min-height: 0;
+}
+
+.gl-appointment-card.is-management .gl-appointment-actions {
+  align-content: center;
+  align-items: stretch;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: center;
+  border-left: 1px solid var(--gl-border);
+  padding: 14px;
+}
+
+.gl-appointment-card.is-management .gl-appointment-actions .gl-retry-btn,
+.gl-appointment-card.is-management .gl-appointment-actions .gl-secondary-btn {
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
 .gl-appointments-grid {
   align-items: start;
+  grid-template-columns: minmax(520px, 720px) minmax(360px, 1fr);
+}
+
+.gl-appointment-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gl-appointment-form-panel .gl-creator-panel-head {
+  margin-bottom: 0;
+}
+
+.gl-appointment-form-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: start;
+  gap: 16px;
+}
+
+.gl-appointment-form-fields {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gl-appointment-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 12px;
+}
+
+.gl-appointment-form-panel .gl-creator-field textarea {
+  min-height: 104px;
+}
+
+.gl-appointment-cover-field .gl-creator-cover-picker {
+  width: 100%;
+  min-height: 0;
+}
+
+.gl-appointment-submit {
+  align-self: flex-start;
+  min-width: 148px;
 }
 
 .gl-appointment-error {
@@ -6461,6 +6569,14 @@ button.gl-fan-badge-empty {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.74));
   color: #fff;
   padding: clamp(18px, 3vw, 30px);
+}
+
+.gl-starting-player .gl-scheduled-player-cover {
+  min-height: 360px;
+}
+
+.gl-starting-player .gl-scheduled-player-overlay {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.72));
 }
 
 .gl-scheduled-player-badge,
@@ -6515,6 +6631,19 @@ button.gl-fan-badge-empty {
   .gl-home-appointment-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .gl-appointments-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-appointment-form-body,
+  .gl-appointment-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-appointment-cover-field .gl-creator-cover-picker {
+    max-width: 380px;
+  }
 }
 
 @media (max-width: 760px) {
@@ -6530,6 +6659,22 @@ button.gl-fan-badge-empty {
   .gl-scheduled-player-overlay {
     padding: 16px;
   }
+
+  .gl-appointment-card.is-management {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-appointment-card.is-management .gl-appointment-link,
+  .gl-appointment-card.is-management .gl-appointment-main {
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
+
+  .gl-appointment-card.is-management .gl-appointment-actions {
+    flex-direction: row;
+    border-top: 1px solid var(--gl-border);
+    border-left: 0;
+    padding-top: 12px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -6541,5 +6686,16 @@ button.gl-fan-badge-empty {
   .gl-appointment-actions .gl-retry-btn,
   .gl-appointment-actions .gl-secondary-btn {
     flex-basis: 100%;
+  }
+
+  .gl-appointment-card.is-management .gl-appointment-link,
+  .gl-appointment-card.is-management .gl-appointment-main {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-appointment-card.is-management .gl-appointment-cover,
+  .gl-appointment-card.is-management .gl-appointment-cover.is-compact {
+    aspect-ratio: 16 / 9;
+    min-height: 0;
   }
 }

@@ -11,6 +11,7 @@ import {
   Radio,
   History,
   Clock,
+  CalendarClock,
   Heart,
   ChevronRight,
   MoreVertical,
@@ -33,6 +34,7 @@ export interface IconSet {
   Live: LucideIcon;
   History: LucideIcon;
   Clock: LucideIcon;
+  CalendarClock: LucideIcon;
   Heart: LucideIcon;
   ChevronRight: LucideIcon;
   More: LucideIcon;
@@ -55,6 +57,7 @@ export const Icons: IconSet = {
   Live: Radio,
   History,
   Clock,
+  CalendarClock,
   Heart,
   ChevronRight,
   More: MoreVertical,

@@ -593,7 +593,7 @@ export function CreatorAppointmentsPage() {
       </section>
 
       <section className="gl-creator-dashboard-grid gl-appointments-grid">
-        <div className="gl-creator-panel">
+        <div className="gl-creator-panel gl-appointment-form-panel">
           <div className="gl-creator-panel-head">
             <div>
               <span>{t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}</span>
@@ -604,37 +604,43 @@ export function CreatorAppointmentsPage() {
             </button>
           </div>
 
-          <div className="gl-creator-field">
-            <span>{t('studio.appointments.time', { defaultValue: 'Start time' })}</span>
-            <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
-          </div>
-          <label className="gl-creator-field">
-            <span>{t('createLive.fields.title')}</span>
-            <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
-          </label>
-          <label className="gl-creator-field">
-            <span>{t('createLive.fields.description')}</span>
-            <textarea
-              value={description}
-              rows={5}
-              maxLength={2000}
-              placeholder={t('studio.appointments.descriptionPlaceholder', { defaultValue: 'Tell viewers what this appointment is about.' })}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </label>
-          <div className="gl-creator-field">
-            <span>{t('createLive.fields.cover')}</span>
-            <CoverPicker
-              preview={coverPreview}
-              onChange={(file) => {
-                if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
-                setCoverFile(file);
-                setCoverPreview(file ? URL.createObjectURL(file) : '');
-              }}
-            />
+          <div className="gl-appointment-form-body">
+            <div className="gl-appointment-form-fields">
+              <div className="gl-appointment-form-row">
+                <div className="gl-creator-field">
+                  <span>{t('studio.appointments.time', { defaultValue: 'Start time' })}</span>
+                  <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
+                </div>
+                <label className="gl-creator-field">
+                  <span>{t('createLive.fields.title')}</span>
+                  <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
+                </label>
+              </div>
+              <label className="gl-creator-field">
+                <span>{t('createLive.fields.description')}</span>
+                <textarea
+                  value={description}
+                  rows={4}
+                  maxLength={2000}
+                  placeholder={t('studio.appointments.descriptionPlaceholder', { defaultValue: 'Tell viewers what this appointment is about.' })}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="gl-creator-field gl-appointment-cover-field">
+              <span>{t('createLive.fields.cover')}</span>
+              <CoverPicker
+                preview={coverPreview}
+                onChange={(file) => {
+                  if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+                  setCoverFile(file);
+                  setCoverPreview(file ? URL.createObjectURL(file) : '');
+                }}
+              />
+            </div>
           </div>
           {error && <div className="gl-creator-empty-soft gl-appointment-error">{error}</div>}
-          <button type="button" className="gl-creator-start" onClick={() => void saveAppointment()} disabled={createAppointment.isPending || updateAppointment.isPending || uploadCover.isPending}>
+          <button type="button" className="gl-creator-primary gl-appointment-submit" onClick={() => void saveAppointment()} disabled={createAppointment.isPending || updateAppointment.isPending || uploadCover.isPending}>
             <Save size={16} />
             {editing
               ? t('studio.appointments.saveEdit', { defaultValue: 'Save changes' })
@@ -693,6 +699,7 @@ function AppointmentStudioRow({
       appointment={item}
       to={item.status === 'scheduled' ? `/live/${encodeURIComponent(item.roomId)}` : undefined}
       compact
+      managementMode
       pending={pending}
       onStart={() => {
         startAppointment.mutate(undefined, {

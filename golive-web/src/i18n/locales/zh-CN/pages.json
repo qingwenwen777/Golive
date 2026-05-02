@@ -84,6 +84,8 @@
     "cancelReserve": "取消预约",
     "startLive": "开始直播",
     "starting": "正在开始...",
+    "startingBadge": "主播已开播",
+    "startingHint": "正在连接直播画面，请留在直播间。",
     "appointmentReserved": "已预约直播。",
     "appointmentUnreserved": "已取消预约。",
     "appointmentReserveFailed": "预约状态更新失败。",
@@ -396,7 +398,7 @@
     "edit": "编辑",
     "delete": "删除",
     "status": {
-      "scheduled": "已预约",
+      "scheduled": "待开播",
       "live": "直播中",
       "completed": "已完成",
       "expired": "已作废",

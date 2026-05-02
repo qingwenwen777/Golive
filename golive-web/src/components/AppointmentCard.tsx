@@ -19,6 +19,7 @@ export interface AppointmentCardProps {
   onDelete?: () => void;
   pending?: boolean;
   showChannel?: boolean;
+  managementMode?: boolean;
 }
 
 export function AppointmentCard({
@@ -33,6 +34,7 @@ export function AppointmentCard({
   onDelete,
   pending = false,
   showChannel = true,
+  managementMode = false,
 }: AppointmentCardProps) {
   const { t, i18n } = useTranslation('pages');
   const scheduled = useMemo(
@@ -97,7 +99,7 @@ export function AppointmentCard({
   );
 
   return (
-    <article className={cn('gl-appointment-card', compact && 'is-compact')}>
+    <article className={cn('gl-appointment-card', compact && 'is-compact', managementMode && 'is-management')}>
       {content}
       <div className="gl-appointment-actions">
         {viewerMode ? (

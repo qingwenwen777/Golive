@@ -84,6 +84,8 @@
     "cancelReserve": "Cancel reservation",
     "startLive": "Start live",
     "starting": "Starting...",
+    "startingBadge": "Creator is live",
+    "startingHint": "Connecting the live video. Stay in the room.",
     "appointmentReserved": "Appointment reserved.",
     "appointmentUnreserved": "Reservation removed.",
     "appointmentReserveFailed": "Could not update this reservation.",
