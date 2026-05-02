@@ -51,6 +51,7 @@ import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import { LoadableImage } from '@/components/LoadableImage';
 import type { Message } from '@/types/message';
 import type { Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
@@ -236,8 +237,8 @@ export function CreatorStudioOverviewPage() {
             <div className="gl-creator-muted-line">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
           ) : latest ? (
             <div className="gl-creator-latest">
-              <div className="gl-creator-latest-cover">
-                {latest.cover && <img src={latest.cover} alt="" />}
+              <div className={`gl-creator-latest-cover${latest.cover ? ' has-image' : ''}`}>
+                {latest.cover && <LoadableImage src={latest.cover} alt="" />}
                 <span>{latest.duration}</span>
               </div>
               <div className="gl-creator-latest-meta">
@@ -988,7 +989,7 @@ function WaitingPreview({ stream }: { stream: Stream }) {
   const { t } = useTranslation('pages');
   return (
     <div className="gl-live-console-waiting">
-      {stream.cover && <img src={stream.cover} alt="" />}
+      {stream.cover && <LoadableImage src={stream.cover} alt="" />}
       <div>
         <Radio size={34} />
         <strong>{t('studio.console.waitingPreview', { defaultValue: 'Waiting for publisher' })}</strong>

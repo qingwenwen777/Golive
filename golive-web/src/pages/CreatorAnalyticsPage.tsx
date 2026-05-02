@@ -21,6 +21,7 @@ import {
   type MonthlyCreatorMetric,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { LoadableImage } from '@/components/LoadableImage';
 
 export function CreatorAnalyticsPage() {
   const { t, i18n } = useTranslation('pages');
@@ -380,11 +381,11 @@ function LiveHistoryStudioRow({
 
 function HistoryCover({ record }: { record: LiveHistoryItem }) {
   return (
-    <div className="gl-history-cover">
+    <div className={`gl-history-cover${record.cover ? ' has-image' : ''}`}>
       <div className="gl-history-cover-fallback" aria-hidden>
         {(record.title || 'GL').slice(0, 2).toUpperCase()}
       </div>
-      {record.cover && <img src={record.cover} alt="" />}
+      {record.cover && <LoadableImage src={record.cover} alt="" />}
       <span>{record.duration}</span>
     </div>
   );

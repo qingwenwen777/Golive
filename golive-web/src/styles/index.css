@@ -672,6 +672,74 @@ input:focus-visible,
     transform: scale(1);
   }
 }
+.gl-loadable-img {
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.gl-loadable-img.is-loaded {
+  opacity: 1;
+}
+.gl-loadable-img.is-error {
+  display: none;
+}
+.gl-avatar {
+  position: relative;
+}
+.gl-avatar.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.32) 45%, transparent 70%);
+  background-size: 220% 100%;
+  animation: glImageBuffer 1.1s ease-in-out infinite;
+}
+.gl-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gl-card-cover.has-image::before,
+.gl-channel-cover.has-cover::before,
+.gl-history-thumb.has-image::before,
+.gl-history-cover.has-image::before,
+.gl-creator-latest-cover.has-image::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(110deg, var(--gl-bg-hover) 0%, rgba(255, 255, 255, 0.55) 45%, var(--gl-bg-hover) 70%);
+  background-size: 220% 100%;
+  animation: glImageBuffer 1.1s ease-in-out infinite;
+}
+.dark .gl-card-cover.has-image::before,
+.dark .gl-channel-cover.has-cover::before,
+.dark .gl-history-thumb.has-image::before,
+.dark .gl-history-cover.has-image::before,
+.dark .gl-creator-latest-cover.has-image::before {
+  background: linear-gradient(110deg, var(--gl-bg-hover) 0%, rgba(255, 255, 255, 0.12) 45%, var(--gl-bg-hover) 70%);
+  background-size: 220% 100%;
+}
+.gl-card-cover .gl-loadable-img,
+.gl-history-thumb .gl-loadable-img,
+.gl-history-cover .gl-loadable-img,
+.gl-creator-latest-cover .gl-loadable-img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@keyframes glImageBuffer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
 .gl-home-head {
   display: flex;
   align-items: baseline;
@@ -732,6 +800,7 @@ input:focus-visible,
 .gl-card-gloss {
   position: absolute;
   inset: 0;
+  z-index: 2;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.45) 100%);
   pointer-events: none;
 }
@@ -739,11 +808,13 @@ input:focus-visible,
   position: absolute;
   top: 8px;
   left: 8px;
+  z-index: 3;
 }
 .gl-card-bottom {
   position: absolute;
   right: 8px;
   bottom: 8px;
+  z-index: 3;
   display: flex;
   gap: 6px;
 }
@@ -763,6 +834,7 @@ input:focus-visible,
 .gl-card-hover-outline {
   position: absolute;
   inset: 4px;
+  z-index: 3;
   border: 2px dashed rgba(255, 255, 255, 0.6);
   border-radius: 8px;
   opacity: 0;
@@ -2622,21 +2694,21 @@ button.gl-fan-badge-empty {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 2;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.08) 55%, rgba(0, 0, 0, 0));
   pointer-events: none;
 }
 .gl-channel-cover-img {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 .gl-channel-cover-mark {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -2651,7 +2723,7 @@ button.gl-fan-badge-empty {
   position: absolute;
   right: 22px;
   bottom: 18px;
-  z-index: 2;
+  z-index: 4;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4089,6 +4161,9 @@ button.gl-fan-badge-empty {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0.4;
+}
+.gl-live-console-waiting > .gl-loadable-img.is-loaded {
   opacity: 0.4;
 }
 .gl-live-console-waiting > div {

@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { cn } from '@/lib/cn';
+import { LoadableImage } from '@/components/LoadableImage';
 
 export interface AvatarProps {
   name: string;
@@ -30,6 +31,7 @@ function computeInitials(name: string): string {
 
 export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const hue = hashHue(name);
   const initials = computeInitials(name);
   const bg1 = `hsl(${hue}, 65%, 55%)`;
@@ -40,6 +42,7 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
     height: size,
     borderRadius: '50%',
     display: 'inline-flex',
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -54,15 +57,21 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
 
   useEffect(() => {
     setFailed(false);
+    setLoaded(false);
   }, [imageSrc]);
 
   return (
-    <div className={cn(className)} style={style} aria-label={name}>
+    <div
+      className={cn('gl-avatar', imageSrc && !failed && !loaded && 'is-loading', className)}
+      style={style}
+      aria-label={name}
+    >
       {imageSrc && !failed ? (
-        <img
+        <LoadableImage
           src={imageSrc}
           alt=""
-          className="h-full w-full object-cover"
+          className="gl-avatar-img"
+          onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
       ) : (

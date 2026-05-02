@@ -30,6 +30,7 @@ import {
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LiveCard } from '@/components/LiveCard';
+import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadDialog';
@@ -122,7 +123,9 @@ export default function ChannelPage() {
     <div className="gl-page gl-channel-page">
       <section className="gl-channel-hero-v2">
         <div className={`gl-channel-cover${channelCover ? ' has-cover' : ''}`}>
-          {channelCover && <img className="gl-channel-cover-img" src={channelCover} alt="" />}
+          {channelCover && (
+            <LoadableImage className="gl-channel-cover-img" src={channelCover} alt="" />
+          )}
           <div className="gl-channel-cover-mark">
             <Radio size={26} />
             <span>GoLive</span>
@@ -461,9 +464,9 @@ function ChannelHistoryRow({
 function HistoryThumb({ record }: { record: LiveHistoryItem }) {
   const initials = record.title.trim().slice(0, 2).toUpperCase() || 'GL';
   return (
-    <div className="gl-history-thumb">
+    <div className={`gl-history-thumb${record.cover ? ' has-image' : ''}`}>
       <div className="gl-history-thumb-fallback">{initials}</div>
-      {record.cover && <img src={record.cover} alt="" />}
+      {record.cover && <LoadableImage src={record.cover} alt="" />}
       <span>{record.duration}</span>
     </div>
   );

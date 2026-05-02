@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Icons } from '@/components/Icons';
 import { Avatar } from '@/components/Avatar';
 import { LiveBadge } from '@/components/LiveBadge';
+import { LoadableImage } from '@/components/LoadableImage';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -101,7 +102,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         if (isLive && e.key === 'Enter') handleOpen();
       }}
     >
-      <div className="gl-card-cover relative overflow-hidden rounded-card">
+      <div className={`gl-card-cover relative overflow-hidden rounded-card${stream.cover ? ' has-image' : ''}`}>
         <div
           aria-hidden
           className="absolute inset-0 flex items-center justify-center"
@@ -114,16 +115,12 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
           </span>
         </div>
         {stream.cover ? (
-          <img
+          <LoadableImage
             src={stream.cover}
             alt=""
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
-            onError={(e) => {
-              // Hide broken image and let the gradient placeholder show.
-              (e.currentTarget as HTMLImageElement).style.display = 'none';
-            }}
           />
         ) : null}
         <div className="gl-card-gloss" />
