@@ -362,14 +362,15 @@ input:focus-visible,
   font-family: Roboto, Arial, sans-serif;
 }
 .gl-logo-country {
-  align-self: flex-start;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
   font-size: 10px;
   color: var(--gl-text-2);
-  vertical-align: super;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   margin-left: 2px;
-  margin-top: 3px;
 }
 
 .gl-search-pill {
@@ -456,6 +457,9 @@ input:focus-visible,
 }
 
 .gl-lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--gl-border);
