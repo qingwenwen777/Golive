@@ -1,10 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Coins, Plus, User as UserIcon } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
+import { useRooms } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
+import { loadPublisherSession } from '@/features/creator/CreateLiveDialog';
 import { Icons } from '@/components/Icons';
 import { GoLiveLogo } from '@/components/Logo';
 import {
@@ -19,6 +21,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
+import type { Stream } from '@/types/stream';
 import type { AppLang } from '@/i18n';
 
 export interface TopBarProps {
@@ -37,10 +40,15 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const user = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const me = useMe();
+  const liveRooms = useRooms({ size: 100 });
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('q') ?? '');
   const currentUser = me.data ?? user;
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
+  const activeLiveId = useMemo(
+    () => resolveActiveLiveId(liveRooms.data?.items ?? [], currentUser?.id),
+    [currentUser?.id, liveRooms.data?.items],
+  );
 
   useEffect(() => {
     setSearch(new URLSearchParams(location.search).get('q') ?? '');
@@ -119,10 +127,12 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
               <button
                 type="button"
                 className="gl-create-btn"
-                onClick={() => navigate('/studio/prepare')}
+                onClick={() => navigate(activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/prepare')}
               >
-                <Icons.Plus size={22} />
-                <span className="gl-create-label">{t('goLive', { defaultValue: t('create') })}</span>
+                {activeLiveId ? <Icons.Live size={22} /> : <Icons.Plus size={22} />}
+                <span className="gl-create-label">
+                  {activeLiveId ? t('nav.liveNow') : t('goLive', { defaultValue: t('create') })}
+                </span>
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -213,3 +223,22 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 }
 
 const LANG_OPTIONS: AppLang[] = ['zh', 'ja', 'en'];
+
+function resolveActiveLiveId(items: Stream[], userId?: string): string {
+  const session = loadPublisherSession();
+  const liveByUser = userId
+    ? items.find((item) => item.ownerId === userId && isLiveStream(item))
+    : undefined;
+  if (liveByUser) return liveByUser.id;
+
+  const liveBySession = session?.streamId
+    ? items.find((item) => item.id === session.streamId && isLiveStream(item))
+    : undefined;
+  if (liveBySession) return liveBySession.id;
+
+  return session?.streamId ?? '';
+}
+
+function isLiveStream(stream: Pick<Stream, 'isLive' | 'status'>): boolean {
+  return stream.isLive === true || stream.status === 'live';
+}

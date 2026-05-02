@@ -25,7 +25,14 @@ import {
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
 import { useSubmitCreatorApplication } from '@/api/creator';
-import { useCreatorAnalytics, useGoLive, useRoom, useStopLive, useUploadLiveCover } from '@/api/room';
+import {
+  useCreatorAnalytics,
+  useGoLive,
+  useRoom,
+  useRooms,
+  useStopLive,
+  useUploadLiveCover,
+} from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { Chat } from '@/features/live-room/Chat';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
@@ -57,10 +64,54 @@ function currentChannelKey(user: User | null | undefined): string {
   return user?.id ?? '';
 }
 
+function isStreamLive(stream: Pick<Stream, 'isLive' | 'status'>): boolean {
+  return stream.isLive === true || stream.status === 'live';
+}
+
+function mergeStreamSnapshot(
+  roomStream: Stream | undefined,
+  directoryStream: Stream | null,
+): Stream | undefined {
+  if (!roomStream) return directoryStream ?? undefined;
+  if (!directoryStream) return roomStream;
+  return {
+    ...roomStream,
+    ...directoryStream,
+    ownerId: roomStream.ownerId ?? directoryStream.ownerId,
+    streamKey: roomStream.streamKey ?? directoryStream.streamKey,
+    playbackUrl: directoryStream.playbackUrl ?? roomStream.playbackUrl,
+    isLive: true,
+    status: directoryStream.status ?? 'live',
+  };
+}
+
 function useStudioUser() {
   const storeUser = useAuthStore((s) => s.user);
   const me = useMe();
   return { user: me.data ?? storeUser, me };
+}
+
+function useActiveCreatorStream(user: User | null | undefined): { stream: { id: string } | null } {
+  const liveRooms = useRooms({ size: 100 });
+  const storedSession = useMemo(() => loadPublisherSession(), []);
+
+  const stream = useMemo(() => {
+    const items = liveRooms.data?.items ?? [];
+    const byStoredSession = storedSession
+      ? items.find((item) => item.id === storedSession.streamId)
+      : undefined;
+    if (byStoredSession) return byStoredSession;
+
+    const byOwner = user?.id
+      ? items.find((item) => item.ownerId === user.id && isStreamLive(item))
+      : undefined;
+    if (byOwner) return byOwner;
+
+    if (storedSession?.streamId) return { id: storedSession.streamId };
+    return null;
+  }, [liveRooms.data?.items, storedSession, user?.id]);
+
+  return { stream };
 }
 
 export function CreatorStudioShell() {
@@ -225,6 +276,7 @@ export function CreatorPreparePage() {
   const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const { user } = useStudioUser();
+  const activeLive = useActiveCreatorStream(user);
   const uploadCover = useUploadLiveCover();
   const goLive = useGoLive();
   const [title, setTitle] = useState(() => t('createLive.defaultTitle'));
@@ -246,6 +298,10 @@ export function CreatorPreparePage() {
   const done2 = done1 && Boolean(category) && Boolean(coverPreview);
   const done3 = done2 && obsChecked && user?.livePermissionStatus === 'approved';
   const starting = goLive.isPending || uploadCover.isPending;
+
+  if (activeLive.stream) {
+    return <Navigate to={`/studio/live/${encodeURIComponent(activeLive.stream.id)}`} replace />;
+  }
 
   const startLive = async () => {
     if (!done3 || !user) return;
@@ -312,16 +368,11 @@ export function CreatorPreparePage() {
           title={t('studio.prepare.steps.cover', { defaultValue: 'Choose cover and category' })}
           onOpen={() => done1 && setStep(2)}
         >
-          <label className="gl-creator-field">
-            <span>{t('createLive.fields.category')}</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {t(`createLive.categories.${categoryKey(item)}`, { defaultValue: item })}
-                </option>
-              ))}
-            </select>
-          </label>
+          <CategoryPicker
+            categories={categories}
+            value={category}
+            onChange={setCategory}
+          />
           <CoverPicker
             preview={coverPreview}
             onChange={(file) => {
@@ -416,9 +467,18 @@ export function CreatorLiveConsolePage() {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const room = useRoom(id, Boolean(id));
+  const liveRooms = useRooms({ size: 100 });
   const stopLive = useStopLive();
-  const stream = room.data;
-  const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
+  const directoryStream = useMemo(
+    () => liveRooms.data?.items.find((item) => item.id === id) ?? null,
+    [id, liveRooms.data?.items],
+  );
+  const stream = useMemo(
+    () => mergeStreamSnapshot(room.data, directoryStream),
+    [directoryStream, room.data],
+  );
+  const roomIsLive = Boolean(stream && (isStreamLive(stream) || directoryStream));
+  const streamEnded = Boolean(stream && !roomIsLive && stream.status === 'ended');
   const ownsStream = Boolean(stream?.ownerId && currentUser?.id && stream.ownerId === currentUser.id);
   const [ended, setEnded] = useState(false);
   const realtime = useRoomRealtime(id, Boolean(id && stream), {
@@ -431,11 +491,32 @@ export function CreatorLiveConsolePage() {
     return publisherSessionFromStream(stream) ?? matchingStoredSession(stream.id);
   }, [stream]);
 
-  if (room.isPending) {
+  useEffect(() => {
+    if (!id) return;
+    void room.refetch();
+    void liveRooms.refetch();
+    const timer = window.setInterval(() => {
+      void room.refetch();
+      void liveRooms.refetch();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [id, liveRooms.refetch, room.refetch]);
+
+  useEffect(() => {
+    if (!stream?.streamKey || !ownsStream) return;
+    savePublisherSession(stream);
+  }, [ownsStream, stream]);
+
+  useEffect(() => {
+    if (!streamEnded) return;
+    localStorage.removeItem(LIVE_SESSION_STORAGE_KEY);
+  }, [streamEnded]);
+
+  if (room.isPending && liveRooms.isPending && !stream) {
     return <StudioLoading label={t('studio.loading', { defaultValue: 'Loading studio...' })} />;
   }
 
-  if (room.isError || !stream) {
+  if ((room.isError && !directoryStream) || !stream) {
     return (
       <StudioAccessPage
         icon={<Radio size={24} />}
@@ -453,6 +534,20 @@ export function CreatorLiveConsolePage() {
         icon={<ShieldCheck size={24} />}
         title={t('studio.console.ownerOnly', { defaultValue: 'Owner console only' })}
         body={t('studio.console.ownerOnlyBody', { defaultValue: 'Only the channel owner can control this live.' })}
+        actionLabel={t('notFound.back')}
+        onAction={() => navigate('/studio/overview')}
+      />
+    );
+  }
+
+  if (streamEnded) {
+    return (
+      <StudioAccessPage
+        icon={<Square size={24} />}
+        title={t('studio.console.ended', { defaultValue: 'Live ended.' })}
+        body={t('studio.console.endFinished', {
+          defaultValue: 'This live has already finished. Open the studio overview to start a new one.',
+        })}
         actionLabel={t('notFound.back')}
         onAction={() => navigate('/studio/overview')}
       />
@@ -504,7 +599,17 @@ export function CreatorLiveConsolePage() {
           ) : (
             <WaitingPreview stream={stream} />
           )}
-          {session && <ConsolePublisherPanel session={session} playbackUrl={stream.playbackUrl} live={roomIsLive} onRefresh={() => void room.refetch()} />}
+          {session && (
+            <ConsolePublisherPanel
+              session={session}
+              playbackUrl={stream.playbackUrl}
+              live={roomIsLive}
+              onRefresh={() => {
+                void room.refetch();
+                void liveRooms.refetch();
+              }}
+            />
+          )}
           <section className="gl-creator-panel gl-live-console-activity">
             <div className="gl-creator-panel-head">
               <div>
@@ -722,6 +827,40 @@ function CoverPicker({ preview, onChange }: { preview: string; onChange: (file: 
   );
 }
 
+function CategoryPicker({
+  categories,
+  value,
+  onChange,
+}: {
+  categories: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTranslation('pages');
+  return (
+    <div className="gl-creator-category-picker">
+      <span>{t('createLive.fields.category')}</span>
+      <div className="gl-creator-category-list" role="listbox" aria-label={t('createLive.fields.category')}>
+        {categories.map((item) => {
+          const active = item === value;
+          return (
+            <button
+              key={item}
+              type="button"
+              role="option"
+              aria-selected={active}
+              className={cn('gl-creator-category-chip', active && 'is-active')}
+              onClick={() => onChange(item)}
+            >
+              {t(`createLive.categories.${categoryKey(item)}`, { defaultValue: item })}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LiveSetupPreview({
   title,
   description,
@@ -918,7 +1057,7 @@ function StudioInteractionRail({
         <div className="gl-live-console-gifts">
           {gifts.items.length > 0 ? (
             gifts.items.map((item) => (
-              <div key={item.name}>
+              <div className="gl-live-console-gift-row" key={item.name}>
                 <span>{item.icon || item.name}</span>
                 <strong>{item.name}</strong>
                 <small>x{item.count}</small>

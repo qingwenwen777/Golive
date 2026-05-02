@@ -1,8 +1,13 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { LucideProps } from 'lucide-react';
+import { useMe } from '@/api/auth';
+import { useRooms } from '@/api/room';
 import { Icons } from '@/components/Icons';
+import { loadPublisherSession } from '@/features/creator/CreateLiveDialog';
 import { cn } from '@/lib/cn';
+import type { Stream } from '@/types/stream';
 
 export interface SidebarProps {
   collapsed: boolean;
@@ -24,8 +29,14 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
+  const me = useMe();
+  const liveRooms = useRooms({ size: 100 });
 
   const active = activeKey ?? deriveActiveKey(location.pathname);
+  const activeLiveId = useMemo(
+    () => resolveActiveLiveId(liveRooms.data?.items ?? [], me.data?.id),
+    [liveRooms.data?.items, me.data?.id],
+  );
 
   const handleNav = (key: string, route?: string): void => {
     if (onNav) onNav(key);
@@ -40,7 +51,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       key: 'studio',
       icon: Icons.Live,
       label: t('nav.creatorStudio', { defaultValue: 'Creator Studio' }),
-      route: '/studio/overview',
+      route: activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/overview',
     },
   ];
 
@@ -142,6 +153,25 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
 function isNavItemActive(key: string, active: string): boolean {
   if (key === 'studio') return active.startsWith('studio');
   return active === key;
+}
+
+function resolveActiveLiveId(items: Stream[], userId?: string): string {
+  const session = loadPublisherSession();
+  const liveByUser = userId
+    ? items.find((item) => item.ownerId === userId && isLiveStream(item))
+    : undefined;
+  if (liveByUser) return liveByUser.id;
+
+  const liveBySession = session?.streamId
+    ? items.find((item) => item.id === session.streamId && isLiveStream(item))
+    : undefined;
+  if (liveBySession) return liveBySession.id;
+
+  return session?.streamId ?? '';
+}
+
+function isLiveStream(stream: Pick<Stream, 'isLive' | 'status'>): boolean {
+  return stream.isLive === true || stream.status === 'live';
 }
 
 function deriveActiveKey(pathname: string): string {

@@ -533,17 +533,17 @@ input:focus-visible,
 .gl-side-subsec {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 0 0 4px 24px;
-  padding-left: 10px;
+  gap: 4px;
+  margin: 6px 0 10px 28px;
+  padding: 4px 0 4px 12px;
   border-left: 1px solid var(--gl-border);
 }
 .gl-side-sub-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  min-height: 34px;
+  width: calc(100% - 10px);
+  min-height: 36px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -557,6 +557,9 @@ input:focus-visible,
 .gl-side-sub-item.is-active {
   background: var(--gl-bg-hover);
   color: var(--gl-text);
+}
+.gl-side-sub-item.is-active {
+  font-weight: 850;
 }
 .gl-side-sub-item span {
   min-width: 0;
@@ -3396,6 +3399,45 @@ button.gl-fan-badge-empty {
   border-color: #1c62b9;
   box-shadow: inset 0 0 0 1px #1c62b9;
 }
+.gl-creator-category-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gl-creator-category-picker > span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-creator-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 760px;
+}
+.gl-creator-category-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 13px;
+  white-space: nowrap;
+}
+.gl-creator-category-chip:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-creator-category-chip.is-active {
+  border-color: var(--gl-text);
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
 .gl-creator-cover-picker {
   position: relative;
   display: flex;
@@ -3830,7 +3872,7 @@ button.gl-fan-badge-empty {
   cursor: default;
   opacity: 0.5;
 }
-.gl-live-console-gifts div,
+.gl-live-console-gift-row,
 .gl-live-console-superchats div {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;
@@ -3839,14 +3881,14 @@ button.gl-fan-badge-empty {
   border-bottom: 1px solid var(--gl-border);
   padding: 9px 0;
 }
-.gl-live-console-gifts div:last-child,
+.gl-live-console-gift-row:last-child,
 .gl-live-console-superchats div:last-child {
   border-bottom: 0;
 }
-.gl-live-console-gifts span {
+.gl-live-console-gift-row span {
   text-align: center;
 }
-.gl-live-console-gifts strong,
+.gl-live-console-gift-row strong,
 .gl-live-console-superchats strong {
   overflow: hidden;
   color: var(--gl-text);
@@ -3855,7 +3897,7 @@ button.gl-fan-badge-empty {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.gl-live-console-gifts small,
+.gl-live-console-gift-row small,
 .gl-live-console-superchats span {
   color: var(--gl-text-2);
   font-size: 12px;
