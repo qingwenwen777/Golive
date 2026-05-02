@@ -290,6 +290,132 @@
       "coverUpload": "无法上传封面。"
     }
   },
+  "studio": {
+    "brand": "主播工作台",
+    "title": "{{name}} 的工作台",
+    "loading": "正在加载工作台...",
+    "tabs": {
+      "label": "主播工作台栏目",
+      "overview": "概览",
+      "prepare": "开播准备",
+      "replay": "数据复盘"
+    },
+    "auth": {
+      "title": "登录后进入主播工作台",
+      "body": "概览、开播配置和数据复盘会绑定到你的 GoLive 账号。",
+      "action": "登录"
+    },
+    "permission": {
+      "reviewTime": "预计审核时间：1 个工作日内。",
+      "notice": "请保持频道名、头像和封面信息完整，便于审核。",
+      "progress": "审核进度：已提交 -> 人工审核 -> 给出结果。",
+      "pending": {
+        "title": "申请审核中",
+        "body": "我们正在检查你的频道资料与账号状态。",
+        "action": "已提交"
+      },
+      "rejected": {
+        "title": "申请未通过",
+        "body": "拒绝原因：你的频道信息需要重新完善后再开启直播权限。",
+        "action": "重新申请",
+        "reason": "拒绝原因：频道准备度暂未满足当前创作者策略。"
+      },
+      "none": {
+        "title": "申请主播权限",
+        "body": "进入开播工作区前需要先通过主播权限审核。",
+        "action": "提交申请"
+      }
+    },
+    "overview": {
+      "kpis": "主播核心数据",
+      "cards": {
+        "online": "当前观众",
+        "onlineSub": "峰值观众",
+        "subscribers": "订阅者",
+        "subscribersSub": "频道总数",
+        "streams": "直播场次",
+        "streamsSub": "已完成",
+        "revenue": "收益",
+        "revenueSub": "直播收入"
+      },
+      "quickTitle": "快捷操作",
+      "quickHeading": "准备下一场直播",
+      "recentTitle": "最近表现",
+      "noRecent": "暂无直播记录",
+      "latestPeak": "峰值 {{count}} 人",
+      "emptyRecent": "开播后复盘数据会显示在这里。"
+    },
+    "actions": {
+      "prepare": "进入开播准备",
+      "prepareSub": "标题、封面、分类与 OBS 检查。",
+      "analytics": "查看数据复盘",
+      "analyticsSub": "收益、观众与已结束直播报告。",
+      "channel": "查看频道",
+      "channelSub": "确认观众看到的频道页面。"
+    },
+    "prepare": {
+      "created": "直播间已创建。请打开 OBS 开始推流。",
+      "next": "下一步",
+      "descriptionPlaceholder": "告诉观众这场直播的内容。",
+      "permissionApproved": "主播权限已通过",
+      "obsReady": "OBS 配置已检查",
+      "runCheck": "标记 OBS 检查完成",
+      "readyTitle": "可以创建直播间了",
+      "readyBody": "确认后会签发推流密钥，并打开直播控制台。",
+      "startLive": "开始直播",
+      "previewLabel": "预览",
+      "previewTitle": "开播前效果",
+      "waitingStatus": "待开播",
+      "noDescription": "简介会显示在这里。",
+      "steps": {
+        "info": "填写直播信息",
+        "cover": "选择封面与分类",
+        "check": "检查推流连接与权限",
+        "confirm": "确认开始直播"
+      }
+    },
+    "publisher": {
+      "title": "推流",
+      "server": "推流地址",
+      "key": "推流密钥",
+      "keyAfterStart": "确认后签发",
+      "playback": "播放地址",
+      "connected": "OBS 已连接",
+      "waiting": "等待 OBS 连接",
+      "refresh": "刷新状态"
+    },
+    "console": {
+      "notFound": "直播间不可用",
+      "notFoundBody": "无法加载这个直播间。",
+      "ownerOnly": "仅主播可进入控制台",
+      "ownerOnlyBody": "只有频道所有者可以控制这场直播。",
+      "ended": "直播已结束。",
+      "endFailed": "无法结束直播。",
+      "live": "LIVE",
+      "waiting": "等待中",
+      "duration": "直播时长",
+      "online": "在线人数",
+      "bitrate": "码率",
+      "dropped": "掉帧率",
+      "latency": "延迟",
+      "ending": "结束中...",
+      "endLive": "结束直播",
+      "activity": "互动",
+      "bettingTitle": "竞猜模块",
+      "reconnecting": "重连中 #{{count}}",
+      "disconnected": "已断开",
+      "waitingPreview": "等待推流",
+      "waitingPreviewBody": "在 OBS 中填入推流地址与密钥，然后开始推流。",
+      "danmu": "弹幕管理",
+      "chatControl": "直播聊天",
+      "activeBullets": "{{count}} 条弹幕正在预览",
+      "clearPreview": "清空预览",
+      "gifts": "礼物汇总",
+      "noGifts": "暂无礼物。",
+      "superChat": "SuperChat 置顶",
+      "noSuperChat": "暂无置顶 SuperChat。"
+    }
+  },
   "upload": {
     "description": "上传 JPG、PNG、WebP 或 GIF 图片，最大 5MB。",
     "imageTypeError": "请使用 JPG、PNG、WebP 或 GIF 图片。",

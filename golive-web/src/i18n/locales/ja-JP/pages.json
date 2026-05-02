@@ -288,6 +288,132 @@
       "coverUpload": "カバーをアップロードできませんでした。"
     }
   },
+  "studio": {
+    "brand": "配信者ワークスペース",
+    "title": "{{name}} のワークスペース",
+    "loading": "ワークスペースを読み込み中...",
+    "tabs": {
+      "label": "配信者ワークスペースのセクション",
+      "overview": "概要",
+      "prepare": "配信準備",
+      "replay": "データ振り返り"
+    },
+    "auth": {
+      "title": "ログインして配信者ワークスペースを開く",
+      "body": "ダッシュボード、配信設定、分析は GoLive アカウントに紐づきます。",
+      "action": "ログイン"
+    },
+    "permission": {
+      "reviewTime": "審査目安: 1 営業日以内。",
+      "notice": "チャンネル名、アイコン、カバーを整えておくと審査がスムーズです。",
+      "progress": "進捗: 申請済み -> 手動審査 -> 結果通知。",
+      "pending": {
+        "title": "申請を審査中",
+        "body": "チャンネル情報とアカウント状態を確認しています。",
+        "action": "送信済み"
+      },
+      "rejected": {
+        "title": "申請は承認されませんでした",
+        "body": "理由: 配信権限を有効にする前にチャンネル情報の再確認が必要です。",
+        "action": "再申請",
+        "reason": "却下理由: 現在のクリエイターポリシーに対してチャンネル準備が不足しています。"
+      },
+      "none": {
+        "title": "配信者権限を申請",
+        "body": "配信ワークスペースを開く前に配信者権限の承認が必要です。",
+        "action": "申請を送信"
+      }
+    },
+    "overview": {
+      "kpis": "配信者の主要データ",
+      "cards": {
+        "online": "現在の視聴者",
+        "onlineSub": "ピーク視聴者",
+        "subscribers": "登録者",
+        "subscribersSub": "チャンネル合計",
+        "streams": "配信数",
+        "streamsSub": "完了済み",
+        "revenue": "収益",
+        "revenueSub": "ライブ収益"
+      },
+      "quickTitle": "クイック操作",
+      "quickHeading": "次の配信を準備",
+      "recentTitle": "最新の結果",
+      "noRecent": "配信履歴はまだありません",
+      "latestPeak": "ピーク {{count}} 人",
+      "emptyRecent": "配信を開始すると振り返りがここに表示されます。"
+    },
+    "actions": {
+      "prepare": "配信準備を開く",
+      "prepareSub": "タイトル、カバー、カテゴリ、OBS チェック。",
+      "analytics": "分析を見る",
+      "analyticsSub": "収益、視聴者、終了した配信レポート。",
+      "channel": "チャンネルを見る",
+      "channelSub": "視聴者から見えるページを確認します。"
+    },
+    "prepare": {
+      "created": "ライブルームを作成しました。OBS を開いて配信を開始してください。",
+      "next": "次へ",
+      "descriptionPlaceholder": "この配信の内容を視聴者に伝えましょう。",
+      "permissionApproved": "配信者権限は承認済み",
+      "obsReady": "OBS 設定を確認済み",
+      "runCheck": "OBS チェック完了にする",
+      "readyTitle": "ライブルームを作成できます",
+      "readyBody": "確認後にストリームキーを発行し、ライブコントロール画面を開きます。",
+      "startLive": "配信開始",
+      "previewLabel": "プレビュー",
+      "previewTitle": "配信前の表示",
+      "waitingStatus": "配信待機中",
+      "noDescription": "説明はここに表示されます。",
+      "steps": {
+        "info": "配信情報を入力",
+        "cover": "カバーとカテゴリを選択",
+        "check": "配信接続と権限を確認",
+        "confirm": "確認して配信開始"
+      }
+    },
+    "publisher": {
+      "title": "配信",
+      "server": "配信 URL",
+      "key": "ストリームキー",
+      "keyAfterStart": "確認後に発行",
+      "playback": "再生 URL",
+      "connected": "OBS 接続済み",
+      "waiting": "OBS 接続待ち",
+      "refresh": "状態を更新"
+    },
+    "console": {
+      "notFound": "ライブルームを利用できません",
+      "notFoundBody": "このライブルームを読み込めませんでした。",
+      "ownerOnly": "配信者専用コントロール",
+      "ownerOnlyBody": "この配信を操作できるのはチャンネル所有者のみです。",
+      "ended": "配信を終了しました。",
+      "endFailed": "配信を終了できませんでした。",
+      "live": "LIVE",
+      "waiting": "待機中",
+      "duration": "配信時間",
+      "online": "オンライン",
+      "bitrate": "ビットレート",
+      "dropped": "ドロップ率",
+      "latency": "遅延",
+      "ending": "終了中...",
+      "endLive": "配信終了",
+      "activity": "インタラクション",
+      "bettingTitle": "予想モジュール",
+      "reconnecting": "再接続中 #{{count}}",
+      "disconnected": "切断中",
+      "waitingPreview": "配信待機中",
+      "waitingPreviewBody": "OBS に配信 URL とキーを入力し、配信を開始してください。",
+      "danmu": "弾幕管理",
+      "chatControl": "ライブチャット",
+      "activeBullets": "{{count}} 件の弾幕をプレビュー中",
+      "clearPreview": "プレビューをクリア",
+      "gifts": "ギフト集計",
+      "noGifts": "ギフトはまだありません。",
+      "superChat": "固定 SuperChat",
+      "noSuperChat": "固定 SuperChat はありません。"
+    }
+  },
   "upload": {
     "description": "JPG、PNG、WebP、GIF 画像を最大 5MB までアップロードできます。",
     "imageTypeError": "JPG、PNG、WebP、GIF 画像を使用してください。",

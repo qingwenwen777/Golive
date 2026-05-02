@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Coins, Plus, User as UserIcon } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
 import { Avatar } from '@/components/Avatar';
-import { CreateLiveDialog } from '@/features/creator/CreateLiveDialog';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { Icons } from '@/components/Icons';
 import { GoLiveLogo } from '@/components/Logo';
@@ -38,7 +37,6 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const user = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const me = useMe();
-  const [createOpen, setCreateOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('q') ?? '');
   const currentUser = me.data ?? user;
@@ -118,9 +116,13 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 
           {isAuthed ? (
             <>
-              <button type="button" className="gl-create-btn" onClick={() => setCreateOpen(true)}>
+              <button
+                type="button"
+                className="gl-create-btn"
+                onClick={() => navigate('/studio/prepare')}
+              >
                 <Icons.Plus size={22} />
-                <span className="gl-create-label">{t('create')}</span>
+                <span className="gl-create-label">{t('goLive', { defaultValue: t('create') })}</span>
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -205,7 +207,6 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           )}
         </div>
       </header>
-      <CreateLiveDialog open={createOpen} onOpenChange={setCreateOpen} />
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={currentUser} />
     </>
   );

@@ -288,6 +288,132 @@
       "coverUpload": "Could not upload the cover."
     }
   },
+  "studio": {
+    "brand": "Creator Studio",
+    "title": "{{name}} workspace",
+    "loading": "Loading studio...",
+    "tabs": {
+      "label": "Creator Studio sections",
+      "overview": "Overview",
+      "prepare": "Stream setup",
+      "replay": "Data replay"
+    },
+    "auth": {
+      "title": "Sign in to open Creator Studio",
+      "body": "Your dashboard, stream setup, and analytics are tied to your GoLive account.",
+      "action": "Sign in"
+    },
+    "permission": {
+      "reviewTime": "Estimated review time: within 1 business day.",
+      "notice": "Keep your channel name, avatar, and cover ready for review.",
+      "progress": "Progress: submitted -> manual review -> result.",
+      "pending": {
+        "title": "Application under review",
+        "body": "We are checking your channel and account status.",
+        "action": "Submitted"
+      },
+      "rejected": {
+        "title": "Application was rejected",
+        "body": "Reason: your channel information needs another review before live access can be enabled.",
+        "action": "Apply again",
+        "reason": "Rejected reason: channel readiness did not meet the current creator policy."
+      },
+      "none": {
+        "title": "Apply for creator access",
+        "body": "Creator access is required before opening the streaming workspace.",
+        "action": "Submit application"
+      }
+    },
+    "overview": {
+      "kpis": "Creator performance summary",
+      "cards": {
+        "online": "Current audience",
+        "onlineSub": "peak audience",
+        "subscribers": "Subscribers",
+        "subscribersSub": "channel total",
+        "streams": "Streams",
+        "streamsSub": "completed",
+        "revenue": "Revenue",
+        "revenueSub": "live income"
+      },
+      "quickTitle": "Quick actions",
+      "quickHeading": "Prepare your next live",
+      "recentTitle": "Latest result",
+      "noRecent": "No stream yet",
+      "latestPeak": "{{count}} peak viewers",
+      "emptyRecent": "Start a live and the recap will appear here."
+    },
+    "actions": {
+      "prepare": "Open stream setup",
+      "prepareSub": "Title, cover, category, and OBS checks.",
+      "analytics": "Review analytics",
+      "analyticsSub": "Revenue, viewers, and finished live reports.",
+      "channel": "View channel",
+      "channelSub": "Check how viewers see your creator page."
+    },
+    "prepare": {
+      "created": "Live room created. Open OBS and begin publishing.",
+      "next": "Next",
+      "descriptionPlaceholder": "Tell viewers what this live is about.",
+      "permissionApproved": "Creator permission approved",
+      "obsReady": "OBS setup reviewed",
+      "runCheck": "Mark OBS check complete",
+      "readyTitle": "Ready to create the live room",
+      "readyBody": "After confirmation, your stream key is issued and the live control console opens.",
+      "startLive": "Start live",
+      "previewLabel": "Preview",
+      "previewTitle": "Before going live",
+      "waitingStatus": "Waiting to go live",
+      "noDescription": "Description will appear here.",
+      "steps": {
+        "info": "Fill live info",
+        "cover": "Choose cover and category",
+        "check": "Check publishing and permission",
+        "confirm": "Confirm and start live"
+      }
+    },
+    "publisher": {
+      "title": "Publishing",
+      "server": "OBS server",
+      "key": "Stream key",
+      "keyAfterStart": "Issued after confirmation",
+      "playback": "Playback URL",
+      "connected": "OBS connected",
+      "waiting": "Waiting for OBS",
+      "refresh": "Refresh status"
+    },
+    "console": {
+      "notFound": "Live room unavailable",
+      "notFoundBody": "The live room could not be loaded.",
+      "ownerOnly": "Owner console only",
+      "ownerOnlyBody": "Only the channel owner can control this live.",
+      "ended": "Live ended.",
+      "endFailed": "Could not end the live.",
+      "live": "LIVE",
+      "waiting": "Waiting",
+      "duration": "Duration",
+      "online": "Online",
+      "bitrate": "Bitrate",
+      "dropped": "Dropped frames",
+      "latency": "Latency",
+      "ending": "Ending...",
+      "endLive": "End live",
+      "activity": "Interaction",
+      "bettingTitle": "Betting module",
+      "reconnecting": "Reconnecting #{{count}}",
+      "disconnected": "Disconnected",
+      "waitingPreview": "Waiting for publisher",
+      "waitingPreviewBody": "Add the stream server and key in OBS, then start streaming.",
+      "danmu": "Danmu management",
+      "chatControl": "Live chat",
+      "activeBullets": "{{count}} active bullets",
+      "clearPreview": "Clear preview",
+      "gifts": "Gift summary",
+      "noGifts": "No gifts yet.",
+      "superChat": "Pinned SuperChat",
+      "noSuperChat": "No SuperChat pinned."
+    }
+  },
   "upload": {
     "description": "Upload a JPG, PNG, WebP, or GIF image up to 5MB.",
     "imageTypeError": "Use a JPG, PNG, WebP, or GIF image.",

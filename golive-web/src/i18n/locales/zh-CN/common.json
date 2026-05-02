@@ -3,6 +3,7 @@
   "searchPlaceholder": "搜索直播间",
   "voiceSearch": "语音搜索",
   "create": "开播",
+  "goLive": "开播",
   "notifications": "通知",
   "menu": "菜单",
   "theme": {
@@ -26,6 +27,10 @@
     "liveNow": "正在直播",
     "subscriptions": "订阅",
     "coins": "Coins",
+    "creatorStudio": "主播工作台",
+    "studioOverview": "概览",
+    "studioPrepare": "开播准备",
+    "studioReplay": "数据复盘",
     "yourLibrary": "我的",
     "history": "观看历史",
     "watchLater": "稍后观看",

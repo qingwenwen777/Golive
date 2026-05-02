@@ -9,6 +9,14 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import AdminApplicationsPage, { AdminIndexPage } from '@/pages/AdminApplicationsPage';
 import CoinPage from '@/pages/CoinPage';
 import {
+  CreatorLiveConsolePage,
+  CreatorPreparePage,
+  CreatorReplayPage,
+  CreatorStudioIndexPage,
+  CreatorStudioOverviewPage,
+  CreatorStudioShell,
+} from '@/pages/CreatorStudioPage';
+import {
   HistoryPage,
   LikedPage,
   SettingsPage,
@@ -26,6 +34,17 @@ export const router = createBrowserRouter([
       { path: 'live-now', element: <Navigate to="/" replace /> },
       { path: 'live/:id', element: <LiveRoomPage /> },
       { path: 'channel/:name', element: <ChannelPage /> },
+      {
+        path: 'studio',
+        element: <CreatorStudioShell />,
+        children: [
+          { index: true, element: <CreatorStudioIndexPage /> },
+          { path: 'overview', element: <CreatorStudioOverviewPage /> },
+          { path: 'prepare', element: <CreatorPreparePage /> },
+          { path: 'replay', element: <CreatorReplayPage /> },
+        ],
+      },
+      { path: 'studio/live/:id', element: <CreatorLiveConsolePage /> },
       { path: 'studio/analytics/:name', element: <CreatorAnalyticsPage /> },
       { path: 'studio/analytics/:name/live/:recordId', element: <LiveAnalysisPage /> },
       { path: 'subscriptions', element: <SubscriptionsPage /> },

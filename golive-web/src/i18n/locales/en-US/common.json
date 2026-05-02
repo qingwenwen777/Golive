@@ -3,6 +3,7 @@
   "searchPlaceholder": "hololive",
   "voiceSearch": "Search with your voice",
   "create": "Create",
+  "goLive": "Go live",
   "notifications": "Notifications",
   "menu": "Menu",
   "theme": {
@@ -26,6 +27,10 @@
     "liveNow": "Live now",
     "subscriptions": "Subscriptions",
     "coins": "Coins",
+    "creatorStudio": "Creator Studio",
+    "studioOverview": "Overview",
+    "studioPrepare": "Stream setup",
+    "studioReplay": "Data replay",
     "yourLibrary": "You",
     "history": "History",
     "watchLater": "Watch later",

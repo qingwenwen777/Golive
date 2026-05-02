@@ -36,6 +36,33 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
     { key: 'home', icon: Icons.Home, label: t('nav.home'), route: '/' },
     { key: 'subs', icon: Icons.Subs, label: t('nav.subscriptions'), route: '/subscriptions' },
     { key: 'coins', icon: Icons.Wallet, label: t('nav.coins', 'Coins'), route: '/coins' },
+    {
+      key: 'studio',
+      icon: Icons.Live,
+      label: t('nav.creatorStudio', { defaultValue: 'Creator Studio' }),
+      route: '/studio/overview',
+    },
+  ];
+
+  const studioItems: NavItem[] = [
+    {
+      key: 'studio-overview',
+      icon: Icons.Home,
+      label: t('nav.studioOverview', { defaultValue: 'Overview' }),
+      route: '/studio/overview',
+    },
+    {
+      key: 'studio-prepare',
+      icon: Icons.Live,
+      label: t('nav.studioPrepare', { defaultValue: 'Stream setup' }),
+      route: '/studio/prepare',
+    },
+    {
+      key: 'studio-replay',
+      icon: Icons.History,
+      label: t('nav.studioReplay', { defaultValue: 'Data replay' }),
+      route: '/studio/replay',
+    },
   ];
 
   const youItems: NavItem[] = [
@@ -53,7 +80,11 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
         type="button"
         aria-label={it.label}
         title={it.label}
-        className={cn('gl-side-item', active === it.key && 'is-active', collapsed && 'is-col')}
+        className={cn(
+          'gl-side-item',
+          isNavItemActive(it.key, active) && 'is-active',
+          collapsed && 'is-col',
+        )}
         onClick={() => handleNav(it.key, it.route)}
       >
         <Icon size={22} />
@@ -63,9 +94,31 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
     );
   };
 
+  const renderSubItem = (it: NavItem) => {
+    const Icon = it.icon;
+    return (
+      <button
+        key={it.key}
+        type="button"
+        aria-label={it.label}
+        title={it.label}
+        className={cn('gl-side-sub-item', active === it.key && 'is-active')}
+        onClick={() => handleNav(it.key, it.route)}
+      >
+        <Icon size={17} />
+        <span>{it.label}</span>
+      </button>
+    );
+  };
+
   return (
     <aside className={cn('gl-sidebar', collapsed && 'is-col')}>
-      <nav className="gl-side-sec">{mainItems.map(renderItem)}</nav>
+      <nav className="gl-side-sec">
+        {mainItems.map(renderItem)}
+        {!collapsed && active.startsWith('studio') && (
+          <div className="gl-side-subsec">{studioItems.map(renderSubItem)}</div>
+        )}
+      </nav>
       {!collapsed && (
         <>
           <div className="gl-side-divider" />
@@ -86,8 +139,20 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
   );
 }
 
+function isNavItemActive(key: string, active: string): boolean {
+  if (key === 'studio') return active.startsWith('studio');
+  return active === key;
+}
+
 function deriveActiveKey(pathname: string): string {
   if (pathname === '/') return 'home';
+  if (pathname === '/studio' || pathname === '/studio/overview') return 'studio-overview';
+  if (pathname.startsWith('/studio/prepare') || pathname.startsWith('/studio/live')) {
+    return 'studio-prepare';
+  }
+  if (pathname.startsWith('/studio/replay') || pathname.startsWith('/studio/analytics')) {
+    return 'studio-replay';
+  }
   if (pathname === '/subscriptions' || pathname.startsWith('/channel/')) return 'subs';
   if (pathname === '/coins') return 'coins';
   if (pathname === '/you') return 'you';

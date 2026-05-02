@@ -3,6 +3,7 @@
   "searchPlaceholder": "ホロライブ",
   "voiceSearch": "音声で検索",
   "create": "作成",
+  "goLive": "配信開始",
   "notifications": "通知",
   "menu": "メニュー",
   "theme": {
@@ -26,6 +27,10 @@
     "liveNow": "ライブ中",
     "subscriptions": "登録チャンネル",
     "coins": "コイン",
+    "creatorStudio": "配信者ワークスペース",
+    "studioOverview": "概要",
+    "studioPrepare": "配信準備",
+    "studioReplay": "データ振り返り",
     "yourLibrary": "あなた",
     "history": "履歴",
     "watchLater": "後で見る",
