@@ -217,6 +217,11 @@ export function Player({
     );
     const onErr = (errType: string, errDetail: string) => {
       const detail = `${errType} ${errDetail}`.toLowerCase();
+      if (quality !== 'source' && (detail.includes('network') || detail.includes('exception'))) {
+        setQuality('source');
+        setBuffering(true);
+        return;
+      }
       if (detail.includes('eof') || detail.includes('ended') || detail.includes('loading_complete')) {
         showPlaybackEnded();
         return;
@@ -263,7 +268,7 @@ export function Player({
       setBuffering(false);
       clearStallTimer();
     };
-  }, [clearStallTimer, isLiveFlv, flvUrl, retryNonce, showPlaybackEnded]);
+  }, [clearStallTimer, isLiveFlv, flvUrl, quality, retryNonce, showPlaybackEnded]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
