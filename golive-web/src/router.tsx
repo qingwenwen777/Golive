@@ -1,29 +1,89 @@
+import { lazy } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import App from '@/App';
-import HomePage from '@/pages/HomePage';
-import LiveRoomPage from '@/pages/LiveRoomPage';
-import ChannelPage from '@/pages/ChannelPage';
-import { CreatorAnalyticsPage, LiveAnalysisPage } from '@/pages/CreatorAnalyticsPage';
-import LoginPage from '@/pages/LoginPage';
 import NotFoundPage from '@/pages/NotFoundPage';
-import AdminApplicationsPage, { AdminIndexPage } from '@/pages/AdminApplicationsPage';
-import CoinPage from '@/pages/CoinPage';
-import {
-  CreatorLiveConsolePage,
-  CreatorPreparePage,
-  CreatorReplayPage,
-  CreatorStudioIndexPage,
-  CreatorStudioOverviewPage,
-  CreatorStudioShell,
-} from '@/pages/CreatorStudioPage';
-import {
-  HistoryPage,
-  LikedPage,
-  SettingsPage,
-  SubscriptionsPage,
-  WatchLaterPage,
-  YouPage,
-} from '@/pages/LibraryPages';
+
+const HomePage = lazy(() => import('@/pages/HomePage'));
+const LiveRoomPage = lazy(() => import('@/pages/LiveRoomPage'));
+const ChannelPage = lazy(() => import('@/pages/ChannelPage'));
+const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const CoinPage = lazy(() => import('@/pages/CoinPage'));
+const AdminApplicationsPage = lazy(() => import('@/pages/AdminApplicationsPage'));
+const AdminIndexPage = lazy(() =>
+  import('@/pages/AdminApplicationsPage').then((module) => ({
+    default: module.AdminIndexPage,
+  })),
+);
+const CreatorAnalyticsPage = lazy(() =>
+  import('@/pages/CreatorAnalyticsPage').then((module) => ({
+    default: module.CreatorAnalyticsPage,
+  })),
+);
+const LiveAnalysisPage = lazy(() =>
+  import('@/pages/CreatorAnalyticsPage').then((module) => ({
+    default: module.LiveAnalysisPage,
+  })),
+);
+const CreatorStudioShell = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorStudioShell,
+  })),
+);
+const CreatorStudioIndexPage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorStudioIndexPage,
+  })),
+);
+const CreatorStudioOverviewPage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorStudioOverviewPage,
+  })),
+);
+const CreatorPreparePage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorPreparePage,
+  })),
+);
+const CreatorReplayPage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorReplayPage,
+  })),
+);
+const CreatorLiveConsolePage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorLiveConsolePage,
+  })),
+);
+const SubscriptionsPage = lazy(() =>
+  import('@/pages/LibraryPages').then((module) => ({
+    default: module.SubscriptionsPage,
+  })),
+);
+const YouPage = lazy(() =>
+  import('@/pages/LibraryPages').then((module) => ({
+    default: module.YouPage,
+  })),
+);
+const HistoryPage = lazy(() =>
+  import('@/pages/LibraryPages').then((module) => ({
+    default: module.HistoryPage,
+  })),
+);
+const WatchLaterPage = lazy(() =>
+  import('@/pages/LibraryPages').then((module) => ({
+    default: module.WatchLaterPage,
+  })),
+);
+const LikedPage = lazy(() =>
+  import('@/pages/LibraryPages').then((module) => ({
+    default: module.LikedPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import('@/pages/LibraryPages').then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
 
 export const router = createBrowserRouter([
   {

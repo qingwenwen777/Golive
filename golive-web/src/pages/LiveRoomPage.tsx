@@ -97,8 +97,8 @@ export default function LiveRoomPage() {
       return { ...rest, isLive: false, status: 'ended' };
     });
     void queryClient.invalidateQueries({ queryKey: ['rooms'] });
-    toast.info('Live has ended.');
-  }, [id, queryClient, stream]);
+    toast.info(t('liveRoom.connection.liveEnded'));
+  }, [id, queryClient, stream, t]);
 
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
     useRoomRealtime(roomId, roomIsLive, { onLiveEnded: handleLiveEnded, activeFanBadge });
@@ -117,16 +117,18 @@ export default function LiveRoomPage() {
     if (readyState === prev) return;
 
     if (readyState === 'connecting' && prev === 'closed') {
-      toast.loading('Connecting...', { id: connectionToastId });
+      toast.loading(t('liveRoom.connection.connecting'), { id: connectionToastId });
     } else if (readyState === 'open') {
-      toast.success('Connected', { id: connectionToastId });
+      toast.success(t('liveRoom.connection.connected'), { id: connectionToastId });
       window.setTimeout(() => toast.dismiss(connectionToastId), 1500);
     } else if (readyState === 'reconnecting') {
-      toast.loading(`Reconnecting... (#${retryCount})`, { id: connectionToastId });
+      toast.loading(t('liveRoom.connection.reconnecting', { count: retryCount }), {
+        id: connectionToastId,
+      });
     } else if (readyState === 'closed' && prev !== 'closed') {
-      toast.error('Disconnected', { id: connectionToastId });
+      toast.error(t('liveRoom.connection.disconnected'), { id: connectionToastId });
     }
-  }, [readyState, retryCount, roomId]);
+  }, [readyState, retryCount, roomId, t]);
 
   useEffect(() => {
     return () => {
@@ -199,7 +201,9 @@ export default function LiveRoomPage() {
   const effectiveViewers = viewerCount > 0 ? viewerCount : stream.viewers;
   const reconnecting = readyState === 'reconnecting' || readyState === 'closed';
   const reconnectingLabel =
-    readyState === 'closed' ? 'Disconnected' : `Reconnecting… (#${retryCount})`;
+    readyState === 'closed'
+      ? t('liveRoom.connection.disconnected')
+      : t('liveRoom.connection.reconnecting', { count: retryCount });
 
   const ownsStream = Boolean(currentUser?.id && stream.ownerId === currentUser.id);
   const activeBetRound =

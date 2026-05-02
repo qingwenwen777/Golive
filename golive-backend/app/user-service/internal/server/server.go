@@ -65,6 +65,8 @@ func NewRouter(d Deps) *gin.Engine {
 
 	admin := r.Group("/admin", handler.AuthRequired(d.Auth), handler.AdminRequired(d.Users))
 	{
+		admin.GET("/live-creators", adminH.ListLiveCreators)
+		admin.POST("/users/:id/live-permission", adminH.UpdateLivePermission)
 		admin.GET("/creator-applications", adminH.ListCreatorApplications)
 		admin.POST("/creator-applications/:id/approve", adminH.ApproveCreatorApplication)
 		admin.POST("/creator-applications/:id/reject", adminH.RejectCreatorApplication)

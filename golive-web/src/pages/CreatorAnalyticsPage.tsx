@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -21,56 +23,60 @@ import {
 import { Avatar } from '@/components/Avatar';
 
 export function CreatorAnalyticsPage() {
+  const { t, i18n } = useTranslation('pages');
   const { name = '' } = useParams<{ name: string }>();
   const channelKey = decodeURIComponent(name);
   const analytics = useCreatorAnalytics(channelKey);
   const data = analytics.data;
   const latest = data?.history[0];
+  const locale = i18n.resolvedLanguage ?? i18n.language;
 
   return (
     <div className="gl-page gl-studio-page">
       <StudioHeader
         channelKey={channelKey}
-        title="Channel analytics"
-        subtitle="Revenue, subscriptions, watch time, and finished live performance."
+        title={t('studio.analytics.title')}
+        subtitle={t('studio.analytics.subtitle')}
       />
 
       {analytics.isPending ? (
-        <div className="gl-studio-panel gl-studio-loading">Loading analytics...</div>
+        <div className="gl-studio-panel gl-studio-loading">
+          {t('studio.analytics.loading')}
+        </div>
       ) : analytics.isError ? (
         <div className="gl-channel-empty">
           <BarChart3 size={34} />
           <div>
-            <strong>Analytics unavailable</strong>
-            <span>Only the channel owner can view studio analytics.</span>
+            <strong>{t('studio.analytics.unavailableTitle')}</strong>
+            <span>{t('studio.analytics.unavailableBody')}</span>
           </div>
         </div>
       ) : data ? (
         <>
-          <section className="gl-studio-kpis" aria-label="Creator performance summary">
+          <section className="gl-studio-kpis" aria-label={t('studio.analytics.kpis')}>
             <StudioKpi
               icon={<Coins size={18} />}
-              label="Revenue"
-              value={formatCoin(data.revenueCoin)}
-              trend="last 6 months"
+              label={t('studio.analytics.cards.revenue')}
+              value={formatCoin(data.revenueCoin, locale, t)}
+              trend={t('studio.analytics.cards.revenueSub')}
             />
             <StudioKpi
               icon={<UserPlus size={18} />}
-              label="Subscribers"
-              value={data.subscriberCount.toLocaleString()}
-              trend="current total"
+              label={t('studio.analytics.cards.subscribers')}
+              value={data.subscriberCount.toLocaleString(locale)}
+              trend={t('studio.analytics.cards.subscribersSub')}
             />
             <StudioKpi
               icon={<Radio size={18} />}
-              label="Streams"
-              value={data.streams.toLocaleString()}
-              trend="completed"
+              label={t('studio.analytics.cards.streams')}
+              value={data.streams.toLocaleString(locale)}
+              trend={t('studio.analytics.cards.streamsSub')}
             />
             <StudioKpi
               icon={<Eye size={18} />}
-              label="Peak online"
-              value={data.peakViewers.toLocaleString()}
-              trend="best live"
+              label={t('studio.analytics.cards.peakOnline')}
+              value={data.peakViewers.toLocaleString(locale)}
+              trend={t('studio.analytics.cards.peakOnlineSub')}
             />
           </section>
 
@@ -78,24 +84,24 @@ export function CreatorAnalyticsPage() {
             <div className="gl-studio-panel gl-studio-panel-wide">
               <div className="gl-studio-panel-head">
                 <div>
-                  <span>Monthly revenue</span>
-                  <h2>{formatCoin(data.monthly.at(-1)?.revenueCoin ?? 0)}</h2>
+                  <span>{t('studio.analytics.sections.monthlyRevenue')}</span>
+                  <h2>{formatCoin(data.monthly.at(-1)?.revenueCoin ?? 0, locale, t)}</h2>
                 </div>
                 <BarChart3 size={22} />
               </div>
               <BarChart
                 items={data.monthly}
                 value={(item) => item.revenueCoin}
-                label={(item) => formatMonth(item.month)}
-                valueLabel={formatCoin}
+                label={(item) => formatMonth(item.month, locale)}
+                valueLabel={(value) => formatCoin(value, locale, t)}
               />
             </div>
 
             <div className="gl-studio-panel">
               <div className="gl-studio-panel-head">
                 <div>
-                  <span>Subscription growth</span>
-                  <h2>{data.monthly.at(-1)?.subscribers.toLocaleString() ?? '0'}</h2>
+                  <span>{t('studio.analytics.sections.subscriptionGrowth')}</span>
+                  <h2>{data.monthly.at(-1)?.subscribers.toLocaleString(locale) ?? '0'}</h2>
                 </div>
                 <TrendingUp size={22} />
               </div>
@@ -105,34 +111,42 @@ export function CreatorAnalyticsPage() {
             <div className="gl-studio-panel">
               <div className="gl-studio-panel-head">
                 <div>
-                  <span>Watch time</span>
-                  <h2>{data.watchHours.toLocaleString()}h</h2>
+                  <span>{t('studio.analytics.sections.watchTime')}</span>
+                  <h2>{formatHours(data.watchHours, locale, t)}</h2>
                 </div>
                 <Users size={22} />
               </div>
-              <MetricRows items={data.monthly} />
+              <MetricRows items={data.monthly} locale={locale} t={t} />
             </div>
           </section>
 
           <section className="gl-studio-panel">
             <div className="gl-studio-panel-head">
               <div>
-                <span>Recent live performance</span>
-                <h2>History</h2>
+                <span>{t('studio.analytics.sections.recentPerformance')}</span>
+                <h2>{t('studio.analytics.sections.history')}</h2>
               </div>
               <Link
                 className="gl-text-link"
                 to={`/channel/${encodeURIComponent(channelKey)}#history`}
               >
-                View channel
+                {t('studio.analytics.sections.viewChannel')}
               </Link>
             </div>
             <div className="gl-studio-live-table">
               {data.history.slice(0, 8).map((record) => (
-                <LiveHistoryStudioRow key={record.id} record={record} channelKey={channelKey} />
+                <LiveHistoryStudioRow
+                  key={record.id}
+                  record={record}
+                  channelKey={channelKey}
+                  locale={locale}
+                  t={t}
+                />
               ))}
               {data.history.length === 0 && (
-                <div className="gl-yt-shelf-empty">No finished live streams yet.</div>
+                <div className="gl-yt-shelf-empty">
+                  {t('studio.analytics.sections.emptyHistory')}
+                </div>
               )}
             </div>
           </section>
@@ -140,10 +154,10 @@ export function CreatorAnalyticsPage() {
           {latest && (
             <section className="gl-studio-latest">
               <div>
-                <span>Last stream</span>
+                <span>{t('studio.analytics.sections.lastStream')}</span>
                 <strong>{latest.title}</strong>
                 <small>
-                  {formatDate(latest.startedAt)} · {latest.duration}
+                  {formatDate(latest.startedAt, locale)} · {latest.duration}
                 </small>
               </div>
               <Link
@@ -151,7 +165,7 @@ export function CreatorAnalyticsPage() {
                 to={`/studio/analytics/${encodeURIComponent(channelKey)}/live/${encodeURIComponent(latest.id)}`}
               >
                 <BarChart3 size={16} />
-                Open analysis
+                {t('studio.analytics.sections.openAnalysis')}
               </Link>
             </section>
           )}
@@ -162,33 +176,37 @@ export function CreatorAnalyticsPage() {
 }
 
 export function LiveAnalysisPage() {
+  const { t, i18n } = useTranslation('pages');
   const navigate = useNavigate();
   const { name = '', recordId = '' } = useParams<{ name: string; recordId: string }>();
   const channelKey = decodeURIComponent(name);
   const analysis = useLiveAnalysis(channelKey, decodeURIComponent(recordId));
   const data = analysis.data;
   const record = data?.record;
+  const locale = i18n.resolvedLanguage ?? i18n.language;
 
   return (
     <div className="gl-page gl-studio-page">
       <button className="gl-studio-back" type="button" onClick={() => navigate(-1)}>
         <ArrowLeft size={18} />
-        Back
+        {t('studio.analytics.live.back')}
       </button>
       <StudioHeader
         channelKey={channelKey}
-        title={record?.title ?? 'Live analysis'}
-        subtitle="Single-stream revenue, peak audience, and top fan contribution."
+        title={record?.title ?? t('studio.analytics.live.title')}
+        subtitle={t('studio.analytics.live.subtitle')}
       />
 
       {analysis.isPending ? (
-        <div className="gl-studio-panel gl-studio-loading">Loading live analysis...</div>
+        <div className="gl-studio-panel gl-studio-loading">
+          {t('studio.analytics.live.loading')}
+        </div>
       ) : analysis.isError || !record ? (
         <div className="gl-channel-empty">
           <BarChart3 size={34} />
           <div>
-            <strong>Live analysis unavailable</strong>
-            <span>Only the channel owner can view this report.</span>
+            <strong>{t('studio.analytics.live.unavailableTitle')}</strong>
+            <span>{t('studio.analytics.live.unavailableBody')}</span>
           </div>
         </div>
       ) : (
@@ -198,32 +216,32 @@ export function LiveAnalysisPage() {
             <div className="gl-studio-live-copy">
               <div className="gl-studio-live-date">
                 <CalendarDays size={16} />
-                {formatDate(record.startedAt)} · {record.duration}
+                {formatDate(record.startedAt, locale)} · {record.duration}
               </div>
               <div className="gl-studio-kpis compact">
                 <StudioKpi
                   icon={<Coins size={18} />}
-                  label="Revenue"
-                  value={formatCoin(record.revenueCoin)}
-                  trend="this live"
+                  label={t('studio.analytics.cards.revenue')}
+                  value={formatCoin(record.revenueCoin, locale, t)}
+                  trend={t('studio.analytics.live.cards.revenueSub')}
                 />
                 <StudioKpi
                   icon={<Eye size={18} />}
-                  label="Peak online"
-                  value={record.peakViewers.toLocaleString()}
-                  trend="highest"
+                  label={t('studio.analytics.cards.peakOnline')}
+                  value={record.peakViewers.toLocaleString(locale)}
+                  trend={t('studio.analytics.live.cards.peakOnlineSub')}
                 />
                 <StudioKpi
                   icon={<UserPlus size={18} />}
-                  label="New subscribers"
-                  value={record.newSubscribers.toLocaleString()}
-                  trend="during live"
+                  label={t('studio.analytics.live.cards.newSubscribers')}
+                  value={record.newSubscribers.toLocaleString(locale)}
+                  trend={t('studio.analytics.live.cards.newSubscribersSub')}
                 />
                 <StudioKpi
                   icon={<Crown size={18} />}
-                  label="Top fan"
+                  label={t('studio.analytics.live.cards.topFan')}
                   value={record.topFan?.name ?? '-'}
-                  trend={formatCoin(record.topFan?.amount ?? 0)}
+                  trend={formatCoin(record.topFan?.amount ?? 0, locale, t)}
                 />
               </div>
             </div>
@@ -233,19 +251,29 @@ export function LiveAnalysisPage() {
             <div className="gl-studio-panel gl-studio-panel-wide">
               <div className="gl-studio-panel-head">
                 <div>
-                  <span>Revenue breakdown</span>
-                  <h2>{formatCoin(record.revenueCoin)}</h2>
+                  <span>{t('studio.analytics.sections.revenueBreakdown')}</span>
+                  <h2>{formatCoin(record.revenueCoin, locale, t)}</h2>
                 </div>
                 <Coins size={22} />
               </div>
-              <BreakdownBars gift={data.giftRevenue} superChat={data.superChatRevenue} />
+              <BreakdownBars
+                gift={data.giftRevenue}
+                superChat={data.superChatRevenue}
+                locale={locale}
+                t={t}
+              />
             </div>
 
             <div className="gl-studio-panel">
               <div className="gl-studio-panel-head">
                 <div>
-                  <span>Top contributions</span>
-                  <h2>{data.topFans.length} fans</h2>
+                  <span>{t('studio.analytics.sections.topContributions')}</span>
+                  <h2>
+                    {t('studio.analytics.units.fanCount', {
+                      count: data.topFans.length,
+                      formattedCount: data.topFans.length.toLocaleString(locale),
+                    })}
+                  </h2>
                 </div>
                 <Crown size={22} />
               </div>
@@ -254,11 +282,13 @@ export function LiveAnalysisPage() {
                   <div className="gl-studio-fan-row" key={fan.userId || fan.name}>
                     <Avatar name={fan.name} src={fan.avatar} size={34} />
                     <span>{fan.name}</span>
-                    <strong>{formatCoin(fan.amount)}</strong>
+                    <strong>{formatCoin(fan.amount, locale, t)}</strong>
                   </div>
                 ))}
                 {data.topFans.length === 0 && (
-                  <div className="gl-yt-shelf-empty">No contribution data for this live.</div>
+                  <div className="gl-yt-shelf-empty">
+                    {t('studio.analytics.sections.emptyContributions')}
+                  </div>
                 )}
               </div>
             </div>
@@ -278,13 +308,15 @@ function StudioHeader({
   title: string;
   subtitle: string;
 }) {
+  const { t } = useTranslation('pages');
+
   return (
     <header className="gl-studio-head">
       <div className="gl-studio-head-icon">
         <BarChart3 size={26} />
       </div>
       <div>
-        <span>GoLive Studio</span>
+        <span>{t('studio.brand')}</span>
         <h1>{title}</h1>
         <Link to={`/channel/${encodeURIComponent(channelKey)}`}>{subtitle}</Link>
       </div>
@@ -316,9 +348,13 @@ function StudioKpi({
 function LiveHistoryStudioRow({
   record,
   channelKey,
+  locale,
+  t,
 }: {
   record: LiveHistoryItem;
   channelKey: string;
+  locale: string;
+  t: TFunction;
 }) {
   return (
     <Link
@@ -329,11 +365,15 @@ function LiveHistoryStudioRow({
       <div>
         <strong>{record.title}</strong>
         <span>
-          {formatDate(record.startedAt)} · {record.duration}
+          {formatDate(record.startedAt, locale)} · {record.duration}
         </span>
       </div>
-      <span>{formatCoin(record.revenueCoin)}</span>
-      <span>{record.peakViewers.toLocaleString()} peak</span>
+      <span>{formatCoin(record.revenueCoin, locale, t)}</span>
+      <span>
+        {t('studio.analytics.units.peakViewers', {
+          amount: record.peakViewers.toLocaleString(locale),
+        })}
+      </span>
     </Link>
   );
 }
@@ -404,44 +444,75 @@ function LineChart({
   );
 }
 
-function MetricRows({ items }: { items: MonthlyCreatorMetric[] }) {
+function MetricRows({
+  items,
+  locale,
+  t,
+}: {
+  items: MonthlyCreatorMetric[];
+  locale: string;
+  t: TFunction;
+}) {
   return (
     <div className="gl-studio-metric-rows">
       {items.slice(-4).map((item) => (
         <div key={item.month}>
-          <span>{formatMonth(item.month)}</span>
-          <strong>{item.watchHours.toLocaleString()}h</strong>
-          <small>{item.streams} streams</small>
+          <span>{formatMonth(item.month, locale)}</span>
+          <strong>{formatHours(item.watchHours, locale, t)}</strong>
+          <small>
+            {t('studio.analytics.units.streamCount', {
+              count: item.streams,
+              formattedCount: item.streams.toLocaleString(locale),
+            })}
+          </small>
         </div>
       ))}
     </div>
   );
 }
 
-function BreakdownBars({ gift, superChat }: { gift: number; superChat: number }) {
+function BreakdownBars({
+  gift,
+  superChat,
+  locale,
+  t,
+}: {
+  gift: number;
+  superChat: number;
+  locale: string;
+  t: TFunction;
+}) {
   const total = Math.max(1, gift + superChat);
   return (
     <div className="gl-studio-breakdown">
       <div>
-        <span>Gifts</span>
-        <strong>{formatCoin(gift)}</strong>
+        <span>{t('studio.analytics.breakdown.gifts')}</span>
+        <strong>{formatCoin(gift, locale, t)}</strong>
         <i style={{ width: `${(gift / total) * 100}%` }} />
       </div>
       <div>
-        <span>Super Chat</span>
-        <strong>{formatCoin(superChat)}</strong>
+        <span>{t('studio.analytics.breakdown.superChat')}</span>
+        <strong>{formatCoin(superChat, locale, t)}</strong>
         <i style={{ width: `${(superChat / total) * 100}%` }} />
       </div>
     </div>
   );
 }
 
-function formatCoin(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+function formatCoin(value: number, locale: string, t: TFunction): string {
+  return t('studio.analytics.units.coinAmount', {
+    amount: Math.round(value).toLocaleString(locale),
+  });
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+function formatHours(value: number, locale: string, t: TFunction): string {
+  return t('studio.analytics.units.hourAmount', {
+    amount: value.toLocaleString(locale),
+  });
+}
+
+function formatDate(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -449,10 +520,10 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function formatMonth(value: string): string {
+function formatMonth(value: string, locale: string): string {
   const [year, month] = value.split('-').map(Number);
   if (!year || !month) return value;
-  return new Intl.DateTimeFormat(undefined, { month: 'short' }).format(
+  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(
     new Date(year, month - 1, 1),
   );
 }

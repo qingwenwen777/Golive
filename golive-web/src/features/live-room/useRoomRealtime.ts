@@ -124,7 +124,6 @@ export function useRoomRealtime(
   opts: { onLiveEnded?: () => void; activeFanBadge?: ChatFanBadge | null } = {},
 ): UseRoomRealtimeReturn {
   const ensureRoom = useRealtimeStore((s) => s.ensureRoom);
-  const resetRoom = useRealtimeStore((s) => s.resetRoom);
   const appendMessage = useRealtimeStore((s) => s.appendMessage);
   const mergeMessages = useRealtimeStore((s) => s.mergeMessages);
   const appendBullet = useRealtimeStore((s) => s.appendBullet);
@@ -145,17 +144,14 @@ export function useRoomRealtime(
 
   useEffect(() => {
     ensureRoom(roomId);
-    return () => resetRoom(roomId);
-  }, [roomId, ensureRoom, resetRoom]);
+  }, [roomId, ensureRoom]);
 
   // Bounded history (YouTube-style): a small window of recent chat + SC
   // entries so newcomers see what just happened without flooding the panel.
-  const history = useDanmuHistory(roomId, enabled, 12);
+  const history = useDanmuHistory(roomId, enabled);
 
-  // Fallback: replay the user's own recent chats from localStorage so a
-  // refresh / re-entry does not blank out messages that the server-side
-  // history endpoint did not return (chat persistence may be skipped in
-  // local dev when Kafka is the no-op producer).
+  // Fallback: replay recent chats seen by this browser so a refresh / re-entry
+  // does not blank out messages if the server-side history endpoint lags.
   useEffect(() => {
     if (!enabled || !roomId) return;
     const cached = loadRecentChatMessages(roomId);

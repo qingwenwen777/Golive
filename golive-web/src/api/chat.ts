@@ -68,7 +68,7 @@ function toMessage(item: ChatHistoryItem): Message {
   return toChatMessage(item);
 }
 
-export function useDanmuHistory(roomId: string, enabled = true, limit = 12) {
+export function useDanmuHistory(roomId: string, enabled = true, limit = 50) {
   return useQuery<Message[], Error>({
     queryKey: ['danmu-history', roomId, limit],
     queryFn: async ({ signal }) => {

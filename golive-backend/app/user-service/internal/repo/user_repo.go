@@ -71,7 +71,7 @@ func (r *UserRepo) EnsureAdmin(ctx context.Context, username string) error {
 		}).Error
 }
 
-func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID string) (*model.CreatorApplication, *model.User, bool, error) {
+func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason string) (*model.CreatorApplication, *model.User, bool, error) {
 	var app model.CreatorApplication
 	var user model.User
 	created := false
@@ -94,6 +94,7 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID string) 
 				app = model.CreatorApplication{
 					ID:     newID(),
 					UserID: userID,
+					Reason: reason,
 					Status: model.LivePermissionPending,
 				}
 				created = true
@@ -104,6 +105,7 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID string) 
 			app = model.CreatorApplication{
 				ID:     newID(),
 				UserID: userID,
+				Reason: reason,
 				Status: model.LivePermissionPending,
 			}
 			if err := tx.Create(&app).Error; err != nil {
@@ -112,10 +114,14 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID string) 
 			created = true
 			if err := tx.Model(&model.User{}).
 				Where("id = ?", userID).
-				Update("live_permission_status", model.LivePermissionPending).Error; err != nil {
+				Updates(map[string]any{
+					"live_permission_status":        model.LivePermissionPending,
+					"live_permission_reject_reason": "",
+				}).Error; err != nil {
 				return err
 			}
 			user.LivePermissionStatus = model.LivePermissionPending
+			user.LivePermissionRejectReason = ""
 			return nil
 		default:
 			return errors.New("invalid live permission status")
@@ -132,16 +138,18 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID string) 
 }
 
 type CreatorApplicationView struct {
-	ID          string     `json:"id"`
-	UserID      string     `json:"userId"`
-	Username    string     `json:"username"`
-	DisplayName string     `json:"displayName,omitempty"`
-	Avatar      string     `json:"avatar"`
-	Status      string     `json:"status"`
-	ReviewerID  string     `json:"reviewerId,omitempty"`
-	ReviewedAt  *time.Time `json:"reviewedAt,omitempty"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UpdatedAt   time.Time  `json:"updatedAt"`
+	ID           string     `json:"id"`
+	UserID       string     `json:"userId"`
+	Username     string     `json:"username"`
+	DisplayName  string     `json:"displayName,omitempty"`
+	Avatar       string     `json:"avatar"`
+	Reason       string     `json:"reason"`
+	Status       string     `json:"status"`
+	ReviewerID   string     `json:"reviewerId,omitempty"`
+	RejectReason string     `json:"rejectReason,omitempty"`
+	ReviewedAt   *time.Time `json:"reviewedAt,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
 func (r *UserRepo) ListCreatorApplications(ctx context.Context) ([]CreatorApplicationView, error) {
@@ -149,14 +157,14 @@ func (r *UserRepo) ListCreatorApplications(ctx context.Context) ([]CreatorApplic
 	err := r.db.WithContext(ctx).
 		Table("creator_applications AS ca").
 		Select(`ca.id, ca.user_id, users.username, users.display_name, users.avatar,
-			ca.status, ca.reviewer_id, ca.reviewed_at, ca.created_at, ca.updated_at`).
+			ca.reason, ca.status, ca.reviewer_id, ca.reject_reason, ca.reviewed_at, ca.created_at, ca.updated_at`).
 		Joins("JOIN users ON users.id = ca.user_id").
 		Order("CASE ca.status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, ca.created_at DESC").
 		Scan(&rows).Error
 	return rows, err
 }
 
-func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID, status string) (*model.CreatorApplication, *model.User, error) {
+func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID, status, rejectReason string) (*model.CreatorApplication, *model.User, error) {
 	if status != model.LivePermissionApproved && status != model.LivePermissionRejected {
 		return nil, nil, errors.New("invalid review status")
 	}
@@ -171,16 +179,30 @@ func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID,
 		if app.Status != model.LivePermissionPending {
 			return ErrApplicationAlreadyReviewed
 		}
-		if err := tx.Model(&app).Updates(map[string]any{
+		updates := map[string]any{
 			"status":      status,
 			"reviewer_id": reviewerID,
 			"reviewed_at": &now,
-		}).Error; err != nil {
+		}
+		if status == model.LivePermissionRejected {
+			updates["reject_reason"] = rejectReason
+		} else {
+			updates["reject_reason"] = ""
+		}
+		if err := tx.Model(&app).Updates(updates).Error; err != nil {
 			return err
+		}
+		userUpdates := map[string]any{
+			"live_permission_status": status,
+		}
+		if status == model.LivePermissionRejected {
+			userUpdates["live_permission_reject_reason"] = rejectReason
+		} else {
+			userUpdates["live_permission_reject_reason"] = ""
 		}
 		if err := tx.Model(&model.User{}).
 			Where("id = ?", app.UserID).
-			Update("live_permission_status", status).Error; err != nil {
+			Updates(userUpdates).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("id = ?", app.ID).Take(&app).Error; err != nil {
@@ -195,6 +217,56 @@ func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID,
 		return nil, nil, err
 	}
 	return &app, &user, nil
+}
+
+type LiveCreatorView struct {
+	ID                   string    `json:"id"`
+	Username             string    `json:"username"`
+	DisplayName          string    `json:"displayName,omitempty"`
+	Avatar               string    `json:"avatar"`
+	LivePermissionStatus string    `json:"livePermissionStatus"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+}
+
+func (r *UserRepo) ListLiveCreators(ctx context.Context) ([]LiveCreatorView, error) {
+	var rows []LiveCreatorView
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Select("id, username, display_name, avatar, live_permission_status, updated_at").
+		Where("live_permission_status = ?", model.LivePermissionApproved).
+		Order("updated_at DESC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *UserRepo) SetLivePermissionStatus(ctx context.Context, userID, status string) (*model.User, error) {
+	if status != model.LivePermissionApproved && status != model.LivePermissionRejected {
+		return nil, errors.New("invalid live permission status")
+	}
+	var user model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", userID).Take(&user).Error; err != nil {
+			return err
+		}
+		rejectReason := ""
+		if status == model.LivePermissionRejected {
+			rejectReason = "Live permission disabled by administrator."
+		}
+		if err := tx.Model(&user).Updates(map[string]any{
+			"live_permission_status":        status,
+			"live_permission_reject_reason": rejectReason,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", userID).Take(&user).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (r *UserRepo) IncrementCoins(ctx context.Context, id string, delta int64) (*model.User, error) {

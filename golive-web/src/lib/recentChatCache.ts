@@ -1,7 +1,7 @@
 import type { ChatMessage } from '@/types/message';
 
 const STORAGE_KEY = 'golive-recent-chat:v1';
-const MAX_RECENT_PER_ROOM = 8;
+const MAX_RECENT_PER_ROOM = 50;
 const RECENT_TTL_MS = 24 * 60 * 60 * 1000;
 
 type RecentChatStore = Record<string, ChatMessage[]>;

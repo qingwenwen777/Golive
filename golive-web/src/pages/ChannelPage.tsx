@@ -217,13 +217,6 @@ export default function ChannelPage() {
         </div>
       </section>
 
-      <nav className="gl-channel-tabs" aria-label={t('channel.sections')}>
-        <a className="is-active" href="#live">
-          {t('channel.tabs.live')}
-        </a>
-        <a href="#history">{t('channel.tabs.history')}</a>
-      </nav>
-
       <section className="gl-library-section" id="live">
         <div className="gl-section-title-row">
           <h2>{t('channel.liveRooms')}</h2>

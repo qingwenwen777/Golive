@@ -109,6 +109,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const apply = useSubmitCreatorApplication();
   const [title, setTitle] = useState(() => t('createLive.defaultTitle'));
   const [description, setDescription] = useState('');
+  const [applicationReason, setApplicationReason] = useState('');
   const [category, setCategory] = useState('Just Chatting');
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
@@ -129,7 +130,12 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   }, [open, user, refetchMe]);
 
   const submitApplication = () => {
-    apply.mutate(undefined, {
+    const reason = applicationReason.trim();
+    if (!reason) {
+      toast.error(t('createLive.permission.reasonRequired'));
+      return;
+    }
+    apply.mutate({ reason }, {
       onSuccess: (resp) => toast.success(resp.message),
       onError: (err) => toast.error(err.message || t('createLive.errors.applicationFailed')),
     });
@@ -190,9 +196,22 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
               <span>{t('createLive.permission.label')}</span>
               <strong>{livePermissionStatus}</strong>
             </div>
+            {livePermissionStatus !== 'pending' && (
+              <label className="gl-auth-field">
+                <span className="gl-auth-label">{t('createLive.permission.reasonLabel')}</span>
+                <textarea
+                  className="gl-live-create-textarea"
+                  value={applicationReason}
+                  onChange={(e) => setApplicationReason(e.target.value)}
+                  maxLength={500}
+                  rows={4}
+                  placeholder={t('createLive.permission.reasonPlaceholder')}
+                />
+              </label>
+            )}
             <button
               type="button"
-              disabled={apply.isPending || livePermissionStatus === 'pending'}
+              disabled={apply.isPending || livePermissionStatus === 'pending' || !applicationReason.trim()}
               className="gl-auth-submit"
               onClick={submitApplication}
             >

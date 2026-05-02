@@ -56,7 +56,43 @@
     },
     "startedAt": "{{time}}配信開始",
     "showMore": "もっと見る",
-    "showLess": "折りたたむ"
+    "showLess": "折りたたむ",
+    "connection": {
+      "connecting": "接続中...",
+      "connected": "接続しました",
+      "reconnecting": "再接続中...（#{{count}}）",
+      "reconnectingShort": "再接続中...",
+      "disconnected": "切断されました",
+      "liveEnded": "配信は終了しました。"
+    },
+    "chatPanel": {
+      "chatTab": "チャット",
+      "viewersTab": "ルーム視聴者",
+      "watchingNow": "{{formattedCount}} 人が視聴中",
+      "dailyContribution": "本日の貢献",
+      "emptyViewers": "オンライン視聴者はいません",
+      "rankTop": "上位{{rank}}",
+      "online": "オンライン",
+      "contribution": "貢献値",
+      "newMessages": "新着 {{formattedCount}} 件",
+      "newMessagesAria": "{{formattedCount}} 件の新着メッセージ。最新へ移動。",
+      "messageTooLong": "メッセージは {{max}} 文字以内にしてください。",
+      "host": "配信者",
+      "fanBadgeTitle": "ファンバッジレベル {{level}}",
+      "pinnedSuperChats": "固定 SuperChat",
+      "openSuperChat": "{{user}} の SuperChat を開く",
+      "tapToRead": "タップして読む",
+      "noMessage": "メッセージなし",
+      "noSuperChatMessage": "この SuperChat にはメッセージがありません。",
+      "you": "あなた",
+      "sentGift": "送信",
+      "guestViewer": "あなた",
+      "emojiGroups": {
+        "faces": "表情",
+        "gestures": "ジェスチャー",
+        "stream": "配信"
+      }
+    }
   },
   "player": {
     "play": "再生",
@@ -277,7 +313,10 @@
       "applyTitle": "クリエイター権限を申請",
       "applyBody": "ライブルーム作成には管理者の簡単な承認が必要です。",
       "submitApplication": "申請を送信",
-      "submitting": "送信中..."
+      "submitting": "送信中...",
+      "reasonLabel": "配信理由",
+      "reasonPlaceholder": "配信予定の内容と、このチャンネルにライブ権限が必要な理由を管理者に伝えてください。",
+      "reasonRequired": "配信理由を入力してください。"
     },
     "errors": {
       "signInAgain": "配信開始前にもう一度ログインしてください。",
@@ -307,6 +346,8 @@
       "reviewTime": "審査目安: 1 営業日以内。",
       "notice": "チャンネル名、アイコン、カバーを整えておくと審査がスムーズです。",
       "progress": "進捗: 申請済み -> 手動審査 -> 結果通知。",
+      "reasonLabel": "なぜライブ配信したいですか？",
+      "reasonPlaceholder": "配信内容の計画と、このチャンネルにライブ権限が必要な理由を入力してください。",
       "pending": {
         "title": "申請を審査中",
         "body": "チャンネル情報とアカウント状態を確認しています。",
@@ -316,7 +357,8 @@
         "title": "申請は承認されませんでした",
         "body": "理由: 配信権限を有効にする前にチャンネル情報の再確認が必要です。",
         "action": "再申請",
-        "reason": "却下理由: 現在のクリエイターポリシーに対してチャンネル準備が不足しています。"
+        "reason": "却下理由: {{reason}}",
+        "reasonFallback": "現在のクリエイターポリシーに対してチャンネル準備が不足しています。"
       },
       "none": {
         "title": "配信者権限を申請",
@@ -350,6 +392,64 @@
       "analyticsSub": "収益、視聴者、終了した配信レポート。",
       "channel": "チャンネルを見る",
       "channelSub": "視聴者から見えるページを確認します。"
+    },
+    "analytics": {
+      "title": "チャンネル分析",
+      "subtitle": "収益、登録、視聴時間、終了した配信の成果。",
+      "loading": "分析を読み込み中...",
+      "unavailableTitle": "分析を表示できません",
+      "unavailableBody": "ワークスペース分析を表示できるのはチャンネル所有者のみです。",
+      "kpis": "配信者の主要データ",
+      "cards": {
+        "revenue": "収益",
+        "revenueSub": "直近 6 か月",
+        "subscribers": "登録者",
+        "subscribersSub": "現在の合計",
+        "streams": "配信数",
+        "streamsSub": "完了済み",
+        "peakOnline": "ピーク同時視聴",
+        "peakOnlineSub": "最高の配信"
+      },
+      "sections": {
+        "monthlyRevenue": "月別収益",
+        "subscriptionGrowth": "登録者の増加",
+        "watchTime": "視聴時間",
+        "recentPerformance": "最近の配信成果",
+        "history": "履歴",
+        "viewChannel": "チャンネルを見る",
+        "emptyHistory": "終了した配信はまだありません。",
+        "lastStream": "前回の配信",
+        "openAnalysis": "分析を開く",
+        "revenueBreakdown": "収益内訳",
+        "topContributions": "貢献ランキング",
+        "emptyContributions": "この配信の貢献データはありません。"
+      },
+      "live": {
+        "title": "ライブ分析",
+        "subtitle": "単一配信の収益、ピーク視聴者、トップファン貢献。",
+        "back": "戻る",
+        "loading": "ライブ分析を読み込み中...",
+        "unavailableTitle": "ライブ分析を表示できません",
+        "unavailableBody": "このレポートを表示できるのはチャンネル所有者のみです。",
+        "cards": {
+          "revenueSub": "この配信",
+          "peakOnlineSub": "最高値",
+          "newSubscribers": "新規登録者",
+          "newSubscribersSub": "配信中",
+          "topFan": "トップファン"
+        }
+      },
+      "breakdown": {
+        "gifts": "ギフト",
+        "superChat": "Super Chat"
+      },
+      "units": {
+        "coinAmount": "{{amount}} コイン",
+        "hourAmount": "{{amount}}時間",
+        "streamCount": "{{formattedCount}} 件の配信",
+        "fanCount": "{{formattedCount}} 人のファン",
+        "peakViewers": "ピーク {{amount}} 人"
+      }
     },
     "prepare": {
       "created": "ライブルームを作成しました。OBS を開いて配信を開始してください。",
@@ -412,6 +512,57 @@
       "noGifts": "ギフトはまだありません。",
       "superChat": "固定 SuperChat",
       "noSuperChat": "固定 SuperChat はありません。"
+    }
+  },
+  "admin": {
+    "kicker": "管理",
+    "title": "クリエイター権限",
+    "refresh": "更新",
+    "fallbackCreator": "クリエイター",
+    "denied": {
+      "title": "管理者権限がありません",
+      "body": "このエリアは管理者のみ利用できます。",
+      "action": "ホームへ戻る"
+    },
+    "tabs": {
+      "label": "クリエイター管理セクション",
+      "permissions": "権限ユーザー",
+      "applications": "申請審査"
+    },
+    "status": {
+      "pending": "審査中",
+      "approved": "承認済み",
+      "rejected": "拒否済み",
+      "none": "権限なし"
+    },
+    "permissions": {
+      "eyebrow": "権限管理",
+      "title": "ライブ配信できるクリエイター",
+      "loading": "クリエイターを読み込み中...",
+      "error": "クリエイターを読み込めませんでした。",
+      "empty": "現在ライブ権限を持つクリエイターはいません。",
+      "disable": "ライブを無効化",
+      "confirmDisable": "{{name}} のライブ権限を無効化しますか？",
+      "disabled": "ライブ権限を無効化しました。",
+      "disableFailed": "権限を更新できませんでした。"
+    },
+    "applications": {
+      "eyebrow": "申請審査",
+      "title": "クリエイター申請",
+      "loading": "申請を読み込み中...",
+      "error": "申請を読み込めませんでした。",
+      "empty": "クリエイター申請はまだありません。",
+      "reason": "配信理由",
+      "noReason": "理由は入力されていません。",
+      "rejectReason": "拒否理由",
+      "approve": "承認",
+      "reject": "拒否",
+      "approved": "申請を承認しました。",
+      "rejected": "申請を拒否しました。",
+      "reviewFailed": "審査に失敗しました。",
+      "rejectReasonLabel": "拒否理由",
+      "rejectReasonPlaceholder": "改善が必要な内容をクリエイターに伝えてください。",
+      "confirmReject": "拒否を確定"
     }
   },
   "upload": {

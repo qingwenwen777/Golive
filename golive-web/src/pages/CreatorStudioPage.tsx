@@ -146,9 +146,10 @@ export function CreatorStudioShell() {
     return (
       <StudioPermissionPage
         status={status}
+        rejectReason={user?.livePermissionRejectReason}
         applying={apply.isPending}
-        onApply={() => {
-          apply.mutate(undefined, {
+        onApply={(reason) => {
+          apply.mutate({ reason }, {
             onSuccess: (resp) => toast.success(resp.message),
             onError: (err) =>
               toast.error(err.message || t('createLive.errors.applicationFailed')),
@@ -575,9 +576,6 @@ export function CreatorLiveConsolePage() {
           </span>
           <StatusMetric label={t('studio.console.duration', { defaultValue: 'Duration' })} value={elapsed} />
           <StatusMetric label={t('studio.console.online', { defaultValue: 'Online' })} value={viewerCount.toLocaleString()} />
-          <StatusMetric label={t('studio.console.bitrate', { defaultValue: 'Bitrate' })} value={roomIsLive ? '5.8 Mbps' : '--'} />
-          <StatusMetric label={t('studio.console.dropped', { defaultValue: 'Dropped frames' })} value={roomIsLive ? '0.1%' : '--'} />
-          <StatusMetric label={t('studio.console.latency', { defaultValue: 'Latency' })} value={roomIsLive ? '2.4s' : '--'} />
         </div>
         <button type="button" className="gl-owner-end-live" disabled={stopLive.isPending} onClick={stop}>
           <Square size={15} />
@@ -663,14 +661,17 @@ function StudioTabs() {
 
 function StudioPermissionPage({
   status,
+  rejectReason,
   applying,
   onApply,
 }: {
   status: User['livePermissionStatus'];
+  rejectReason?: string;
   applying: boolean;
-  onApply: () => void;
+  onApply: (reason: string) => void;
 }) {
   const { t } = useTranslation('pages');
+  const [reason, setReason] = useState('');
   const pending = status === 'pending';
   const rejected = status === 'rejected';
   const title = pending
@@ -698,16 +699,34 @@ function StudioPermissionPage({
               ? t('studio.permission.rejected.action', { defaultValue: 'Apply again' })
               : t('studio.permission.none.action', { defaultValue: 'Submit application' })
       }
-      actionDisabled={pending || applying}
-      onAction={onApply}
+      actionDisabled={pending || applying || (!pending && !reason.trim())}
+      onAction={() => onApply(reason.trim())}
       details={[
         t('studio.permission.reviewTime', { defaultValue: 'Estimated review time: within 1 business day.' }),
         t('studio.permission.notice', { defaultValue: 'Keep your channel name, avatar, and cover ready for review.' }),
         rejected
-          ? t('studio.permission.rejected.reason', { defaultValue: 'Rejected reason: channel readiness did not meet the current creator policy.' })
+          ? t('studio.permission.rejected.reason', {
+              reason: rejectReason || t('studio.permission.rejected.reasonFallback', { defaultValue: 'Channel readiness did not meet the current creator policy.' }),
+              defaultValue: 'Rejected reason: {{reason}}',
+            })
           : t('studio.permission.progress', { defaultValue: 'Progress: submitted -> manual review -> result.' }),
       ]}
-    />
+    >
+      {!pending && (
+        <label className="gl-creator-access-reason">
+          <span>{t('studio.permission.reasonLabel', { defaultValue: 'Why do you want to go live?' })}</span>
+          <textarea
+            value={reason}
+            rows={5}
+            maxLength={500}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder={t('studio.permission.reasonPlaceholder', {
+              defaultValue: 'Tell admins your live content plan and why this channel needs live access.',
+            })}
+          />
+        </label>
+      )}
+    </StudioAccessPage>
   );
 }
 
@@ -719,6 +738,7 @@ function StudioAccessPage({
   actionDisabled,
   onAction,
   details = [],
+  children,
 }: {
   icon: ReactNode;
   title: string;
@@ -727,6 +747,7 @@ function StudioAccessPage({
   actionDisabled?: boolean;
   onAction: () => void;
   details?: string[];
+  children?: ReactNode;
 }) {
   return (
     <div className="gl-page gl-creator-access">
@@ -741,6 +762,7 @@ function StudioAccessPage({
             ))}
           </div>
         )}
+        {children}
         <button className="gl-creator-primary" type="button" disabled={actionDisabled} onClick={onAction}>
           {actionLabel}
         </button>

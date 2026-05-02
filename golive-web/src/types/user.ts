@@ -8,6 +8,7 @@ export interface User {
   verified?: boolean;
   role: 'user' | 'admin';
   livePermissionStatus: 'none' | 'pending' | 'approved' | 'rejected';
+  livePermissionRejectReason?: string;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -56,7 +56,43 @@
     },
     "startedAt": "Started {{time}}",
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "connection": {
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "reconnecting": "Reconnecting... (#{{count}})",
+      "reconnectingShort": "Reconnecting...",
+      "disconnected": "Disconnected",
+      "liveEnded": "Live has ended."
+    },
+    "chatPanel": {
+      "chatTab": "Chat",
+      "viewersTab": "Room viewers",
+      "watchingNow": "{{formattedCount}} watching",
+      "dailyContribution": "Daily contribution",
+      "emptyViewers": "No viewers online yet",
+      "rankTop": "Top {{rank}}",
+      "online": "Online",
+      "contribution": "Contribution",
+      "newMessages": "{{formattedCount}} new messages",
+      "newMessagesAria": "{{formattedCount}} new messages. Jump to latest.",
+      "messageTooLong": "Message must be {{max}} characters or fewer.",
+      "host": "HOST",
+      "fanBadgeTitle": "Fan badge level {{level}}",
+      "pinnedSuperChats": "Pinned SuperChats",
+      "openSuperChat": "Open SuperChat from {{user}}",
+      "tapToRead": "Tap to read",
+      "noMessage": "No message",
+      "noSuperChatMessage": "This SuperChat did not include a message.",
+      "you": "You",
+      "sentGift": "sent",
+      "guestViewer": "You Viewer",
+      "emojiGroups": {
+        "faces": "Faces",
+        "gestures": "Gestures",
+        "stream": "Stream"
+      }
+    }
   },
   "player": {
     "play": "Play",
@@ -277,7 +313,10 @@
       "applyTitle": "Apply for creator access",
       "applyBody": "A quick admin approval is required before you can create live rooms.",
       "submitApplication": "Submit application",
-      "submitting": "Submitting..."
+      "submitting": "Submitting...",
+      "reasonLabel": "Live reason",
+      "reasonPlaceholder": "Tell admins what you plan to stream and why this channel needs live access.",
+      "reasonRequired": "Please enter a live reason."
     },
     "errors": {
       "signInAgain": "Please sign in again before starting a live.",
@@ -307,6 +346,8 @@
       "reviewTime": "Estimated review time: within 1 business day.",
       "notice": "Keep your channel name, avatar, and cover ready for review.",
       "progress": "Progress: submitted -> manual review -> result.",
+      "reasonLabel": "Why do you want to go live?",
+      "reasonPlaceholder": "Tell admins your live content plan and why this channel needs live access.",
       "pending": {
         "title": "Application under review",
         "body": "We are checking your channel and account status.",
@@ -316,7 +357,8 @@
         "title": "Application was rejected",
         "body": "Reason: your channel information needs another review before live access can be enabled.",
         "action": "Apply again",
-        "reason": "Rejected reason: channel readiness did not meet the current creator policy."
+        "reason": "Rejected reason: {{reason}}",
+        "reasonFallback": "Channel readiness did not meet the current creator policy."
       },
       "none": {
         "title": "Apply for creator access",
@@ -350,6 +392,64 @@
       "analyticsSub": "Revenue, viewers, and finished live reports.",
       "channel": "View channel",
       "channelSub": "Check how viewers see your creator page."
+    },
+    "analytics": {
+      "title": "Channel analytics",
+      "subtitle": "Revenue, subscriptions, watch time, and finished live performance.",
+      "loading": "Loading analytics...",
+      "unavailableTitle": "Analytics unavailable",
+      "unavailableBody": "Only the channel owner can view studio analytics.",
+      "kpis": "Creator performance summary",
+      "cards": {
+        "revenue": "Revenue",
+        "revenueSub": "last 6 months",
+        "subscribers": "Subscribers",
+        "subscribersSub": "current total",
+        "streams": "Streams",
+        "streamsSub": "completed",
+        "peakOnline": "Peak online",
+        "peakOnlineSub": "best live"
+      },
+      "sections": {
+        "monthlyRevenue": "Monthly revenue",
+        "subscriptionGrowth": "Subscription growth",
+        "watchTime": "Watch time",
+        "recentPerformance": "Recent live performance",
+        "history": "History",
+        "viewChannel": "View channel",
+        "emptyHistory": "No finished live streams yet.",
+        "lastStream": "Last stream",
+        "openAnalysis": "Open analysis",
+        "revenueBreakdown": "Revenue breakdown",
+        "topContributions": "Top contributions",
+        "emptyContributions": "No contribution data for this live."
+      },
+      "live": {
+        "title": "Live analysis",
+        "subtitle": "Single-stream revenue, peak audience, and top fan contribution.",
+        "back": "Back",
+        "loading": "Loading live analysis...",
+        "unavailableTitle": "Live analysis unavailable",
+        "unavailableBody": "Only the channel owner can view this report.",
+        "cards": {
+          "revenueSub": "this live",
+          "peakOnlineSub": "highest",
+          "newSubscribers": "New subscribers",
+          "newSubscribersSub": "during live",
+          "topFan": "Top fan"
+        }
+      },
+      "breakdown": {
+        "gifts": "Gifts",
+        "superChat": "Super Chat"
+      },
+      "units": {
+        "coinAmount": "{{amount}} coins",
+        "hourAmount": "{{amount}}h",
+        "streamCount": "{{formattedCount}} streams",
+        "fanCount": "{{formattedCount}} fans",
+        "peakViewers": "{{amount}} peak"
+      }
     },
     "prepare": {
       "created": "Live room created. Open OBS and begin publishing.",
@@ -412,6 +512,57 @@
       "noGifts": "No gifts yet.",
       "superChat": "Pinned SuperChat",
       "noSuperChat": "No SuperChat pinned."
+    }
+  },
+  "admin": {
+    "kicker": "Admin",
+    "title": "Creator permissions",
+    "refresh": "Refresh",
+    "fallbackCreator": "Creator",
+    "denied": {
+      "title": "No admin access",
+      "body": "This area is only available to administrators.",
+      "action": "Back to home"
+    },
+    "tabs": {
+      "label": "Admin creator sections",
+      "permissions": "Permission users",
+      "applications": "Applications"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "none": "None"
+    },
+    "permissions": {
+      "eyebrow": "Permission management",
+      "title": "Creators who can go live",
+      "loading": "Loading creators...",
+      "error": "Could not load creators.",
+      "empty": "No creators currently have live permission.",
+      "disable": "Disable live",
+      "confirmDisable": "Disable live permission for {{name}}?",
+      "disabled": "Live permission disabled.",
+      "disableFailed": "Could not update permission."
+    },
+    "applications": {
+      "eyebrow": "Application review",
+      "title": "Creator applications",
+      "loading": "Loading applications...",
+      "error": "Could not load applications.",
+      "empty": "No creator applications yet.",
+      "reason": "Live reason",
+      "noReason": "No reason provided.",
+      "rejectReason": "Reject reason",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Application approved.",
+      "rejected": "Application rejected.",
+      "reviewFailed": "Review failed.",
+      "rejectReasonLabel": "Rejection reason",
+      "rejectReasonPlaceholder": "Tell the creator what needs to be improved.",
+      "confirmReject": "Confirm reject"
     }
   },
   "upload": {

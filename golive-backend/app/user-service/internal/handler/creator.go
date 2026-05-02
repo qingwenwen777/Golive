@@ -23,6 +23,10 @@ func NewCreatorHandler(users *repo.UserRepo) *CreatorHandler {
 	return &CreatorHandler{users: users}
 }
 
+type submitCreatorApplicationReq struct {
+	Reason string `json:"reason"`
+}
+
 func (h *CreatorHandler) SubmitApplication(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {
@@ -30,7 +34,18 @@ func (h *CreatorHandler) SubmitApplication(c *gin.Context) {
 		return
 	}
 
-	app, user, created, err := h.users.SubmitCreatorApplication(c.Request.Context(), uid)
+	var req submitCreatorApplicationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "application reason is required"))
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "application reason is required"))
+		return
+	}
+
+	app, user, created, err := h.users.SubmitCreatorApplication(c.Request.Context(), uid, reason)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
@@ -81,6 +96,15 @@ func (h *AdminHandler) ListCreatorApplications(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
+func (h *AdminHandler) ListLiveCreators(c *gin.Context) {
+	items, err := h.users.ListLiveCreators(c.Request.Context())
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
 func (h *AdminHandler) ApproveCreatorApplication(c *gin.Context) {
 	h.reviewCreatorApplication(c, model.LivePermissionApproved)
 }
@@ -91,7 +115,22 @@ func (h *AdminHandler) RejectCreatorApplication(c *gin.Context) {
 
 func (h *AdminHandler) reviewCreatorApplication(c *gin.Context, status string) {
 	reviewerID := UserIDFromCtx(c)
-	app, user, err := h.users.ReviewCreatorApplication(c.Request.Context(), c.Param("id"), reviewerID, status)
+	rejectReason := ""
+	if status == model.LivePermissionRejected {
+		var req struct {
+			Reason string `json:"reason"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "reject reason is required"))
+			return
+		}
+		rejectReason = strings.TrimSpace(req.Reason)
+		if rejectReason == "" {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "reject reason is required"))
+			return
+		}
+	}
+	app, user, err := h.users.ReviewCreatorApplication(c.Request.Context(), c.Param("id"), reviewerID, status, rejectReason)
 	if errors.Is(err, repo.ErrApplicationNotFound) {
 		errcode.Respond(c, errcode.New(http.StatusNotFound, "creator application not found"))
 		return
@@ -108,6 +147,33 @@ func (h *AdminHandler) reviewCreatorApplication(c *gin.Context, status string) {
 		"application": app,
 		"user":        user.Public(),
 	})
+}
+
+type updateLivePermissionReq struct {
+	Status string `json:"status" binding:"required"`
+}
+
+func (h *AdminHandler) UpdateLivePermission(c *gin.Context) {
+	var req updateLivePermissionReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "live permission status is required"))
+		return
+	}
+	status := strings.TrimSpace(req.Status)
+	if status != model.LivePermissionApproved && status != model.LivePermissionRejected {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid live permission status"))
+		return
+	}
+	user, err := h.users.SetLivePermissionStatus(c.Request.Context(), c.Param("id"), status)
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user.Public()})
 }
 
 type createAdminReq struct {

@@ -25,14 +25,16 @@ describe('recentChatCache', () => {
     });
   });
 
-  it('keeps the newest eight messages per room in timestamp order', () => {
-    for (let i = 1; i <= 10; i += 1) {
-      saveRecentChatMessage('room-1', message(String(i), i), 10);
+  it('keeps the newest fifty messages per room in timestamp order', () => {
+    for (let i = 1; i <= 55; i += 1) {
+      saveRecentChatMessage('room-1', message(String(i), i), 55);
     }
 
-    const loaded = loadRecentChatMessages('room-1', 10);
+    const loaded = loadRecentChatMessages('room-1', 55);
 
-    expect(loaded.map((item) => item.id)).toEqual(['3', '4', '5', '6', '7', '8', '9', '10']);
+    expect(loaded).toHaveLength(50);
+    expect(loaded[0].id).toBe('6');
+    expect(loaded.at(-1)?.id).toBe('55');
   });
 
   it('deduplicates by id and drops messages older than 24 hours', () => {

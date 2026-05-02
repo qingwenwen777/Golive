@@ -204,6 +204,8 @@ function ChatRow({
   isOwner?: boolean;
   isFan?: boolean;
 }) {
+  const { t } = useTranslation('pages');
+
   return (
     <div className={cn('gl-chat-line', isOwner && 'is-owner', isFan && 'is-fan')}>
       <div className="gl-chat-avatar-wrap">
@@ -217,11 +219,13 @@ function ChatRow({
           >
             {m.user}
           </span>
-          {isOwner && <span className="gl-chat-owner-badge">HOST</span>}
+          {isOwner && (
+            <span className="gl-chat-owner-badge">{t('liveRoom.chatPanel.host')}</span>
+          )}
           {isFan && m.fanBadge && (
             <span
               className={cn('gl-chat-fan-badge', fanBadgeToneClass(m.fanBadge.level))}
-              title={`Fan badge level ${m.fanBadge.level}`}
+              title={t('liveRoom.chatPanel.fanBadgeTitle', { level: m.fanBadge.level })}
             >
               <Crown size={12} strokeWidth={2.4} />
               <span>#{m.fanBadge.level}</span>
@@ -268,6 +272,7 @@ function PinnedSuperChatCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
   const progress = Math.max(0, Math.min(100, (remainingMs / durationMs) * 100));
   const style = {
@@ -283,7 +288,7 @@ function PinnedSuperChatCard({
       style={style}
       onClick={onToggle}
       aria-expanded={expanded}
-      aria-label={`Open SuperChat from ${m.user}`}
+      aria-label={t('liveRoom.chatPanel.openSuperChat', { user: m.user })}
     >
       <div className="gl-sc-pin-main">
         <Avatar name={m.user} src={m.avatar} size={24} />
@@ -294,14 +299,16 @@ function PinnedSuperChatCard({
           </div>
           <div className="gl-sc-pin-hint">
             <span>{formatRemaining(remainingMs)}</span>
-            <span>{m.text ? 'Tap to read' : 'No message'}</span>
+            <span>
+              {m.text ? t('liveRoom.chatPanel.tapToRead') : t('liveRoom.chatPanel.noMessage')}
+            </span>
           </div>
         </div>
         <ChevronDown className="gl-sc-pin-chevron" size={18} />
       </div>
       {expanded && (
         <div className="gl-sc-pin-body">
-          {m.text || 'This SuperChat did not include a message.'}
+          {m.text || t('liveRoom.chatPanel.noSuperChatMessage')}
         </div>
       )}
       <span className="gl-sc-pin-progress" aria-hidden="true" />
@@ -318,6 +325,7 @@ function SystemNotice({ m }: { m: SystemMessage }) {
 }
 
 function GiftNotice({ m }: { m: GiftMessage }) {
+  const { t } = useTranslation('pages');
   const count = m.count ?? 1;
   const meta = giftMeta(m.giftName);
   // Treat empty string as missing so server broadcasts that omit the icon
@@ -331,8 +339,10 @@ function GiftNotice({ m }: { m: GiftMessage }) {
       </div>
       <div className="gl-gift-notice-body">
         <div className="gl-gift-notice-title">
-          <span className="gl-gift-notice-user">{m.self ? 'You' : m.user}</span>
-          <span>sent</span>
+          <span className="gl-gift-notice-user">
+            {m.self ? t('liveRoom.chatPanel.you') : m.user}
+          </span>
+          <span>{t('liveRoom.chatPanel.sentGift')}</span>
         </div>
         <div className="gl-gift-notice-meta">
           <span className="gl-gift-notice-name">{m.giftName}</span>
@@ -343,11 +353,13 @@ function GiftNotice({ m }: { m: GiftMessage }) {
   );
 }
 
-function formatContribution(value: number): string {
-  return Math.max(0, Math.floor(value)).toLocaleString('en-US');
+function formatContribution(value: number, locale: string): string {
+  return Math.max(0, Math.floor(value)).toLocaleString(locale);
 }
 
 function ViewerRankList({ viewers, total }: { viewers: RoomViewer[]; total: number }) {
+  const { t, i18n } = useTranslation('pages');
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const sorted = viewers
     .slice()
     .sort((a, b) => {
@@ -360,14 +372,17 @@ function ViewerRankList({ viewers, total }: { viewers: RoomViewer[]; total: numb
     <div className="gl-viewer-panel">
       <div className="gl-viewer-summary">
         <span>
-          {total.toLocaleString('en-US')} {'\u4eba\u5728\u770b'}
+          {t('liveRoom.chatPanel.watchingNow', {
+            count: total,
+            formattedCount: total.toLocaleString(locale),
+          })}
         </span>
-        <span>{'\u65e5\u8d21\u732e\u503c'}</span>
+        <span>{t('liveRoom.chatPanel.dailyContribution')}</span>
       </div>
       {sorted.length === 0 ? (
         <div className="gl-viewer-empty">
           <Users size={34} strokeWidth={1.6} />
-          <span>{'\u6682\u65e0\u5728\u7ebf\u89c2\u4f17'}</span>
+          <span>{t('liveRoom.chatPanel.emptyViewers')}</span>
         </div>
       ) : (
         <div className="gl-viewer-list">
@@ -376,16 +391,16 @@ function ViewerRankList({ viewers, total }: { viewers: RoomViewer[]; total: numb
             return (
               <div key={`${viewer.userId ?? viewer.user}-${index}`} className="gl-viewer-row">
                 <span className={cn('gl-viewer-rank', rank <= 3 && `top-${rank}`)}>
-                  {rank <= 3 ? `\u699c${rank}` : rank}
+                  {rank <= 3 ? t('liveRoom.chatPanel.rankTop', { rank }) : rank}
                 </span>
                 <Avatar name={viewer.user} src={viewer.avatar} size={34} />
                 <div className="gl-viewer-main">
                   <span className="gl-viewer-name">{viewer.user}</span>
-                  <span className="gl-viewer-sub">{'\u5728\u7ebf'}</span>
+                  <span className="gl-viewer-sub">{t('liveRoom.chatPanel.online')}</span>
                 </div>
                 <div className="gl-viewer-score">
-                  <span>{formatContribution(viewer.contribution)}</span>
-                  <small>{'\u8d21\u732e\u503c'}</small>
+                  <span>{formatContribution(viewer.contribution, locale)}</span>
+                  <small>{t('liveRoom.chatPanel.contribution')}</small>
                 </div>
               </div>
             );
@@ -409,7 +424,8 @@ export function Chat({
   onSendChat,
   onComposerFocusChange,
 }: ChatProps) {
-  const { t } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const emojiWrapRef = useRef<HTMLDivElement | null>(null);
@@ -439,7 +455,7 @@ export function Chat({
       return;
     }
     if (charCount(text) > MAX_CHAT_CHARS) {
-      toast.error(`Message must be ${MAX_CHAT_CHARS} characters or fewer.`);
+      toast.error(t('liveRoom.chatPanel.messageTooLong', { max: MAX_CHAT_CHARS }));
       return;
     }
     if (!onSendChat) return;
@@ -468,7 +484,7 @@ export function Chat({
     const end = el?.selectionEnd ?? start;
     const next = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
     if (charCount(next.trim()) > MAX_CHAT_CHARS) {
-      toast.error(`Message must be ${MAX_CHAT_CHARS} characters or fewer.`);
+      toast.error(t('liveRoom.chatPanel.messageTooLong', { max: MAX_CHAT_CHARS }));
       return;
     }
     const caret = start + emoji.length;
@@ -580,7 +596,7 @@ export function Chat({
           }}
         >
           <MessageCircle size={16} />
-          <span>{'\u804a\u5929'}</span>
+          <span>{t('liveRoom.chatPanel.chatTab')}</span>
         </button>
         <button
           type="button"
@@ -590,14 +606,14 @@ export function Chat({
           onClick={() => setActiveTab('viewers')}
         >
           <Users size={16} />
-          <span>{'\u623f\u95f4\u89c2\u4f17'}</span>
+          <span>{t('liveRoom.chatPanel.viewersTab')}</span>
           <span className="gl-chat-tab-count">
-            {(viewerTotal ?? viewers.length).toLocaleString('en-US')}
+            {(viewerTotal ?? viewers.length).toLocaleString(locale)}
           </span>
         </button>
       </div>
       {activeTab === 'chat' && pinnedSuperChats.length > 0 && (
-        <div className="gl-sc-pin-stack" aria-label="Pinned SuperChats">
+        <div className="gl-sc-pin-stack" aria-label={t('liveRoom.chatPanel.pinnedSuperChats')}>
           {pinnedSuperChats.map(({ message, remainingMs, durationMs }) => (
             <PinnedSuperChatCard
               key={message.id}
@@ -642,9 +658,17 @@ export function Chat({
           type="button"
           className="gl-chat-new-message"
           onClick={() => scrollChatToBottom('smooth')}
-          aria-label={`${newMessageCount} new messages. Jump to latest.`}
+          aria-label={t('liveRoom.chatPanel.newMessagesAria', {
+            count: newMessageCount,
+            formattedCount: newMessageCount.toLocaleString(locale),
+          })}
         >
-          <span>{`\u65b0\u6d88\u606f${newMessageCount}`}</span>
+          <span>
+            {t('liveRoom.chatPanel.newMessages', {
+              count: newMessageCount,
+              formattedCount: newMessageCount.toLocaleString(locale),
+            })}
+          </span>
           <ChevronDown size={14} strokeWidth={2.6} />
         </button>
       )}
@@ -656,14 +680,14 @@ export function Chat({
           aria-live="polite"
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-text-secondary" />
-          <span>{reconnectingLabel ?? 'Reconnecting...'}</span>
+          <span>{reconnectingLabel ?? t('liveRoom.connection.reconnectingShort')}</span>
         </div>
       )}
 
       {activeTab === 'chat' && (
         <div className="gl-chat-input">
           <Avatar
-            name={currentUser ? userDisplayName(currentUser) : 'You Viewer'}
+            name={currentUser ? userDisplayName(currentUser) : t('liveRoom.chatPanel.guestViewer')}
             src={currentUser?.avatar}
             size={24}
           />
@@ -695,7 +719,7 @@ export function Chat({
                 }
                 if (e.key !== 'Enter') return;
                 // Skip Enter while an IME composition is active. Some browsers
-                // also fire Enter with keyCode 229 during composition 鈥?guard
+                // also fire Enter with keyCode 229 during composition; guard
                 // both to be safe.
                 if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
                   return;
@@ -736,22 +760,33 @@ export function Chat({
                   onPointerDown={(event) => event.preventDefault()}
                 >
                   <div className="gl-emoji-tabs" role="tablist" aria-label={t('liveRoom.emoji')}>
-                    {EMOJI_GROUPS.map((group) => (
-                      <button
-                        key={group.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={emojiGroup === group.id}
-                        aria-label={group.label}
-                        title={group.label}
-                        className={cn('gl-emoji-tab', emojiGroup === group.id && 'is-active')}
-                        onClick={() => setEmojiGroup(group.id)}
-                      >
-                        {group.icon}
-                      </button>
-                    ))}
+                    {EMOJI_GROUPS.map((group) => {
+                      const label = t(`liveRoom.chatPanel.emojiGroups.${group.id}`, {
+                        defaultValue: group.label,
+                      });
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          role="tab"
+                          aria-selected={emojiGroup === group.id}
+                          aria-label={label}
+                          title={label}
+                          className={cn('gl-emoji-tab', emojiGroup === group.id && 'is-active')}
+                          onClick={() => setEmojiGroup(group.id)}
+                        >
+                          {group.icon}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="gl-emoji-grid" role="group" aria-label={activeEmojiGroup.label}>
+                  <div
+                    className="gl-emoji-grid"
+                    role="group"
+                    aria-label={t(`liveRoom.chatPanel.emojiGroups.${activeEmojiGroup.id}`, {
+                      defaultValue: activeEmojiGroup.label,
+                    })}
+                  >
                     {activeEmojiGroup.items.map((emoji) => (
                       <button
                         key={emoji}
