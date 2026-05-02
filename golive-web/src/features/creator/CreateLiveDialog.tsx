@@ -115,7 +115,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const [error, setError] = useState<string | null>(null);
   const currentUser = meUser ?? user;
   const channelName = useMemo(() => userDisplayName(currentUser), [currentUser]);
-  const categories = CATEGORIES_EN.filter((c) => c !== 'All' && c !== 'Live Now');
+  const categories = CATEGORIES_EN.filter((c) => c !== 'All');
   const livePermissionStatus = currentUser?.livePermissionStatus ?? 'none';
   const canGoLive = livePermissionStatus === 'approved';
 

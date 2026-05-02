@@ -34,7 +34,6 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
 
   const mainItems: NavItem[] = [
     { key: 'home', icon: Icons.Home, label: t('nav.home'), route: '/' },
-    { key: 'live', icon: Icons.Live, label: t('nav.liveNow', 'Live now'), route: '/live-now' },
     { key: 'subs', icon: Icons.Subs, label: t('nav.subscriptions'), route: '/subscriptions' },
     { key: 'coins', icon: Icons.Wallet, label: t('nav.coins', 'Coins'), route: '/coins' },
   ];
@@ -89,7 +88,6 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
 
 function deriveActiveKey(pathname: string): string {
   if (pathname === '/') return 'home';
-  if (pathname === '/live-now') return 'live';
   if (pathname === '/subscriptions' || pathname.startsWith('/channel/')) return 'subs';
   if (pathname === '/coins') return 'coins';
   if (pathname === '/you') return 'you';

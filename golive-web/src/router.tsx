@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router-dom';
 import App from '@/App';
 import HomePage from '@/pages/HomePage';
 import LiveRoomPage from '@/pages/LiveRoomPage';
@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'live-now', element: <HomePage /> },
+      { path: 'live-now', element: <Navigate to="/" replace /> },
       { path: 'live/:id', element: <LiveRoomPage /> },
       { path: 'channel/:name', element: <ChannelPage /> },
       { path: 'studio/analytics/:name', element: <CreatorAnalyticsPage /> },

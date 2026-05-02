@@ -1,6 +1,5 @@
 export const CATEGORIES_EN = [
   'All',
-  'Live Now',
   'Gaming',
   'VTuber',
   'Music',
@@ -18,7 +17,6 @@ export const CATEGORIES_EN = [
 
 export const CATEGORIES_JA = [
   'すべて',
-  'ライブ中',
   'ゲーム',
   'VTuber',
   '音楽',
@@ -36,7 +34,6 @@ export const CATEGORIES_JA = [
 
 export const CATEGORIES_ZH = [
   '全部',
-  '正在直播',
   '游戏',
   'VTuber',
   '音乐',
