@@ -237,10 +237,23 @@ services:
     depends_on: [srs, api-gateway, im-gateway]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        if [ -s /etc/letsencrypt/live/golive.us.ci/fullchain.pem ] && [ -s /etc/letsencrypt/live/golive.us.ci/privkey.pem ]; then
+          exec nginx -c /etc/nginx/nginx.https.conf -g 'daemon off;'
+        fi
+        exec nginx -c /etc/nginx/nginx.http.conf -g 'daemon off;'
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/nginx.http.conf:ro
+      - ./nginx.https.conf:/etc/nginx/nginx.https.conf:ro
       - ../../golive-web/dist:/usr/share/nginx/html:ro
-    ports: ["80:80"]
+      - ./certbot/www:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    ports:
+      - "80:80"
+      - "443:443"
 
   # ========== observability stack ==========
 

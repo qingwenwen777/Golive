@@ -20,7 +20,7 @@ jwt:
 live:
   stream_key_secret: "golive-1718011198-stream-key-0e49b7c2a65d4391bd8f"
   stream_key_ttl: 4h
-  flv_base: "http://154.36.185.85/live"
+  flv_base: "https://golive.us.ci/live"
 
 upload:
   cover_dir: "/tmp/golive/covers"

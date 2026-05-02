@@ -20,6 +20,8 @@ jwt:
 
 cors:
   allowed_origins:
+    - "https://golive.us.ci"
+    - "http://golive.us.ci"
     - "http://154.36.185.85"
     - "http://localhost"
     - "http://localhost:5173"
