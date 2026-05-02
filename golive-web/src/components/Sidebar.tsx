@@ -36,6 +36,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
     { key: 'home', icon: Icons.Home, label: t('nav.home'), route: '/' },
     { key: 'live', icon: Icons.Live, label: t('nav.liveNow', 'Live now'), route: '/live-now' },
     { key: 'subs', icon: Icons.Subs, label: t('nav.subscriptions'), route: '/subscriptions' },
+    { key: 'coins', icon: Icons.Wallet, label: t('nav.coins', 'Coins'), route: '/coins' },
   ];
 
   const youItems: NavItem[] = [
@@ -53,11 +54,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
         type="button"
         aria-label={it.label}
         title={it.label}
-        className={cn(
-          'gl-side-item',
-          active === it.key && 'is-active',
-          collapsed && 'is-col',
-        )}
+        className={cn('gl-side-item', active === it.key && 'is-active', collapsed && 'is-col')}
         onClick={() => handleNav(it.key, it.route)}
       >
         <Icon size={22} />
@@ -94,6 +91,7 @@ function deriveActiveKey(pathname: string): string {
   if (pathname === '/') return 'home';
   if (pathname === '/live-now') return 'live';
   if (pathname === '/subscriptions' || pathname.startsWith('/channel/')) return 'subs';
+  if (pathname === '/coins') return 'coins';
   if (pathname === '/you') return 'you';
   if (pathname === '/history') return 'history';
   if (pathname === '/watch-later') return 'later';

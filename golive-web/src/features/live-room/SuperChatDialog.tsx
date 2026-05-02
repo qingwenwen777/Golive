@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Coins } from 'lucide-react';
 import {
@@ -31,6 +32,7 @@ const QUICK_AMOUNTS = [200, 500, 1000, 2000, 5000, 10000];
 
 export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogProps) {
   const isMobile = useMediaQuery('(max-width: 640px)');
+  const navigate = useNavigate();
   const me = useMe();
   const balance = me.data?.coinBalance ?? 0;
   const user = useAuthStore((s) => s.user);
@@ -47,7 +49,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
   const canText = tier >= 1;
   const maxText = SC_MAX_TEXT_BY_TIER[tier];
   const insufficient = amount > balance;
-  const disabled = send.isPending || insufficient || amount < MIN;
+  const disabled = send.isPending || amount < MIN;
 
   const updateAmount = (value: number) => {
     const next = Math.min(MAX, Math.max(MIN, Math.round(value / 100) * 100));
@@ -56,6 +58,11 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
 
   const handleSend = () => {
     if (!user) return;
+    if (insufficient) {
+      onOpenChange(false);
+      navigate('/coins?focus=recharge');
+      return;
+    }
     const requestId = newRequestId();
     const pendingId = `pending:${requestId}`;
     const now = Date.now();
@@ -227,7 +234,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
               disabled ? 'bg-accent/40' : 'bg-accent hover:bg-accent/90',
             )}
           >
-            {send.isPending ? 'Sending…' : 'Send'}
+            {insufficient ? 'Top up' : send.isPending ? 'Sending...' : 'Send'}
           </button>
         </div>
       </DialogContent>

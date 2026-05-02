@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
@@ -52,6 +53,7 @@ func (r *OrderRepo) AutoMigrate() error {
 		&model.BetWager{},
 		&model.LocalMessage{},
 		&model.FanBadge{},
+		&model.CoinTransaction{},
 	)
 }
 
@@ -96,6 +98,40 @@ WHERE id = ?
 		return "", err
 	}
 	return strings.TrimSpace(avatar), nil
+}
+
+func createCoinTransaction(
+	tx *gorm.DB,
+	userID string,
+	amount int64,
+	txType string,
+	title string,
+	description string,
+	sourceType string,
+	sourceID string,
+	roomID string,
+	counterpartyID string,
+) error {
+	if userID == "" || amount == 0 {
+		return nil
+	}
+	var balanceAfter int64
+	if err := tx.Raw("SELECT coin_balance FROM users WHERE id = ?", userID).Row().Scan(&balanceAfter); err != nil {
+		return err
+	}
+	return tx.Create(&model.CoinTransaction{
+		ID:             uuid.NewString(),
+		UserID:         userID,
+		Type:           txType,
+		Amount:         amount,
+		BalanceAfter:   balanceAfter,
+		Title:          title,
+		Description:    description,
+		SourceType:     sourceType,
+		SourceID:       sourceID,
+		RoomID:         roomID,
+		CounterpartyID: counterpartyID,
+	}).Error
 }
 
 func FanBadgeLevel(totalContribution int64) int {
@@ -247,6 +283,20 @@ func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, ou
 			}
 			return err
 		}
+		if err := createCoinTransaction(
+			tx,
+			wager.UserID,
+			-wager.Amount,
+			model.CoinTxBetWager,
+			"竞猜消费",
+			round.Question,
+			"bet_wager",
+			wager.ID,
+			wager.RoomID,
+			round.OwnerID,
+		); err != nil {
+			return err
+		}
 		return tx.Create(&model.LocalMessage{
 			BizID:   wager.ID,
 			RoomID:  wager.RoomID,
@@ -321,18 +371,48 @@ func (r *OrderRepo) SettleBetRound(ctx context.Context, roundID, ownerID, winnin
 			return ErrBetClosed
 		}
 
+		payouts := make([]int64, len(wagers))
 		var paidBonus int64
+		firstWinner := -1
+		for i := range wagers {
+			if wagers[i].Option != winningOption {
+				continue
+			}
+			if firstWinner == -1 {
+				firstWinner = i
+			}
+			bonus := loserPool * wagers[i].Amount / winnerPool
+			paidBonus += bonus
+			payouts[i] = wagers[i].Amount + bonus
+		}
+		remainder := loserPool - paidBonus
+		if remainder > 0 && firstWinner >= 0 {
+			payouts[firstWinner] += remainder
+		}
+
 		for i := range wagers {
 			w := &wagers[i]
 			updates := map[string]any{"status": model.StatusLost, "payout": int64(0)}
 			if w.Option == winningOption {
-				bonus := loserPool * w.Amount / winnerPool
-				paidBonus += bonus
-				payout := w.Amount + bonus
+				payout := payouts[i]
 				updates = map[string]any{"status": model.StatusWon, "payout": payout}
 				res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", payout, w.UserID)
 				if res.Error != nil {
 					return res.Error
+				}
+				if err := createCoinTransaction(
+					tx,
+					w.UserID,
+					payout,
+					model.CoinTxBetPayout,
+					"竞猜获得",
+					round.Question,
+					"bet_wager",
+					w.ID,
+					w.RoomID,
+					round.OwnerID,
+				); err != nil {
+					return err
 				}
 			}
 			if err := tx.Model(&model.BetWager{}).Where("id = ?", w.ID).Updates(updates).Error; err != nil {
@@ -340,23 +420,6 @@ func (r *OrderRepo) SettleBetRound(ctx context.Context, roundID, ownerID, winnin
 			}
 			w.Status = updates["status"].(string)
 			w.Payout = updates["payout"].(int64)
-		}
-
-		remainder := loserPool - paidBonus
-		if remainder > 0 {
-			for i := range wagers {
-				if wagers[i].Option != winningOption {
-					continue
-				}
-				if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", remainder, wagers[i].UserID).Error; err != nil {
-					return err
-				}
-				wagers[i].Payout += remainder
-				if err := tx.Model(&model.BetWager{}).Where("id = ?", wagers[i].ID).Update("payout", wagers[i].Payout).Error; err != nil {
-					return err
-				}
-				break
-			}
 		}
 
 		if err := tx.Create(&model.LocalMessage{
@@ -415,6 +478,20 @@ func (r *OrderRepo) CancelBetRound(ctx context.Context, roundID, ownerID string,
 		for i := range refunded {
 			w := &refunded[i]
 			if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", w.Amount, w.UserID).Error; err != nil {
+				return err
+			}
+			if err := createCoinTransaction(
+				tx,
+				w.UserID,
+				w.Amount,
+				model.CoinTxBetRefund,
+				"竞猜返还",
+				round.Question,
+				"bet_wager",
+				w.ID,
+				w.RoomID,
+				round.OwnerID,
+			); err != nil {
 				return err
 			}
 			if err := tx.Model(&model.BetWager{}).Where("id = ?", w.ID).
@@ -550,6 +627,20 @@ func (r *OrderRepo) PlaceGiftOrder(
 			}
 			return err
 		}
+		if err := createCoinTransaction(
+			tx,
+			o.UserID,
+			-o.TotalCoin,
+			model.CoinTxGiftSpend,
+			"礼物消费",
+			fmt.Sprintf("%s x%d", o.GiftID, o.Count),
+			"gift_order",
+			o.OrderID,
+			o.RoomID,
+			receiverID,
+		); err != nil {
+			return err
+		}
 		if receiverID != "" {
 			res = tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.TotalCoin, receiverID)
 			if res.Error != nil {
@@ -557,6 +648,20 @@ func (r *OrderRepo) PlaceGiftOrder(
 			}
 			if res.RowsAffected == 0 {
 				return ErrRoomOwnerNotFound
+			}
+			if err := createCoinTransaction(
+				tx,
+				receiverID,
+				o.TotalCoin,
+				model.CoinTxCreatorGiftIncome,
+				"直播礼物收入",
+				fmt.Sprintf("%s x%d", o.GiftID, o.Count),
+				"gift_order",
+				o.OrderID,
+				o.RoomID,
+				o.UserID,
+			); err != nil {
+				return err
 			}
 		}
 		if err := applyFanBadgeContribution(tx, o.UserID, o.RoomID, receiverID, o.TotalCoin, fanBadgeMode); err != nil {
@@ -628,6 +733,20 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			}
 			return err
 		}
+		if err := createCoinTransaction(
+			tx,
+			o.UserID,
+			-o.Amount,
+			model.CoinTxSuperChatSpend,
+			"SC 消费",
+			o.Text,
+			"super_chat_order",
+			o.OrderID,
+			o.RoomID,
+			receiverID,
+		); err != nil {
+			return err
+		}
 		if receiverID != "" {
 			res = tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.Amount, receiverID)
 			if res.Error != nil {
@@ -635,6 +754,20 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			}
 			if res.RowsAffected == 0 {
 				return ErrRoomOwnerNotFound
+			}
+			if err := createCoinTransaction(
+				tx,
+				receiverID,
+				o.Amount,
+				model.CoinTxCreatorSuperChatIncome,
+				"直播 SC 收入",
+				o.Text,
+				"super_chat_order",
+				o.OrderID,
+				o.RoomID,
+				o.UserID,
+			); err != nil {
+				return err
 			}
 		}
 		if err := applyFanBadgeContribution(tx, o.UserID, o.RoomID, receiverID, o.Amount, fanBadgeMode); err != nil {

@@ -68,6 +68,21 @@ func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
 	persisted, err := users.FindByID(ctx, login.User.ID)
 	require.NoError(t, err)
 	require.Equal(t, int64(2200), persisted.CoinBalance)
+
+	txReq := httptest.NewRequest(http.MethodGet, "/users/me/coins/transactions", nil)
+	txReq.Header.Set("Authorization", "Bearer "+login.Token)
+	txRec := httptest.NewRecorder()
+	router.ServeHTTP(txRec, txReq)
+
+	require.Equal(t, http.StatusOK, txRec.Code)
+	var ledger struct {
+		Items []model.CoinTransaction `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(txRec.Body.Bytes(), &ledger))
+	require.Len(t, ledger.Items, 1)
+	require.Equal(t, model.CoinTxTopup, ledger.Items[0].Type)
+	require.Equal(t, int64(1000), ledger.Items[0].Amount)
+	require.Equal(t, int64(2200), ledger.Items[0].BalanceAfter)
 }
 
 func TestTopupCoinsRejectsInvalidAmount(t *testing.T) {
@@ -82,4 +97,46 @@ func TestTopupCoinsRejectsInvalidAmount(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestClaimDailyTaskIsOncePerDay(t *testing.T) {
+	router, _, auth := newCoinsTestRouter(t)
+	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/watch-3-lives/claim", nil)
+	req.Header.Set("Authorization", "Bearer "+login.Token)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var first struct {
+		User           model.PublicUser      `json:"user"`
+		Transaction    model.CoinTransaction `json:"transaction"`
+		Created        bool                  `json:"created"`
+		AlreadyClaimed bool                  `json:"alreadyClaimed"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &first))
+	require.True(t, first.Created)
+	require.False(t, first.AlreadyClaimed)
+	require.Equal(t, int64(18), first.Transaction.Amount)
+	require.Equal(t, int64(1218), first.User.CoinBalance)
+
+	req2 := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/watch-3-lives/claim", nil)
+	req2.Header.Set("Authorization", "Bearer "+login.Token)
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+
+	require.Equal(t, http.StatusOK, rec2.Code)
+	var second struct {
+		User           model.PublicUser      `json:"user"`
+		Transaction    model.CoinTransaction `json:"transaction"`
+		Created        bool                  `json:"created"`
+		AlreadyClaimed bool                  `json:"alreadyClaimed"`
+	}
+	require.NoError(t, json.Unmarshal(rec2.Body.Bytes(), &second))
+	require.False(t, second.Created)
+	require.True(t, second.AlreadyClaimed)
+	require.Equal(t, int64(1218), second.User.CoinBalance)
+	require.Equal(t, first.Transaction.ID, second.Transaction.ID)
 }

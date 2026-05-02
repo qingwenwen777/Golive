@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import {
   Bell,
   Bookmark,
@@ -20,7 +19,7 @@ import {
   Video,
   Wallet,
 } from 'lucide-react';
-import { useMe, useTopupCoins } from '@/api/auth';
+import { useMe } from '@/api/auth';
 import { useFanBadges } from '@/api/gift';
 import { useRooms, useSubscriptions } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -114,7 +113,7 @@ export function SubscriptionsPage() {
                   <span>{channel.name}</span>
                   {channel.verified && <CheckCircle2 size={12} />}
                 </div>
-                <div className={`gl-yt-channel-status${channel.live ? '' : ' is-offline'}`}>
+                <div className={`gl-yt-channel-status${channel.live ? '' : 'is-offline'}`}>
                   {channel.live ? 'LIVE' : 'Offline'}
                 </div>
               </Link>
@@ -147,7 +146,6 @@ export function YouPage() {
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const me = useMe();
-  const topup = useTopupCoins();
   const rooms = useRooms({ size: 100 });
   const fanBadges = useFanBadges(isAuthed, user?.id);
   const liveStreams = rooms.data?.items;
@@ -176,18 +174,12 @@ export function YouPage() {
   const ownLive = rooms.data?.items.find((stream) => stream.ownerId === user?.id);
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
 
-  const handleAddCoins = () => {
+  const handleOpenCoins = () => {
     if (!user) {
       openLogin();
       return;
     }
-    topup.mutate(
-      { amount: 1000 },
-      {
-        onSuccess: () => toast.success('Added 1,000 coins.'),
-        onError: (err) => toast.error(err.message || 'Top-up failed.'),
-      },
-    );
+    navigate('/coins?focus=recharge');
   };
 
   const channelHref = `/channel/${user?.id ?? ''}`;
@@ -214,13 +206,12 @@ export function YouPage() {
             <button
               type="button"
               className="gl-yt-coin-chip"
-              onClick={handleAddCoins}
-              disabled={topup.isPending}
-              title="Add 1,000 coins"
+              onClick={handleOpenCoins}
+              title="Open coin center"
             >
               <Wallet size={14} />
               <span>{balance.toLocaleString()}</span>
-              <span className="gl-yt-coin-chip-add">{topup.isPending ? '…' : '+1,000'}</span>
+              <span className="gl-yt-coin-chip-add">Recharge</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
               <Bookmark size={14} /> Watch later · {saved.length}
@@ -434,11 +425,7 @@ export function SettingsPage() {
             <>
               <h2>Account</h2>
               <div className="gl-account-row">
-                <Avatar
-                  name={userDisplayName(currentUser)}
-                  src={currentUser?.avatar}
-                  size={56}
-                />
+                <Avatar name={userDisplayName(currentUser)} src={currentUser?.avatar} size={56} />
                 <div>
                   <div className="gl-account-name">{userDisplayName(currentUser)}</div>
                   <div className="gl-muted-line">

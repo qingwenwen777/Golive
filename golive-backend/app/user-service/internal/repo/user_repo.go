@@ -23,7 +23,7 @@ func NewUserRepo(db *gorm.DB) *UserRepo { return &UserRepo{db: db} }
 
 // AutoMigrate creates / updates the users table.
 func (r *UserRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.User{}, &model.CreatorApplication{})
+	return r.db.AutoMigrate(&model.User{}, &model.CreatorApplication{}, &model.CoinTransaction{})
 }
 
 func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*model.User, error) {
@@ -215,6 +215,125 @@ func (r *UserRepo) IncrementCoins(ctx context.Context, id string, delta int64) (
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (r *UserRepo) IncrementCoinsWithTransaction(
+	ctx context.Context,
+	id string,
+	delta int64,
+	txType string,
+	title string,
+	description string,
+	sourceType string,
+	sourceID string,
+	roomID string,
+	counterpartyID string,
+) (*model.User, *model.CoinTransaction, error) {
+	var u model.User
+	var coinTx *model.CoinTransaction
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", delta)).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+			return err
+		}
+		coinTx = &model.CoinTransaction{
+			ID:             newID(),
+			UserID:         id,
+			Type:           txType,
+			Amount:         delta,
+			BalanceAfter:   u.CoinBalance,
+			Title:          title,
+			Description:    description,
+			SourceType:     sourceType,
+			SourceID:       sourceID,
+			RoomID:         roomID,
+			CounterpartyID: counterpartyID,
+		}
+		return tx.Create(coinTx).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return &u, coinTx, nil
+}
+
+func (r *UserRepo) ClaimDailyCoinReward(
+	ctx context.Context,
+	id string,
+	taskSourceID string,
+	title string,
+	description string,
+	reward int64,
+) (*model.User, *model.CoinTransaction, bool, error) {
+	var u model.User
+	var coinTx model.CoinTransaction
+	created := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+			return err
+		}
+		err := tx.Where("user_id = ? AND type = ? AND source_id = ?", id, model.CoinTxDailyTask, taskSourceID).
+			Take(&coinTx).Error
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", reward)).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+			return err
+		}
+		coinTx = model.CoinTransaction{
+			ID:           newID(),
+			UserID:       id,
+			Type:         model.CoinTxDailyTask,
+			Amount:       reward,
+			BalanceAfter: u.CoinBalance,
+			Title:        title,
+			Description:  description,
+			SourceType:   "daily_task",
+			SourceID:     taskSourceID,
+		}
+		if err := tx.Create(&coinTx).Error; err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, false, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	return &u, &coinTx, created, nil
+}
+
+func (r *UserRepo) ListCoinTransactions(ctx context.Context, id string, limit int) ([]model.CoinTransaction, error) {
+	if limit <= 0 {
+		limit = 80
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	var rows []model.CoinTransaction
+	err := r.db.WithContext(ctx).
+		Where("user_id = ?", id).
+		Order("created_at DESC, id DESC").
+		Limit(limit).
+		Find(&rows).Error
+	return rows, err
 }
 
 func (r *UserRepo) UpdateAvatar(ctx context.Context, id, avatar string) (*model.User, error) {

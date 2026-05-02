@@ -18,6 +18,7 @@ import {
   Eye,
   Sun,
   Moon,
+  Wallet,
 } from 'lucide-react';
 
 export interface IconSet {
@@ -39,6 +40,7 @@ export interface IconSet {
   Eye: LucideIcon;
   Sun: LucideIcon;
   Moon: LucideIcon;
+  Wallet: LucideIcon;
 }
 
 export const Icons: IconSet = {
@@ -60,4 +62,5 @@ export const Icons: IconSet = {
   Eye,
   Sun,
   Moon,
+  Wallet,
 };

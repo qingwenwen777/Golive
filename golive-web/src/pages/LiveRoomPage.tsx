@@ -20,6 +20,7 @@ import { useRoom, useStopLive } from '@/api/room';
 import { useLatestBet } from '@/api/bet';
 import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
 import { copyText } from '@/lib/clipboard';
+import { addDailyCoinWatchSeconds, markDailyCoinRoomWatched } from '@/lib/coinActivity';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
 import {
   LIVE_SESSION_STORAGE_KEY,
@@ -147,6 +148,15 @@ export default function LiveRoomPage() {
     if (!stream || !roomIsLive) return;
     saveToLibrary(WATCH_HISTORY_KEY, stream, 'watchedAt');
   }, [roomIsLive, stream]);
+
+  useEffect(() => {
+    if (!roomIsLive || !roomId || !currentUser?.id) return;
+    markDailyCoinRoomWatched(currentUser.id, roomId);
+    const timer = window.setInterval(() => {
+      addDailyCoinWatchSeconds(currentUser.id, 30);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [currentUser?.id, roomId, roomIsLive]);
 
   useEffect(() => {
     if (!stream) return;

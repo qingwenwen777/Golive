@@ -2,8 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Coins, Plus, User as UserIcon } from 'lucide-react';
-import { toast } from 'sonner';
-import { logout as doLogout, useMe, useTopupCoins } from '@/api/auth';
+import { logout as doLogout, useMe } from '@/api/auth';
 import { Avatar } from '@/components/Avatar';
 import { CreateLiveDialog } from '@/features/creator/CreateLiveDialog';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
@@ -38,7 +37,6 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const user = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const me = useMe();
-  const topup = useTopupCoins();
   const [createOpen, setCreateOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('q') ?? '');
@@ -48,17 +46,6 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   useEffect(() => {
     setSearch(new URLSearchParams(location.search).get('q') ?? '');
   }, [location.search]);
-
-  const handleTopup = () => {
-    topup.mutate(
-      { amount: 1000 },
-      {
-        onSuccess: (next) =>
-          toast.success(`Coins added. Balance: ${next.coinBalance.toLocaleString()}.`),
-        onError: (err) => toast.error(err.message || 'Could not add coins.'),
-      },
-    );
-  };
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -148,11 +135,10 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="flex items-center gap-2"
-                    disabled={topup.isPending}
-                    onClick={handleTopup}
+                    onClick={() => navigate('/coins?focus=recharge')}
                   >
                     <Plus size={14} />
-                    <span>{topup.isPending ? 'Adding coins...' : 'Add 1,000 coins'}</span>
+                    <span>Recharge coins</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {currentUser?.role === 'admin' && (

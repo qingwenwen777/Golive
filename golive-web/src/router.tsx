@@ -7,6 +7,7 @@ import { CreatorAnalyticsPage, LiveAnalysisPage } from '@/pages/CreatorAnalytics
 import LoginPage from '@/pages/LoginPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import AdminApplicationsPage, { AdminIndexPage } from '@/pages/AdminApplicationsPage';
+import CoinPage from '@/pages/CoinPage';
 import {
   HistoryPage,
   LikedPage,
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'studio/analytics/:name/live/:recordId', element: <LiveAnalysisPage /> },
       { path: 'subscriptions', element: <SubscriptionsPage /> },
       { path: 'you', element: <YouPage /> },
+      { path: 'coins', element: <CoinPage /> },
       { path: 'history', element: <HistoryPage /> },
       { path: 'watch-later', element: <WatchLaterPage /> },
       { path: 'liked', element: <LikedPage /> },

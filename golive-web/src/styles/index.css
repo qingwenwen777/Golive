@@ -3548,9 +3548,504 @@ button.gl-fan-badge-empty {
   transform: translateX(18px);
 }
 
+/* Coin center */
+.gl-coin-page {
+  gap: 20px;
+}
+.gl-coin-hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 18px;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(15, 15, 15, 0.96), rgba(42, 64, 86, 0.94) 54%, rgba(180, 26, 43, 0.9)),
+    #111;
+  color: #fff;
+  padding: 26px;
+}
+.gl-coin-hero-copy {
+  min-width: 0;
+}
+.gl-coin-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-coin-hero h1 {
+  margin: 14px 0 0;
+  color: #fff;
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1.04;
+}
+.gl-coin-hero p {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.gl-coin-hero-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: 10px;
+}
+.gl-coin-hero-actions .gl-secondary-btn {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.gl-coin-hero-actions .gl-secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.gl-coin-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+  font-size: 14px;
+  font-weight: 800;
+  padding: 0 17px;
+}
+.gl-coin-primary:hover {
+  background: var(--gl-btn-primary-hover);
+}
+.gl-coin-primary:disabled {
+  opacity: 0.58;
+  cursor: progress;
+}
+.gl-coin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.gl-coin-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  padding: 14px;
+}
+.gl-coin-stat-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-coin-stat strong {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-coin-stat span {
+  display: block;
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.gl-coin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 18px;
+  align-items: start;
+}
+.gl-coin-main,
+.gl-coin-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+}
+.gl-coin-side {
+  position: sticky;
+  top: 76px;
+}
+.gl-coin-panel {
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  padding: 18px;
+}
+.gl-coin-panel h2 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 900;
+}
+.gl-coin-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.gl-coin-panel-head p,
+.gl-coin-footnote,
+.gl-coin-note {
+  margin: 4px 0 0;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.gl-coin-task-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.gl-coin-task {
+  display: flex;
+  min-width: 0;
+  min-height: 184px;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  padding: 14px;
+}
+.gl-coin-task-top,
+.gl-coin-task-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gl-coin-task-icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-coin-task-top span {
+  color: #137333;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.dark .gl-coin-task-top span {
+  color: #7bd88f;
+}
+.gl-coin-task h3 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+.gl-coin-task p {
+  min-height: 34px;
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.gl-coin-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+}
+.gl-coin-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #1c62b9;
+}
+.gl-coin-task-bottom {
+  margin-top: auto;
+}
+.gl-coin-task-bottom span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-coin-task-bottom button {
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 12px;
+}
+.gl-coin-task-bottom button.is-ready {
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+}
+.gl-coin-task-bottom button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+.gl-coin-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.gl-coin-filter {
+  flex: 0 0 auto;
+  height: 32px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 12px;
+}
+.gl-coin-filter:hover,
+.gl-coin-filter.is-active {
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+  border-color: transparent;
+}
+.gl-coin-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gl-coin-record {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 62px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  padding: 10px 12px;
+}
+.gl-coin-record.is-loading {
+  background: linear-gradient(90deg, var(--gl-bg-hover), var(--gl-bg-card), var(--gl-bg-hover));
+  background-size: 220% 100%;
+  animation: glBreathe 1.25s ease-in-out infinite;
+}
+.gl-coin-record-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-coin-record-icon.is-income {
+  color: #137333;
+}
+.gl-coin-record-icon.is-spend {
+  color: var(--gl-red);
+}
+.dark .gl-coin-record-icon.is-income {
+  color: #7bd88f;
+}
+.gl-coin-record-main {
+  min-width: 0;
+}
+.gl-coin-record-main strong {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-coin-record-main span {
+  display: block;
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-coin-record-amount {
+  text-align: right;
+}
+.gl-coin-record-amount strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.gl-coin-record-amount.is-income strong {
+  color: #137333;
+}
+.gl-coin-record-amount.is-spend strong {
+  color: var(--gl-red);
+}
+.dark .gl-coin-record-amount.is-income strong {
+  color: #7bd88f;
+}
+.gl-coin-record-amount span {
+  display: block;
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.gl-coin-empty {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed var(--gl-border);
+  border-radius: 10px;
+  color: var(--gl-text-2);
+  text-align: center;
+}
+.gl-coin-empty strong {
+  color: var(--gl-text);
+  font-size: 15px;
+}
+.gl-coin-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.gl-coin-input-label > span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-coin-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  padding: 0 12px;
+}
+.gl-coin-input:focus-within {
+  border-color: #1c62b9;
+  box-shadow: inset 0 0 0 1px #1c62b9;
+}
+.gl-coin-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 900;
+}
+.gl-coin-input span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-coin-quick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.gl-coin-quick button {
+  height: 32px;
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-coin-quick button:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-coin-exchange {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--gl-text-2);
+  font-size: 13px;
+}
+.gl-coin-exchange strong {
+  color: var(--gl-text);
+  font-size: 22px;
+  font-weight: 900;
+}
+.gl-coin-wide {
+  width: 100%;
+  margin-top: 14px;
+}
+.gl-coin-withdraw-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+.gl-coin-withdraw-lines span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--gl-text-2);
+  font-size: 13px;
+}
+.gl-coin-withdraw-lines strong {
+  color: var(--gl-text);
+  font-weight: 900;
+}
+
 @media (max-width: 1199px) {
   .gl-fan-badge-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gl-coin-stats,
+  .gl-coin-task-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gl-coin-layout {
+    grid-template-columns: 1fr;
+  }
+  .gl-coin-side {
+    position: static;
   }
   .gl-yt-collection {
     grid-template-columns: 1fr;
@@ -3577,6 +4072,40 @@ button.gl-fan-badge-empty {
 @media (max-width: 767px) {
   .gl-fan-badge-grid {
     grid-template-columns: 1fr;
+  }
+  .gl-coin-hero {
+    flex-direction: column;
+    padding: 20px;
+  }
+  .gl-coin-hero h1 {
+    font-size: 30px;
+  }
+  .gl-coin-hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .gl-coin-hero-actions .gl-coin-primary,
+  .gl-coin-hero-actions .gl-secondary-btn {
+    width: 100%;
+  }
+  .gl-coin-stats,
+  .gl-coin-task-grid {
+    grid-template-columns: 1fr;
+  }
+  .gl-coin-panel {
+    padding: 14px;
+  }
+  .gl-coin-record {
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+  }
+  .gl-coin-record-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .gl-coin-record-amount {
+    grid-column: 2;
+    text-align: left;
   }
   .gl-yt-you-head {
     grid-template-columns: 1fr;
@@ -3650,7 +4179,7 @@ button.gl-fan-badge-empty {
     flex: 1 1 0;
     width: auto;
     min-width: 0;
-    max-width: 33.333%;
+    max-width: 25%;
     height: 56px;
     padding: 8px 0 6px;
     border-radius: 10px;

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Coins } from 'lucide-react';
 import {
@@ -33,6 +34,7 @@ export interface GiftPanelProps {
 
 export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps) {
   const isMobile = useMediaQuery('(max-width: 640px)');
+  const navigate = useNavigate();
   const { data: gifts, isPending } = useGifts();
   const me = useMe();
   const balance = me.data?.coinBalance ?? 0;
@@ -54,6 +56,11 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
 
   const handleSend = () => {
     if (!selected) return;
+    if (insufficient) {
+      onOpenChange(false);
+      navigate('/coins?focus=recharge');
+      return;
+    }
     const requestId = newRequestId();
     sendGift.mutate(
       { roomId, giftId: selected.id, count, requestId },
@@ -178,7 +185,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                 </div>
               </div>
               <button
-                disabled={sendGift.isPending || insufficient}
+                disabled={sendGift.isPending}
                 onClick={handleSend}
                 className={cn(
                   'rounded-full px-5 py-2 text-sm font-semibold transition',

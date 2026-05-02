@@ -36,6 +36,7 @@ func newTestDB(t *testing.T, balance int64) *gorm.DB {
 	_ = db.Exec("DROP TABLE IF EXISTS gifts").Error
 	_ = db.Exec("DROP TABLE IF EXISTS gift_orders").Error
 	_ = db.Exec("DROP TABLE IF EXISTS super_chat_orders").Error
+	_ = db.Exec("DROP TABLE IF EXISTS coin_transactions").Error
 	_ = db.Exec("DROP TABLE IF EXISTS local_messages").Error
 	_ = db.Exec("DROP TABLE IF EXISTS fan_badges").Error
 
@@ -65,7 +66,7 @@ func newTestDB(t *testing.T, balance int64) *gorm.DB {
 		"r", "Streamer", "room.png", "u-owner", "r1", "Streamer", "room.png", "u-owner",
 	).Error)
 
-	require.NoError(t, db.AutoMigrate(&model.Gift{}, &model.GiftOrder{}, &model.SuperChatOrder{}, &model.LocalMessage{}, &model.FanBadge{}))
+	require.NoError(t, db.AutoMigrate(&model.Gift{}, &model.GiftOrder{}, &model.SuperChatOrder{}, &model.CoinTransaction{}, &model.LocalMessage{}, &model.FanBadge{}))
 	return db
 }
 
