@@ -3789,11 +3789,11 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-prepare {
   display: grid;
-  width: min(1120px, 100%);
+  width: min(1360px, 100%);
   min-width: 0;
-  grid-template-columns: minmax(500px, 680px) minmax(300px, 360px);
+  grid-template-columns: minmax(520px, 1.45fr) minmax(420px, 0.95fr);
   align-items: start;
-  gap: 18px;
+  gap: 22px;
 }
 .gl-creator-flow {
   display: flex;
