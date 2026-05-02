@@ -19,7 +19,7 @@ export interface Stream {
   ownerId?: string;
   playbackUrl?: string;
   streamKey?: string;
-  status?: 'publishing' | 'live' | 'ending' | 'ended' | string;
+  status?: 'scheduled' | 'publishing' | 'live' | 'ending' | 'ended' | 'expired' | 'canceled' | string;
   subscriberCount?: number;
 }
 

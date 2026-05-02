@@ -2,7 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { CloudOff, Copy, MessageSquare, Radio, Square, Trophy } from 'lucide-react';
+import {
+  Bell,
+  CalendarClock,
+  CheckCircle2,
+  CloudOff,
+  Copy,
+  MessageSquare,
+  PlayCircle,
+  Radio,
+  Square,
+  Trophy,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Player } from '@/features/live-room/Player';
@@ -19,6 +32,12 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
 import { useLatestBet } from '@/api/bet';
 import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
+import {
+  useChannelAppointments,
+  useReserveAppointment,
+  useStartAppointment,
+  useUnreserveAppointment,
+} from '@/api/room';
 import { copyText } from '@/lib/clipboard';
 import { addDailyCoinWatchSeconds, markDailyCoinRoomWatched } from '@/lib/coinActivity';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
@@ -30,8 +49,10 @@ import {
   type PublisherSession,
 } from '@/features/creator/publisherSession';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { LoadableImage } from '@/components/LoadableImage';
+import type { AppointmentItem } from '@/api/room';
 import { userDisplayName } from '@/types/user';
-import { streamChannelName } from '@/types/stream';
+import { streamChannelName, type Stream } from '@/types/stream';
 import type { FanBadge } from '@/types/gift';
 
 function fanBadgeLevel(totalContribution: number): number {
@@ -71,10 +92,25 @@ export default function LiveRoomPage() {
   );
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
+  const isScheduledRoom = stream?.status === 'scheduled';
+  const appointmentList = useChannelAppointments(
+    stream?.channelId ?? '',
+    Boolean(stream?.channelId && isScheduledRoom),
+    1,
+    20,
+  );
+  const appointment = useMemo(
+    () => appointmentList.data?.items.find((item) => item.id === id) ?? null,
+    [appointmentList.data?.items, id],
+  );
   const roomId = stream?.id ?? id;
   const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
+  const roomCanWatch = Boolean(stream && stream.status !== 'ended');
   const fanBadges = useFanBadges(isAuthed, currentUser?.id);
+  const reserveAppointment = useReserveAppointment(roomId);
+  const unreserveAppointment = useUnreserveAppointment(roomId);
+  const startAppointment = useStartAppointment(roomId);
   const activeFanBadge = useMemo(() => {
     if (!stream?.ownerId) return null;
     const badge = fanBadges.data?.find((item) => item.creatorId === stream.ownerId);
@@ -102,7 +138,7 @@ export default function LiveRoomPage() {
   }, [id, queryClient, stream, t]);
 
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
-    useRoomRealtime(roomId, roomIsLive, { onLiveEnded: handleLiveEnded, activeFanBadge });
+    useRoomRealtime(roomId, roomCanWatch, { onLiveEnded: handleLiveEnded, activeFanBadge });
 
   useEffect(() => {
     liveEndedRef.current = false;
@@ -223,6 +259,13 @@ export default function LiveRoomPage() {
     : null;
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
   const ownerName = streamChannelName(stream, currentUser);
+  const openSuperChat = () => {
+    if (!isAuthed) {
+      openLogin(() => setSuperChatOpen(true));
+      return;
+    }
+    setSuperChatOpen(true);
+  };
   const updateLocalFanBadge = (coin: number, createIfMissing: boolean) => {
     if (!currentUser?.id || !stream.ownerId || currentUser.id === stream.ownerId) return;
     const creatorId = stream.ownerId;
@@ -276,7 +319,7 @@ export default function LiveRoomPage() {
     });
   };
 
-  if (!roomIsLive) {
+  if (!roomIsLive && !isScheduledRoom) {
     if (!canShowPublisherPanel) {
       return (
         <div className="gl-empty">
@@ -316,13 +359,213 @@ export default function LiveRoomPage() {
     );
   }
 
-  const openSuperChat = () => {
-    if (!isAuthed) {
-      openLogin(() => setSuperChatOpen(true));
-      return;
-    }
-    setSuperChatOpen(true);
-  };
+  if (isScheduledRoom && stream) {
+    return (
+      <>
+        <div
+          className={[
+            isNarrow ? 'grid grid-cols-1 gap-6 px-4 pb-20' : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
+            isMobile && mobileComposerFocused ? 'gl-live-room-chatting' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <div className="min-w-0 flex-1 xl:pt-6">
+            <ScheduledRoomPlayer
+              stream={stream}
+              appointment={appointment}
+              owner={ownsStream}
+              canStart={Boolean(appointment?.canStart)}
+              pending={startAppointment.isPending}
+              onReserve={() => {
+                if (!isAuthed) {
+                  openLogin(() => reserveAppointment.mutate(undefined));
+                  return;
+                }
+                reserveAppointment.mutate(undefined, {
+                  onSuccess: () => toast.success(t('liveRoom.appointmentReserved', { defaultValue: 'Appointment reserved.' })),
+                  onError: (err) => toast.error(err.message || t('liveRoom.appointmentReserveFailed', { defaultValue: 'Could not reserve this appointment.' })),
+                });
+              }}
+              onUnreserve={() => {
+                unreserveAppointment.mutate(undefined, {
+                  onSuccess: () => toast.success(t('liveRoom.appointmentUnreserved', { defaultValue: 'Reservation removed.' })),
+                  onError: (err) => toast.error(err.message || t('liveRoom.appointmentReserveFailed', { defaultValue: 'Could not update reservation.' })),
+                });
+              }}
+              onStart={() => {
+                startAppointment.mutate(undefined, {
+                  onSuccess: (next) => {
+                    savePublisherSession(next);
+                    toast.success(t('liveRoom.appointmentStartSuccess', { defaultValue: 'Appointment live started.' }));
+                    navigate(`/studio/live/${encodeURIComponent(next.id)}`);
+                  },
+                  onError: (err) => toast.error(err.message || t('liveRoom.appointmentStartFailed', { defaultValue: 'Could not start this appointment.' })),
+                });
+              }}
+            />
+            <InfoBlock
+              stream={stream}
+              viewerCount={effectiveViewers}
+              onOpenGifts={() => {
+                if (!isAuthed) {
+                  openLogin(() => setGiftOpen(true));
+                  return;
+                }
+                setGiftOpen(true);
+              }}
+            />
+            <div ref={betAnchorRef}>
+              <BettingPanel roomId={roomId} ownsStream={ownsStream} />
+            </div>
+            {ownsStream && (
+              <div className="gl-owner-live-actions">
+                <div>
+                  <h2>{t('liveRoom.appointmentOwnerTitle', { defaultValue: 'Appointment management' })}</h2>
+                  <p>{t('liveRoom.appointmentOwnerSub', { defaultValue: 'Start the appointment within 30 minutes of the scheduled time.' })}</p>
+                </div>
+                {appointment?.canStart && (
+                  <button
+                    type="button"
+                    className="gl-owner-end-live"
+                    onClick={() => {
+                      startAppointment.mutate(undefined, {
+                        onSuccess: (next) => {
+                          savePublisherSession(next);
+                          navigate(`/studio/live/${encodeURIComponent(next.id)}`);
+                        },
+                        onError: (err) => toast.error(err.message || t('liveRoom.appointmentStartFailed', { defaultValue: 'Could not start this appointment.' })),
+                      });
+                    }}
+                    disabled={startAppointment.isPending}
+                  >
+                    <PlayCircle size={15} />
+                    <span>{startAppointment.isPending ? t('liveRoom.starting', { defaultValue: 'Starting...' }) : t('liveRoom.startLive', { defaultValue: 'Start live' })}</span>
+                  </button>
+                )}
+              </div>
+            )}
+            {isMobile && (
+              <div className="gl-mobile-chat">
+                <Chat
+                  messages={messages}
+                  viewers={viewers}
+                  viewerTotal={effectiveViewers}
+                  ownerId={stream.ownerId}
+                  ownerName={ownerName}
+                  onSendChat={sendChat}
+                  onSendSuperChat={openSuperChat}
+                  reconnecting={reconnecting}
+                  reconnectingLabel={reconnectingLabel}
+                  onComposerFocusChange={setMobileComposerFocused}
+                />
+              </div>
+            )}
+          </div>
+
+          {!isNarrow && (
+            <div className="gl-side-rail sticky top-20 self-start">
+              <Chat
+                messages={messages}
+                viewers={viewers}
+                viewerTotal={effectiveViewers}
+                ownerId={stream.ownerId}
+                ownerName={ownerName}
+                onSendChat={sendChat}
+                onSendSuperChat={openSuperChat}
+                reconnecting={reconnecting}
+                reconnectingLabel={reconnectingLabel}
+              />
+            </div>
+          )}
+        </div>
+
+        {isNarrow && !isMobile && (
+          <>
+            <button
+              className="gl-chat-fab"
+              aria-label={t('liveRoom.openChat')}
+              onClick={() => setSheetOpen(true)}
+            >
+              <MessageSquare size={24} />
+            </button>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetContent side="right" className="w-[402px] max-w-full p-0 sm:max-w-[402px]">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
+                </SheetHeader>
+                <Chat
+                  messages={messages}
+                  viewers={viewers}
+                  viewerTotal={effectiveViewers}
+                  ownerId={stream.ownerId}
+                  ownerName={ownerName}
+                  onSendChat={sendChat}
+                  onSendSuperChat={openSuperChat}
+                  reconnecting={reconnecting}
+                  reconnectingLabel={reconnectingLabel}
+                  sheetMode
+                />
+              </SheetContent>
+            </Sheet>
+          </>
+        )}
+
+        <GiftPanel
+          open={giftOpen}
+          onOpenChange={setGiftOpen}
+          roomId={roomId}
+          onSent={({ gift, count, requestId }) => {
+            const totalCoin = gift.priceCoin * count;
+            const currentName = currentUser ? userDisplayName(currentUser) : 'You';
+            if (currentUser) {
+              incrementViewerContribution(
+                roomId,
+                {
+                  userId: currentUser.id,
+                  user: currentName,
+                  avatar: currentUser.avatar,
+                  contribution: 0,
+                },
+                totalCoin,
+              );
+            }
+            updateLocalFanBadge(totalCoin, gift.id === 'fan_light');
+            setFlying((prev) => [
+              ...prev,
+              {
+                id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                icon: gift.icon,
+                label: `${gift.name} x${count}`,
+              },
+            ]);
+            appendMessage(roomId, {
+              id: `gift:${requestId}`,
+              kind: 'gift',
+              requestId,
+              userId: currentUser?.id,
+              user: currentName,
+              avatar: currentUser?.avatar,
+              giftName: gift.name,
+              giftIcon: gift.icon,
+              count,
+              tier: gift.tier,
+              totalCoin,
+              self: true,
+              ts: Date.now(),
+            });
+          }}
+        />
+
+        <SuperChatDialog open={superChatOpen} onOpenChange={setSuperChatOpen} roomId={roomId} />
+
+        <FlyingGiftLayer
+          items={flying}
+          onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
+        />
+      </>
+    );
+  }
 
   const Left = (
     <div className="min-w-0 flex-1 xl:pt-6">
@@ -485,7 +728,7 @@ export default function LiveRoomPage() {
             {
               id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               icon: gift.icon,
-              label: `${gift.name} ×${count}`,
+              label: `${gift.name} x${count}`,
             },
           ]);
           appendMessage(roomId, {
@@ -513,6 +756,83 @@ export default function LiveRoomPage() {
         onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
       />
     </>
+  );
+}
+
+function ScheduledRoomPlayer({
+  stream,
+  appointment,
+  owner,
+  canStart,
+  pending,
+  onReserve,
+  onUnreserve,
+  onStart,
+}: {
+  stream: Stream;
+  appointment?: AppointmentItem | null;
+  owner: boolean;
+  canStart: boolean;
+  pending: boolean;
+  onReserve: () => void;
+  onUnreserve: () => void;
+  onStart: () => void;
+}) {
+  const { t, i18n } = useTranslation('pages');
+  const scheduled = new Intl.DateTimeFormat(i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(stream.startedAt));
+  const reserved = appointment?.reserved ?? false;
+  const reservationCount = appointment?.reservationCount ?? 0;
+  return (
+    <section className="gl-scheduled-player">
+      <div className="gl-scheduled-player-cover">
+        {stream.cover ? <LoadableImage src={stream.cover} alt="" /> : <div className="gl-scheduled-player-fallback" />}
+        <div className="gl-scheduled-player-overlay">
+          <span className="gl-scheduled-player-badge">
+            <CalendarClock size={14} />
+            {t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' })}
+          </span>
+          <h2>{stream.title}</h2>
+          <p>{scheduled}</p>
+          <div className="gl-scheduled-player-meta">
+            <span>
+              <Bell size={14} />
+              {t('liveRoom.scheduledReserved', { count: reservationCount, defaultValue: '{{count}} reserved' })}
+            </span>
+            <span>
+              <CheckCircle2 size={14} />
+              {owner
+                ? t('liveRoom.scheduledOwner', { defaultValue: 'Owner view' })
+                : reserved
+                  ? t('liveRoom.scheduledReservedByYou', { defaultValue: 'Reserved by you' })
+                  : t('liveRoom.scheduledOpen', { defaultValue: 'Open for reservation' })}
+            </span>
+          </div>
+          <div className="gl-scheduled-player-actions">
+            {owner ? (
+              <button type="button" className="gl-retry-btn" disabled={pending || !canStart} onClick={onStart}>
+                <PlayCircle size={16} />
+                {t('liveRoom.startLive', { defaultValue: 'Start live' })}
+              </button>
+            ) : reserved ? (
+              <button type="button" className="gl-secondary-btn" disabled={pending} onClick={onUnreserve}>
+                <X size={16} />
+                {t('liveRoom.cancelReserve', { defaultValue: 'Cancel reservation' })}
+              </button>
+            ) : (
+              <button type="button" className="gl-retry-btn" disabled={pending} onClick={onReserve}>
+                <UserPlus size={16} />
+                {t('liveRoom.reserve', { defaultValue: 'Reserve' })}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

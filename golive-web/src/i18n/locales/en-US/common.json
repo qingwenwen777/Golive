@@ -92,6 +92,17 @@
       "passwordMismatch": "Passwords do not match."
     }
   },
+  "loading": "Loading...",
+  "notificationsReadAll": "Read all",
+  "notificationsEmpty": "No notifications yet",
+  "notificationTypes": {
+    "appointment_reminder": {
+      "title": "Scheduled live starts soon"
+    },
+    "appointment_started": {
+      "title": "Scheduled live has started"
+    }
+  },
   "live": "LIVE",
   "viewersWatching": "{{count}} watching"
 }

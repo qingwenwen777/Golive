@@ -23,6 +23,14 @@
       "subscribe": "订阅",
       "subscribed": "已订阅",
       "empty": "暂无可推荐的主播。"
+    },
+    "myAppointments": {
+      "title": "我的预约",
+      "subtitle": "你预约的直播会显示在这里。",
+      "signInTitle": "登录后查看预约",
+      "signInSub": "把即将开播的直播统一收在这里。",
+      "viewAll": "查看全部",
+      "empty": "还没有预约。"
     }
   },
   "liveRoom": {
@@ -67,6 +75,22 @@
     "startedAt": "{{time}}开播",
     "showMore": "展开",
     "showLess": "收起",
+    "scheduledBadge": "直播预约",
+    "scheduledReserved": "{{count}} 人已预约",
+    "scheduledOwner": "主播视角",
+    "scheduledReservedByYou": "你已预约",
+    "scheduledOpen": "可预约",
+    "reserve": "预约",
+    "cancelReserve": "取消预约",
+    "startLive": "开始直播",
+    "starting": "正在开始...",
+    "appointmentReserved": "已预约直播。",
+    "appointmentUnreserved": "已取消预约。",
+    "appointmentReserveFailed": "预约状态更新失败。",
+    "appointmentStartSuccess": "预约直播已开始。",
+    "appointmentStartFailed": "无法开始这场预约。",
+    "appointmentOwnerTitle": "预约管理",
+    "appointmentOwnerSub": "请在预约时间前后 30 分钟内开始直播。",
     "connection": {
       "connecting": "连接中...",
       "connected": "已连接",
@@ -179,6 +203,12 @@
       "topFan": "{{name}} 贡献最高",
       "noFan": "暂无粉丝贡献",
       "liveAnalysis": "直播分析"
+    },
+    "appointments": {
+      "title": "直播预约",
+      "subtitle": "查看并预约这个频道即将开始的直播。",
+      "empty": "暂无直播预约。",
+      "emptySub": "稍后回来看看，或去浏览其他主播。"
     }
   },
   "library": {
@@ -195,7 +225,13 @@
       "signInSub": "关注创作者后，他们的直播间会出现在这里。",
       "emptyAuthed": "还没有订阅创作者",
       "emptyGuest": "暂无可显示的订阅",
-      "emptySub": "去直播目录逛逛，并在播放器页面关注喜欢的直播间。"
+      "emptySub": "去直播目录逛逛，并在播放器页面关注喜欢的直播间。",
+      "appointments": {
+        "title": "订阅主播的直播预约",
+        "subtitle": "浏览你关注的主播即将开始的直播。",
+        "empty": "你订阅的主播暂无直播预约。",
+        "signIn": "登录后查看直播预约。"
+      }
     },
     "you": {
       "viewChannel": "查看频道",
@@ -343,6 +379,30 @@
       "coverUpload": "无法上传封面。"
     }
   },
+  "appointments": {
+    "pagination": "预约分页",
+    "pageCount": "{{start}}-{{end}} / {{total}}",
+    "previous": "上一页",
+    "next": "下一页",
+    "reservationCount": "{{count}} 人已预约",
+    "startWindow": "现在可以开播",
+    "waitingWindow": "等待开播窗口",
+    "reserve": "预约",
+    "cancelReserve": "取消",
+    "reserved": "预约成功。",
+    "unreserved": "已取消预约。",
+    "reserveFailed": "预约状态更新失败。",
+    "start": "开始直播",
+    "edit": "编辑",
+    "delete": "删除",
+    "status": {
+      "scheduled": "已预约",
+      "live": "直播中",
+      "completed": "已完成",
+      "expired": "已作废",
+      "canceled": "已取消"
+    }
+  },
   "studio": {
     "brand": "主播工作台",
     "title": "{{name}} 的工作台",
@@ -351,7 +411,8 @@
       "label": "主播工作台栏目",
       "overview": "概览",
       "prepare": "开播准备",
-      "replay": "数据复盘"
+      "replay": "数据复盘",
+      "appointments": "直播预约"
     },
     "auth": {
       "title": "登录后进入主播工作台",
@@ -481,12 +542,45 @@
       "previewTitle": "开播前效果",
       "waitingStatus": "待开播",
       "noDescription": "简介会显示在这里。",
+      "appointmentRequired": "有一场预约已经进入可开播时间，请到直播预约里开始直播。",
+      "appointmentRequiredTitle": "从预约开始直播",
       "steps": {
         "info": "填写直播信息",
         "cover": "选择封面与分类",
         "check": "检查推流连接与权限",
         "confirm": "确认开始直播"
       }
+    },
+    "appointments": {
+      "total": "预约",
+      "totalSub": "全部记录",
+      "upcoming": "待开播",
+      "upcomingSub": "已发布",
+      "live": "直播中",
+      "liveSub": "已开始",
+      "completed": "已完成",
+      "completedSub": "完成或作废",
+      "formLabel": "直播预约",
+      "createTitle": "创建预约",
+      "editTitle": "编辑预约",
+      "reset": "重置",
+      "time": "开播时间",
+      "descriptionPlaceholder": "告诉观众这场预约的内容。",
+      "formIncomplete": "请填写开播时间、标题、封面和简介。",
+      "invalidTime": "请选择有效的未来时间。",
+      "publish": "发布预约",
+      "saveEdit": "保存修改",
+      "created": "预约已发布。",
+      "updated": "预约已更新。",
+      "saveFailed": "预约保存失败。",
+      "listLabel": "我的预约",
+      "listTitle": "全部预约状态",
+      "empty": "还没有预约。",
+      "started": "预约直播已开始。",
+      "startFailed": "无法开始这场预约。",
+      "locked": "这条预约已无法编辑。",
+      "deleted": "预约已删除。",
+      "deleteFailed": "无法删除这条预约。"
     },
     "publisher": {
       "title": "推流",
@@ -504,6 +598,7 @@
       "ownerOnly": "仅主播可进入控制台",
       "ownerOnlyBody": "只有频道所有者可以控制这场直播。",
       "ended": "直播已结束。",
+      "endFinished": "直播已结束。",
       "endFailed": "无法结束直播。",
       "live": "LIVE",
       "waiting": "等待中",

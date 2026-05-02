@@ -24,6 +24,7 @@ import (
 type LiveService struct {
 	rooms          *repo.RoomRepo
 	live           *repo.LiveRepo
+	appointments   *repo.AppointmentRepo
 	keySecret      []byte
 	keyTTL         time.Duration
 	flvBase        string
@@ -61,6 +62,10 @@ func NewLiveService(rooms *repo.RoomRepo, live *repo.LiveRepo, secret string, tt
 	}
 }
 
+func (s *LiveService) SetAppointmentRepo(appointments *repo.AppointmentRepo) {
+	s.appointments = appointments
+}
+
 // GoLiveReq is the body of POST /rooms/live.
 type GoLiveReq struct {
 	Title       string `json:"title" binding:"required"`
@@ -82,6 +87,13 @@ type UpdateLiveReq struct {
 // Stream WITH streamKey populated — only the publisher ever sees this.
 func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq) (*model.Stream, error) {
 	now := s.now()
+	if s.appointments != nil {
+		if appt, err := s.appointments.DueStartWindowForOwner(ctx, ownerID, now); err == nil && appt != nil {
+			return nil, errcode.New(409, "An appointment is ready to start. Please start live from Live Appointments.")
+		} else if err != nil && !errors.Is(err, repo.ErrAppointmentNotFound) {
+			return nil, err
+		}
+	}
 	if active, err := s.rooms.ActiveByOwner(ctx, ownerID); err == nil {
 		if err := s.endRoom(ctx, active, now); err != nil {
 			return nil, err
@@ -425,7 +437,15 @@ func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt tim
 	if peak < viewers {
 		peak = viewers
 	}
-	return s.rooms.SetEndedWithMetrics(ctx, room.ID, endedAt, viewers, peak)
+	if err := s.rooms.SetEndedWithMetrics(ctx, room.ID, endedAt, viewers, peak); err != nil {
+		return err
+	}
+	if s.appointments != nil {
+		if err := s.appointments.MarkCompletedByRoom(ctx, room.ID, endedAt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *LiveService) broadcastEnded(ctx context.Context, roomID string, endedAt time.Time) error {

@@ -92,6 +92,17 @@
       "passwordMismatch": "パスワードが一致しません。"
     }
   },
+  "loading": "読み込み中...",
+  "notificationsReadAll": "すべて既読",
+  "notificationsEmpty": "通知はまだありません",
+  "notificationTypes": {
+    "appointment_reminder": {
+      "title": "予約ライブがまもなく始まります"
+    },
+    "appointment_started": {
+      "title": "予約ライブが開始されました"
+    }
+  },
   "live": "LIVE",
   "viewersWatching": "{{count}} 人が視聴中"
 }

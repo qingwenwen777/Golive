@@ -333,6 +333,51 @@ export interface LiveAnalysisResp {
   superChatRevenue: number;
 }
 
+export interface AppointmentItem {
+  id: string;
+  roomId: string;
+  ownerId: string;
+  channelId: string;
+  channel: string;
+  avatar: string;
+  verified: boolean;
+  title: string;
+  description?: string;
+  cover: string;
+  scheduledAt: string;
+  status: 'scheduled' | 'live' | 'completed' | 'expired' | 'canceled' | string;
+  startedAt?: string;
+  endedAt?: string;
+  reservationCount: number;
+  reserved: boolean;
+  canStart: boolean;
+}
+
+export interface AppointmentListResp {
+  items: AppointmentItem[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  link?: string;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface NotificationListResp {
+  items: NotificationItem[];
+  total: number;
+  unread: number;
+  page: number;
+  size: number;
+}
+
 export function useChannelLiveHistory(channelKey: string, page = 1, size = 4) {
   return useQuery<LiveHistoryResp, Error>({
     queryKey: ['channel-live-history', channelKey, page, size],
@@ -379,6 +424,210 @@ export function useLiveAnalysis(channelKey: string, recordId: string, enabled = 
     enabled: enabled && !!channelKey && !!recordId,
     staleTime: 30_000,
     retry: 0,
+  });
+}
+
+export function useChannelAppointments(channelKey: string, enabled = true, page = 1, size = 6) {
+  return useQuery<AppointmentListResp, Error>({
+    queryKey: ['channel-appointments', channelKey, page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AppointmentListResp>(
+        `/rooms/channels/${encodeURIComponent(channelKey)}/appointments`,
+        { params: { page, size }, signal },
+      );
+      return data;
+    },
+    enabled: enabled && !!channelKey,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useStudioAppointments(enabled = true, page = 1, size = 10) {
+  return useQuery<AppointmentListResp, Error>({
+    queryKey: ['studio-appointments', page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AppointmentListResp>('/rooms/appointments', {
+        params: { page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useReservedAppointments(enabled = true, page = 1, size = 8) {
+  return useQuery<AppointmentListResp, Error>({
+    queryKey: ['reserved-appointments', page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AppointmentListResp>('/appointments/my', {
+        params: { page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useSubscriptionAppointments(enabled = true, page = 1, size = 8) {
+  return useQuery<AppointmentListResp, Error>({
+    queryKey: ['subscription-appointments', page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AppointmentListResp>('/subscriptions/appointments', {
+        params: { page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export interface AppointmentPayload {
+  scheduledAt: string;
+  title: string;
+  description?: string;
+  cover?: string;
+  channelName?: string;
+  avatar?: string;
+}
+
+function useAppointmentMutation<T>(method: 'post' | 'patch' | 'delete', path: string) {
+  const qc = useQueryClient();
+  return useMutation<T, Error, AppointmentPayload | void>({
+    mutationFn: async (payload) => {
+      const { data } = await http.request<T>({
+        url: path,
+        method,
+        data: payload,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['studio-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['appointments-my'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useCreateAppointment() {
+  return useAppointmentMutation<AppointmentItem>('post', '/rooms/appointments');
+}
+
+export function useUpdateAppointment(id: string) {
+  return useAppointmentMutation<AppointmentItem>('patch', `/rooms/appointments/${encodeURIComponent(id)}`);
+}
+
+export function useCancelAppointment(id: string) {
+  return useAppointmentMutation<AppointmentItem>('delete', `/rooms/appointments/${encodeURIComponent(id)}`);
+}
+
+export function useStartAppointment(id: string) {
+  const qc = useQueryClient();
+  return useMutation<Stream, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.post<Stream>(`/rooms/appointments/${encodeURIComponent(id)}/start`);
+      return data;
+    },
+    onSuccess: (stream) => {
+      qc.setQueryData(['room', stream.id], stream);
+      void qc.invalidateQueries({ queryKey: ['studio-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['subscriptions'] });
+      void qc.invalidateQueries({ queryKey: ['rooms'] });
+    },
+  });
+}
+
+export function useReserveAppointment(id: string) {
+  const qc = useQueryClient();
+  return useMutation<AppointmentItem, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.post<AppointmentItem>(`/rooms/appointments/${encodeURIComponent(id)}/reservations`);
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['appointments-my'] });
+    },
+  });
+}
+
+export function useUnreserveAppointment(id: string) {
+  const qc = useQueryClient();
+  return useMutation<AppointmentItem, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.delete<AppointmentItem>(`/rooms/appointments/${encodeURIComponent(id)}/reservations`);
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['appointments-my'] });
+    },
+  });
+}
+
+export function useNotifications(enabled = true, page = 1, size = 20) {
+  return useQuery<NotificationListResp, Error>({
+    queryKey: ['notifications', page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<NotificationListResp>('/notifications', {
+        params: { page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: enabled ? 30_000 : false,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, string>({
+    mutationFn: async (id) => {
+      const { data } = await http.patch<{ ok: boolean }>(`/notifications/${encodeURIComponent(id)}/read`);
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.patch<{ ok: boolean }>('/notifications/read-all');
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
   });
 }
 

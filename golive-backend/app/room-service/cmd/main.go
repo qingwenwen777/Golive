@@ -56,6 +56,10 @@ func main() {
 	if err := roomRepo.AutoMigrate(); err != nil {
 		log.Fatal("automigrate", zap.Error(err))
 	}
+	appointmentRepo := repo.NewAppointmentRepo(db)
+	if err := appointmentRepo.AutoMigrate(); err != nil {
+		log.Fatal("appointment automigrate", zap.Error(err))
+	}
 	if n, err := roomRepo.FixUUIDChannels(context.Background()); err != nil {
 		log.Warn("fix uuid channels", zap.Error(err))
 	} else if n > 0 {
@@ -67,6 +71,8 @@ func main() {
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase, socialRepo)
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
+	liveSvc.SetAppointmentRepo(appointmentRepo)
+	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	permission := service.NewUserPermissionClient(cfg.Users.ServiceURL)
 
 	r := server.NewRouter(server.Deps{
@@ -74,11 +80,14 @@ func main() {
 		Room:           roomSvc,
 		Social:         socialSvc,
 		Live:           liveSvc,
+		Appointments:   appointmentSvc,
 		Permission:     permission,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	defer stopScheduler()
 
 	go func() {
 		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -92,11 +101,13 @@ func main() {
 			log.Fatal("http exit", zap.Error(err))
 		}
 	}()
+	go appointmentSvc.RunScheduler(schedulerCtx)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
 	log.Info("shutting down")
+	stopScheduler()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpSrv.Shutdown(ctx)

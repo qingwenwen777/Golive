@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { usePublicUser } from '@/api/auth';
 import {
   useChannelLiveHistory,
+  useChannelAppointments,
   useFollow,
   useFollowState,
   useRooms,
@@ -29,6 +30,7 @@ import {
   type LiveHistoryItem,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
@@ -58,6 +60,7 @@ export default function ChannelPage() {
   const [coverOpen, setCoverOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  const [appointmentPage, setAppointmentPage] = useState(1);
 
   const profile = useMemo(
     () => resolveProfile(profileLookupKey, publicUser.data, authUser),
@@ -82,6 +85,10 @@ export default function ChannelPage() {
   const historyTotal = liveHistory.data?.total ?? 0;
   const historyPageSize = liveHistory.data?.size ?? HISTORY_PAGE_SIZE;
   const historyPageCount = Math.max(1, Math.ceil(historyTotal / historyPageSize));
+  const channelAppointments = useChannelAppointments(channelKey, true, appointmentPage, 4);
+  const appointmentTotal = channelAppointments.data?.total ?? 0;
+  const appointmentPageSize = channelAppointments.data?.size ?? 4;
+  const appointmentPageCount = Math.max(1, Math.ceil(appointmentTotal / appointmentPageSize));
 
   const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
   const primaryCategory = primary?.category ?? 'Just Chatting';
@@ -93,10 +100,20 @@ export default function ChannelPage() {
   }, [channelKey]);
 
   useEffect(() => {
+    setAppointmentPage(1);
+  }, [channelKey]);
+
+  useEffect(() => {
     if (historyPage > historyPageCount) {
       setHistoryPage(historyPageCount);
     }
   }, [historyPage, historyPageCount]);
+
+  useEffect(() => {
+    if (appointmentPage > appointmentPageCount) {
+      setAppointmentPage(appointmentPageCount);
+    }
+  }, [appointmentPage, appointmentPageCount]);
 
   const handleSubscribe = () => {
     if (!isAuthed) {
@@ -218,6 +235,51 @@ export default function ChannelPage() {
           <ChannelStat label={t('channel.stats.watchingNow')} value={totalViewers.toLocaleString()} />
           <ChannelStat label={t('channel.stats.mainCategory')} value={primaryCategory} />
         </div>
+      </section>
+
+      <section className="gl-library-section" id="appointments">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('channel.appointments.title', { defaultValue: 'Live appointments' })}</h2>
+            <span>{t('channel.appointments.subtitle', { defaultValue: 'Reserve or follow upcoming live rooms from this channel.' })}</span>
+          </div>
+        </div>
+        {channelAppointments.isPending ? (
+          <div className="gl-grid" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <LiveCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : channelAppointments.data?.items.length ? (
+          <>
+            <div className="gl-appointment-grid">
+              {channelAppointments.data.items.map((item) => (
+                <AppointmentViewerCard
+                  key={item.id}
+                  appointment={item}
+                  to={`/live/${encodeURIComponent(item.roomId)}`}
+                />
+              ))}
+            </div>
+            {appointmentPageCount > 1 && (
+              <HistoryPager
+                page={appointmentPage}
+                pageCount={appointmentPageCount}
+                pageSize={appointmentPageSize}
+                total={appointmentTotal}
+                onPageChange={setAppointmentPage}
+              />
+            )}
+          </>
+        ) : (
+          <div className="gl-channel-empty">
+            <CalendarDays size={34} />
+            <div>
+              <strong>{t('channel.appointments.empty', { defaultValue: 'No upcoming appointments.' })}</strong>
+              <span>{t('channel.appointments.emptySub', { defaultValue: 'Check back later or browse other creators.' })}</span>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="gl-library-section" id="live">

@@ -23,6 +23,14 @@
       "subscribe": "Subscribe",
       "subscribed": "Subscribed",
       "empty": "No creator recommendations yet."
+    },
+    "myAppointments": {
+      "title": "My appointments",
+      "subtitle": "Your reserved live rooms appear here.",
+      "signInTitle": "Sign in to track reservations",
+      "signInSub": "Keep an eye on upcoming live rooms from one place.",
+      "viewAll": "View all",
+      "empty": "No reservations yet."
     }
   },
   "liveRoom": {
@@ -67,6 +75,22 @@
     "startedAt": "Started {{time}}",
     "showMore": "Show more",
     "showLess": "Show less",
+    "scheduledBadge": "Appointment",
+    "scheduledReserved": "{{count}} reserved",
+    "scheduledOwner": "Owner view",
+    "scheduledReservedByYou": "Reserved by you",
+    "scheduledOpen": "Open for reservation",
+    "reserve": "Reserve",
+    "cancelReserve": "Cancel reservation",
+    "startLive": "Start live",
+    "starting": "Starting...",
+    "appointmentReserved": "Appointment reserved.",
+    "appointmentUnreserved": "Reservation removed.",
+    "appointmentReserveFailed": "Could not update this reservation.",
+    "appointmentStartSuccess": "Appointment live started.",
+    "appointmentStartFailed": "Could not start this appointment.",
+    "appointmentOwnerTitle": "Appointment management",
+    "appointmentOwnerSub": "Start the appointment within 30 minutes of the scheduled time.",
     "connection": {
       "connecting": "Connecting...",
       "connected": "Connected",
@@ -178,6 +202,12 @@
       "topFan": "{{name}} top fan",
       "noFan": "No fan contribution yet",
       "liveAnalysis": "Live analysis"
+    },
+    "appointments": {
+      "title": "Live appointments",
+      "subtitle": "Reserve or follow upcoming live rooms from this channel.",
+      "empty": "No upcoming appointments.",
+      "emptySub": "Check back later or browse other creators."
     }
   },
   "library": {
@@ -194,7 +224,13 @@
       "signInSub": "Follow creators to keep their live rooms in this feed.",
       "emptyAuthed": "No subscribed creators yet",
       "emptyGuest": "No subscriptions to show",
-      "emptySub": "Explore the live directory and follow rooms from the player page."
+      "emptySub": "Explore the live directory and follow rooms from the player page.",
+      "appointments": {
+        "title": "Appointments from subscriptions",
+        "subtitle": "Browse upcoming live rooms from creators you follow.",
+        "empty": "No upcoming appointments from your subscriptions.",
+        "signIn": "Sign in to browse appointment schedules."
+      }
     },
     "you": {
       "viewChannel": "View channel",
@@ -342,6 +378,30 @@
       "coverUpload": "Could not upload the cover."
     }
   },
+  "appointments": {
+    "pagination": "Appointment pagination",
+    "pageCount": "{{start}}-{{end}} of {{total}}",
+    "previous": "Prev",
+    "next": "Next",
+    "reservationCount": "{{count}} reserved",
+    "startWindow": "Start available now",
+    "waitingWindow": "Waiting to start",
+    "reserve": "Reserve",
+    "cancelReserve": "Cancel",
+    "reserved": "Reservation saved.",
+    "unreserved": "Reservation removed.",
+    "reserveFailed": "Could not update this reservation.",
+    "start": "Start live",
+    "edit": "Edit",
+    "delete": "Delete",
+    "status": {
+      "scheduled": "Scheduled",
+      "live": "Live",
+      "completed": "Completed",
+      "expired": "Expired",
+      "canceled": "Canceled"
+    }
+  },
   "studio": {
     "brand": "Creator Studio",
     "title": "{{name}} workspace",
@@ -350,7 +410,8 @@
       "label": "Creator Studio sections",
       "overview": "Overview",
       "prepare": "Stream setup",
-      "replay": "Data replay"
+      "replay": "Data replay",
+      "appointments": "Live appointments"
     },
     "auth": {
       "title": "Sign in to open Creator Studio",
@@ -480,12 +541,45 @@
       "previewTitle": "Before going live",
       "waitingStatus": "Waiting to go live",
       "noDescription": "Description will appear here.",
+      "appointmentRequired": "A scheduled appointment is ready. Please start from Live appointments.",
+      "appointmentRequiredTitle": "Start from your appointment",
       "steps": {
         "info": "Fill live info",
         "cover": "Choose cover and category",
         "check": "Check publishing and permission",
         "confirm": "Confirm and start live"
       }
+    },
+    "appointments": {
+      "total": "Appointments",
+      "totalSub": "all records",
+      "upcoming": "Upcoming",
+      "upcomingSub": "scheduled",
+      "live": "Live now",
+      "liveSub": "started",
+      "completed": "Completed",
+      "completedSub": "finished or expired",
+      "formLabel": "Live appointments",
+      "createTitle": "Create appointment",
+      "editTitle": "Edit appointment",
+      "reset": "Reset",
+      "time": "Start time",
+      "descriptionPlaceholder": "Tell viewers what this appointment is about.",
+      "formIncomplete": "Start time, title, cover, and description are required.",
+      "invalidTime": "Please pick a valid future time.",
+      "publish": "Publish appointment",
+      "saveEdit": "Save changes",
+      "created": "Appointment published.",
+      "updated": "Appointment updated.",
+      "saveFailed": "Could not save the appointment.",
+      "listLabel": "My appointments",
+      "listTitle": "All appointment states",
+      "empty": "No appointments yet.",
+      "started": "Appointment live started.",
+      "startFailed": "Could not start the appointment.",
+      "locked": "This appointment can no longer be edited.",
+      "deleted": "Appointment deleted.",
+      "deleteFailed": "Could not delete the appointment."
     },
     "publisher": {
       "title": "Publishing",
@@ -503,6 +597,7 @@
       "ownerOnly": "Owner console only",
       "ownerOnlyBody": "Only the channel owner can control this live.",
       "ended": "Live ended.",
+      "endFinished": "Live ended.",
       "endFailed": "Could not end the live.",
       "live": "LIVE",
       "waiting": "Waiting",

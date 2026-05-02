@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Bell, CheckCircle2, CloudOff, Inbox, Radio, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
+import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import {
   useFollow,
   useRecommendedCreators,
   useRooms,
+  useReservedAppointments,
   useUnfollow,
   type RecommendedCreator,
 } from '@/api/room';
@@ -122,8 +124,72 @@ export default function HomePage() {
             ))}
           </div>
         )}
+
+        <MyAppointmentsSection />
       </div>
     </>
+  );
+}
+
+function MyAppointmentsSection() {
+  const { t } = useTranslation('pages');
+  const isAuthed = useIsAuthed();
+  const openLogin = useAuthModalStore((s) => s.openLogin);
+  const appointments = useReservedAppointments(isAuthed, 1, 6);
+
+  if (!isAuthed) {
+    return (
+      <section className="gl-home-my-appointments">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
+            <span>{t('home.myAppointments.subtitle', { defaultValue: 'Sign in to see your reserved live rooms.' })}</span>
+          </div>
+        </div>
+        <div className="gl-yt-banner">
+          <div>
+            <strong>{t('home.myAppointments.signInTitle', { defaultValue: 'Sign in to track reservations' })}</strong>
+            <span>{t('home.myAppointments.signInSub', { defaultValue: 'Keep an eye on upcoming live rooms from one place.' })}</span>
+          </div>
+          <button className="gl-secondary-btn" type="button" onClick={() => openLogin()}>
+            {t('library.signIn')}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const items = appointments.data?.items ?? [];
+
+  return (
+    <section className="gl-home-my-appointments">
+      <div className="gl-section-title-row">
+        <div>
+          <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
+          <span>{t('home.myAppointments.subtitle', { defaultValue: 'Your reserved live rooms appear here.' })}</span>
+        </div>
+        <Link className="gl-text-link" to="/subscriptions">
+          {t('home.myAppointments.viewAll', { defaultValue: 'View all' })}
+        </Link>
+      </div>
+      {appointments.isPending ? (
+        <div className="gl-grid" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-[280px] animate-pulse rounded-card bg-bg-hover" />
+          ))}
+        </div>
+      ) : items.length > 0 ? (
+        <div className="gl-home-appointment-grid">
+          {items.map((item) => (
+            <AppointmentViewerCard key={item.id} appointment={item} to={`/live/${encodeURIComponent(item.roomId)}`} compact />
+          ))}
+        </div>
+      ) : (
+        <div className="gl-creator-empty-soft">
+          {t('home.myAppointments.empty', { defaultValue: 'No reservations yet.' })}
+        </div>
+      )}
+    </section>
   );
 }
 

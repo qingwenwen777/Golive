@@ -44,6 +44,11 @@ const CreatorPreparePage = lazy(() =>
     default: module.CreatorPreparePage,
   })),
 );
+const CreatorAppointmentsPage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorAppointmentsPage,
+  })),
+);
 const CreatorReplayPage = lazy(() =>
   import('@/pages/CreatorStudioPage').then((module) => ({
     default: module.CreatorReplayPage,
@@ -101,6 +106,7 @@ export const router = createBrowserRouter([
           { index: true, element: <CreatorStudioIndexPage /> },
           { path: 'overview', element: <CreatorStudioOverviewPage /> },
           { path: 'prepare', element: <CreatorPreparePage /> },
+          { path: 'appointments', element: <CreatorAppointmentsPage /> },
           { path: 'replay', element: <CreatorReplayPage /> },
         ],
       },

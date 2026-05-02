@@ -92,6 +92,17 @@
       "passwordMismatch": "两次输入的密码不一致。"
     }
   },
+  "loading": "加载中...",
+  "notificationsReadAll": "全部已读",
+  "notificationsEmpty": "暂无通知",
+  "notificationTypes": {
+    "appointment_reminder": {
+      "title": "预约直播即将开始"
+    },
+    "appointment_started": {
+      "title": "预约直播已开播"
+    }
+  },
   "live": "直播中",
   "viewersWatching": "{{count}} 人正在观看"
 }

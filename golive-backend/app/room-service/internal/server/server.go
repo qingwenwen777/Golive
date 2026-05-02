@@ -15,6 +15,7 @@ type Deps struct {
 	Room           *service.RoomService
 	Social         *service.SocialService
 	Live           *service.LiveService
+	Appointments   *service.AppointmentService
 	Permission     service.LivePermissionChecker
 	CoverDir       string
 	CoverPublicURL string
@@ -31,6 +32,7 @@ func NewRouter(d Deps) *gin.Engine {
 	roomH := handler.NewRoomHandler(d.Room)
 	socialH := handler.NewSocialHandler(d.Social)
 	liveH := handler.NewLiveHandler(d.Live, d.Permission)
+	appointmentH := handler.NewAppointmentHandler(d.Appointments)
 	srsH := handler.NewSRSHandler(d.Live)
 	coverH := handler.NewCoverUploadHandler(d.CoverDir, d.CoverPublicURL)
 
@@ -38,12 +40,25 @@ func NewRouter(d Deps) *gin.Engine {
 	optionalAuth := handler.OptionalAuth(d.JWTSecret)
 
 	r.GET("/subscriptions", auth, socialH.ListSubscriptions)
+	r.GET("/subscriptions/appointments", auth, appointmentH.ListSubscriptionAppointments)
+	r.GET("/appointments/my", auth, appointmentH.ListReserved)
+	r.GET("/notifications", auth, appointmentH.Notifications)
+	r.PATCH("/notifications/read-all", auth, appointmentH.MarkAllNotificationsRead)
+	r.PATCH("/notifications/:id/read", auth, appointmentH.MarkNotificationRead)
 
 	// Public room endpoints (no auth).
 	rooms := r.Group("/rooms")
 	{
 		rooms.GET("", roomH.List)
+		rooms.GET("/appointments", auth, appointmentH.ListOwner)
+		rooms.POST("/appointments", auth, appointmentH.Create)
+		rooms.PATCH("/appointments/:id", auth, appointmentH.Update)
+		rooms.DELETE("/appointments/:id", auth, appointmentH.Cancel)
+		rooms.POST("/appointments/:id/start", auth, appointmentH.Start)
+		rooms.POST("/appointments/:id/reservations", auth, appointmentH.Reserve)
+		rooms.DELETE("/appointments/:id/reservations", auth, appointmentH.Unreserve)
 		rooms.GET("/channels/:channel/history", optionalAuth, roomH.ChannelHistory)
+		rooms.GET("/channels/:channel/appointments", optionalAuth, appointmentH.ListChannel)
 		rooms.GET("/channels/:channel/analytics", auth, roomH.ChannelAnalytics)
 		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
 		rooms.GET("/recommended-creators", optionalAuth, socialH.RecommendedCreators)

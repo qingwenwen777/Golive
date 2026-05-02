@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Copy,
+  CalendarClock,
   Eye,
   Gift,
   ImagePlus,
@@ -22,20 +23,29 @@ import {
   Upload,
   Users,
   Zap,
+  Bell,
+  Clock3,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
 import { useSubmitCreatorApplication } from '@/api/creator';
 import {
+  useCancelAppointment,
+  useCreateAppointment,
   useCreatorAnalytics,
   useGoLive,
   useRoom,
   useRooms,
+  useStartAppointment,
+  useStudioAppointments,
   useStopLive,
+  useUpdateAppointment,
   useUpdateLiveMetadata,
   useUploadLiveCover,
+  type AppointmentItem,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { AppointmentCard } from '@/components/AppointmentCard';
 import { Chat } from '@/features/live-room/Chat';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { Player } from '@/features/live-room/Player';
@@ -274,6 +284,8 @@ export function CreatorPreparePage() {
   const [step, setStep] = useState(1);
   const [obsChecked, setObsChecked] = useState(false);
   const categories = CATEGORIES_EN.filter((item) => item !== 'All');
+  const appointments = useStudioAppointments(Boolean(user), 1, 5);
+  const dueAppointment = appointments.data?.items.find((item) => item.status === 'scheduled' && item.canStart);
 
   useEffect(() => {
     return () => {
@@ -292,6 +304,11 @@ export function CreatorPreparePage() {
 
   const startLive = async () => {
     if (!done3 || !user) return;
+    if (dueAppointment) {
+      toast.info(t('studio.prepare.appointmentRequired', { defaultValue: 'A scheduled appointment is ready. Please start from Live appointments.' }));
+      navigate('/studio/appointments');
+      return;
+    }
     try {
       const uploadedCover = coverFile ? (await uploadCover.mutateAsync(coverFile)).url : coverPreview;
       goLive.mutate(
@@ -412,6 +429,12 @@ export function CreatorPreparePage() {
             <strong>{t('studio.prepare.readyTitle', { defaultValue: 'Ready to create the live room' })}</strong>
             <span>{t('studio.prepare.readyBody', { defaultValue: 'After confirmation, your stream key is issued and the live control console opens.' })}</span>
           </div>
+          {dueAppointment && (
+            <div className="gl-creator-confirm">
+              <strong>{t('studio.prepare.appointmentRequiredTitle', { defaultValue: 'Start from your appointment' })}</strong>
+              <span>{dueAppointment.title}</span>
+            </div>
+          )}
           <button className="gl-creator-start" type="button" disabled={!done3 || starting} onClick={() => void startLive()}>
             <Radio size={17} />
             {starting
@@ -446,6 +469,270 @@ export function CreatorReplayPage() {
   const channelKey = currentChannelKey(user);
   if (!channelKey) return null;
   return <Navigate to={`/studio/analytics/${encodeURIComponent(channelKey)}`} replace />;
+}
+
+const APPOINTMENT_PAGE_SIZE = 100;
+
+export function CreatorAppointmentsPage() {
+  const { t } = useTranslation('pages');
+  const { user } = useStudioUser();
+  const channelKey = currentChannelKey(user);
+  const appointments = useStudioAppointments(Boolean(channelKey), 1, APPOINTMENT_PAGE_SIZE);
+  const createAppointment = useCreateAppointment();
+  const uploadCover = useUploadLiveCover();
+  const [editing, setEditing] = useState<AppointmentItem | null>(null);
+  const updateAppointment = useUpdateAppointment(editing?.id ?? '');
+  const [scheduledAt, setScheduledAt] = useState(() => toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!editing) return;
+    setTitle(editing.title);
+    setDescription(editing.description ?? '');
+    setScheduledAt(toLocalDateTimeInput(editing.scheduledAt));
+    setCoverPreview(editing.cover ?? '');
+    setCoverFile(null);
+    setError('');
+  }, [editing]);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+    };
+  }, [coverPreview]);
+
+  const clearDraft = () => {
+    setEditing(null);
+    setTitle('');
+    setDescription('');
+    setScheduledAt(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+    setCoverFile(null);
+    setCoverPreview('');
+    setError('');
+  };
+
+  const saveAppointment = async () => {
+    if (!user) return;
+    const scheduled = new Date(scheduledAt);
+    const normalizedTitle = title.trim();
+    const normalizedDescription = description.trim();
+    if (Number.isNaN(scheduled.getTime())) {
+      setError(t('studio.appointments.invalidTime', { defaultValue: 'Please pick a valid future time.' }));
+      return;
+    }
+    if (scheduled.getTime() <= Date.now()) {
+      setError(t('studio.appointments.invalidTime', { defaultValue: 'Please pick a valid future time.' }));
+      return;
+    }
+    if (!normalizedTitle || !normalizedDescription || !coverPreview.trim()) {
+      setError(t('studio.appointments.formIncomplete', { defaultValue: 'Start time, title, cover, and description are required.' }));
+      return;
+    }
+    setError('');
+    try {
+      const cover = coverFile ? (await uploadCover.mutateAsync(coverFile)).url : coverPreview;
+      const payload = {
+        scheduledAt: scheduled.toISOString(),
+        title: normalizedTitle,
+        description: normalizedDescription,
+        cover,
+        channelName: userDisplayName(user),
+        avatar: user.avatar,
+      };
+      if (!editing) {
+        await createAppointment.mutateAsync(payload);
+        toast.success(t('studio.appointments.created', { defaultValue: 'Appointment published.' }));
+      } else {
+        await updateAppointment.mutateAsync(payload);
+        toast.success(t('studio.appointments.updated', { defaultValue: 'Appointment updated.' }));
+      }
+      clearDraft();
+      void appointments.refetch();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('studio.appointments.saveFailed', { defaultValue: 'Could not save the appointment.' }));
+    }
+  };
+
+  const items = appointments.data?.items ?? [];
+  const total = appointments.data?.total ?? 0;
+  const upcoming = items.filter((item) => item.status === 'scheduled').length;
+  const live = items.filter((item) => item.status === 'live').length;
+  const completed = items.filter((item) => item.status === 'completed').length;
+
+  return (
+    <div className="gl-creator-appointments">
+      <section className="gl-creator-kpis">
+        <StudioKpi
+          icon={<CalendarClock size={18} />}
+          label={t('studio.appointments.total', { defaultValue: 'Appointments' })}
+          value={String(total)}
+          sub={t('studio.appointments.totalSub', { defaultValue: 'all records' })}
+        />
+        <StudioKpi
+          icon={<Clock3 size={18} />}
+          label={t('studio.appointments.upcoming', { defaultValue: 'Upcoming' })}
+          value={String(upcoming)}
+          sub={t('studio.appointments.upcomingSub', { defaultValue: 'scheduled' })}
+        />
+        <StudioKpi
+          icon={<Radio size={18} />}
+          label={t('studio.appointments.live', { defaultValue: 'Live now' })}
+          value={String(live)}
+          sub={t('studio.appointments.liveSub', { defaultValue: 'started' })}
+        />
+        <StudioKpi
+          icon={<CheckCircle2 size={18} />}
+          label={t('studio.appointments.completed', { defaultValue: 'Completed' })}
+          value={String(completed)}
+          sub={t('studio.appointments.completedSub', { defaultValue: 'finished or expired' })}
+        />
+      </section>
+
+      <section className="gl-creator-dashboard-grid gl-appointments-grid">
+        <div className="gl-creator-panel">
+          <div className="gl-creator-panel-head">
+            <div>
+              <span>{t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}</span>
+              <h2>{editing ? t('studio.appointments.editTitle', { defaultValue: 'Edit appointment' }) : t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}</h2>
+            </div>
+            <button type="button" className="gl-creator-secondary" onClick={clearDraft} disabled={!title && !description && !coverPreview && !editing}>
+              {t('studio.appointments.reset', { defaultValue: 'Reset' })}
+            </button>
+          </div>
+
+          <div className="gl-creator-field">
+            <span>{t('studio.appointments.time', { defaultValue: 'Start time' })}</span>
+            <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
+          </div>
+          <label className="gl-creator-field">
+            <span>{t('createLive.fields.title')}</span>
+            <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
+          </label>
+          <label className="gl-creator-field">
+            <span>{t('createLive.fields.description')}</span>
+            <textarea
+              value={description}
+              rows={5}
+              maxLength={2000}
+              placeholder={t('studio.appointments.descriptionPlaceholder', { defaultValue: 'Tell viewers what this appointment is about.' })}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </label>
+          <div className="gl-creator-field">
+            <span>{t('createLive.fields.cover')}</span>
+            <CoverPicker
+              preview={coverPreview}
+              onChange={(file) => {
+                if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+                setCoverFile(file);
+                setCoverPreview(file ? URL.createObjectURL(file) : '');
+              }}
+            />
+          </div>
+          {error && <div className="gl-creator-empty-soft gl-appointment-error">{error}</div>}
+          <button type="button" className="gl-creator-start" onClick={() => void saveAppointment()} disabled={createAppointment.isPending || updateAppointment.isPending || uploadCover.isPending}>
+            <Save size={16} />
+            {editing
+              ? t('studio.appointments.saveEdit', { defaultValue: 'Save changes' })
+              : t('studio.appointments.publish', { defaultValue: 'Publish appointment' })}
+          </button>
+        </div>
+
+        <div className="gl-creator-panel">
+          <div className="gl-creator-panel-head">
+            <div>
+              <span>{t('studio.appointments.listLabel', { defaultValue: 'My appointments' })}</span>
+              <h2>{t('studio.appointments.listTitle', { defaultValue: 'All appointment states' })}</h2>
+            </div>
+            <Bell size={22} />
+          </div>
+          <div className="gl-appointment-list">
+            {appointments.isPending ? (
+              <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+            ) : items.length === 0 ? (
+              <div className="gl-creator-empty-soft">{t('studio.appointments.empty', { defaultValue: 'No appointments yet.' })}</div>
+            ) : (
+              items.map((item) => (
+                <AppointmentStudioRow
+                  key={item.id}
+                  item={item}
+                  onEdit={() => setEditing(item)}
+                  onUpdated={() => void appointments.refetch()}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AppointmentStudioRow({
+  item,
+  onEdit,
+  onUpdated,
+}: {
+  item: AppointmentItem;
+  onEdit: () => void;
+  onUpdated: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  const navigate = useNavigate();
+  const startAppointment = useStartAppointment(item.id);
+  const cancelAppointment = useCancelAppointment(item.id);
+  const mutable = item.status === 'scheduled';
+  const pending = startAppointment.isPending || cancelAppointment.isPending;
+
+  return (
+    <AppointmentCard
+      appointment={item}
+      to={item.status === 'scheduled' ? `/live/${encodeURIComponent(item.roomId)}` : undefined}
+      compact
+      pending={pending}
+      onStart={() => {
+        startAppointment.mutate(undefined, {
+          onSuccess: (stream) => {
+            savePublisherSession(stream);
+            toast.success(t('studio.appointments.started', { defaultValue: 'Appointment live started.' }));
+            navigate(`/studio/live/${encodeURIComponent(stream.id)}`);
+          },
+          onError: (err) => toast.error(err.message || t('studio.appointments.startFailed', { defaultValue: 'Could not start the appointment.' })),
+        });
+      }}
+      onEdit={() => {
+        if (!mutable) {
+          toast.info(t('studio.appointments.locked', { defaultValue: 'This appointment can no longer be edited.' }));
+          return;
+        }
+        onEdit();
+      }}
+      onDelete={() => {
+        if (!mutable) {
+          toast.info(t('studio.appointments.locked', { defaultValue: 'This appointment can no longer be edited.' }));
+          return;
+        }
+        cancelAppointment.mutate(undefined, {
+          onSuccess: () => {
+            toast.success(t('studio.appointments.deleted', { defaultValue: 'Appointment deleted.' }));
+            onUpdated();
+          },
+          onError: (err) => toast.error(err.message || t('studio.appointments.deleteFailed', { defaultValue: 'Could not delete the appointment.' })),
+        });
+      }}
+    />
+  );
+}
+
+function toLocalDateTimeInput(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 export function CreatorLiveConsolePage() {
@@ -647,6 +934,7 @@ function StudioTabs() {
     <nav className="gl-creator-tabs" aria-label={t('studio.tabs.label', { defaultValue: 'Creator Studio sections' })}>
       <NavLink to="/studio/overview">{t('studio.tabs.overview', { defaultValue: 'Overview' })}</NavLink>
       <NavLink to="/studio/prepare">{t('studio.tabs.prepare', { defaultValue: 'Stream setup' })}</NavLink>
+      <NavLink to="/studio/appointments">{t('studio.tabs.appointments', { defaultValue: 'Live appointments' })}</NavLink>
       <NavLink to="/studio/replay">{t('studio.tabs.replay', { defaultValue: 'Data replay' })}</NavLink>
     </nav>
   );

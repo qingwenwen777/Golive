@@ -7,10 +7,13 @@ import (
 
 // Status values for Room.Status.
 const (
+	StatusScheduled  = "scheduled"
 	StatusPublishing = "publishing"
 	StatusLive       = "live"
 	StatusEnding     = "ending"
 	StatusEnded      = "ended"
+	StatusExpired    = "expired"
+	StatusCanceled   = "canceled"
 )
 
 // Room is the GORM model. Internal-only fields are kept off the JSON wire by

@@ -92,7 +92,8 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 		return nil, err
 	}
 	isOwner := viewerID != "" && viewerID == r.OwnerID
-	if r.Status != model.StatusLive && !(isOwner && r.Status == model.StatusPublishing) {
+	isPublicScheduled := r.Status == model.StatusScheduled && !s.now().After(r.StartedAt.Add(30*time.Minute))
+	if r.Status != model.StatusLive && !isPublicScheduled && !(isOwner && r.Status == model.StatusPublishing) {
 		return nil, ErrRoomNotFound
 	}
 	st := r.ToStream(s.now())

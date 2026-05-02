@@ -76,6 +76,10 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		api.Any("/rooms", gin.WrapH(roomProxy))
 		api.Any("/rooms/*action", gin.WrapH(roomProxy))
 		api.Any("/subscriptions", gin.WrapH(roomProxy))
+		api.Any("/subscriptions/*action", gin.WrapH(roomProxy))
+		api.Any("/appointments/*action", gin.WrapH(roomProxy))
+		api.Any("/notifications", gin.WrapH(roomProxy))
+		api.Any("/notifications/*action", gin.WrapH(roomProxy))
 		api.Any("/srs/*action", gin.WrapH(roomProxy))
 		api.Any("/uploads/*action", uploadProxy(userProxy, roomProxy))
 

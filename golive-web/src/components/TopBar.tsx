@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Coins, Plus, User as UserIcon } from 'lucide-react';
+import { Bell, Coins, Plus, User as UserIcon } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, type NotificationItem } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
@@ -118,6 +119,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 
           {isAuthed ? (
             <>
+              <NotificationBell />
               <button
                 type="button"
                 className="gl-create-btn"
@@ -217,3 +219,78 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 }
 
 const LANG_OPTIONS: AppLang[] = ['zh', 'ja', 'en'];
+
+function NotificationBell() {
+  const { t, i18n } = useTranslation('common');
+  const navigate = useNavigate();
+  const notifications = useNotifications(true, 1, 8);
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+  const items = notifications.data?.items ?? [];
+  const unread = notifications.data?.unread ?? 0;
+
+  const openNotification = (item: NotificationItem) => {
+    if (!item.readAt) markRead.mutate(item.id);
+    if (item.link) navigate(item.link);
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="gl-icon-btn gl-notification-btn" aria-label={t('notifications')}>
+          <Bell size={22} />
+          {unread > 0 && <span className="gl-bell-dot" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="gl-notification-menu w-80">
+        <DropdownMenuLabel className="gl-notification-head">
+          <span>{t('notifications')}</span>
+          {unread > 0 && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                markAllRead.mutate();
+              }}
+            >
+              {t('notificationsReadAll', { defaultValue: 'Read all' })}
+            </button>
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {notifications.isPending ? (
+          <DropdownMenuItem disabled>{t('loading', { defaultValue: 'Loading...' })}</DropdownMenuItem>
+        ) : items.length === 0 ? (
+          <DropdownMenuItem disabled>{t('notificationsEmpty', { defaultValue: 'No notifications yet' })}</DropdownMenuItem>
+        ) : (
+          items.map((item) => (
+            <DropdownMenuItem
+              key={item.id}
+              className={`gl-notification-item${item.readAt ? '' : ' is-unread'}`}
+              onClick={() => openNotification(item)}
+            >
+              <span>
+                <strong>{notificationTitle(item, t)}</strong>
+                {item.body && <small>{item.body}</small>}
+                <time>{formatNotificationTime(item.createdAt, i18n.language)}</time>
+              </span>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function notificationTitle(item: NotificationItem, t: ReturnType<typeof useTranslation>['t']): string {
+  return t(`notificationTypes.${item.type}.title`, { defaultValue: item.title });
+}
+
+function formatNotificationTime(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}

@@ -23,6 +23,14 @@
       "subscribe": "登録",
       "subscribed": "登録済み",
       "empty": "おすすめできるクリエイターはまだありません。"
+    },
+    "myAppointments": {
+      "title": "予約中のライブ",
+      "subtitle": "予約したライブルームがここに表示されます。",
+      "signInTitle": "ログインして予約を確認",
+      "signInSub": "これから始まるライブをまとめて確認できます。",
+      "viewAll": "すべて見る",
+      "empty": "予約はまだありません。"
     }
   },
   "liveRoom": {
@@ -67,6 +75,22 @@
     "startedAt": "{{time}}配信開始",
     "showMore": "もっと見る",
     "showLess": "折りたたむ",
+    "scheduledBadge": "ライブ予約",
+    "scheduledReserved": "{{count}} 人が予約済み",
+    "scheduledOwner": "配信者ビュー",
+    "scheduledReservedByYou": "予約済み",
+    "scheduledOpen": "予約受付中",
+    "reserve": "予約",
+    "cancelReserve": "予約をキャンセル",
+    "startLive": "配信開始",
+    "starting": "開始中...",
+    "appointmentReserved": "ライブを予約しました。",
+    "appointmentUnreserved": "予約をキャンセルしました。",
+    "appointmentReserveFailed": "予約状態を更新できませんでした。",
+    "appointmentStartSuccess": "予約ライブを開始しました。",
+    "appointmentStartFailed": "この予約を開始できませんでした。",
+    "appointmentOwnerTitle": "予約管理",
+    "appointmentOwnerSub": "予約時刻の前後 30 分以内に配信を開始してください。",
     "connection": {
       "connecting": "接続中...",
       "connected": "接続しました",
@@ -178,6 +202,12 @@
       "topFan": "{{name}} がトップファン",
       "noFan": "ファン貢献はまだありません",
       "liveAnalysis": "ライブ分析"
+    },
+    "appointments": {
+      "title": "ライブ予約",
+      "subtitle": "このチャンネルの今後のライブを予約できます。",
+      "empty": "今後のライブ予約はありません。",
+      "emptySub": "後でもう一度確認するか、他のクリエイターを探してみましょう。"
     }
   },
   "library": {
@@ -194,7 +224,13 @@
       "signInSub": "フォローしたクリエイターのライブルームがここに表示されます。",
       "emptyAuthed": "登録済みのクリエイターはまだいません",
       "emptyGuest": "表示できる登録チャンネルはありません",
-      "emptySub": "ライブ一覧を見て、プレイヤーページからルームをフォローしましょう。"
+      "emptySub": "ライブ一覧を見て、プレイヤーページからルームをフォローしましょう。",
+      "appointments": {
+        "title": "登録チャンネルのライブ予約",
+        "subtitle": "フォロー中のクリエイターの今後のライブを確認できます。",
+        "empty": "登録チャンネルに今後の予約はありません。",
+        "signIn": "ログインしてライブ予約を確認してください。"
+      }
     },
     "you": {
       "viewChannel": "チャンネルを見る",
@@ -342,6 +378,30 @@
       "coverUpload": "カバーをアップロードできませんでした。"
     }
   },
+  "appointments": {
+    "pagination": "予約ページ",
+    "pageCount": "{{start}}-{{end}} / {{total}}",
+    "previous": "前へ",
+    "next": "次へ",
+    "reservationCount": "{{count}} 人が予約済み",
+    "startWindow": "今すぐ開始できます",
+    "waitingWindow": "開始可能時間待ち",
+    "reserve": "予約",
+    "cancelReserve": "キャンセル",
+    "reserved": "予約しました。",
+    "unreserved": "予約をキャンセルしました。",
+    "reserveFailed": "予約状態を更新できませんでした。",
+    "start": "配信開始",
+    "edit": "編集",
+    "delete": "削除",
+    "status": {
+      "scheduled": "予約済み",
+      "live": "配信中",
+      "completed": "完了",
+      "expired": "期限切れ",
+      "canceled": "キャンセル済み"
+    }
+  },
   "studio": {
     "brand": "配信者ワークスペース",
     "title": "{{name}} のワークスペース",
@@ -350,7 +410,8 @@
       "label": "配信者ワークスペースのセクション",
       "overview": "概要",
       "prepare": "配信準備",
-      "replay": "データ振り返り"
+      "replay": "データ振り返り",
+      "appointments": "ライブ予約"
     },
     "auth": {
       "title": "ログインして配信者ワークスペースを開く",
@@ -480,12 +541,45 @@
       "previewTitle": "配信前の表示",
       "waitingStatus": "配信待機中",
       "noDescription": "説明はここに表示されます。",
+      "appointmentRequired": "開始可能な予約があります。ライブ予約から配信を開始してください。",
+      "appointmentRequiredTitle": "予約から配信を開始",
       "steps": {
         "info": "配信情報を入力",
         "cover": "カバーとカテゴリを選択",
         "check": "配信接続と権限を確認",
         "confirm": "確認して配信開始"
       }
+    },
+    "appointments": {
+      "total": "予約",
+      "totalSub": "すべての記録",
+      "upcoming": "予定",
+      "upcomingSub": "予約済み",
+      "live": "配信中",
+      "liveSub": "開始済み",
+      "completed": "完了",
+      "completedSub": "完了または期限切れ",
+      "formLabel": "ライブ予約",
+      "createTitle": "予約を作成",
+      "editTitle": "予約を編集",
+      "reset": "リセット",
+      "time": "開始時刻",
+      "descriptionPlaceholder": "この予約ライブの内容を視聴者に伝えましょう。",
+      "formIncomplete": "開始時刻、タイトル、カバー、説明を入力してください。",
+      "invalidTime": "有効な未来の時刻を選んでください。",
+      "publish": "予約を公開",
+      "saveEdit": "変更を保存",
+      "created": "予約を公開しました。",
+      "updated": "予約を更新しました。",
+      "saveFailed": "予約を保存できませんでした。",
+      "listLabel": "自分の予約",
+      "listTitle": "すべての予約状態",
+      "empty": "予約はまだありません。",
+      "started": "予約ライブを開始しました。",
+      "startFailed": "この予約を開始できませんでした。",
+      "locked": "この予約はもう編集できません。",
+      "deleted": "予約を削除しました。",
+      "deleteFailed": "この予約を削除できませんでした。"
     },
     "publisher": {
       "title": "配信",
@@ -503,6 +597,7 @@
       "ownerOnly": "配信者専用コントロール",
       "ownerOnlyBody": "この配信を操作できるのはチャンネル所有者のみです。",
       "ended": "配信を終了しました。",
+      "endFinished": "配信を終了しました。",
       "endFailed": "配信を終了できませんでした。",
       "live": "LIVE",
       "waiting": "待機中",

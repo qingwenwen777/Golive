@@ -21,8 +21,9 @@ import {
 } from 'lucide-react';
 import { useMe } from '@/api/auth';
 import { useFanBadges } from '@/api/gift';
-import { useRooms, useSubscriptions } from '@/api/room';
+import { useRooms, useSubscriptions, useSubscriptionAppointments } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
@@ -49,8 +50,13 @@ export function SubscriptionsPage() {
   const { t } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
+  const [appointmentPage, setAppointmentPage] = useState(1);
   const subscriptions = useSubscriptions(isAuthed);
+  const subscriptionAppointments = useSubscriptionAppointments(isAuthed, appointmentPage, 8);
   const channels = subscriptions.data?.items ?? [];
+  const appointmentTotal = subscriptionAppointments.data?.total ?? 0;
+  const appointmentPageSize = subscriptionAppointments.data?.size ?? 8;
+  const appointmentPageCount = Math.max(1, Math.ceil(appointmentTotal / appointmentPageSize));
   const streams = useMemo(
     () =>
       channels.map(
@@ -75,6 +81,16 @@ export function SubscriptionsPage() {
       ),
     [channels],
   );
+
+  useEffect(() => {
+    setAppointmentPage(1);
+  }, [isAuthed]);
+
+  useEffect(() => {
+    if (appointmentPage > appointmentPageCount) {
+      setAppointmentPage(appointmentPageCount);
+    }
+  }, [appointmentPage, appointmentPageCount]);
 
   return (
     <div className="gl-page gl-library-page">
@@ -122,6 +138,49 @@ export function SubscriptionsPage() {
           </div>
         </section>
       )}
+
+      <section className="gl-library-section">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('library.subscriptions.appointments.title', { defaultValue: 'Appointments from subscriptions' })}</h2>
+            <span>{t('library.subscriptions.appointments.subtitle', { defaultValue: 'Browse upcoming live rooms from creators you follow.' })}</span>
+          </div>
+        </div>
+        {isAuthed && subscriptionAppointments.isPending ? (
+          <div className="gl-grid" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <LiveCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : isAuthed && subscriptionAppointments.data?.items.length ? (
+          <>
+            <div className="gl-appointment-grid">
+              {subscriptionAppointments.data.items.map((item) => (
+                <AppointmentViewerCard
+                  key={item.id}
+                  appointment={item}
+                  to={`/live/${encodeURIComponent(item.roomId)}`}
+                />
+              ))}
+            </div>
+            {appointmentPageCount > 1 && (
+              <AppointmentPager
+                page={appointmentPage}
+                pageCount={appointmentPageCount}
+                total={appointmentTotal}
+                pageSize={appointmentPageSize}
+                onPageChange={setAppointmentPage}
+              />
+            )}
+          </>
+        ) : (
+          <div className="gl-creator-empty-soft">
+            {isAuthed
+              ? t('library.subscriptions.appointments.empty', { defaultValue: 'No upcoming appointments from your subscriptions.' })
+              : t('library.subscriptions.appointments.signIn', { defaultValue: 'Sign in to browse appointment schedules.' })}
+          </div>
+        )}
+      </section>
 
       <section className="gl-library-section">
         <div className="gl-section-title-row">
@@ -742,6 +801,52 @@ function StreamGrid({
       {streams.map((stream, i) => (
         <LiveCard key={stream.id} stream={stream} priority={i < 2} />
       ))}
+    </div>
+  );
+}
+
+function AppointmentPager({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  return (
+    <div className="gl-history-pager" aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}>
+      <div className="gl-history-pager-count">
+        {t('appointments.pageCount', {
+          start,
+          end,
+          total,
+          defaultValue: '{{start}}-{{end}} of {{total}}',
+        })}
+      </div>
+      <div className="gl-history-pager-controls">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          {t('appointments.previous', { defaultValue: 'Prev' })}
+        </button>
+        <button
+          type="button"
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+        >
+          {t('appointments.next', { defaultValue: 'Next' })}
+        </button>
+      </div>
     </div>
   );
 }
