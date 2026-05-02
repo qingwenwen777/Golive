@@ -581,7 +581,13 @@
       "startFailed": "Could not start the appointment.",
       "locked": "This appointment can no longer be edited.",
       "deleted": "Appointment deleted.",
-      "deleteFailed": "Could not delete the appointment."
+      "deleteFailed": "Could not delete the appointment.",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "hour": "Hour",
+      "minute": "Minute",
+      "oneHourLater": "1 hour later",
+      "done": "Done"
     },
     "publisher": {
       "title": "Publishing",

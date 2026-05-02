@@ -581,7 +581,13 @@
       "startFailed": "この予約を開始できませんでした。",
       "locked": "この予約はもう編集できません。",
       "deleted": "予約を削除しました。",
-      "deleteFailed": "この予約を削除できませんでした。"
+      "deleteFailed": "この予約を削除できませんでした。",
+      "previousMonth": "前の月",
+      "nextMonth": "次の月",
+      "hour": "時",
+      "minute": "分",
+      "oneHourLater": "1時間後",
+      "done": "完了"
     },
     "publisher": {
       "title": "配信",

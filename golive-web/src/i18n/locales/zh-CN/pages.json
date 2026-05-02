@@ -582,7 +582,13 @@
       "startFailed": "无法开始这场预约。",
       "locked": "这条预约已无法编辑。",
       "deleted": "预约已删除。",
-      "deleteFailed": "无法删除这条预约。"
+      "deleteFailed": "无法删除这条预约。",
+      "previousMonth": "上个月",
+      "nextMonth": "下个月",
+      "hour": "小时",
+      "minute": "分钟",
+      "oneHourLater": "一小时后",
+      "done": "完成"
     },
     "publisher": {
       "title": "推流",

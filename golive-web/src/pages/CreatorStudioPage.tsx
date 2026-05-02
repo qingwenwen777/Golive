@@ -25,6 +25,8 @@ import {
   Zap,
   Bell,
   Clock3,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
@@ -471,13 +473,16 @@ export function CreatorReplayPage() {
   return <Navigate to={`/studio/analytics/${encodeURIComponent(channelKey)}`} replace />;
 }
 
-const APPOINTMENT_PAGE_SIZE = 100;
+const APPOINTMENT_STATS_PAGE_SIZE = 100;
+const APPOINTMENT_LIST_PAGE_SIZE = 4;
 
 export function CreatorAppointmentsPage() {
   const { t } = useTranslation('pages');
   const { user } = useStudioUser();
   const channelKey = currentChannelKey(user);
-  const appointments = useStudioAppointments(Boolean(channelKey), 1, APPOINTMENT_PAGE_SIZE);
+  const [appointmentPage, setAppointmentPage] = useState(1);
+  const appointmentStats = useStudioAppointments(Boolean(channelKey), 1, APPOINTMENT_STATS_PAGE_SIZE);
+  const appointments = useStudioAppointments(Boolean(channelKey), appointmentPage, APPOINTMENT_LIST_PAGE_SIZE);
   const createAppointment = useCreateAppointment();
   const uploadCover = useUploadLiveCover();
   const [editing, setEditing] = useState<AppointmentItem | null>(null);
@@ -488,6 +493,10 @@ export function CreatorAppointmentsPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setAppointmentPage(1);
+  }, [channelKey]);
 
   useEffect(() => {
     if (!editing) return;
@@ -546,22 +555,34 @@ export function CreatorAppointmentsPage() {
       if (!editing) {
         await createAppointment.mutateAsync(payload);
         toast.success(t('studio.appointments.created', { defaultValue: 'Appointment published.' }));
+        setAppointmentPage(1);
       } else {
         await updateAppointment.mutateAsync(payload);
         toast.success(t('studio.appointments.updated', { defaultValue: 'Appointment updated.' }));
       }
       clearDraft();
       void appointments.refetch();
+      void appointmentStats.refetch();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('studio.appointments.saveFailed', { defaultValue: 'Could not save the appointment.' }));
     }
   };
 
   const items = appointments.data?.items ?? [];
-  const total = appointments.data?.total ?? 0;
-  const upcoming = items.filter((item) => item.status === 'scheduled').length;
-  const live = items.filter((item) => item.status === 'live').length;
-  const completed = items.filter((item) => item.status === 'completed').length;
+  const statsItems = appointmentStats.data?.items ?? items;
+  const total = appointmentStats.data?.total ?? appointments.data?.total ?? 0;
+  const appointmentPageCount = Math.max(1, Math.ceil((appointments.data?.total ?? 0) / APPOINTMENT_LIST_PAGE_SIZE));
+  const upcoming = statsItems.filter((item) => item.status === 'scheduled').length;
+  const live = statsItems.filter((item) => item.status === 'live').length;
+  const completed = statsItems.filter((item) => item.status === 'completed').length;
+
+  useEffect(() => {
+    if (!appointments.data) return;
+    const nextPageCount = Math.max(1, Math.ceil(appointments.data.total / APPOINTMENT_LIST_PAGE_SIZE));
+    if (appointmentPage > nextPageCount) {
+      setAppointmentPage(nextPageCount);
+    }
+  }, [appointmentPage, appointments.data]);
 
   return (
     <div className="gl-creator-appointments">
@@ -609,7 +630,7 @@ export function CreatorAppointmentsPage() {
               <div className="gl-appointment-form-row">
                 <div className="gl-creator-field">
                   <span>{t('studio.appointments.time', { defaultValue: 'Start time' })}</span>
-                  <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
+                  <AppointmentDateTimePicker value={scheduledAt} onChange={setScheduledAt} />
                 </div>
                 <label className="gl-creator-field">
                   <span>{t('createLive.fields.title')}</span>
@@ -656,20 +677,34 @@ export function CreatorAppointmentsPage() {
             </div>
             <Bell size={22} />
           </div>
-          <div className="gl-appointment-list">
-            {appointments.isPending ? (
-              <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
-            ) : items.length === 0 ? (
-              <div className="gl-creator-empty-soft">{t('studio.appointments.empty', { defaultValue: 'No appointments yet.' })}</div>
-            ) : (
-              items.map((item) => (
-                <AppointmentStudioRow
-                  key={item.id}
-                  item={item}
-                  onEdit={() => setEditing(item)}
-                  onUpdated={() => void appointments.refetch()}
-                />
-              ))
+          <div className="gl-appointment-list-wrap">
+            <div className="gl-appointment-list">
+              {appointments.isPending ? (
+                <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+              ) : items.length === 0 ? (
+                <div className="gl-creator-empty-soft">{t('studio.appointments.empty', { defaultValue: 'No appointments yet.' })}</div>
+              ) : (
+                items.map((item) => (
+                  <AppointmentStudioRow
+                    key={item.id}
+                    item={item}
+                    onEdit={() => setEditing(item)}
+                    onUpdated={() => {
+                      void appointments.refetch();
+                      void appointmentStats.refetch();
+                    }}
+                  />
+                ))
+              )}
+            </div>
+            {appointments.data && appointments.data.total > APPOINTMENT_LIST_PAGE_SIZE && (
+              <StudioAppointmentPager
+                page={appointmentPage}
+                pageCount={appointmentPageCount}
+                total={appointments.data.total}
+                pageSize={APPOINTMENT_LIST_PAGE_SIZE}
+                onPageChange={setAppointmentPage}
+              />
             )}
           </div>
         </div>
@@ -735,11 +770,228 @@ function AppointmentStudioRow({
   );
 }
 
+function AppointmentDateTimePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { t, i18n } = useTranslation('pages');
+  const [open, setOpen] = useState(false);
+  const selected = useMemo(() => parseLocalDateTimeValue(value) ?? new Date(Date.now() + 60 * 60 * 1000), [value]);
+  const [viewMonth, setViewMonth] = useState(() => startOfMonth(selected));
+  const monthDays = useMemo(() => calendarMonthDays(viewMonth), [viewMonth]);
+  const weekdays = useMemo(() => weekdayLabels(i18n.language), [i18n.language]);
+  const selectedHour = pad2(selected.getHours());
+  const selectedMinute = pad2(selected.getMinutes());
+
+  useEffect(() => {
+    if (open) return;
+    setViewMonth(startOfMonth(selected));
+  }, [open, selected]);
+
+  const pickDate = (date: Date) => {
+    onChange(replaceDatePart(value, date));
+    setViewMonth(startOfMonth(date));
+  };
+
+  return (
+    <div className="gl-appointment-datetime">
+      <button
+        type="button"
+        className="gl-appointment-datetime-trigger"
+        aria-expanded={open}
+        onClick={() => setOpen((next) => !next)}
+      >
+        <CalendarClock size={17} />
+        <span>{formatDateTimeLabel(value, i18n.language)}</span>
+      </button>
+      {open && (
+        <div className="gl-appointment-datetime-popover">
+          <div className="gl-appointment-calendar-head">
+            <button type="button" aria-label={t('studio.appointments.previousMonth', { defaultValue: 'Previous month' })} onClick={() => setViewMonth(addMonths(viewMonth, -1))}>
+              <ChevronLeft size={17} />
+            </button>
+            <strong>{formatMonthLabel(viewMonth, i18n.language)}</strong>
+            <button type="button" aria-label={t('studio.appointments.nextMonth', { defaultValue: 'Next month' })} onClick={() => setViewMonth(addMonths(viewMonth, 1))}>
+              <ChevronRight size={17} />
+            </button>
+          </div>
+          <div className="gl-appointment-calendar-weekdays">
+            {weekdays.map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="gl-appointment-calendar-grid">
+            {monthDays.map((day) => {
+              const sameMonth = day.getMonth() === viewMonth.getMonth();
+              const selectedDay = isSameDate(day, selected);
+              return (
+                <button
+                  type="button"
+                  key={day.toISOString()}
+                  className={cn(!sameMonth && 'is-muted', selectedDay && 'is-selected')}
+                  aria-pressed={selectedDay}
+                  onClick={() => pickDate(day)}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          <div className="gl-appointment-time-row">
+            <label>
+              <span>{t('studio.appointments.hour', { defaultValue: 'Hour' })}</span>
+              <select value={selectedHour} onChange={(event) => onChange(replaceTimePart(value, event.target.value, selectedMinute))}>
+                {Array.from({ length: 24 }).map((_, index) => {
+                  const hour = pad2(index);
+                  return <option key={hour} value={hour}>{hour}</option>;
+                })}
+              </select>
+            </label>
+            <label>
+              <span>{t('studio.appointments.minute', { defaultValue: 'Minute' })}</span>
+              <select value={selectedMinute} onChange={(event) => onChange(replaceTimePart(value, selectedHour, event.target.value))}>
+                {minuteOptions(selectedMinute).map((minute) => (
+                  <option key={minute} value={minute}>{minute}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="gl-appointment-datetime-actions">
+            <button type="button" className="gl-creator-secondary" onClick={() => onChange(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)))}>
+              {t('studio.appointments.oneHourLater', { defaultValue: '1 hour later' })}
+            </button>
+            <button type="button" className="gl-creator-primary" onClick={() => setOpen(false)}>
+              {t('studio.appointments.done', { defaultValue: 'Done' })}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudioAppointmentPager({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  return (
+    <div className="gl-history-pager gl-appointment-pager" aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}>
+      <div className="gl-history-pager-count">
+        {t('appointments.pageCount', {
+          start,
+          end,
+          total,
+          defaultValue: '{{start}}-{{end}} of {{total}}',
+        })}
+      </div>
+      <div className="gl-history-pager-controls">
+        <button
+          type="button"
+          aria-label={t('appointments.previous', { defaultValue: 'Previous page' })}
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="gl-appointment-pager-current">{page} / {pageCount}</span>
+        <button
+          type="button"
+          aria-label={t('appointments.next', { defaultValue: 'Next page' })}
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function toLocalDateTimeInput(value: Date | string): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '';
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
+}
+
+function parseLocalDateTimeValue(value: string): Date | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function startOfMonth(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), 1);
+}
+
+function addMonths(value: Date, amount: number): Date {
+  return new Date(value.getFullYear(), value.getMonth() + amount, 1);
+}
+
+function calendarMonthDays(month: Date): Date[] {
+  const start = startOfMonth(month);
+  start.setDate(start.getDate() - start.getDay());
+  return Array.from({ length: 42 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index));
+}
+
+function weekdayLabels(locale: string): string[] {
+  return Array.from({ length: 7 }, (_, index) =>
+    new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(new Date(2026, 0, 4 + index)),
+  );
+}
+
+function formatMonthLabel(value: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' }).format(value);
+}
+
+function formatDateTimeLabel(value: string, locale: string): string {
+  const date = parseLocalDateTimeValue(value);
+  if (!date) return value;
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function isSameDate(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function replaceDatePart(value: string, date: Date): string {
+  const current = parseLocalDateTimeValue(value) ?? new Date(Date.now() + 60 * 60 * 1000);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(current.getHours())}:${pad2(current.getMinutes())}`;
+}
+
+function replaceTimePart(value: string, hour: string, minute: string): string {
+  const current = parseLocalDateTimeValue(value) ?? new Date(Date.now() + 60 * 60 * 1000);
+  return `${current.getFullYear()}-${pad2(current.getMonth() + 1)}-${pad2(current.getDate())}T${hour}:${minute}`;
+}
+
+function minuteOptions(selectedMinute: string): string[] {
+  const options = new Set(Array.from({ length: 12 }, (_, index) => pad2(index * 5)));
+  options.add(selectedMinute);
+  return Array.from(options).sort();
 }
 
 export function CreatorLiveConsolePage() {
