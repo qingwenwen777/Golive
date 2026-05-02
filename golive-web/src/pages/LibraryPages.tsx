@@ -547,7 +547,7 @@ function LibraryCollectionPage({
   return (
     <div className="gl-page gl-library-page">
       <div className="gl-yt-collection">
-        <aside className="gl-yt-collection-side">
+        <aside className={`gl-yt-collection-side ${collectionThemeClass(storageKey)}`}>
           <div className="gl-yt-collection-art" aria-hidden>
             {icon}
           </div>
@@ -616,6 +616,13 @@ function LibraryCollectionPage({
       )}
     </div>
   );
+}
+
+function collectionThemeClass(storageKey: string): string {
+  if (storageKey === WATCH_HISTORY_KEY) return 'is-history';
+  if (storageKey === WATCH_LATER_KEY) return 'is-watch-later';
+  if (storageKey === LIKED_STREAMS_KEY) return 'is-liked';
+  return 'is-default';
 }
 
 function Shelf({

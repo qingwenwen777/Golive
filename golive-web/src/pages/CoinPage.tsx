@@ -41,6 +41,7 @@ type RecordFilter =
 
 const QUICK_TOPUPS = [1000, 5000, 10000, 50000] as const;
 const WITHDRAW_FEE_RATE = 0.35;
+const RECORD_PAGE_SIZE = 8;
 
 const DAILY_TASKS = [
   {
@@ -100,6 +101,7 @@ export default function CoinPage() {
   const [topupText, setTopupText] = useState('1000');
   const [withdrawText, setWithdrawText] = useState('10000');
   const [filter, setFilter] = useState<RecordFilter>('all');
+  const [recordPage, setRecordPage] = useState(1);
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
   const [activity, setActivity] = useState(() => readDailyCoinActivity(user?.id));
 
@@ -129,6 +131,19 @@ export default function CoinPage() {
     () => rows.filter((item) => matchesFilter(item, filter)),
     [filter, rows],
   );
+  const totalRecordPages = Math.max(1, Math.ceil(filteredRows.length / RECORD_PAGE_SIZE));
+  const visibleRows = filteredRows.slice(
+    (recordPage - 1) * RECORD_PAGE_SIZE,
+    recordPage * RECORD_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setRecordPage(1);
+  }, [filter]);
+
+  useEffect(() => {
+    setRecordPage((page) => Math.min(page, totalRecordPages));
+  }, [totalRecordPages]);
 
   const today = coinTodayKey();
   const claimedByTask = useMemo(() => {
@@ -263,7 +278,6 @@ export default function CoinPage() {
           <section className="gl-coin-panel">
             <div className="gl-section-title-row">
               <h2>每日任务</h2>
-              <span className="gl-coin-note">奖励偏小，控制成本</span>
             </div>
             <div className="gl-coin-task-grid">
               {DAILY_TASKS.map((task) => {
@@ -290,7 +304,6 @@ export default function CoinPage() {
           <section className="gl-coin-panel">
             <div className="gl-section-title-row">
               <h2>Coin 流水</h2>
-              <span className="gl-coin-note">礼物、SC、竞猜、充值、任务都会记录</span>
             </div>
             <div className="gl-coin-filters" role="tablist" aria-label="Coin record filters">
               {FILTERS.map((item) => (
@@ -318,11 +331,21 @@ export default function CoinPage() {
                 <span>开始充值、送礼物、发 SC 或参与竞猜后会出现在这里。</span>
               </div>
             ) : (
-              <div className="gl-coin-record-list">
-                {filteredRows.map((item) => (
-                  <CoinRecordRow key={item.id} item={item} />
-                ))}
-              </div>
+              <>
+                <div className="gl-coin-record-list">
+                  {visibleRows.map((item) => (
+                    <CoinRecordRow key={item.id} item={item} />
+                  ))}
+                </div>
+                {totalRecordPages > 1 && (
+                  <RecordPagination
+                    page={recordPage}
+                    totalPages={totalRecordPages}
+                    totalItems={filteredRows.length}
+                    onPageChange={setRecordPage}
+                  />
+                )}
+              </>
             )}
           </section>
         </div>
@@ -371,9 +394,6 @@ export default function CoinPage() {
               <CreditCard size={16} />
               {topup.isPending ? '充值中...' : '立即充值'}
             </button>
-            <p className="gl-coin-footnote">
-              当前为开发模式：点击后直接充值成功，后续接入支付接口。
-            </p>
           </section>
 
           <section className="gl-coin-panel">
@@ -508,6 +528,42 @@ function CoinRecordRow({ item }: { item: CoinTransaction }) {
         <span>余额 {item.balanceAfter.toLocaleString()}</span>
       </div>
     </article>
+  );
+}
+
+function RecordPagination({
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <div className="gl-coin-pagination" aria-label="Coin record pagination">
+      <span>
+        共 {totalItems.toLocaleString()} 条 · 第 {page} / {totalPages} 页
+      </span>
+      <div className="gl-coin-page-controls">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+        >
+          上一页
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+        >
+          下一页
+        </button>
+      </div>
+    </div>
   );
 }
 
