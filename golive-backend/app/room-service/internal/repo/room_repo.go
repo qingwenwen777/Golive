@@ -105,6 +105,69 @@ func (r *RoomRepo) LatestByChannelIDs(ctx context.Context, channelIDs []string) 
 	return out, nil
 }
 
+type CreatorRecommendationCandidate struct {
+	ID          string
+	Username    string
+	DisplayName string
+	Avatar      string
+	Verified    bool
+	UpdatedAt   time.Time
+	ChannelID   string
+	Channel     string
+	LastLiveAt  *time.Time
+	LastTitle   string
+	StreamCount int64
+	PeakViewers int64
+}
+
+func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit int) ([]CreatorRecommendationCandidate, error) {
+	if limit < 1 {
+		limit = 50
+	}
+	var rows []CreatorRecommendationCandidate
+	err := r.db.WithContext(ctx).
+		Table("users AS u").
+		Select(`
+			u.id,
+			u.username,
+			u.display_name,
+			u.avatar,
+			u.verified,
+			u.updated_at,
+			COALESCE((
+				SELECT r.channel_id FROM rooms r
+				WHERE r.owner_id = u.id
+				ORDER BY r.started_at DESC, r.created_at DESC
+				LIMIT 1
+			), '') AS channel_id,
+			COALESCE((
+				SELECT r.channel FROM rooms r
+				WHERE r.owner_id = u.id
+				ORDER BY r.started_at DESC, r.created_at DESC
+				LIMIT 1
+			), '') AS channel,
+			(
+				SELECT r.started_at FROM rooms r
+				WHERE r.owner_id = u.id
+				ORDER BY r.started_at DESC, r.created_at DESC
+				LIMIT 1
+			) AS last_live_at,
+			COALESCE((
+				SELECT r.title FROM rooms r
+				WHERE r.owner_id = u.id
+				ORDER BY r.started_at DESC, r.created_at DESC
+				LIMIT 1
+			), '') AS last_title,
+			(SELECT COUNT(*) FROM rooms r WHERE r.owner_id = u.id) AS stream_count,
+			COALESCE((SELECT MAX(r.peak_viewers) FROM rooms r WHERE r.owner_id = u.id), 0) AS peak_viewers
+		`).
+		Where("u.live_permission_status = ?", "approved").
+		Order("u.updated_at DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	return rows, err
+}
+
 // Upsert inserts the room or updates the mutable fields if id already exists.
 // Used by POST /rooms/live and admin/import flows.
 func (r *RoomRepo) Upsert(ctx context.Context, room *model.Room) error {

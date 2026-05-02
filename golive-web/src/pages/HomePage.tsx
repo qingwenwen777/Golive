@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
-import { Inbox, CloudOff } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Bell, CheckCircle2, CloudOff, Inbox, Radio, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
-import { useRooms } from '@/api/room';
-import { useAuthStore } from '@/stores/useAuthStore';
+import {
+  useFollow,
+  useRecommendedCreators,
+  useRooms,
+  useUnfollow,
+  type RecommendedCreator,
+} from '@/api/room';
+import { Avatar } from '@/components/Avatar';
+import { useAuthModalStore } from '@/stores/useAuthModalStore';
+import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { streamChannelName, type Stream } from '@/types/stream';
 
 export default function HomePage() {
@@ -93,11 +101,7 @@ export default function HomePage() {
             </button>
           </div>
         ) : data && data.items.length === 0 ? (
-          <div className="gl-empty">
-            <Inbox size={64} strokeWidth={1.5} />
-            <div className="gl-empty-title">{t('home.empty')}</div>
-            <div className="gl-empty-sub">{t('home.emptySub')}</div>
-          </div>
+          <HomeNoLiveRecommendations />
         ) : visibleItems.length === 0 ? (
           <div className="gl-empty">
             <Inbox size={64} strokeWidth={1.5} />
@@ -121,4 +125,114 @@ export default function HomePage() {
       </div>
     </>
   );
+}
+
+function HomeNoLiveRecommendations() {
+  const { t } = useTranslation('pages');
+  const recommendations = useRecommendedCreators(8);
+
+  return (
+    <div className="gl-home-empty-wrap">
+      <div className="gl-empty gl-home-empty-compact">
+        <Inbox size={56} strokeWidth={1.5} />
+        <div className="gl-empty-title">{t('home.empty')}</div>
+        <div className="gl-empty-sub">{t('home.emptySub')}</div>
+      </div>
+
+      <section className="gl-home-recs" aria-label={t('home.recommendations.title')}>
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('home.recommendations.title')}</h2>
+            <span>{t('home.recommendations.subtitle')}</span>
+          </div>
+        </div>
+        {recommendations.isPending ? (
+          <div className="gl-home-rec-grid" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div className="gl-home-rec-card is-loading" key={index} />
+            ))}
+          </div>
+        ) : recommendations.data?.items.length ? (
+          <div className="gl-home-rec-grid">
+            {recommendations.data.items.map((creator) => (
+              <RecommendedCreatorCard key={creator.channelId} creator={creator} />
+            ))}
+          </div>
+        ) : (
+          <div className="gl-creator-empty-soft">
+            {t('home.recommendations.empty')}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
+  const { t, i18n } = useTranslation('pages');
+  const isAuthed = useIsAuthed();
+  const openLogin = useAuthModalStore((s) => s.openLogin);
+  const follow = useFollow(creator.channelId);
+  const unfollow = useUnfollow(creator.channelId);
+  const pending = follow.isPending || unfollow.isPending;
+  const channelPath = `/channel/${encodeURIComponent(creator.channelId)}`;
+
+  const toggleFollow = () => {
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    if (creator.following) unfollow.mutate();
+    else follow.mutate();
+  };
+
+  return (
+    <article className="gl-home-rec-card">
+      <Link className="gl-home-rec-main" to={channelPath}>
+        <Avatar name={creator.name} src={creator.avatar} size={54} />
+        <div className="gl-home-rec-copy">
+          <h3>
+            <span>{creator.name}</span>
+            {creator.verified && <CheckCircle2 size={15} />}
+          </h3>
+          <span>
+            {t('home.recommendations.followers', {
+              count: creator.subscriberCount,
+            })}
+          </span>
+        </div>
+      </Link>
+      <div className="gl-home-rec-meta">
+        <Radio size={14} />
+        <span>
+          {creator.lastLiveAt
+            ? t('home.recommendations.lastLive', {
+                time: formatRecommendationTime(creator.lastLiveAt, i18n.language),
+              })
+            : t('home.recommendations.noLive')}
+        </span>
+      </div>
+      {creator.lastTitle && <p>{creator.lastTitle}</p>}
+      <button
+        type="button"
+        className={creator.following ? 'gl-secondary-btn' : 'gl-retry-btn'}
+        disabled={pending}
+        onClick={toggleFollow}
+      >
+        {creator.following ? <Bell size={15} /> : <UserPlus size={15} />}
+        {creator.following
+          ? t('home.recommendations.subscribed')
+          : t('home.recommendations.subscribe')}
+      </button>
+    </article>
+  );
+}
+
+function formatRecommendationTime(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 }

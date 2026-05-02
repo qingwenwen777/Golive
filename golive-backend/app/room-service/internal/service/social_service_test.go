@@ -3,11 +3,15 @@ package service_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/glebarez/sqlite"
 	"github.com/go-redis/redis/v9"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 
+	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/room-service/internal/service"
 )
@@ -67,6 +71,83 @@ func TestFollow_Toggle(t *testing.T) {
 
 	st, _ = svc.Unfollow(ctx, "u1", "ch1")
 	require.False(t, st.Following)
+}
+
+func TestRecommendedCreatorsRanksByFollowersAndRecency(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+	require.NoError(t, db.Exec(`
+CREATE TABLE users (
+	id varchar(36) primary key,
+	username varchar(64),
+	display_name varchar(64),
+	avatar varchar(500),
+	verified boolean,
+	live_permission_status varchar(16),
+	updated_at datetime
+)`).Error)
+
+	now := time.Date(2026, 5, 3, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, live_permission_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"creator-a", "luna", "Luna", "luna.png", true, "approved", now.Add(-time.Hour),
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, live_permission_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"creator-b", "mika", "Mika", "", false, "approved", now.Add(-2*time.Hour),
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, live_permission_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"viewer-1", "viewer", "Viewer", "", false, "approved", now,
+	).Error)
+
+	require.NoError(t, rooms.Upsert(ctx, &model.Room{
+		ID:          "live-a-old",
+		Title:       "Luna comeback",
+		Channel:     "Luna Space",
+		ChannelID:   "ch-creator-a",
+		Avatar:      "luna-room.png",
+		Category:    "Music",
+		StartedAt:   now.Add(-24 * time.Hour),
+		Status:      model.StatusEnded,
+		OwnerID:     "creator-a",
+		PeakViewers: 100,
+	}))
+	require.NoError(t, rooms.Upsert(ctx, &model.Room{
+		ID:          "live-b-old",
+		Title:       "Mika archive",
+		Channel:     "Mika Lab",
+		ChannelID:   "ch-creator-b",
+		Category:    "Gaming",
+		StartedAt:   now.Add(-60 * 24 * time.Hour),
+		Status:      model.StatusEnded,
+		OwnerID:     "creator-b",
+		PeakViewers: 10,
+	}))
+
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	svc := service.NewSocialService(repo.NewSocialRepo(rdb), rooms)
+	_, err = svc.Follow(ctx, "fan-1", "ch-creator-a")
+	require.NoError(t, err)
+	_, err = svc.Follow(ctx, "viewer-1", "ch-creator-a")
+	require.NoError(t, err)
+
+	resp, err := svc.RecommendedCreators(ctx, "viewer-1", 4)
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 2)
+	require.Equal(t, "creator-a", resp.Items[0].ID)
+	require.Equal(t, "ch-creator-a", resp.Items[0].ChannelID)
+	require.Equal(t, "Luna Space", resp.Items[0].Name)
+	require.EqualValues(t, 2, resp.Items[0].SubscriberCount)
+	require.True(t, resp.Items[0].Following)
+	require.NotEmpty(t, resp.Items[0].LastLiveAt)
+	require.Equal(t, "Luna comeback", resp.Items[0].LastTitle)
+	require.Equal(t, "creator-b", resp.Items[1].ID)
 }
 
 // The big one: like / dislike state machine. We replay the same sequence the

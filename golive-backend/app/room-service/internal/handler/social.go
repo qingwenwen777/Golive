@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -44,6 +45,16 @@ func (h *SocialHandler) ListSubscriptions(c *gin.Context) {
 		return
 	}
 	resp, err := h.svc.ListSubscriptions(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *SocialHandler) RecommendedCreators(c *gin.Context) {
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "8"))
+	resp, err := h.svc.RecommendedCreators(c.Request.Context(), UserIDFromCtx(c), size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

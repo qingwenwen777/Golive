@@ -13,7 +13,17 @@
     "errorSub": "请检查网络后重试",
     "retry": "重试",
     "watching": "{{count}} 人正在观看",
-    "subscribers": "{{count}} 位订阅者"
+    "subscribers": "{{count}} 位订阅者",
+    "recommendations": {
+      "title": "热门主播推荐",
+      "subtitle": "先订阅感兴趣的频道，开播时更容易回来看。",
+      "followers": "{{count}} 位粉丝",
+      "lastLive": "上次直播：{{time}}",
+      "noLive": "暂未开播",
+      "subscribe": "订阅",
+      "subscribed": "已订阅",
+      "empty": "暂无可推荐的主播。"
+    }
   },
   "liveRoom": {
     "title": "直播间",

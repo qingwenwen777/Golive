@@ -13,7 +13,17 @@
     "errorSub": "Check your connection and try again",
     "retry": "Retry",
     "watching": "{{count}} watching",
-    "subscribers": "{{count}} subscribers"
+    "subscribers": "{{count}} subscribers",
+    "recommendations": {
+      "title": "Popular creators",
+      "subtitle": "Follow channels you like so they are easier to find when they go live.",
+      "followers": "{{count}} followers",
+      "lastLive": "Last live: {{time}}",
+      "noLive": "No live yet",
+      "subscribe": "Subscribe",
+      "subscribed": "Subscribed",
+      "empty": "No creator recommendations yet."
+    }
   },
   "liveRoom": {
     "title": "Live Room",

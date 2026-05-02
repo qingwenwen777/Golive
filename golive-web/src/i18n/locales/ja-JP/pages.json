@@ -13,7 +13,17 @@
     "errorSub": "接続を確認してもう一度お試しください",
     "retry": "再試行",
     "watching": "{{count}} 人が視聴中",
-    "subscribers": "チャンネル登録者数 {{count}} 人"
+    "subscribers": "チャンネル登録者数 {{count}} 人",
+    "recommendations": {
+      "title": "人気クリエイター",
+      "subtitle": "気になるチャンネルを登録しておくと、配信開始時に見つけやすくなります。",
+      "followers": "フォロワー {{count}} 人",
+      "lastLive": "前回の配信：{{time}}",
+      "noLive": "まだ配信はありません",
+      "subscribe": "登録",
+      "subscribed": "登録済み",
+      "empty": "おすすめできるクリエイターはまだありません。"
+    }
   },
   "liveRoom": {
     "title": "ライブルーム",

@@ -139,6 +139,22 @@ export interface SubscriptionsResp {
   items: SubscriptionChannel[];
 }
 
+export interface RecommendedCreator {
+  id: string;
+  channelId: string;
+  name: string;
+  avatar: string;
+  verified: boolean;
+  subscriberCount: number;
+  lastLiveAt?: string;
+  lastTitle?: string;
+  following: boolean;
+}
+
+export interface RecommendedCreatorsResp {
+  items: RecommendedCreator[];
+}
+
 export function useFollowState(channelId: string, enabled: boolean) {
   return useQuery<FollowState, Error>({
     queryKey: ['follow', channelId],
@@ -162,6 +178,22 @@ export function useSubscriptions(enabled: boolean) {
     enabled,
     staleTime: 30_000,
     retry: 0,
+  });
+}
+
+export function useRecommendedCreators(size = 8, enabled = true) {
+  return useQuery<RecommendedCreatorsResp, Error>({
+    queryKey: ['recommended-creators', size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<RecommendedCreatorsResp>('/rooms/recommended-creators', {
+        params: { size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 60_000,
+    retry: 1,
   });
 }
 
@@ -195,6 +227,7 @@ export function useFollow(channelId: string) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['follow', channelId] });
       void qc.invalidateQueries({ queryKey: ['subscriptions'] });
+      void qc.invalidateQueries({ queryKey: ['recommended-creators'] });
     },
   });
 }
@@ -229,6 +262,7 @@ export function useUnfollow(channelId: string) {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['follow', channelId] });
       void qc.invalidateQueries({ queryKey: ['subscriptions'] });
+      void qc.invalidateQueries({ queryKey: ['recommended-creators'] });
     },
   });
 }

@@ -223,9 +223,6 @@ export default function ChannelPage() {
       <section className="gl-library-section" id="live">
         <div className="gl-section-title-row">
           <h2>{t('channel.liveRooms')}</h2>
-          <Link className="gl-text-link" to="/subscriptions">
-            {t('channel.subscriptions')}
-          </Link>
         </div>
         {rooms.isPending ? (
           <div className="gl-grid" aria-busy="true">
@@ -267,14 +264,6 @@ export default function ChannelPage() {
       <section className="gl-library-section" id="history">
         <div className="gl-section-title-row">
           <h2>{t('channel.liveHistory')}</h2>
-          {isOwner && (
-            <Link
-              className="gl-text-link"
-              to={`/studio/analytics/${encodeURIComponent(channelKey)}`}
-            >
-              {t('channel.channelAnalytics')}
-            </Link>
-          )}
         </div>
         {liveHistory.isPending ? (
           <div className="gl-history-list" aria-busy="true">
