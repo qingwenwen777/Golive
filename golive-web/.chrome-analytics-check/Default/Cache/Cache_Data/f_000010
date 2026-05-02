@@ -1,0 +1,758 @@
+export const home = {
+	title: "首页",
+	liveNow: "正在直播",
+	recommended: "推荐",
+	allCategory: "全部",
+	searchResults: "搜索“{{query}}”",
+	searchEmpty: "没有匹配的直播间",
+	searchEmptySub: "换个关键词试试。",
+	empty: "现在没有直播",
+	emptySub: "稍后再来看看",
+	errorTitle: "直播加载失败",
+	errorSub: "请检查网络后重试",
+	retry: "重试",
+	watching: "{{count}} 人正在观看",
+	subscribers: "{{count}} 位订阅者"
+};
+export const liveRoom = {
+	title: "直播间",
+	roomId: "房间 ID：{{id}}",
+	ended: "这场直播已结束",
+	chat: "直播聊天",
+	openChat: "打开聊天",
+	close: "关闭",
+	more: "更多",
+	topChat: "热门聊天",
+	liveChat: "直播聊天",
+	sayHi: "说点什么...",
+	signInToChat: "登录后聊天",
+	chatInput: "聊天消息",
+	emoji: "表情",
+	send: "发送",
+	chatSendFailed: "连接中或发送失败，请稍后重试",
+	superChat: "Super Chat",
+	heart: "点赞",
+	subscribe: "订阅",
+	subscribed: "已订阅",
+	subscribers: "{{count}} 位订阅者",
+	watching: "{{count}} 人正在观看",
+	like: "喜欢",
+	dislike: "不喜欢",
+	share: "分享",
+	gift: "礼物",
+	save: "保存",
+	saved: "已保存",
+	addedLiked: "已加入喜欢的直播间。",
+	removedWatchLater: "已从稍后观看移除。",
+	savedWatchLater: "已保存到稍后观看。",
+	copyManual: "直播间链接已打开，请手动复制。",
+	copySuccess: "直播间链接已复制。",
+	copyFailed: "无法复制直播间链接。",
+	copyTarget: "直播间链接",
+	timeAgo: {
+		hours: "{{hours}} 小时 {{minutes}} 分钟前",
+		minutes: "{{minutes}} 分钟前"
+	},
+	startedAt: "{{time}}开播",
+	showMore: "展开",
+	showLess: "收起",
+	connection: {
+		connecting: "连接中...",
+		connected: "已连接",
+		reconnecting: "重连中...（#{{count}}）",
+		reconnectingShort: "重连中...",
+		disconnected: "已断开",
+		liveEnded: "直播已结束。"
+	},
+	chatPanel: {
+		chatTab: "聊天",
+		viewersTab: "房间观众",
+		watchingNow: "{{formattedCount}} 人在看",
+		dailyContribution: "日贡献值",
+		emptyViewers: "暂无在线观众",
+		rankTop: "榜{{rank}}",
+		online: "在线",
+		contribution: "贡献值",
+		newMessages: "{{formattedCount}} 条新消息",
+		newMessagesAria: "{{formattedCount}} 条新消息，跳转到最新。",
+		messageTooLong: "消息不能超过 {{max}} 个字符。",
+		host: "主播",
+		fanBadgeTitle: "粉丝牌等级 {{level}}",
+		pinnedSuperChats: "置顶 SuperChat",
+		openSuperChat: "打开 {{user}} 的 SuperChat",
+		tapToRead: "点按查看",
+		noMessage: "无消息",
+		noSuperChatMessage: "这条 SuperChat 没有附带消息。",
+		you: "你",
+		sentGift: "送出",
+		guestViewer: "你",
+		emojiGroups: {
+			faces: "表情",
+			gestures: "手势",
+			stream: "直播"
+		}
+	}
+};
+export const player = {
+	play: "播放",
+	pause: "暂停",
+	mute: "静音",
+	unmute: "取消静音",
+	volume: "音量",
+	fullscreen: "全屏",
+	exitFullscreen: "退出全屏",
+	pip: "画中画",
+	quality: "画质",
+	qualityAuto: "自动",
+	toggleDanmu: "切换弹幕",
+	danmuOn: "弹幕：开",
+	danmuOff: "弹幕：关",
+	danmuFontSize: "弹幕字号",
+	live: "直播中",
+	jumpLive: "回到直播",
+	liveProgress: "直播进度",
+	retry: "重试"
+};
+export const channel = {
+	title: "频道",
+	name: "频道：{{name}}",
+	creatorFallback: "创作者",
+	creatorShort: "创作者 {{id}}",
+	copyTarget: "频道链接",
+	copyManual: "频道链接已打开，请手动复制。",
+	copySuccess: "频道链接已复制。",
+	changeCover: "更换封面",
+	yourChannel: "我的频道",
+	liveChannel: "直播频道",
+	subscribers: "{{count}} 位订阅者",
+	activeRooms: "{{count}} 个活跃直播间",
+	startLive: "开播",
+	changeAvatar: "更换头像",
+	settings: "设置",
+	subscribed: "已订阅",
+	subscribe: "订阅",
+	share: "分享",
+	sections: "频道板块",
+	tabs: {
+		live: "直播",
+		history: "历史"
+	},
+	stats: {
+		liveRooms: "直播间",
+		watchingNow: "正在观看",
+		mainCategory: "主分类"
+	},
+	liveRooms: "直播间",
+	subscriptions: "订阅",
+	notFound: "频道不存在",
+	notFoundSub: "这个创作者资料不可用，或链接不正确。",
+	noLiveRooms: "现在没有直播间",
+	noLiveOwnerSub: "准备好后就可以开始直播。",
+	noLiveViewerSub: "订阅这个频道，等创作者开播后再回来看看。",
+	liveHistory: "直播历史",
+	channelAnalytics: "频道数据",
+	noHistory: "还没有已结束的直播",
+	noHistoryOwnerSub: "结束后的直播会在这里显示时长、封面、标题和数据表现。",
+	noHistoryViewerSub: "这个创作者还没有可展示的已结束直播。",
+	history: {
+		pagination: "直播历史分页",
+		pageCount: "{{start}}-{{end}} / {{total}}",
+		previousPage: "上一页直播历史",
+		nextPage: "下一页直播历史",
+		peakViewers: "峰值 {{amount}} 人",
+		revenue: "收入 {{amount}}",
+		topFan: "{{name}} 贡献最高",
+		noFan: "暂无粉丝贡献",
+		liveAnalysis: "直播分析"
+	}
+};
+export const library = {
+	signIn: "登录",
+	latest: "最新",
+	browseAll: "浏览全部",
+	status: {
+		live: "直播中",
+		offline: "离线"
+	},
+	subscriptions: {
+		title: "订阅",
+		signInTitle: "登录后查看订阅",
+		signInSub: "关注创作者后，他们的直播间会出现在这里。",
+		emptyAuthed: "还没有订阅创作者",
+		emptyGuest: "暂无可显示的订阅",
+		emptySub: "去直播目录逛逛，并在播放器页面关注喜欢的直播间。"
+	},
+	you: {
+		viewChannel: "查看频道",
+		openCoinCenter: "打开 coin 中心",
+		recharge: "充值",
+		watchLaterCount: "稍后观看 · {{count}}",
+		likedCount: "已喜欢 · {{count}}",
+		historyCount: "历史 · {{count}}",
+		settings: "设置",
+		yourLiveRoom: "我的直播间",
+		openStudio: "打开直播间",
+		fanBadges: "粉丝徽章",
+		history: "观看历史",
+		viewAll: "查看全部",
+		watchLater: "稍后观看",
+		seeAll: "查看全部",
+		likedRooms: "喜欢的直播间",
+		liked: "已喜欢",
+		quickActions: "快捷操作",
+		startLive: "开播",
+		noHistory: "还没有观看历史。",
+		noWatchLater: "保存直播间后会显示在这里。",
+		noLiked: "喜欢的直播间会显示在这里。"
+	},
+	fanBadges: {
+		signIn: "登录后查看你的粉丝徽章。",
+		empty: "送出 Fan Light 后即可解锁创作者徽章。",
+		contribution: "{{amount}} 贡献"
+	},
+	historyPage: {
+		title: "观看历史",
+		subtitle: "你在这台设备上打开过的直播间。",
+		emptyTitle: "还没有观看历史",
+		emptySub: "访问直播间后，GoLive 会自动把它加入这里。",
+		primaryAction: "打开最新直播间",
+		clear: "清空历史"
+	},
+	watchLaterPage: {
+		title: "稍后观看",
+		subtitle: "已保存、之后想再看的直播间。",
+		emptyTitle: "还没有保存内容",
+		emptySub: "在直播间点击保存即可建立列表。",
+		primaryAction: "打开已保存直播间",
+		clear: "全部清空"
+	},
+	likedPage: {
+		title: "喜欢的直播间",
+		subtitle: "你喜欢过的直播会集中在这里，方便快速回访。",
+		emptyTitle: "还没有喜欢的直播间",
+		emptySub: "在直播间点击喜欢后会收藏到这里。",
+		primaryAction: "打开喜欢的直播间",
+		clear: "全部清空"
+	},
+	collection: {
+		liveRoomCount: "{{count}} 个直播间",
+		remove: "移除",
+		exploreTitle: "去看看这些直播间",
+		exploreEmptyTitle: "暂无可用直播间",
+		exploreEmptySub: "等创作者开播后再试试。"
+	},
+	settings: {
+		title: "设置",
+		sections: "设置板块",
+		tabs: {
+			account: "账号",
+			experience: "体验",
+			live: "直播默认值"
+		},
+		notSignedIn: "未登录",
+		changeAvatar: "更换头像",
+		darkTheme: "深色主题",
+		currentTheme: "当前：{{mode}}",
+		dark: "深色",
+		light: "浅色",
+		language: "语言",
+		languageNames: {
+			zh: "中文",
+			ja: "日本語",
+			en: "English"
+		},
+		lowLatency: "低延迟播放",
+		lowLatencySub: "直播支持时优先使用更低延迟。",
+		defaultCategory: "默认分类",
+		categories: {
+			justchatting: "聊天",
+			gaming: "游戏",
+			music: "音乐",
+			vtuber: "VTuber",
+			news: "新闻"
+		},
+		chatAssist: "聊天安全辅助",
+		chatAssistSub: "提示高速聊天和可能需要管理的波动。"
+	}
+};
+export const createLive = {
+	title: "开播",
+	description: "创建直播间并获取 OBS 推流密钥。",
+	formSub: "先创建直播间，再使用推流密钥从 OBS 推流。",
+	defaultTitle: "未命名直播",
+	created: "直播间已创建。请在 OBS 中填入推流密钥开始推流。",
+	fields: {
+		title: "标题",
+		category: "分类",
+		cover: "封面",
+		description: "简介"
+	},
+	categories: {
+		gaming: "游戏",
+		music: "音乐",
+		justchatting: "聊天",
+		anime: "动画",
+		vtuber: "VTuber",
+		drawing: "绘画",
+		asmr: "ASMR",
+		podcast: "播客",
+		cooking: "料理",
+		news: "新闻"
+	},
+	addCover: "添加封面",
+	optional: "可选",
+	starting: "开播中...",
+	createRoom: "创建直播间",
+	permission: {
+		label: "直播权限",
+		pendingTitle: "申请审核中",
+		pendingBody: "你的创作者申请正在等待管理员审核。",
+		submitted: "已提交",
+		rejectedTitle: "创作者权限未通过",
+		rejectedBody: "频道准备好后，你可以重新提交申请。",
+		applyAgain: "重新申请",
+		applyTitle: "申请创作者权限",
+		applyBody: "开播前需要管理员快速审核。",
+		submitApplication: "提交申请",
+		submitting: "提交中...",
+		reasonLabel: "开播理由",
+		reasonPlaceholder: "告诉管理员你计划直播的内容，以及这个频道为什么需要开播权限。",
+		reasonRequired: "请填写开播理由。"
+	},
+	errors: {
+		signInAgain: "开播前请重新登录。",
+		notApproved: "你的直播权限尚未通过审核。",
+		required: "标题和分类不能为空。",
+		startFailed: "无法开始直播，请重试。",
+		applicationFailed: "无法提交申请。",
+		coverUpload: "无法上传封面。"
+	}
+};
+export const studio = {
+	brand: "主播工作台",
+	title: "{{name}} 的工作台",
+	loading: "正在加载工作台...",
+	tabs: {
+		label: "主播工作台栏目",
+		overview: "概览",
+		prepare: "开播准备",
+		replay: "数据复盘"
+	},
+	auth: {
+		title: "登录后进入主播工作台",
+		body: "概览、开播配置和数据复盘会绑定到你的 GoLive 账号。",
+		action: "登录"
+	},
+	permission: {
+		reviewTime: "预计审核时间：1 个工作日内。",
+		notice: "请保持频道名、头像和封面信息完整，便于审核。",
+		progress: "审核进度：已提交 -> 人工审核 -> 给出结果。",
+		reasonLabel: "为什么想开播？",
+		reasonPlaceholder: "说明你的直播内容规划，以及这个频道为什么需要开播权限。",
+		pending: {
+			title: "申请审核中",
+			body: "我们正在检查你的频道资料与账号状态。",
+			action: "已提交"
+		},
+		rejected: {
+			title: "申请未通过",
+			body: "拒绝原因：你的频道信息需要重新完善后再开启直播权限。",
+			action: "重新申请",
+			reason: "拒绝原因：{{reason}}",
+			reasonFallback: "频道准备度暂未满足当前创作者策略。"
+		},
+		none: {
+			title: "申请主播权限",
+			body: "进入开播工作区前需要先通过主播权限审核。",
+			action: "提交申请"
+		}
+	},
+	overview: {
+		kpis: "主播核心数据",
+		cards: {
+			online: "当前观众",
+			onlineSub: "峰值观众",
+			subscribers: "订阅者",
+			subscribersSub: "频道总数",
+			streams: "直播场次",
+			streamsSub: "已完成",
+			revenue: "收益",
+			revenueSub: "直播收入"
+		},
+		quickTitle: "快捷操作",
+		quickHeading: "准备下一场直播",
+		recentTitle: "最近表现",
+		noRecent: "暂无直播记录",
+		latestPeak: "峰值 {{count}} 人",
+		emptyRecent: "开播后复盘数据会显示在这里。"
+	},
+	actions: {
+		prepare: "进入开播准备",
+		prepareSub: "标题、封面、分类与 OBS 检查。",
+		analytics: "查看数据复盘",
+		analyticsSub: "收益、观众与已结束直播报告。",
+		channel: "查看频道",
+		channelSub: "确认观众看到的频道页面。"
+	},
+	analytics: {
+		title: "频道数据分析",
+		subtitle: "收益、订阅、观看时长和已结束直播表现。",
+		loading: "正在加载数据分析...",
+		unavailableTitle: "无法查看数据分析",
+		unavailableBody: "只有频道所有者可以查看工作台数据。",
+		kpis: "主播核心数据",
+		cards: {
+			revenue: "收益",
+			revenueSub: "近 6 个月",
+			subscribers: "订阅者",
+			subscribersSub: "当前总数",
+			streams: "直播场次",
+			streamsSub: "已完成",
+			peakOnline: "峰值在线",
+			peakOnlineSub: "最佳直播"
+		},
+		sections: {
+			monthlyRevenue: "月度收益",
+			subscriptionGrowth: "订阅增长",
+			watchTime: "观看时长",
+			recentPerformance: "近期直播表现",
+			history: "历史记录",
+			viewChannel: "查看频道",
+			emptyHistory: "暂无已结束直播。",
+			lastStream: "上一场直播",
+			openAnalysis: "打开分析",
+			revenueBreakdown: "收益拆分",
+			topContributions: "贡献排行",
+			emptyContributions: "这场直播暂无贡献数据。"
+		},
+		live: {
+			title: "直播分析",
+			subtitle: "单场直播收益、峰值观众和头号粉丝贡献。",
+			back: "返回",
+			loading: "正在加载直播分析...",
+			unavailableTitle: "无法查看直播分析",
+			unavailableBody: "只有频道所有者可以查看这份报告。",
+			cards: {
+				revenueSub: "本场直播",
+				peakOnlineSub: "最高值",
+				newSubscribers: "新增订阅者",
+				newSubscribersSub: "直播期间",
+				topFan: "头号粉丝"
+			}
+		},
+		breakdown: {
+			gifts: "礼物",
+			superChat: "Super Chat"
+		},
+		units: {
+			coinAmount: "{{amount}} 金币",
+			hourAmount: "{{amount}} 小时",
+			streamCount: "{{formattedCount}} 场直播",
+			fanCount: "{{formattedCount}} 位粉丝",
+			peakViewers: "峰值 {{amount}} 人"
+		}
+	},
+	prepare: {
+		created: "直播间已创建。请打开 OBS 开始推流。",
+		next: "下一步",
+		descriptionPlaceholder: "告诉观众这场直播的内容。",
+		permissionApproved: "主播权限已通过",
+		obsReady: "OBS 配置已检查",
+		runCheck: "标记 OBS 检查完成",
+		readyTitle: "可以创建直播间了",
+		readyBody: "确认后会签发推流密钥，并打开直播控制台。",
+		startLive: "开始直播",
+		previewLabel: "预览",
+		previewTitle: "开播前效果",
+		waitingStatus: "待开播",
+		noDescription: "简介会显示在这里。",
+		steps: {
+			info: "填写直播信息",
+			cover: "选择封面与分类",
+			check: "检查推流连接与权限",
+			confirm: "确认开始直播"
+		}
+	},
+	publisher: {
+		title: "推流",
+		server: "推流地址",
+		key: "推流密钥",
+		keyAfterStart: "确认后签发",
+		playback: "播放地址",
+		connected: "OBS 已连接",
+		waiting: "等待 OBS 连接",
+		refresh: "刷新状态"
+	},
+	console: {
+		notFound: "直播间不可用",
+		notFoundBody: "无法加载这个直播间。",
+		ownerOnly: "仅主播可进入控制台",
+		ownerOnlyBody: "只有频道所有者可以控制这场直播。",
+		ended: "直播已结束。",
+		endFailed: "无法结束直播。",
+		live: "LIVE",
+		waiting: "等待中",
+		duration: "直播时长",
+		online: "在线人数",
+		bitrate: "码率",
+		dropped: "掉帧率",
+		latency: "延迟",
+		ending: "结束中...",
+		endLive: "结束直播",
+		activity: "互动",
+		bettingTitle: "竞猜模块",
+		reconnecting: "重连中 #{{count}}",
+		disconnected: "已断开",
+		waitingPreview: "等待推流",
+		waitingPreviewBody: "在 OBS 中填入推流地址与密钥，然后开始推流。",
+		danmu: "弹幕管理",
+		chatControl: "直播聊天",
+		activeBullets: "{{count}} 条弹幕正在预览",
+		clearPreview: "清空预览",
+		gifts: "礼物汇总",
+		noGifts: "暂无礼物。",
+		superChat: "SuperChat 置顶",
+		noSuperChat: "暂无置顶 SuperChat。"
+	}
+};
+export const admin = {
+	kicker: "管理后台",
+	title: "主播权限管理",
+	refresh: "刷新",
+	fallbackCreator: "主播",
+	denied: {
+		title: "无管理员权限",
+		body: "此区域仅管理员可访问。",
+		action: "返回首页"
+	},
+	tabs: {
+		label: "主播管理分区",
+		permissions: "权限用户",
+		applications: "申请审核"
+	},
+	status: {
+		pending: "审核中",
+		approved: "已通过",
+		rejected: "已拒绝",
+		none: "无权限"
+	},
+	permissions: {
+		eyebrow: "权限管理",
+		title: "可开播的主播",
+		loading: "正在加载主播...",
+		error: "无法加载主播列表。",
+		empty: "当前没有已获得开播权限的主播。",
+		disable: "禁用直播",
+		confirmDisable: "确定禁用 {{name}} 的开播权限吗？",
+		disabled: "已禁用直播权限。",
+		disableFailed: "无法更新权限。"
+	},
+	applications: {
+		eyebrow: "申请审核",
+		title: "主播开播申请",
+		loading: "正在加载申请...",
+		error: "无法加载申请列表。",
+		empty: "暂无主播申请。",
+		reason: "开播理由",
+		noReason: "未填写理由。",
+		rejectReason: "拒绝理由",
+		approve: "同意",
+		reject: "拒绝",
+		approved: "已同意申请。",
+		rejected: "已拒绝申请。",
+		reviewFailed: "审核失败。",
+		rejectReasonLabel: "拒绝理由",
+		rejectReasonPlaceholder: "告诉主播需要补充或改进的内容。",
+		confirmReject: "确认拒绝"
+	}
+};
+export const upload = {
+	description: "上传 JPG、PNG、WebP 或 GIF 图片，最大 5MB。",
+	imageTypeError: "请使用 JPG、PNG、WebP 或 GIF 图片。",
+	chooseFirst: "请先选择图片。",
+	chooseImage: "选择图片",
+	saving: "保存中...",
+	avatar: {
+		title: "更换头像",
+		sizeError: "头像必须小于等于 5MB。",
+		signInError: "更换头像前请先登录。",
+		success: "头像已更新。",
+		failed: "无法更新头像。",
+		save: "保存头像"
+	},
+	cover: {
+		title: "更换频道封面",
+		add: "添加频道封面",
+		sizeError: "封面必须小于等于 5MB。",
+		signInError: "更换频道封面前请先登录。",
+		success: "频道封面已更新。",
+		failed: "无法更新频道封面。",
+		save: "保存封面"
+	}
+};
+export const login = {
+	title: "登录",
+	placeholder: "阶段 2 占位内容"
+};
+export const notFound = {
+	title: "404",
+	subtitle: "页面不存在",
+	back: "返回首页"
+};
+export const coin = {
+	authTitle: "登录后管理 coins",
+	authSub: "查看消费记录、充值、每日任务和提现预留信息。",
+	guest: "游客",
+	heroSub: "{{name}} 的 coin 账户，充值比例为 1,000 coins = 1 人民币。",
+	goTopup: "去充值",
+	watchHistory: "观看记录",
+	stats: {
+		balance: "当前余额",
+		monthSpend: "本月消费",
+		monthIncome: "本月获得",
+		liveIncome: "直播收入"
+	},
+	dailyTasks: "每日任务",
+	tasks: {
+		dailyLogin: {
+			title: "每日登录抽奖",
+			description: "每天抽一次，小额鼓励不伤钱包。",
+			target: "今日可抽"
+		},
+		watchRooms: {
+			title: "观看 3 个直播间",
+			description: "当天打开 3 个不同直播间后领取。",
+			target: "3 个直播间"
+		},
+		watchMinutes: {
+			title: "累计观看 30 分钟",
+			description: "认真看一会儿，给一点点 coins。",
+			target: "30 分钟"
+		}
+	},
+	ledger: "Coin 流水",
+	filters: {
+		all: "全部",
+		income: "获得",
+		spend: "消费",
+		recharge: "充值",
+		gift: "礼物",
+		sc: "SC",
+		bet: "竞猜",
+		task: "任务",
+		creator: "直播收入"
+	},
+	emptyTitle: "暂无 coin 记录",
+	emptySub: "开始充值、送礼物、发 SC 或参与竞猜后会出现在这里。",
+	topup: {
+		title: "充值",
+		sub: "1,000 coins 起充，上不封顶。",
+		amount: "充值数量",
+		amountAria: "充值 coins 数量",
+		pay: "需支付",
+		pending: "充值中...",
+		submit: "立即充值"
+	},
+	withdraw: {
+		title: "提现预留",
+		sub: "手续费 35%，支付接口接入后启用。",
+		amount: "提现数量",
+		amountAria: "提现 coins 数量",
+		fee: "手续费",
+		net: "预计到账",
+		rmb: "折合人民币",
+		preview: "预览提现"
+	},
+	task: {
+		claim: "领取",
+		claiming: "领取中...",
+		claimed: "已领取"
+	},
+	record: {
+		balance: "余额 {{balance}}",
+		topup: "充值获得",
+		dailyTask: "每日任务",
+		gift: "礼物",
+		superChat: "Super Chat",
+		bet: "竞猜",
+		coin: "Coin"
+	},
+	pagination: "共 {{total}} 条 · 第 {{page}} / {{totalPages}} 页",
+	previous: "上一页",
+	next: "下一页",
+	progressMinutes: "{{current}} / {{total}} 分钟",
+	toast: {
+		minTopup: "充值至少 1,000 coins。",
+		topupSuccess: "充值成功，当前余额 {{balance}} coins。",
+		topupFailed: "充值失败。",
+		taskIncomplete: "任务还没完成，完成后就能领取。",
+		alreadyClaimed: "今天已经领取过这个任务。",
+		claimSuccess: "已获得 {{amount}} coins。",
+		claimFailed: "领取失败。",
+		withdrawPreview: "提现支付接口预留中，当前不会扣除 coins。"
+	}
+};
+export const betting = {
+	title: "竞猜",
+	emptyHint: "填写标题后开盘，观众会看到入口。",
+	entryActive: "竞猜进行中",
+	entryView: "查看",
+	open: "开盘",
+	reopen: "再开一盘",
+	opening: "开盘中...",
+	cancel: "流盘",
+	cancelling: "流盘中...",
+	closed: "已封盘",
+	closesIn: "{{seconds}} 秒封盘",
+	pool: "池子 {{total}}",
+	amount: "下注额",
+	formTitle: "标题",
+	formTitlePlaceholder: "例如：第一局谁能拿下？",
+	option: {
+		win: "能赢",
+		lose: "不能赢"
+	},
+	optionMeta: "{{count}} 人 · {{total}} coin",
+	myWager: "你已下注“{{option}}”",
+	myWagerWon: "，返还 {{payout}} coin",
+	myWagerRefunded: "，已退回",
+	noWagerHint: "该选项无人下注，若需退币请改为流盘。",
+	openSuccess: "竞猜已开盘，60 秒后自动封盘。",
+	wagerSuccess: "已下注“{{option}}”。",
+	settleSuccess: "竞猜已按“{{option}}”结算。",
+	cancelSuccess: "已流盘，下注 coin 已退回。",
+	systemOpened: "竞猜已开盘。",
+	systemSettled: "竞猜已结算：{{option}}。",
+	systemSettledDefault: "结果已出",
+	systemCancelled: "竞猜已流盘，下注 coin 已退回。",
+	status: {
+		open: "开盘中",
+		closed: "封盘",
+		settled: "已结算",
+		cancelled: "流盘"
+	},
+	errorQuestionRequired: "请先填写竞猜标题。",
+	errorInsufficient: "余额不足，无法下注。",
+	errorActiveExists: "当前还有未结算的竞猜。",
+	errorClosed: "竞猜已封盘。",
+	errorAlreadyPlaced: "你已经下注了。",
+	errorNoWinners: "这个结果没有赢家，请选择流盘退回。",
+	errorBadQuestion: "竞猜标题不能为空，最多 80 个字。",
+	errorForbidden: "只有主播可以操作竞猜。",
+	errorGeneric: "操作失败。"
+};
+export default {
+	home: home,
+	liveRoom: liveRoom,
+	player: player,
+	channel: channel,
+	library: library,
+	createLive: createLive,
+	studio: studio,
+	admin: admin,
+	upload: upload,
+	login: login,
+	notFound: notFound,
+	coin: coin,
+	betting: betting
+};

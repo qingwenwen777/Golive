@@ -1025,7 +1025,7 @@ function StudioInteractionRail({
 
   return (
     <aside className="gl-live-console-rail">
-      <section className="gl-creator-panel">
+      <section className="gl-creator-panel gl-live-console-chat-panel">
         <div className="gl-creator-panel-head">
           <div>
             <span>{t('studio.console.danmu', { defaultValue: 'Danmu management' })}</span>

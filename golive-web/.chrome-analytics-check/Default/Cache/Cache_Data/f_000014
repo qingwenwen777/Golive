@@ -1,0 +1,253 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/features/account/AvatarUploadDialog.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=d2feafe2"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=d2feafe2"; const useEffect = __vite__cjsImport3_react["useEffect"]; const useState = __vite__cjsImport3_react["useState"];
+import { useTranslation } from "/node_modules/.vite/deps/react-i18next.js?v=d2feafe2";
+import { Camera, ImagePlus, Save } from "/node_modules/.vite/deps/lucide-react.js?v=d2feafe2";
+import { toast } from "/node_modules/.vite/deps/sonner.js?v=d2feafe2";
+import { useUploadAvatar } from "/src/api/auth.ts";
+import { Avatar } from "/src/components/Avatar.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "/src/components/ui/dialog.tsx";
+import { userDisplayName } from "/src/types/user.ts";
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const AVATAR_TYPES = /* @__PURE__ */ new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const AVATAR_EXT = /\.(jpe?g|png|webp|gif)$/i;
+export function AvatarUploadDialog({ open, onOpenChange, user }) {
+  _s();
+  const { t } = useTranslation("pages");
+  const uploadAvatar = useUploadAvatar();
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [error, setError] = useState(null);
+  const displayName = userDisplayName(user);
+  useEffect(() => {
+    if (!file) {
+      setPreview("");
+      return;
+    }
+    const next = URL.createObjectURL(file);
+    setPreview(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+  useEffect(() => {
+    if (!open) {
+      setFile(null);
+      setError(null);
+    }
+  }, [open]);
+  const handleFile = (e) => {
+    const next = e.target.files?.[0] ?? null;
+    e.target.value = "";
+    setError(null);
+    if (!next) {
+      setFile(null);
+      return;
+    }
+    if (!isAllowedAvatar(next)) {
+      setFile(null);
+      setError(t("upload.imageTypeError"));
+      return;
+    }
+    if (next.size > MAX_AVATAR_SIZE) {
+      setFile(null);
+      setError(t("upload.avatar.sizeError"));
+      return;
+    }
+    setFile(next);
+  };
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!user) {
+      setError(t("upload.avatar.signInError"));
+      return;
+    }
+    if (!file) {
+      setError(t("upload.chooseFirst"));
+      return;
+    }
+    uploadAvatar.mutate(file, {
+      onSuccess: () => {
+        toast.success(t("upload.avatar.success"));
+        onOpenChange(false);
+      },
+      onError: (err) => setError(err.message || t("upload.avatar.failed"))
+    });
+  };
+  return /* @__PURE__ */ jsxDEV(Dialog, { open, onOpenChange, children: /* @__PURE__ */ jsxDEV(DialogContent, { className: "gl-avatar-dialog p-0 sm:max-w-[420px]", children: [
+    /* @__PURE__ */ jsxDEV(DialogHeader, { className: "sr-only", children: [
+      /* @__PURE__ */ jsxDEV(DialogTitle, { children: t("upload.avatar.title") }, void 0, false, {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+        lineNumber: 115,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV(DialogDescription, { children: t("upload.description") }, void 0, false, {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+        lineNumber: 116,
+        columnNumber: 11
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+      lineNumber: 114,
+      columnNumber: 9
+    }, this),
+    /* @__PURE__ */ jsxDEV("form", { className: "gl-avatar-form", onSubmit: handleSubmit, children: [
+      /* @__PURE__ */ jsxDEV("div", { className: "gl-live-create-head", children: [
+        /* @__PURE__ */ jsxDEV("div", { className: "gl-live-create-icon", "aria-hidden": "true", children: /* @__PURE__ */ jsxDEV(Camera, { size: 20 }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 122,
+          columnNumber: 15
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 121,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("h2", { children: t("upload.avatar.title") }, void 0, false, {
+            fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+            lineNumber: 125,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("p", { children: displayName }, void 0, false, {
+            fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+            lineNumber: 126,
+            columnNumber: 15
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 124,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+        lineNumber: 120,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("label", { className: "gl-avatar-picker", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: "gl-avatar-preview", children: preview ? /* @__PURE__ */ jsxDEV("img", { src: preview, alt: "" }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 133,
+          columnNumber: 15
+        }, this) : /* @__PURE__ */ jsxDEV(Avatar, { name: displayName, src: user?.avatar, size: 116 }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 135,
+          columnNumber: 15
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 131,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { className: "gl-avatar-pick-btn", children: [
+          /* @__PURE__ */ jsxDEV(ImagePlus, { size: 16 }, void 0, false, {
+            fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+            lineNumber: 139,
+            columnNumber: 15
+          }, this),
+          t("upload.chooseImage")
+        ] }, void 0, true, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 138,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "input",
+          {
+            type: "file",
+            accept: "image/jpeg,image/png,image/webp,image/gif",
+            onChange: handleFile
+          },
+          void 0,
+          false,
+          {
+            fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+            lineNumber: 142,
+            columnNumber: 13
+          },
+          this
+        )
+      ] }, void 0, true, {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+        lineNumber: 130,
+        columnNumber: 11
+      }, this),
+      error && /* @__PURE__ */ jsxDEV("div", { className: "gl-auth-error", role: "alert", children: error }, void 0, false, {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+        lineNumber: 150,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("button", { type: "submit", disabled: !file || uploadAvatar.isPending, className: "gl-auth-submit", children: [
+        /* @__PURE__ */ jsxDEV(Save, { size: 18 }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 156,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: uploadAvatar.isPending ? t("upload.saving") : t("upload.avatar.save") }, void 0, false, {
+          fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+          lineNumber: 157,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+        lineNumber: 155,
+        columnNumber: 11
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+      lineNumber: 119,
+      columnNumber: 9
+    }, this)
+  ] }, void 0, true, {
+    fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+    lineNumber: 113,
+    columnNumber: 7
+  }, this) }, void 0, false, {
+    fileName: "C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx",
+    lineNumber: 112,
+    columnNumber: 5
+  }, this);
+}
+_s(AvatarUploadDialog, "0HNej8OZVOCbsKt6kfFELBT7PNs=", false, function() {
+  return [useTranslation, useUploadAvatar];
+});
+_c = AvatarUploadDialog;
+function isAllowedAvatar(file) {
+  if (AVATAR_TYPES.has(file.type)) return true;
+  return AVATAR_EXT.test(file.name);
+}
+var _c;
+$RefreshReg$(_c, "AvatarUploadDialog");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/xhb/Desktop/Golive/golive-web/src/features/account/AvatarUploadDialog.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QUFBQztBQUFBLGFBQUFBLElBQUEiLCJuYW1lcyI6WyJ1c2VFZmZlY3QiLCJ1c2VTdGF0ZSIsInVzZVRyYW5zbGF0aW9uIiwiQ2FtZXJhIiwiSW1hZ2VQbHVzIiwiU2F2ZSIsInRvYXN0IiwidXNlVXBsb2FkQXZhdGFyIiwiQXZhdGFyIiwiRGlhbG9nIiwiRGlhbG9nQ29udGVudCIsIkRpYWxvZ0Rlc2NyaXB0aW9uIiwiRGlhbG9nSGVhZGVyIiwiRGlhbG9nVGl0bGUiLCJ1c2VyRGlzcGxheU5hbWUiLCJNQVhfQVZBVEFSX1NJWkUiLCJBVkFUQVJfVFlQRVMiLCJTZXQiLCJBVkFUQVJfRVhUIiwiQXZhdGFyVXBsb2FkRGlhbG9nIiwib3BlbiIsIm9uT3BlbkNoYW5nZSIsInVzZXIiLCJfcyIsInQiLCJ1cGxvYWRBdmF0YXIiLCJmaWxlIiwic2V0RmlsZSIsInByZXZpZXciLCJzZXRQcmV2aWV3IiwiZXJyb3IiLCJzZXRFcnJvciIsImRpc3BsYXlOYW1lIiwibmV4dCIsIlVSTCIsImNyZWF0ZU9iamVjdFVSTCIsInJldm9rZU9iamVjdFVSTCIsImhhbmRsZUZpbGUiLCJlIiwidGFyZ2V0IiwiZmlsZXMiLCJ2YWx1ZSIsImlzQWxsb3dlZEF2YXRhciIsInNpemUiLCJoYW5kbGVTdWJtaXQiLCJwcmV2ZW50RGVmYXVsdCIsIm11dGF0ZSIsIm9uU3VjY2VzcyIsInN1Y2Nlc3MiLCJvbkVycm9yIiwiZXJyIiwibWVzc2FnZSIsImF2YXRhciIsImlzUGVuZGluZyIsImhhcyIsInR5cGUiLCJ0ZXN0IiwibmFtZSIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkF2YXRhclVwbG9hZERpYWxvZy50c3giXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgdHlwZSBDaGFuZ2VFdmVudCwgdHlwZSBGb3JtRXZlbnQsIHVzZUVmZmVjdCwgdXNlU3RhdGUgfSBmcm9tICdyZWFjdCc7XG5pbXBvcnQgeyB1c2VUcmFuc2xhdGlvbiB9IGZyb20gJ3JlYWN0LWkxOG5leHQnO1xuaW1wb3J0IHsgQ2FtZXJhLCBJbWFnZVBsdXMsIFNhdmUgfSBmcm9tICdsdWNpZGUtcmVhY3QnO1xuaW1wb3J0IHsgdG9hc3QgfSBmcm9tICdzb25uZXInO1xuaW1wb3J0IHsgdXNlVXBsb2FkQXZhdGFyIH0gZnJvbSAnQC9hcGkvYXV0aCc7XG5pbXBvcnQgeyBBdmF0YXIgfSBmcm9tICdAL2NvbXBvbmVudHMvQXZhdGFyJztcbmltcG9ydCB7XG4gIERpYWxvZyxcbiAgRGlhbG9nQ29udGVudCxcbiAgRGlhbG9nRGVzY3JpcHRpb24sXG4gIERpYWxvZ0hlYWRlcixcbiAgRGlhbG9nVGl0bGUsXG59IGZyb20gJ0AvY29tcG9uZW50cy91aS9kaWFsb2cnO1xuaW1wb3J0IHR5cGUgeyBVc2VyIH0gZnJvbSAnQC90eXBlcy91c2VyJztcbmltcG9ydCB7IHVzZXJEaXNwbGF5TmFtZSB9IGZyb20gJ0AvdHlwZXMvdXNlcic7XG5cbmNvbnN0IE1BWF9BVkFUQVJfU0laRSA9IDUgKiAxMDI0ICogMTAyNDtcbmNvbnN0IEFWQVRBUl9UWVBFUyA9IG5ldyBTZXQoWydpbWFnZS9qcGVnJywgJ2ltYWdlL3BuZycsICdpbWFnZS93ZWJwJywgJ2ltYWdlL2dpZiddKTtcbmNvbnN0IEFWQVRBUl9FWFQgPSAvXFwuKGpwZT9nfHBuZ3x3ZWJwfGdpZikkL2k7XG5cbmV4cG9ydCBpbnRlcmZhY2UgQXZhdGFyVXBsb2FkRGlhbG9nUHJvcHMge1xuICBvcGVuOiBib29sZWFuO1xuICBvbk9wZW5DaGFuZ2U6IChvcGVuOiBib29sZWFuKSA9PiB2b2lkO1xuICB1c2VyOiBVc2VyIHwgbnVsbDtcbn1cblxuZXhwb3J0IGZ1bmN0aW9uIEF2YXRhclVwbG9hZERpYWxvZyh7IG9wZW4sIG9uT3BlbkNoYW5nZSwgdXNlciB9OiBBdmF0YXJVcGxvYWREaWFsb2dQcm9wcykge1xuICBjb25zdCB7IHQgfSA9IHVzZVRyYW5zbGF0aW9uKCdwYWdlcycpO1xuICBjb25zdCB1cGxvYWRBdmF0YXIgPSB1c2VVcGxvYWRBdmF0YXIoKTtcbiAgY29uc3QgW2ZpbGUsIHNldEZpbGVdID0gdXNlU3RhdGU8RmlsZSB8IG51bGw+KG51bGwpO1xuICBjb25zdCBbcHJldmlldywgc2V0UHJldmlld10gPSB1c2VTdGF0ZSgnJyk7XG4gIGNvbnN0IFtlcnJvciwgc2V0RXJyb3JdID0gdXNlU3RhdGU8c3RyaW5nIHwgbnVsbD4obnVsbCk7XG4gIGNvbnN0IGRpc3BsYXlOYW1lID0gdXNlckRpc3BsYXlOYW1lKHVzZXIpO1xuXG4gIHVzZUVmZmVjdCgoKSA9PiB7XG4gICAgaWYgKCFmaWxlKSB7XG4gICAgICBzZXRQcmV2aWV3KCcnKTtcbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgY29uc3QgbmV4dCA9IFVSTC5jcmVhdGVPYmplY3RVUkwoZmlsZSk7XG4gICAgc2V0UHJldmlldyhuZXh0KTtcbiAgICByZXR1cm4gKCkgPT4gVVJMLnJldm9rZU9iamVjdFVSTChuZXh0KTtcbiAgfSwgW2ZpbGVdKTtcblxuICB1c2VFZmZlY3QoKCkgPT4ge1xuICAgIGlmICghb3Blbikge1xuICAgICAgc2V0RmlsZShudWxsKTtcbiAgICAgIHNldEVycm9yKG51bGwpO1xuICAgIH1cbiAgfSwgW29wZW5dKTtcblxuICBjb25zdCBoYW5kbGVGaWxlID0gKGU6IENoYW5nZUV2ZW50PEhUTUxJbnB1dEVsZW1lbnQ+KSA9PiB7XG4gICAgY29uc3QgbmV4dCA9IGUudGFyZ2V0LmZpbGVzPy5bMF0gPz8gbnVsbDtcbiAgICBlLnRhcmdldC52YWx1ZSA9ICcnO1xuICAgIHNldEVycm9yKG51bGwpO1xuICAgIGlmICghbmV4dCkge1xuICAgICAgc2V0RmlsZShudWxsKTtcbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgaWYgKCFpc0FsbG93ZWRBdmF0YXIobmV4dCkpIHtcbiAgICAgIHNldEZpbGUobnVsbCk7XG4gICAgICBzZXRFcnJvcih0KCd1cGxvYWQuaW1hZ2VUeXBlRXJyb3InKSk7XG4gICAgICByZXR1cm47XG4gICAgfVxuICAgIGlmIChuZXh0LnNpemUgPiBNQVhfQVZBVEFSX1NJWkUpIHtcbiAgICAgIHNldEZpbGUobnVsbCk7XG4gICAgICBzZXRFcnJvcih0KCd1cGxvYWQuYXZhdGFyLnNpemVFcnJvcicpKTtcbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgc2V0RmlsZShuZXh0KTtcbiAgfTtcblxuICBjb25zdCBoYW5kbGVTdWJtaXQgPSAoZTogRm9ybUV2ZW50KSA9PiB7XG4gICAgZS5wcmV2ZW50RGVmYXVsdCgpO1xuICAgIGlmICghdXNlcikge1xuICAgICAgc2V0RXJyb3IodCgndXBsb2FkLmF2YXRhci5zaWduSW5FcnJvcicpKTtcbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgaWYgKCFmaWxlKSB7XG4gICAgICBzZXRFcnJvcih0KCd1cGxvYWQuY2hvb3NlRmlyc3QnKSk7XG4gICAgICByZXR1cm47XG4gICAgfVxuICAgIHVwbG9hZEF2YXRhci5tdXRhdGUoZmlsZSwge1xuICAgICAgb25TdWNjZXNzOiAoKSA9PiB7XG4gICAgICAgIHRvYXN0LnN1Y2Nlc3ModCgndXBsb2FkLmF2YXRhci5zdWNjZXNzJykpO1xuICAgICAgICBvbk9wZW5DaGFuZ2UoZmFsc2UpO1xuICAgICAgfSxcbiAgICAgIG9uRXJyb3I6IChlcnIpID0+IHNldEVycm9yKGVyci5tZXNzYWdlIHx8IHQoJ3VwbG9hZC5hdmF0YXIuZmFpbGVkJykpLFxuICAgIH0pO1xuICB9O1xuXG4gIHJldHVybiAoXG4gICAgPERpYWxvZyBvcGVuPXtvcGVufSBvbk9wZW5DaGFuZ2U9e29uT3BlbkNoYW5nZX0+XG4gICAgICA8RGlhbG9nQ29udGVudCBjbGFzc05hbWU9XCJnbC1hdmF0YXItZGlhbG9nIHAtMCBzbTptYXgtdy1bNDIwcHhdXCI+XG4gICAgICAgIDxEaWFsb2dIZWFkZXIgY2xhc3NOYW1lPVwic3Itb25seVwiPlxuICAgICAgICAgIDxEaWFsb2dUaXRsZT57dCgndXBsb2FkLmF2YXRhci50aXRsZScpfTwvRGlhbG9nVGl0bGU+XG4gICAgICAgICAgPERpYWxvZ0Rlc2NyaXB0aW9uPnt0KCd1cGxvYWQuZGVzY3JpcHRpb24nKX08L0RpYWxvZ0Rlc2NyaXB0aW9uPlxuICAgICAgICA8L0RpYWxvZ0hlYWRlcj5cblxuICAgICAgICA8Zm9ybSBjbGFzc05hbWU9XCJnbC1hdmF0YXItZm9ybVwiIG9uU3VibWl0PXtoYW5kbGVTdWJtaXR9PlxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiZ2wtbGl2ZS1jcmVhdGUtaGVhZFwiPlxuICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJnbC1saXZlLWNyZWF0ZS1pY29uXCIgYXJpYS1oaWRkZW49XCJ0cnVlXCI+XG4gICAgICAgICAgICAgIDxDYW1lcmEgc2l6ZT17MjB9IC8+XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICAgIDxkaXY+XG4gICAgICAgICAgICAgIDxoMj57dCgndXBsb2FkLmF2YXRhci50aXRsZScpfTwvaDI+XG4gICAgICAgICAgICAgIDxwPntkaXNwbGF5TmFtZX08L3A+XG4gICAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgICA8L2Rpdj5cblxuICAgICAgICAgIDxsYWJlbCBjbGFzc05hbWU9XCJnbC1hdmF0YXItcGlja2VyXCI+XG4gICAgICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJnbC1hdmF0YXItcHJldmlld1wiPlxuICAgICAgICAgICAgICB7cHJldmlldyA/IChcbiAgICAgICAgICAgICAgICA8aW1nIHNyYz17cHJldmlld30gYWx0PVwiXCIgLz5cbiAgICAgICAgICAgICAgKSA6IChcbiAgICAgICAgICAgICAgICA8QXZhdGFyIG5hbWU9e2Rpc3BsYXlOYW1lfSBzcmM9e3VzZXI/LmF2YXRhcn0gc2l6ZT17MTE2fSAvPlxuICAgICAgICAgICAgICApfVxuICAgICAgICAgICAgPC9zcGFuPlxuICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwiZ2wtYXZhdGFyLXBpY2stYnRuXCI+XG4gICAgICAgICAgICAgIDxJbWFnZVBsdXMgc2l6ZT17MTZ9IC8+XG4gICAgICAgICAgICAgIHt0KCd1cGxvYWQuY2hvb3NlSW1hZ2UnKX1cbiAgICAgICAgICAgIDwvc3Bhbj5cbiAgICAgICAgICAgIDxpbnB1dFxuICAgICAgICAgICAgICB0eXBlPVwiZmlsZVwiXG4gICAgICAgICAgICAgIGFjY2VwdD1cImltYWdlL2pwZWcsaW1hZ2UvcG5nLGltYWdlL3dlYnAsaW1hZ2UvZ2lmXCJcbiAgICAgICAgICAgICAgb25DaGFuZ2U9e2hhbmRsZUZpbGV9XG4gICAgICAgICAgICAvPlxuICAgICAgICAgIDwvbGFiZWw+XG5cbiAgICAgICAgICB7ZXJyb3IgJiYgKFxuICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJnbC1hdXRoLWVycm9yXCIgcm9sZT1cImFsZXJ0XCI+XG4gICAgICAgICAgICAgIHtlcnJvcn1cbiAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICl9XG5cbiAgICAgICAgICA8YnV0dG9uIHR5cGU9XCJzdWJtaXRcIiBkaXNhYmxlZD17IWZpbGUgfHwgdXBsb2FkQXZhdGFyLmlzUGVuZGluZ30gY2xhc3NOYW1lPVwiZ2wtYXV0aC1zdWJtaXRcIj5cbiAgICAgICAgICAgIDxTYXZlIHNpemU9ezE4fSAvPlxuICAgICAgICAgICAgPHNwYW4+e3VwbG9hZEF2YXRhci5pc1BlbmRpbmcgPyB0KCd1cGxvYWQuc2F2aW5nJykgOiB0KCd1cGxvYWQuYXZhdGFyLnNhdmUnKX08L3NwYW4+XG4gICAgICAgICAgPC9idXR0b24+XG4gICAgICAgIDwvZm9ybT5cbiAgICAgIDwvRGlhbG9nQ29udGVudD5cbiAgICA8L0RpYWxvZz5cbiAgKTtcbn1cblxuZnVuY3Rpb24gaXNBbGxvd2VkQXZhdGFyKGZpbGU6IEZpbGUpOiBib29sZWFuIHtcbiAgaWYgKEFWQVRBUl9UWVBFUy5oYXMoZmlsZS50eXBlKSkgcmV0dXJuIHRydWU7XG4gIHJldHVybiBBVkFUQVJfRVhULnRlc3QoZmlsZS5uYW1lKTtcbn1cbiJdLCJmaWxlIjoiQzovVXNlcnMveGhiL0Rlc2t0b3AvR29saXZlL2dvbGl2ZS13ZWIvc3JjL2ZlYXR1cmVzL2FjY291bnQvQXZhdGFyVXBsb2FkRGlhbG9nLnRzeCJ9

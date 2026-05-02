@@ -2995,9 +2995,11 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-page {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   flex-direction: column;
   gap: 18px;
-  max-width: 1280px;
 }
 .gl-studio-head {
   display: grid;
@@ -3047,6 +3049,7 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-kpis {
   display: grid;
+  width: 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
@@ -3102,8 +3105,10 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
-  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 520px);
+  gap: 18px;
 }
 .gl-studio-panel {
   min-width: 0;
@@ -3244,7 +3249,9 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-live-hero {
   display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(0, 1.05fr);
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(420px, 0.95fr) minmax(0, 1.05fr);
   gap: 18px;
   align-items: stretch;
 }
@@ -3296,7 +3303,9 @@ button.gl-fan-badge-empty {
 /* Creator studio */
 .gl-creator-studio-page {
   display: flex;
-  max-width: 1360px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   flex-direction: column;
   gap: 18px;
 }
@@ -3353,6 +3362,7 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-kpis {
   display: grid;
+  width: 100%;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
@@ -3401,8 +3411,10 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
-  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 500px);
+  gap: 18px;
 }
 .gl-creator-panel,
 .gl-creator-preview-panel,
@@ -3516,9 +3528,11 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-prepare {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 460px);
   align-items: start;
-  gap: 16px;
+  gap: 18px;
 }
 .gl-creator-flow {
   display: flex;
@@ -3945,9 +3959,12 @@ button.gl-fan-badge-empty {
 }
 .gl-live-console {
   display: flex;
+  width: 100%;
+  min-height: calc(100vh - 56px);
+  min-width: 0;
+  max-width: none;
   flex-direction: column;
   gap: 14px;
-  max-width: 1600px;
 }
 .gl-live-console-status {
   display: flex;
@@ -4011,27 +4028,49 @@ button.gl-fan-badge-empty {
 }
 .gl-live-console-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) clamp(380px, 27vw, 520px);
+  gap: 18px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 .gl-live-console-main,
 .gl-live-console-rail {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 .gl-live-console-rail {
   position: sticky;
   top: 76px;
-  max-height: calc(100vh - 92px);
-  overflow-y: auto;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 .gl-live-console-rail .gl-chat {
-  height: 420px;
+  width: 100%;
+  max-width: 100%;
+  height: clamp(430px, calc(100vh - 310px), 640px);
+  max-height: none;
+  min-width: 0;
+  flex-shrink: 1;
   border-radius: 10px;
+}
+.gl-live-console-chat-panel {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
+  padding: 16px;
+}
+.gl-live-console-chat-panel .gl-creator-panel-head {
+  margin-bottom: 12px;
+}
+.gl-live-console-chat-panel .gl-live-console-danmu-row {
+  margin-bottom: 10px;
+}
+.gl-live-console-rail > .gl-creator-panel:not(.gl-live-console-chat-panel) {
+  overflow: hidden;
+  padding: 16px;
 }
 .gl-live-console-waiting {
   position: relative;
