@@ -70,7 +70,7 @@ export default function ChannelPage() {
   const primary = channelStreams[0];
   const channelName = resolveChannelName(profile, primary, channelKey, t);
   const channelAvatar = profile?.avatar || primary?.avatar || '';
-  const channelCover = profile?.cover || primary?.cover || '';
+  const channelCover = resolveChannelCover(profile);
   const channelId =
     primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
@@ -501,6 +501,10 @@ function resolveChannelName(
   if (stream) return streamChannelName(stream);
   if (key && !isUuidLike(key)) return key;
   return t('channel.creatorFallback');
+}
+
+export function resolveChannelCover(profile: User | null): string {
+  return profile?.cover || '';
 }
 
 function matchesChannel(stream: Stream, key: string, profile: User | null): boolean {
