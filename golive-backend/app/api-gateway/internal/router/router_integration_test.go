@@ -129,6 +129,21 @@ func TestRoute_UploadCoversForwardToUserService(t *testing.T) {
 	require.Nil(t, room.last)
 }
 
+func TestRoute_UploadCoversFallbackToRoomService(t *testing.T) {
+	user := newUpstreamSpy(t, 404, `not found`)
+	room := newUpstreamSpy(t, 200, `room-cover`)
+	gift := newUpstreamSpy(t, 200, `{}`)
+
+	r := newGateway(t, baseCfg(user.srv.URL, room.srv.URL, gift.srv.URL))
+
+	w := newRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/api/uploads/covers/live.webp", nil))
+	require.Equal(t, 200, w.Code)
+	require.Equal(t, "room-cover", w.Body.String())
+	require.Equal(t, "/uploads/covers/live.webp", user.last.URL.Path)
+	require.Equal(t, "/uploads/covers/live.webp", room.last.URL.Path)
+}
+
 func TestRoute_PublicChatHistoryNoAuth(t *testing.T) {
 	user := newUpstreamSpy(t, 200, `{}`)
 	room := newUpstreamSpy(t, 200, `{}`)

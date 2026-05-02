@@ -11,6 +11,7 @@
 package router
 
 import (
+	"bytes"
 	"net/http"
 	"net/url"
 	"strings"
@@ -118,10 +119,72 @@ func publicRoutes() []middleware.PublicRoute {
 func uploadProxy(userProxy, roomProxy http.Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		action := c.Param("action")
-		if strings.HasPrefix(action, "/avatars/") || strings.HasPrefix(action, "/covers/") {
+		if strings.HasPrefix(action, "/avatars/") {
 			userProxy.ServeHTTP(c.Writer, c.Request)
 			return
 		}
+		if strings.HasPrefix(action, "/covers/") {
+			serveCoverUpload(c, userProxy, roomProxy)
+			return
+		}
 		roomProxy.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func serveCoverUpload(c *gin.Context, userProxy, roomProxy http.Handler) {
+	if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+		userProxy.ServeHTTP(c.Writer, c.Request)
+		return
+	}
+
+	rec := newCaptureWriter()
+	userProxy.ServeHTTP(rec, c.Request)
+	if rec.status != http.StatusNotFound {
+		rec.replay(c.Writer, c.Request.Method == http.MethodHead)
+		return
+	}
+	roomProxy.ServeHTTP(c.Writer, c.Request)
+}
+
+type captureWriter struct {
+	header http.Header
+	body   bytes.Buffer
+	status int
+}
+
+func newCaptureWriter() *captureWriter {
+	return &captureWriter{header: make(http.Header)}
+}
+
+func (w *captureWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *captureWriter) WriteHeader(status int) {
+	if w.status == 0 {
+		w.status = status
+	}
+}
+
+func (w *captureWriter) Write(p []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.body.Write(p)
+}
+
+func (w *captureWriter) replay(dst http.ResponseWriter, head bool) {
+	for key, values := range w.header {
+		for _, value := range values {
+			dst.Header().Add(key, value)
+		}
+	}
+	status := w.status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	dst.WriteHeader(status)
+	if !head {
+		_, _ = dst.Write(w.body.Bytes())
 	}
 }

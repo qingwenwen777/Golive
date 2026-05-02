@@ -73,6 +73,7 @@ services:
     volumes:
       - ..:/app:ro
       - avatar_uploads:/tmp/golive/avatars
+      - cover_uploads:/tmp/golive/covers
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     environment:

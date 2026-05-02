@@ -22,6 +22,8 @@ jwt:
 upload:
   avatar_dir: "/tmp/golive/avatars"
   avatar_public_url: "/api/uploads/avatars"
+  cover_dir: "/tmp/golive/covers"
+  cover_public_url: "/api/uploads/covers"
 
 bootstrap:
   admin:
