@@ -275,7 +275,7 @@ function NotificationBell() {
                 <Avatar
                   name={notificationActorName(item)}
                   src={item.actorAvatar}
-                  size={38}
+                  size={42}
                   className="gl-notification-avatar"
                 />
                 <span className="gl-notification-copy">
