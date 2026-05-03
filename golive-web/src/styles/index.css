@@ -4285,7 +4285,7 @@ button.gl-fan-badge-empty {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.gl-room-mod-status {
+.gl-room-mod-user-row .gl-room-mod-status {
   grid-column: 3;
   display: inline-flex;
   align-self: center;
@@ -4333,7 +4333,7 @@ button.gl-fan-badge-empty {
   background: rgba(248, 113, 113, 0.1);
   color: #fecaca;
 }
-.dark .gl-room-mod-status {
+.dark .gl-room-mod-user-row .gl-room-mod-status {
   border-color: rgba(74, 222, 128, 0.3);
   background: rgba(34, 197, 94, 0.14);
   color: #bbf7d0 !important;

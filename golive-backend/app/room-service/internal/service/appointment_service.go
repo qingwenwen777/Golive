@@ -402,17 +402,18 @@ func (s *AppointmentService) Notifications(ctx context.Context, userID string, p
 	}
 	out := make([]NotificationDTO, 0, len(items))
 	for _, item := range items {
+		actor := s.notificationActorFromNotification(ctx, item)
 		dto := NotificationDTO{
 			ID:            item.ID,
 			Type:          item.Type,
 			Title:         item.Title,
 			Body:          item.Body,
 			Link:          item.Link,
-			ActorID:       item.ActorID,
-			ActorUsername: item.ActorUsername,
-			ActorName:     item.ActorName,
-			ActorAvatar:   item.ActorAvatar,
-			ActorVerified: item.ActorVerified,
+			ActorID:       actor.id,
+			ActorUsername: actor.username,
+			ActorName:     actor.name,
+			ActorAvatar:   actor.avatar,
+			ActorVerified: actor.verified,
 			CreatedAt:     item.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if item.ReadAt != nil {
@@ -421,6 +422,71 @@ func (s *AppointmentService) Notifications(ctx context.Context, userID string, p
 		out = append(out, dto)
 	}
 	return &NotificationListResp{Items: out, Total: total, Unread: unread, Page: page, Size: size}, nil
+}
+
+func (s *AppointmentService) notificationActorFromNotification(ctx context.Context, item model.Notification) notificationActor {
+	actor := notificationActor{
+		id:       strings.TrimSpace(item.ActorID),
+		username: strings.TrimSpace(item.ActorUsername),
+		name:     strings.TrimSpace(item.ActorName),
+		avatar:   strings.TrimSpace(item.ActorAvatar),
+		verified: item.ActorVerified,
+	}
+	if roomID := notificationRoomID(item.Link); roomID != "" {
+		if room, err := s.rooms.GetByID(ctx, roomID); err == nil && room != nil {
+			if actor.id == "" {
+				actor.id = room.OwnerID
+			}
+			if actor.name == "" {
+				actor.name = room.Channel
+			}
+			if actor.avatar == "" {
+				actor.avatar = room.Avatar
+			}
+			actor.verified = actor.verified || room.Verified
+		}
+	}
+	if actor.id != "" {
+		actor = s.applyNotificationOwnerProfile(ctx, actor, actor.id)
+	}
+	return actor
+}
+
+func (s *AppointmentService) applyNotificationOwnerProfile(ctx context.Context, actor notificationActor, ownerID string) notificationActor {
+	profile, err := s.rooms.OwnerProfile(ctx, ownerID)
+	if err != nil {
+		return actor
+	}
+	if actor.id == "" {
+		actor.id = profile.ID
+	}
+	actor.username = strings.TrimSpace(profile.Username)
+	name := strings.TrimSpace(profile.DisplayName)
+	if name == "" {
+		name = actor.username
+	}
+	if name != "" {
+		actor.name = name
+	}
+	if avatar := strings.TrimSpace(profile.Avatar); avatar != "" {
+		actor.avatar = avatar
+	}
+	actor.verified = actor.verified || profile.Verified
+	return actor
+}
+
+func notificationRoomID(link string) string {
+	link = strings.TrimSpace(link)
+	const prefix = "/live/"
+	idx := strings.Index(link, prefix)
+	if idx < 0 {
+		return ""
+	}
+	roomID := link[idx+len(prefix):]
+	if cut := strings.IndexAny(roomID, "?#/"); cut >= 0 {
+		roomID = roomID[:cut]
+	}
+	return strings.TrimSpace(roomID)
 }
 
 func (s *AppointmentService) MarkNotificationRead(ctx context.Context, userID, id string) error {
