@@ -41,6 +41,10 @@ type CreatePostReq struct {
 	CommentMode     string   `json:"commentMode"`
 }
 
+type UpdatePostVisibilityReq struct {
+	Visibility string `json:"visibility"`
+}
+
 type CreateCommentReq struct {
 	Content  string `json:"content"`
 	ParentID string `json:"parentId"`
@@ -206,6 +210,72 @@ func (s *PostService) ListChannel(ctx context.Context, viewerID, channelKey stri
 		return nil, err
 	}
 	return &PostListResp{Items: items, Total: total, Page: page, Size: size}, nil
+}
+
+func (s *PostService) ListSubscriptionLatest(ctx context.Context, viewerID string, size int) (*PostListResp, error) {
+	if viewerID == "" {
+		return nil, errcode.ErrUnauthorized
+	}
+	if s.social == nil {
+		return &PostListResp{Items: []ChannelPostDTO{}, Total: 0, Page: 1, Size: size}, nil
+	}
+	_, size = normalizeListPage(1, size)
+	channelIDs, err := s.social.Following(ctx, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	ownerIDs := make([]string, 0, len(channelIDs))
+	seen := map[string]bool{}
+	for _, channelID := range channelIDs {
+		ownerID := ownerIDFromChannelID(channelID)
+		if ownerID == "" && s.rooms != nil {
+			resolved, err := s.rooms.ResolveOwnerID(ctx, channelID)
+			if errors.Is(err, repo.ErrRoomNotFound) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			ownerID = resolved
+		}
+		if ownerID == "" || seen[ownerID] {
+			continue
+		}
+		seen[ownerID] = true
+		ownerIDs = append(ownerIDs, ownerID)
+	}
+	if len(ownerIDs) == 0 {
+		return &PostListResp{Items: []ChannelPostDTO{}, Total: 0, Page: 1, Size: size}, nil
+	}
+	posts, total, err := s.posts.ListLatestVisibleByOwners(ctx, ownerIDs, []string{
+		model.PostVisibilityPublic,
+		model.PostVisibilityFollowers,
+	}, size)
+	if err != nil {
+		return nil, err
+	}
+	items, err := s.postsToDTO(ctx, posts, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	return &PostListResp{Items: items, Total: total, Page: 1, Size: size}, nil
+}
+
+func (s *PostService) UpdatePostVisibility(ctx context.Context, ownerID, postID string, req UpdatePostVisibilityReq) (*ChannelPostDTO, error) {
+	if ownerID == "" {
+		return nil, errcode.ErrUnauthorized
+	}
+	visibility := normalizePostVisibility(req.Visibility)
+	post, err := s.posts.UpdatePostVisibility(ctx, ownerID, postID, visibility)
+	if err != nil {
+		return nil, postError(err)
+	}
+	author := s.authorForUser(ctx, ownerID)
+	dto, err := s.postDTO(ctx, *post, ownerID, author, false)
+	if err != nil {
+		return nil, err
+	}
+	return &dto, nil
 }
 
 func (s *PostService) DeletePost(ctx context.Context, ownerID, postID string) error {

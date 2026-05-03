@@ -109,6 +109,94 @@ func TestPosts_VisibilityAndFollowerComments(t *testing.T) {
 	require.True(t, owner.Items[0].CanDelete)
 }
 
+func TestPosts_DisabledCommentsStayDisabled(t *testing.T) {
+	fx := newPostFixture(t)
+	ctx := context.Background()
+	disabled := false
+	post, err := fx.svc.CreatePost(ctx, "creator-1", service.CreatePostReq{
+		Content:         "quiet note",
+		Visibility:      "public",
+		CommentsEnabled: &disabled,
+		CommentMode:     "everyone",
+	})
+	require.NoError(t, err)
+	require.False(t, post.CommentsEnabled)
+	require.False(t, post.CanComment)
+
+	listed, err := fx.svc.ListChannel(ctx, "viewer-1", "creator", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	require.False(t, listed.Items[0].CommentsEnabled)
+	require.False(t, listed.Items[0].CanComment)
+
+	_, err = fx.svc.CreateComment(ctx, "viewer-1", post.ID, service.CreateCommentReq{Content: "should fail"})
+	require.Error(t, err)
+}
+
+func TestPosts_OwnerCanUpdateVisibility(t *testing.T) {
+	fx := newPostFixture(t)
+	ctx := context.Background()
+	enabled := true
+	post, err := fx.svc.CreatePost(ctx, "creator-1", service.CreatePostReq{
+		Content:         "visibility note",
+		Visibility:      "public",
+		CommentsEnabled: &enabled,
+	})
+	require.NoError(t, err)
+
+	updated, err := fx.svc.UpdatePostVisibility(ctx, "creator-1", post.ID, service.UpdatePostVisibilityReq{Visibility: "private"})
+	require.NoError(t, err)
+	require.Equal(t, "private", updated.Visibility)
+
+	viewer, err := fx.svc.ListChannel(ctx, "viewer-1", "creator", 1, 10)
+	require.NoError(t, err)
+	require.Empty(t, viewer.Items)
+
+	owner, err := fx.svc.ListChannel(ctx, "creator-1", "creator", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, owner.Items, 1)
+	require.Equal(t, "private", owner.Items[0].Visibility)
+
+	_, err = fx.svc.UpdatePostVisibility(ctx, "viewer-1", post.ID, service.UpdatePostVisibilityReq{Visibility: "public"})
+	require.Error(t, err)
+}
+
+func TestPosts_SubscriptionLatestReturnsLatestVisiblePerFollowedCreator(t *testing.T) {
+	fx := newPostFixture(t)
+	ctx := context.Background()
+	enabled := true
+	_, err := fx.svc.CreatePost(ctx, "creator-1", service.CreatePostReq{
+		Content:         "old public",
+		Visibility:      "public",
+		CommentsEnabled: &enabled,
+	})
+	require.NoError(t, err)
+	time.Sleep(2 * time.Millisecond)
+	latestVisible, err := fx.svc.CreatePost(ctx, "creator-1", service.CreatePostReq{
+		Content:         "latest visible",
+		Visibility:      "followers",
+		CommentsEnabled: &enabled,
+	})
+	require.NoError(t, err)
+	time.Sleep(2 * time.Millisecond)
+	_, err = fx.svc.CreatePost(ctx, "creator-1", service.CreatePostReq{
+		Content:         "private newer",
+		Visibility:      "private",
+		CommentsEnabled: &enabled,
+	})
+	require.NoError(t, err)
+
+	resp, err := fx.svc.ListSubscriptionLatest(ctx, "fan-1", 8)
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, latestVisible.ID, resp.Items[0].ID)
+	require.Equal(t, "latest visible", resp.Items[0].Content)
+
+	empty, err := fx.svc.ListSubscriptionLatest(ctx, "viewer-1", 8)
+	require.NoError(t, err)
+	require.Empty(t, empty.Items)
+}
+
 func TestPosts_ReplyDepthAndOwnerDeletesThread(t *testing.T) {
 	fx := newPostFixture(t)
 	ctx := context.Background()

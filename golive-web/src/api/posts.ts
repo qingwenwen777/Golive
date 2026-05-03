@@ -74,6 +74,11 @@ export interface CreateCommentPayload {
   parentId?: string;
 }
 
+export interface UpdatePostVisibilityPayload {
+  postId: string;
+  visibility: PostVisibility;
+}
+
 export interface PostLikeState {
   postId: string;
   liked: boolean;
@@ -120,6 +125,23 @@ export function useChannelPosts(channelKey: string, enabled = true, page = 1, si
   });
 }
 
+export function useSubscriptionPosts(enabled = true, size = 8) {
+  return useQuery<PostListResp, Error>({
+    queryKey: ['subscription-posts', size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<PostListResp>('/subscriptions/posts', {
+        params: { size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
 export function useCreatePost() {
   const qc = useQueryClient();
   return useMutation<ChannelPost, Error, CreatePostPayload>({
@@ -130,6 +152,35 @@ export function useCreatePost() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['studio-posts'] });
       void qc.invalidateQueries({ queryKey: ['channel-posts'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-posts'] });
+    },
+  });
+}
+
+export function useUpdatePostVisibility() {
+  const qc = useQueryClient();
+  return useMutation<ChannelPost, Error, UpdatePostVisibilityPayload>({
+    mutationFn: async ({ postId, visibility }) => {
+      const { data } = await http.patch<ChannelPost>(`/rooms/posts/${encodeURIComponent(postId)}`, {
+        visibility,
+      });
+      return data;
+    },
+    onSuccess: (post) => {
+      qc.setQueriesData<PostListResp>({ queryKey: ['studio-posts'] }, (old) =>
+        patchPost(old, post),
+      );
+      qc.setQueriesData<PostListResp>({ queryKey: ['channel-posts'] }, (old) =>
+        patchPost(old, post),
+      );
+      qc.setQueriesData<PostListResp>({ queryKey: ['subscription-posts'] }, (old) =>
+        patchPost(old, post),
+      );
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['studio-posts'] });
+      void qc.invalidateQueries({ queryKey: ['channel-posts'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-posts'] });
     },
   });
 }
@@ -144,6 +195,7 @@ export function useDeletePost() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['studio-posts'] });
       void qc.invalidateQueries({ queryKey: ['channel-posts'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-posts'] });
       void qc.invalidateQueries({ queryKey: ['post-comments'] });
     },
   });
@@ -192,6 +244,7 @@ export function useCreatePostComment(postId: string) {
       void qc.invalidateQueries({ queryKey: ['post-comments', postId] });
       void qc.invalidateQueries({ queryKey: ['studio-posts'] });
       void qc.invalidateQueries({ queryKey: ['channel-posts'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-posts'] });
     },
   });
 }
@@ -209,6 +262,7 @@ export function useDeletePostComment(postId: string) {
       void qc.invalidateQueries({ queryKey: ['post-comments', postId] });
       void qc.invalidateQueries({ queryKey: ['studio-posts'] });
       void qc.invalidateQueries({ queryKey: ['channel-posts'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-posts'] });
     },
   });
 }
@@ -231,10 +285,14 @@ export function useTogglePostLike(postId: string) {
       qc.setQueriesData<PostListResp>({ queryKey: ['channel-posts'] }, (old) =>
         patchPostLike(old, postId, state.liked, state.likes),
       );
+      qc.setQueriesData<PostListResp>({ queryKey: ['subscription-posts'] }, (old) =>
+        patchPostLike(old, postId, state.liked, state.likes),
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['studio-posts'] });
       void qc.invalidateQueries({ queryKey: ['channel-posts'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-posts'] });
     },
   });
 }
@@ -282,6 +340,14 @@ function patchPostLike(
     items: old.items.map((item) =>
       item.id === postId ? { ...item, liked, likeCount: likes } : item,
     ),
+  };
+}
+
+function patchPost(old: PostListResp | undefined, post: ChannelPost): PostListResp | undefined {
+  if (!old) return old;
+  return {
+    ...old,
+    items: old.items.map((item) => (item.id === post.id ? post : item)),
   };
 }
 

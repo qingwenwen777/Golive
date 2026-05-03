@@ -47,6 +47,7 @@ func NewRouter(d Deps) *gin.Engine {
 
 	r.GET("/subscriptions", auth, socialH.ListSubscriptions)
 	r.GET("/subscriptions/appointments", auth, appointmentH.ListSubscriptionAppointments)
+	r.GET("/subscriptions/posts", auth, postH.ListSubscriptionLatest)
 	r.GET("/appointments/my", auth, appointmentH.ListReserved)
 	r.GET("/notifications", auth, appointmentH.Notifications)
 	r.PATCH("/notifications/read-all", auth, appointmentH.MarkAllNotificationsRead)
@@ -76,6 +77,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.GET("/posts/mine", auth, postH.ListMine)
 		rooms.POST("/posts", auth, postH.Create)
 		rooms.POST("/posts/images", auth, postH.UploadImage)
+		rooms.PATCH("/posts/:postID", auth, postH.UpdateVisibility)
 		rooms.DELETE("/posts/:postID", auth, postH.Delete)
 		rooms.GET("/posts/:postID/comments", optionalAuth, postH.ListComments)
 		rooms.POST("/posts/:postID/comments", auth, postH.CreateComment)

@@ -77,7 +77,16 @@ u.verified
 }
 
 func (r *PostRepo) CreatePost(ctx context.Context, post *model.ChannelPost) error {
-	return r.db.WithContext(ctx).Create(post).Error
+	commentsEnabled := post.CommentsEnabled
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(post).Error; err != nil {
+			return err
+		}
+		post.CommentsEnabled = commentsEnabled
+		return tx.Model(&model.ChannelPost{}).
+			Where("id = ?", post.ID).
+			UpdateColumn("comments_enabled", commentsEnabled).Error
+	})
 }
 
 func (r *PostRepo) GetPost(ctx context.Context, postID string) (*model.ChannelPost, error) {
@@ -105,6 +114,64 @@ func (r *PostRepo) ListVisibleByOwner(ctx context.Context, ownerID string, visib
 		tx = tx.Where("visibility IN ?", visibilities)
 	}
 	return listPosts(tx, page, size)
+}
+
+func (r *PostRepo) ListLatestVisibleByOwners(ctx context.Context, ownerIDs, visibilities []string, limit int) ([]model.ChannelPost, int64, error) {
+	if len(ownerIDs) == 0 {
+		return []model.ChannelPost{}, 0, nil
+	}
+	if len(visibilities) == 0 {
+		visibilities = []string{model.PostVisibilityPublic}
+	}
+	if limit < 1 {
+		limit = 8
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	var total int64
+	if err := r.db.WithContext(ctx).
+		Model(&model.ChannelPost{}).
+		Where("owner_id IN ? AND visibility IN ?", ownerIDs, visibilities).
+		Distinct("owner_id").
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var posts []model.ChannelPost
+	err := r.db.WithContext(ctx).
+		Raw(`
+SELECT id, owner_id, channel_id, content, images_json, visibility, comments_enabled, comment_mode, like_count, comment_count, created_at, updated_at, deleted_at
+FROM (
+	SELECT channel_posts.*,
+		ROW_NUMBER() OVER (PARTITION BY owner_id ORDER BY created_at DESC, id DESC) AS rn
+	FROM channel_posts
+	WHERE deleted_at IS NULL AND owner_id IN ? AND visibility IN ?
+) AS ranked_posts
+WHERE rn = 1
+ORDER BY created_at DESC, id DESC
+LIMIT ?`, ownerIDs, visibilities, limit).
+		Scan(&posts).Error
+	return posts, total, err
+}
+
+func (r *PostRepo) UpdatePostVisibility(ctx context.Context, ownerID, postID, visibility string) (*model.ChannelPost, error) {
+	var post model.ChannelPost
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND owner_id = ?", postID, ownerID).Take(&post).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrPostNotFound
+			}
+			return err
+		}
+		if err := tx.Model(&post).Update("visibility", visibility).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", postID).Take(&post).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &post, nil
 }
 
 func listPosts(tx *gorm.DB, page, size int) ([]model.ChannelPost, int64, error) {

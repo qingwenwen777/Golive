@@ -63,6 +63,21 @@ func (h *PostHandler) ListChannel(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *PostHandler) ListSubscriptionLatest(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, errcode.ErrUnauthorized)
+		return
+	}
+	_, size := postPageQuery(c, 1, 8)
+	resp, err := h.svc.ListSubscriptionLatest(c.Request.Context(), uid, size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *PostHandler) Create(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {
@@ -75,6 +90,25 @@ func (h *PostHandler) Create(c *gin.Context) {
 		return
 	}
 	post, err := h.svc.CreatePost(c.Request.Context(), uid, req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, post)
+}
+
+func (h *PostHandler) UpdateVisibility(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, errcode.ErrUnauthorized)
+		return
+	}
+	var req service.UpdatePostVisibilityReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	post, err := h.svc.UpdatePostVisibility(c.Request.Context(), uid, c.Param("postID"), req)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

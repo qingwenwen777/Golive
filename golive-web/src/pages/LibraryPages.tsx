@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock3,
   Crown,
+  FileText,
   Heart,
   History,
   KeyRound,
@@ -30,12 +31,14 @@ import {
 import { toast } from 'sonner';
 import { useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
 import { useFanBadges } from '@/api/gift';
+import { useSubscriptionPosts } from '@/api/posts';
 import { useRooms, useSubscriptions, useSubscriptionAppointments } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
+import { PostCard } from '@/features/posts/PostCard';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import {
   LIKED_STREAMS_KEY,
@@ -62,6 +65,7 @@ export function SubscriptionsPage() {
   const [appointmentPage, setAppointmentPage] = useState(1);
   const subscriptions = useSubscriptions(isAuthed);
   const subscriptionAppointments = useSubscriptionAppointments(isAuthed, appointmentPage, 8);
+  const subscriptionPosts = useSubscriptionPosts(isAuthed, 8);
   const channels = subscriptions.data?.items ?? [];
   const appointmentTotal = subscriptionAppointments.data?.total ?? 0;
   const appointmentPageSize = subscriptionAppointments.data?.size ?? 8;
@@ -187,6 +191,35 @@ export function SubscriptionsPage() {
             {isAuthed
               ? t('library.subscriptions.appointments.empty', { defaultValue: 'No upcoming appointments from your subscriptions.' })
               : t('library.subscriptions.appointments.signIn', { defaultValue: 'Sign in to browse appointment schedules.' })}
+          </div>
+        )}
+      </section>
+
+      <section className="gl-library-section">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('library.subscriptions.posts.title', { defaultValue: '订阅主播的最新动态' })}</h2>
+            <span>{t('library.subscriptions.posts.subtitle', { defaultValue: '每位已订阅主播最近发布的一条动态会显示在这里。' })}</span>
+          </div>
+          <FileText size={22} />
+        </div>
+        {isAuthed && subscriptionPosts.isPending ? (
+          <div className="gl-post-feed-list gl-subscription-post-feed" aria-busy="true">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div className="gl-post-card is-loading" key={index} />
+            ))}
+          </div>
+        ) : isAuthed && subscriptionPosts.data?.items.length ? (
+          <div className="gl-post-feed-list gl-subscription-post-feed">
+            {subscriptionPosts.data.items.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        ) : (
+          <div className="gl-creator-empty-soft">
+            {isAuthed
+              ? t('library.subscriptions.posts.empty', { defaultValue: '你订阅的主播暂时还没有发布动态。' })
+              : t('library.subscriptions.posts.signIn', { defaultValue: '登录后查看订阅主播的动态。' })}
           </div>
         )}
       </section>

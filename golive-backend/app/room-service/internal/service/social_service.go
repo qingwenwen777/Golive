@@ -142,10 +142,24 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 		if err != nil {
 			return nil, err
 		}
+		profile, hasProfile, err := s.ownerProfileForChannel(ctx, channelID)
+		if err != nil {
+			return nil, err
+		}
+		name := fallbackChannelName(channelID)
+		avatar := ""
+		verified := false
+		if hasProfile {
+			name = ownerProfileName(profile)
+			avatar = strings.TrimSpace(profile.Avatar)
+			verified = profile.Verified
+		}
 		item := SubscriptionChannel{
 			Key:             channelID,
 			ChannelID:       channelID,
-			Name:            fallbackChannelName(channelID),
+			Name:            name,
+			Avatar:          avatar,
+			Verified:        verified,
 			Status:          model.StatusEnded,
 			SubscriberCount: count,
 		}
@@ -153,12 +167,14 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 			stream := room.ToStream(time.Now())
 			stream.SubscriberCount = count
 			item.Key = room.ChannelID
-			item.Name = fallbackStreamChannelName(room)
-			item.Avatar = room.Avatar
-			item.Verified = room.Verified
 			item.Live = room.Status == model.StatusLive
 			item.Status = room.Status
 			item.Stream = &stream
+			if !hasProfile {
+				item.Name = fallbackStreamChannelName(room)
+				item.Avatar = strings.TrimSpace(room.Avatar)
+				item.Verified = room.Verified
+			}
 		}
 		if strings.TrimSpace(item.Avatar) == "" {
 			item.Avatar = generatedAvatar(item.Name)
@@ -169,12 +185,16 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 				Channel:         item.Name,
 				ChannelID:       channelID,
 				Avatar:          item.Avatar,
+				Verified:        item.Verified,
 				Status:          model.StatusEnded,
 				IsLive:          false,
 				SubscriberCount: count,
 			}
-		} else if strings.TrimSpace(item.Stream.Avatar) == "" {
+		} else {
+			item.Stream.Channel = item.Name
+			item.Stream.ChannelID = item.ChannelID
 			item.Stream.Avatar = item.Avatar
+			item.Stream.Verified = item.Verified
 		}
 		items = append(items, item)
 	}
@@ -307,6 +327,31 @@ func (s *SocialService) isSelfChannel(ctx context.Context, uid, channelID string
 	return ownerID == uid, nil
 }
 
+func (s *SocialService) ownerProfileForChannel(ctx context.Context, channelID string) (repo.OwnerProfile, bool, error) {
+	if s.rooms == nil || strings.TrimSpace(channelID) == "" {
+		return repo.OwnerProfile{}, false, nil
+	}
+	ownerID := ownerIDFromChannelID(channelID)
+	if ownerID == "" {
+		resolved, err := s.rooms.ResolveOwnerID(ctx, channelID)
+		if errors.Is(err, repo.ErrRoomNotFound) {
+			return repo.OwnerProfile{}, false, nil
+		}
+		if err != nil {
+			return repo.OwnerProfile{}, false, err
+		}
+		ownerID = resolved
+	}
+	profile, err := s.rooms.OwnerProfile(ctx, ownerID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		return repo.OwnerProfile{}, false, nil
+	}
+	if err != nil {
+		return repo.OwnerProfile{}, false, err
+	}
+	return profile, true, nil
+}
+
 func ownerIDFromChannelID(channelID string) string {
 	if strings.HasPrefix(channelID, "ch-") {
 		return strings.TrimPrefix(channelID, "ch-")
@@ -316,6 +361,23 @@ func ownerIDFromChannelID(channelID string) string {
 
 func fallbackChannelName(channelID string) string {
 	id := strings.TrimPrefix(channelID, "ch-")
+	if len(id) > 8 {
+		id = id[:8]
+	}
+	if id == "" {
+		return "Creator"
+	}
+	return "Creator " + id
+}
+
+func ownerProfileName(profile repo.OwnerProfile) string {
+	for _, value := range []string{profile.DisplayName, profile.Username} {
+		name := strings.TrimSpace(value)
+		if name != "" && !repo.IsUUIDLike(name) {
+			return name
+		}
+	}
+	id := strings.TrimSpace(profile.ID)
 	if len(id) > 8 {
 		id = id[:8]
 	}

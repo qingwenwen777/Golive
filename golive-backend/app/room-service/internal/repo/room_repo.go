@@ -138,6 +138,9 @@ func (r *RoomRepo) OwnerProfile(ctx context.Context, ownerID string) (OwnerProfi
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return OwnerProfile{}, ErrRoomNotFound
 	}
+	if isMissingTable(err) {
+		return OwnerProfile{}, ErrRoomNotFound
+	}
 	return row, err
 }
 

@@ -54,6 +54,98 @@ func TestFollow_PopulatesSubscriberCountAndListing(t *testing.T) {
 	require.NotNil(t, resp.Items[0].Stream, "stream placeholder must be set so the grid can render the channel")
 }
 
+func TestListSubscriptionsUsesOwnerProfileWithoutRoomHistory(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+	require.NoError(t, db.Exec(`
+CREATE TABLE users (
+	id varchar(36) primary key,
+	username varchar(64),
+	display_name varchar(64),
+	avatar varchar(500),
+	verified boolean,
+	updated_at datetime
+)`).Error)
+
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"creator-1", "kabun", "Kabun Live", "/uploads/avatars/kabun.jpg", true, time.Now(),
+	).Error)
+
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	svc := service.NewSocialService(repo.NewSocialRepo(rdb), rooms)
+	_, err = svc.Follow(ctx, "viewer-1", "ch-creator-1")
+	require.NoError(t, err)
+
+	resp, err := svc.ListSubscriptions(ctx, "viewer-1")
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "ch-creator-1", resp.Items[0].ChannelID)
+	require.Equal(t, "Kabun Live", resp.Items[0].Name)
+	require.Equal(t, "/uploads/avatars/kabun.jpg", resp.Items[0].Avatar)
+	require.True(t, resp.Items[0].Verified)
+	require.NotNil(t, resp.Items[0].Stream)
+	require.Equal(t, "Kabun Live", resp.Items[0].Stream.Channel)
+	require.Equal(t, "/uploads/avatars/kabun.jpg", resp.Items[0].Stream.Avatar)
+	require.True(t, resp.Items[0].Stream.Verified)
+	require.False(t, resp.Items[0].Live)
+}
+
+func TestListSubscriptionsPrefersCurrentOwnerProfileOverOldRoomMetadata(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+	require.NoError(t, db.Exec(`
+CREATE TABLE users (
+	id varchar(36) primary key,
+	username varchar(64),
+	display_name varchar(64),
+	avatar varchar(500),
+	verified boolean,
+	updated_at datetime
+)`).Error)
+
+	now := time.Now()
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"creator-2", "nora", "Nora Fresh", "/uploads/avatars/nora-new.jpg", false, now,
+	).Error)
+	require.NoError(t, rooms.Upsert(ctx, &model.Room{
+		ID:        "old-live",
+		Title:     "Old title",
+		Channel:   "Old Nora",
+		ChannelID: "ch-creator-2",
+		Avatar:    "/uploads/avatars/nora-old.jpg",
+		StartedAt: now.Add(-24 * time.Hour),
+		Status:    model.StatusEnded,
+		OwnerID:   "creator-2",
+	}))
+
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	svc := service.NewSocialService(repo.NewSocialRepo(rdb), rooms)
+	_, err = svc.Follow(ctx, "viewer-1", "ch-creator-2")
+	require.NoError(t, err)
+
+	resp, err := svc.ListSubscriptions(ctx, "viewer-1")
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, "Nora Fresh", resp.Items[0].Name)
+	require.Equal(t, "/uploads/avatars/nora-new.jpg", resp.Items[0].Avatar)
+	require.NotNil(t, resp.Items[0].Stream)
+	require.Equal(t, "Old title", resp.Items[0].Stream.Title)
+	require.Equal(t, "Nora Fresh", resp.Items[0].Stream.Channel)
+	require.Equal(t, "/uploads/avatars/nora-new.jpg", resp.Items[0].Stream.Avatar)
+}
+
 func TestFollow_Toggle(t *testing.T) {
 	svc, _ := newSocialSvc(t)
 	ctx := context.Background()

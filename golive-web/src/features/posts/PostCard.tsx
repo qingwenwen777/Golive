@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   Globe2,
   Heart,
@@ -19,8 +21,10 @@ import {
   usePostComments,
   useToggleCommentLike,
   useTogglePostLike,
+  useUpdatePostVisibility,
   type ChannelPost,
   type PostComment,
+  type PostVisibility,
 } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
@@ -35,13 +39,16 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [replyTarget, setReplyTarget] = useState<PostComment | null>(null);
+  const [collapsedReplies, setCollapsedReplies] = useState<Record<string, boolean>>({});
   const comments = usePostComments(post.id, commentsOpen);
   const createComment = useCreatePostComment(post.id);
   const deletePost = useDeletePost();
   const toggleLike = useTogglePostLike(post.id);
+  const updateVisibility = useUpdatePostVisibility();
   const meta = visibilityMeta(post, t);
   const CommentMetaIcon = post.commentsEnabled && post.commentMode === 'followers' ? Users : MessageCircle;
   const hasPostBody = Boolean(post.content.trim() || post.images.length > 0);
+  const commentTree = useMemo(() => buildCommentTree(comments.data?.items ?? []), [comments.data?.items]);
 
   const submitComment = (event: FormEvent) => {
     event.preventDefault();
@@ -88,6 +95,17 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
     });
   };
 
+  const changeVisibility = (visibility: PostVisibility) => {
+    if (visibility === post.visibility || updateVisibility.isPending) return;
+    updateVisibility.mutate(
+      { postId: post.id, visibility },
+      {
+        onSuccess: () => toast.success(t('posts.visibility.updated', { defaultValue: '可见范围已更新。' })),
+        onError: (err) => toast.error(err.message || t('posts.visibility.updateFailed', { defaultValue: '可见范围更新失败。' })),
+      },
+    );
+  };
+
   const openReply = (comment: PostComment) => {
     if (!isAuthed) {
       openLogin();
@@ -96,6 +114,10 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
     if (!post.canComment) return;
     setCommentsOpen(true);
     setReplyTarget(comment);
+  };
+
+  const toggleReplies = (commentId: string) => {
+    setCollapsedReplies((current) => ({ ...current, [commentId]: !current[commentId] }));
   };
 
   return (
@@ -136,6 +158,26 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
         )}
       </header>
 
+      {post.canDelete && (
+        <div className="gl-post-owner-tools">
+          <span>{t('posts.visibility.editLabel', { defaultValue: '可见范围' })}</span>
+          <div className="gl-post-visibility-edit" aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}>
+            {postVisibilityOptions(t).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={post.visibility === option.value ? 'is-active' : undefined}
+                disabled={updateVisibility.isPending}
+                onClick={() => changeVisibility(option.value)}
+              >
+                <option.Icon size={14} />
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {hasPostBody && (
         <div className="gl-post-body">
           {post.content.trim() && <p className="gl-post-content">{post.content}</p>}
@@ -167,14 +209,16 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
         <section className="gl-post-comments">
           {comments.isPending ? (
             <div className="gl-post-comment-empty">{t('posts.comments.loading', { defaultValue: '评论加载中...' })}</div>
-          ) : comments.data?.items.length ? (
+          ) : commentTree.length ? (
             <div className="gl-post-comment-list">
-              {comments.data.items.map((comment) => (
+              {commentTree.map((comment) => (
                 <PostCommentRow
                   key={comment.id}
                   comment={comment}
                   postId={post.id}
                   canComment={post.canComment}
+                  isCollapsed={(commentId) => Boolean(collapsedReplies[commentId])}
+                  onToggleReplies={toggleReplies}
                   onReply={openReply}
                 />
               ))}
@@ -227,11 +271,15 @@ function PostCommentRow({
   comment,
   postId,
   canComment,
+  isCollapsed,
+  onToggleReplies,
   onReply,
 }: {
-  comment: PostComment;
+  comment: PostCommentNode;
   postId: string;
   canComment: boolean;
+  isCollapsed: (commentId: string) => boolean;
+  onToggleReplies: (commentId: string) => void;
   onReply: (comment: PostComment) => void;
 }) {
   const { t, i18n } = useTranslation('pages');
@@ -239,6 +287,8 @@ function PostCommentRow({
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const toggleLike = useToggleCommentLike(postId, comment.id);
   const deleteComment = useDeletePostComment(postId);
+  const nestedCount = countNestedComments(comment.children);
+  const collapsed = isCollapsed(comment.id);
 
   const handleLike = () => {
     if (!isAuthed) {
@@ -284,10 +334,83 @@ function PostCommentRow({
               {t('posts.comments.delete', { defaultValue: '删除' })}
             </button>
           )}
+          {comment.children.length > 0 && (
+            <button type="button" className="gl-post-comment-collapse" onClick={() => onToggleReplies(comment.id)}>
+              {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              {collapsed
+                ? t('posts.comments.expandReplies', { count: nestedCount, defaultValue: '展开 {{count}} 条回复' })
+                : t('posts.comments.collapseReplies', { count: nestedCount, defaultValue: '收起 {{count}} 条回复' })}
+            </button>
+          )}
         </div>
+        {comment.children.length > 0 && !collapsed && (
+          <div className="gl-post-comment-children">
+            {comment.children.map((child) => (
+              <PostCommentRow
+                key={child.id}
+                comment={child}
+                postId={postId}
+                canComment={canComment}
+                isCollapsed={isCollapsed}
+                onToggleReplies={onToggleReplies}
+                onReply={onReply}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+interface PostCommentNode extends PostComment {
+  children: PostCommentNode[];
+}
+
+function buildCommentTree(items: PostComment[]): PostCommentNode[] {
+  const nodes = new Map<string, PostCommentNode>();
+  for (const item of items) {
+    nodes.set(item.id, { ...item, children: [] });
+  }
+  const roots: PostCommentNode[] = [];
+  for (const item of items) {
+    const node = nodes.get(item.id);
+    if (!node) continue;
+    const parent = item.parentId ? nodes.get(item.parentId) : undefined;
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+  }
+  roots.sort((a, b) => compareDateDesc(a.createdAt, b.createdAt));
+  const sortChildren = (node: PostCommentNode) => {
+    node.children.sort((a, b) => compareDateAsc(a.createdAt, b.createdAt));
+    node.children.forEach(sortChildren);
+  };
+  roots.forEach(sortChildren);
+  return roots;
+}
+
+function countNestedComments(items: PostCommentNode[]): number {
+  return items.reduce((sum, item) => sum + 1 + countNestedComments(item.children), 0);
+}
+
+function compareDateAsc(a: string, b: string): number {
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
+function compareDateDesc(a: string, b: string): number {
+  return new Date(b).getTime() - new Date(a).getTime();
+}
+
+function postVisibilityOptions(t: ReturnType<typeof useTranslation>['t']): Array<{
+  value: PostVisibility;
+  label: string;
+  Icon: typeof Globe2;
+}> {
+  return [
+    { value: 'public', label: t('posts.visibility.public', { defaultValue: '公开' }), Icon: Globe2 },
+    { value: 'followers', label: t('posts.visibility.followers', { defaultValue: '粉丝' }), Icon: Users },
+    { value: 'private', label: t('posts.visibility.private', { defaultValue: '仅自己' }), Icon: LockKeyhole },
+  ];
 }
 
 function visibilityMeta(post: ChannelPost, t: ReturnType<typeof useTranslation>['t']) {
