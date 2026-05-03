@@ -79,6 +79,16 @@ func main() {
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase, socialRepo)
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
+	replaySvc := service.NewReplayService(roomRepo, socialRepo, service.ReplayConfig{
+		RecordDir:       cfg.Replay.RecordDir,
+		BunnyLibraryID:  cfg.Replay.BunnyLibraryID,
+		BunnyAPIKey:     cfg.Replay.BunnyAPIKey,
+		BunnyAPIBase:    cfg.Replay.BunnyAPIBase,
+		BunnyPlayerBase: cfg.Replay.BunnyPlayerBase,
+		UploadTimeout:   cfg.Replay.UploadTimeout,
+	})
+	roomSvc.SetReplayService(replaySvc)
+	liveSvc.SetReplayService(replaySvc)
 	liveSvc.SetAppointmentRepo(appointmentRepo)
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
@@ -104,6 +114,7 @@ func main() {
 		Social:         socialSvc,
 		Posts:          postSvc,
 		Live:           liveSvc,
+		Replay:         replaySvc,
 		Appointments:   appointmentSvc,
 		Moderation:     moderationSvc,
 		Permission:     permission,

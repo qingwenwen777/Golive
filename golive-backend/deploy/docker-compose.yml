@@ -98,11 +98,14 @@ services:
       - ..:/app:ro
       - cover_uploads:/tmp/golive/covers
       - post_uploads:/tmp/golive/posts
+      - replay_records:/tmp/golive/records
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       GOPROXY: https://goproxy.cn,direct
+      ROOMSVC_REPLAY_BUNNY_LIBRARY_ID: ${BUNNY_STREAM_LIBRARY_ID:-}
+      ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
     depends_on:
       mysql:
         condition: service_healthy
@@ -214,7 +217,9 @@ services:
     logging: *default-logging
     ports:
       - "1935:1935"
-    volumes: [./srs.conf:/usr/local/srs/conf/srs.conf:ro]
+    volumes:
+      - ./srs.conf:/usr/local/srs/conf/srs.conf:ro
+      - replay_records:/tmp/golive/records
     command: ./objs/srs -c conf/srs.conf
 
   minio:
@@ -321,5 +326,6 @@ volumes:
   cover_uploads:
   post_uploads:
   avatar_uploads:
+  replay_records:
   go_mod_cache:
   go_build_cache:

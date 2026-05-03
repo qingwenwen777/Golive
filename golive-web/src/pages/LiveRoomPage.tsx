@@ -13,6 +13,7 @@ import {
   Radio,
   ShieldCheck,
   Square,
+  ThumbsUp,
   Trophy,
   UserPlus,
   X,
@@ -31,7 +32,8 @@ import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
-import { useRoom, useStopLive } from '@/api/room';
+import { useLike, useLikeState, useRoom, useStopLive } from '@/api/room';
+import { useReplayMessages } from '@/api/chat';
 import { useLatestBet } from '@/api/bet';
 import {
   useMuteRoomUser,
@@ -60,10 +62,13 @@ import {
 } from '@/features/creator/publisherSession';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { LoadableImage } from '@/components/LoadableImage';
+import { Avatar } from '@/components/Avatar';
+import { cn } from '@/lib/cn';
 import type { AppointmentItem } from '@/api/room';
 import { userDisplayName } from '@/types/user';
 import { streamChannelName, type Stream } from '@/types/stream';
 import type { FanBadge } from '@/types/gift';
+import type { Message } from '@/types/message';
 
 function fanBadgeLevel(totalContribution: number): number {
   if (totalContribution <= 0) return 1;
@@ -119,7 +124,18 @@ export default function LiveRoomPage() {
   const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
   const roomIsStarting = Boolean(stream?.status === 'publishing' && !roomIsLive);
+  const roomIsReplay = Boolean(
+    stream?.status === 'ended' && stream.replay?.canWatch && stream.replay?.embedUrl,
+  );
   const roomCanWatch = Boolean(stream && stream.status !== 'ended');
+  const [replayTime, setReplayTime] = useState(0);
+  const replayHistory = useReplayMessages(roomId, stream?.startedAt, stream?.endedAt, roomIsReplay);
+  const replayMessages = useMemo(() => {
+    if (!stream?.startedAt) return [];
+    const startMs = new Date(stream.startedAt).getTime();
+    const visibleUntil = startMs + replayTime * 1000 + 500;
+    return (replayHistory.data ?? []).filter((message) => message.ts <= visibleUntil);
+  }, [replayHistory.data, replayTime, stream?.startedAt]);
   const fanBadges = useFanBadges(isAuthed, currentUser?.id);
   const reserveAppointment = useReserveAppointment(roomId);
   const unreserveAppointment = useUnreserveAppointment(roomId);
@@ -431,6 +447,22 @@ export default function LiveRoomPage() {
       onUnmute={submitUnmute}
     />
   );
+
+  if (roomIsReplay && stream?.replay?.embedUrl) {
+    return (
+      <ReplayRoomView
+        stream={stream}
+        messages={replayMessages}
+        loadingMessages={replayHistory.isPending}
+        replayTime={replayTime}
+        onReplayTime={setReplayTime}
+        isNarrow={isNarrow}
+        isMobile={isMobile}
+        sheetOpen={sheetOpen}
+        onSheetOpenChange={setSheetOpen}
+      />
+    );
+  }
 
   if (!roomIsLive && !isScheduledRoom && !roomIsStarting) {
     if (!canShowPublisherPanel) {
@@ -1032,6 +1064,293 @@ export default function LiveRoomPage() {
       {moderationDialog}
     </>
   );
+}
+
+type BunnyPlayerInstance = {
+  on: (event: string, cb: (payload?: unknown) => void) => void;
+  getCurrentTime?: (cb: (seconds: number) => void) => void;
+};
+
+declare global {
+  interface Window {
+    playerjs?: {
+      Player: new (iframe: HTMLIFrameElement) => BunnyPlayerInstance;
+    };
+  }
+}
+
+const BUNNY_PLAYER_JS = 'https://assets.mediadelivery.net/playerjs/playerjs-latest.min.js';
+
+let bunnyPlayerScriptPromise: Promise<void> | null = null;
+
+function loadBunnyPlayerScript(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (window.playerjs?.Player) return Promise.resolve();
+  if (bunnyPlayerScriptPromise) return bunnyPlayerScriptPromise;
+  bunnyPlayerScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${BUNNY_PLAYER_JS}"]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Could not load Bunny player.')), {
+        once: true,
+      });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = BUNNY_PLAYER_JS;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Could not load Bunny player.'));
+    document.head.appendChild(script);
+  });
+  return bunnyPlayerScriptPromise;
+}
+
+function ReplayRoomView({
+  stream,
+  messages,
+  loadingMessages,
+  replayTime,
+  onReplayTime,
+  isNarrow,
+  isMobile,
+  sheetOpen,
+  onSheetOpenChange,
+}: {
+  stream: Stream;
+  messages: Message[];
+  loadingMessages: boolean;
+  replayTime: number;
+  onReplayTime: (seconds: number) => void;
+  isNarrow: boolean;
+  isMobile: boolean;
+  sheetOpen: boolean;
+  onSheetOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const chat = (
+    <Chat
+      messages={messages}
+      ownerId={stream.ownerId}
+      ownerName={stream.channel}
+      readOnly
+      showViewersTab={false}
+      readOnlyLabel={
+        loadingMessages
+          ? t('liveRoom.replay.loadingChat', { defaultValue: 'Loading replay chat...' })
+          : t('liveRoom.replay.chatReadOnly', {
+              defaultValue: 'Replay chat is read-only. Comments and SuperChat follow playback.',
+            })
+      }
+    />
+  );
+
+  return (
+    <>
+      <div
+        className={
+          isNarrow
+            ? 'grid grid-cols-1 gap-6 px-4 pb-20'
+            : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20'
+        }
+      >
+        <div className="min-w-0 flex-1 xl:pt-6">
+          <BunnyReplayPlayer stream={stream} currentTime={replayTime} onTimeChange={onReplayTime} />
+          <ReplayInfoBlock stream={stream} />
+          {isMobile && <div className="gl-mobile-chat">{chat}</div>}
+        </div>
+        {!isNarrow && <div className="gl-side-rail sticky top-20 self-start">{chat}</div>}
+      </div>
+
+      {isNarrow && !isMobile && (
+        <>
+          <button
+            className="gl-chat-fab"
+            aria-label={t('liveRoom.openChat')}
+            onClick={() => onSheetOpenChange(true)}
+          >
+            <MessageSquare size={24} />
+          </button>
+          <Sheet open={sheetOpen} onOpenChange={onSheetOpenChange}>
+            <SheetContent side="right" className="w-[402px] max-w-full p-0 sm:max-w-[402px]">
+              <SheetHeader className="sr-only">
+                <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
+              </SheetHeader>
+              {chat}
+            </SheetContent>
+          </Sheet>
+        </>
+      )}
+    </>
+  );
+}
+
+function BunnyReplayPlayer({
+  stream,
+  currentTime,
+  onTimeChange,
+}: {
+  stream: Stream;
+  currentTime: number;
+  onTimeChange: (seconds: number) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [playerError, setPlayerError] = useState('');
+  const src = useMemo(() => {
+    const raw = stream.replay?.embedUrl ?? '';
+    if (!raw) return '';
+    try {
+      const url = new URL(raw);
+      url.searchParams.set('autoplay', 'false');
+      url.searchParams.set('preload', 'true');
+      return url.toString();
+    } catch {
+      return raw;
+    }
+  }, [stream.replay?.embedUrl]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !src) return;
+    let cancelled = false;
+    let timer: number | null = null;
+
+    const readCurrentTime = (player: BunnyPlayerInstance) => {
+      player.getCurrentTime?.((seconds) => {
+        if (!cancelled && Number.isFinite(seconds)) onTimeChange(Math.max(0, seconds));
+      });
+    };
+
+    loadBunnyPlayerScript()
+      .then(() => {
+        if (cancelled || !window.playerjs?.Player || !iframeRef.current) return;
+        const player = new window.playerjs.Player(iframeRef.current);
+        player.on('ready', () => {
+          readCurrentTime(player);
+          timer = window.setInterval(() => readCurrentTime(player), 1000);
+        });
+        player.on('timeupdate', (payload) => {
+          const value =
+            typeof payload === 'number'
+              ? payload
+              : typeof payload === 'object' && payload
+                ? Number(
+                    (payload as { seconds?: number; currentTime?: number }).seconds ??
+                      (payload as { currentTime?: number }).currentTime,
+                  )
+                : Number.NaN;
+          if (Number.isFinite(value)) onTimeChange(Math.max(0, value));
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) setPlayerError(err instanceof Error ? err.message : 'Player failed');
+      });
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [onTimeChange, src]);
+
+  return (
+    <section className="gl-replay-player">
+      <iframe
+        ref={iframeRef}
+        src={src}
+        title={stream.title}
+        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+        allowFullScreen
+      />
+      <div className="gl-replay-player-top">
+        <span>{t('liveRoom.replay.badge', { defaultValue: 'Replay' })}</span>
+        <strong>{formatReplayClock(currentTime)}</strong>
+      </div>
+      {playerError && <div className="gl-replay-player-error">{playerError}</div>}
+    </section>
+  );
+}
+
+function ReplayInfoBlock({ stream }: { stream: Stream }) {
+  const { t } = useTranslation('pages');
+  const isAuthed = useIsAuthed();
+  const currentUser = useAuthStore((s) => s.user);
+  const openLogin = useAuthModalStore((s) => s.openLogin);
+  const likeState = useLikeState(stream.id, isAuthed);
+  const like = useLike(stream.id);
+  const channelName = streamChannelName(stream, currentUser);
+  const liked = likeState.data?.liked ?? false;
+  const likes =
+    likeState.data?.likes ?? Math.max(0, Math.floor((stream.peakViewers ?? stream.viewers) * 0.3));
+  const endedAt = stream.endedAt
+    ? new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(stream.endedAt))
+    : '';
+
+  const toggleLike = () => {
+    if (!isAuthed) {
+      openLogin(() => like.mutate('like'));
+      return;
+    }
+    like.mutate(liked ? 'unlike' : 'like');
+  };
+
+  return (
+    <div className="gl-replay-info">
+      <h1 className="gl-title">{stream.title}</h1>
+      <div className="gl-info-row">
+        <div className="gl-info-chan">
+          <Avatar name={channelName} src={stream.avatar} size={40} />
+          <div className="gl-info-chan-text">
+            <div className="gl-info-chan-name">
+              <span className="truncate">{channelName}</span>
+              {stream.verified && <CheckCircle2 size={14} className="text-text-secondary" />}
+            </div>
+            <div className="gl-info-chan-subs">
+              {endedAt
+                ? t('liveRoom.replay.endedAt', { time: endedAt, defaultValue: 'Ended {{time}}' })
+                : t('liveRoom.replay.ended', { defaultValue: 'Ended live replay' })}
+            </div>
+          </div>
+        </div>
+        <div className="gl-info-actions">
+          <button
+            className={cn('gl-pg-solo', liked && 'is-on')}
+            aria-label={t('liveRoom.like')}
+            aria-pressed={liked}
+            onClick={toggleLike}
+          >
+            <ThumbsUp size={18} />
+            <span>{likes.toLocaleString()}</span>
+          </button>
+        </div>
+      </div>
+      {stream.description && (
+        <div className="gl-desc">
+          <div className="gl-desc-meta">
+            <span>{stream.duration}</span>
+            <span>路</span>
+            <span className="gl-desc-tag">#{stream.category.replace(/\s+/g, '')}</span>
+          </div>
+          <div className="gl-desc-body">{stream.description}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatReplayClock(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function StartingRoomPlayer({ stream }: { stream: Stream }) {

@@ -37,6 +37,7 @@ type LiveHistoryItem struct {
 	RevenueCoin     int64            `json:"revenueCoin"`
 	NewSubscribers  int64            `json:"newSubscribers"`
 	TopFan          *FanContribution `json:"topFan,omitempty"`
+	Replay          *model.Replay    `json:"replay,omitempty"`
 }
 
 type FanContribution struct {
@@ -73,7 +74,7 @@ type LiveAnalysisResp struct {
 	SuperChatRevenue int64             `json:"superChatRevenue"`
 }
 
-func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey string, page, size int) (*LiveHistoryResp, error) {
+func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID string, page, size int) (*LiveHistoryResp, error) {
 	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelKey)
 	if err != nil {
 		if errors.Is(err, repo.ErrRoomNotFound) {
@@ -81,7 +82,7 @@ func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey string, p
 		}
 		return nil, err
 	}
-	items, _, total, err := s.historyItemsForOwner(ctx, ownerID, page, size)
+	items, _, total, err := s.historyItemsForOwner(ctx, ownerID, viewerID, page, size)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID
 		return nil, ErrForbiddenAnalytics
 	}
 
-	history, rooms, _, err := s.historyItemsForOwner(ctx, ownerID, 1, 100)
+	history, rooms, _, err := s.historyItemsForOwner(ctx, ownerID, viewerID, 1, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +172,7 @@ func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, view
 	}, nil
 }
 
-func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, page, size int) ([]LiveHistoryItem, []model.Room, int64, error) {
+func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID, viewerID string, page, size int) ([]LiveHistoryItem, []model.Room, int64, error) {
 	rooms, total, err := s.rooms.HistoryByOwner(ctx, ownerID, page, size)
 	if err != nil {
 		return nil, nil, 0, err
@@ -197,6 +198,13 @@ func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, 
 	for _, room := range rooms {
 		item := s.historyItem(room, rowsByRoom[room.ID], danmuCounts[room.ID])
 		item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
+		if s.replay != nil {
+			replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
+			if err != nil {
+				return nil, nil, 0, err
+			}
+			item.Replay = replay
+		}
 		items = append(items, item)
 	}
 	return items, rooms, total, nil

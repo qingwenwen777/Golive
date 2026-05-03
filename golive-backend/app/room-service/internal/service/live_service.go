@@ -26,6 +26,7 @@ type LiveService struct {
 	live           *repo.LiveRepo
 	appointments   *repo.AppointmentRepo
 	moderation     *repo.ModerationRepo
+	replay         *ReplayService
 	keySecret      []byte
 	keyTTL         time.Duration
 	flvBase        string
@@ -69,6 +70,10 @@ func (s *LiveService) SetAppointmentRepo(appointments *repo.AppointmentRepo) {
 
 func (s *LiveService) SetModerationRepo(moderation *repo.ModerationRepo) {
 	s.moderation = moderation
+}
+
+func (s *LiveService) SetReplayService(replay *ReplayService) {
+	s.replay = replay
 }
 
 // GoLiveReq is the body of POST /rooms/live.
@@ -119,21 +124,24 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	streamKey := s.generateKey(roomID, ownerID, now)
 
 	room := &model.Room{
-		ID:          roomID,
-		Title:       strings.TrimSpace(req.Title),
-		Description: cleanDescription(req.Description),
-		Category:    strings.TrimSpace(req.Category),
-		Cover:       req.Cover,
-		Channel:     ownerName,
-		ChannelID:   channelID,
-		Verified:    false,
-		Avatar:      cleanAvatar(req.Avatar, ownerName),
-		Viewers:     0,
-		PeakViewers: 0,
-		StartedAt:   now,
-		Status:      model.StatusPublishing,
-		OwnerID:     ownerID,
-		StreamKey:   streamKey,
+		ID:                  roomID,
+		Title:               strings.TrimSpace(req.Title),
+		Description:         cleanDescription(req.Description),
+		Category:            strings.TrimSpace(req.Category),
+		Cover:               req.Cover,
+		Channel:             ownerName,
+		ChannelID:           channelID,
+		Verified:            false,
+		Avatar:              cleanAvatar(req.Avatar, ownerName),
+		Viewers:             0,
+		PeakViewers:         0,
+		StartedAt:           now,
+		Status:              model.StatusPublishing,
+		OwnerID:             ownerID,
+		StreamKey:           streamKey,
+		ReplayUploadEnabled: false,
+		ReplayStatus:        model.ReplayStatusNone,
+		ReplayVisibility:    model.PostVisibilityPublic,
 	}
 	if err := s.rooms.Upsert(ctx, room); err != nil {
 		return nil, err
@@ -251,6 +259,9 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 		}
 		if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
 			return err
+		}
+		if s.replay != nil {
+			s.replay.EnqueueUpload(ctx, room)
 		}
 		if room.StreamKey != "" {
 			if err := s.live.Delete(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
@@ -426,6 +437,9 @@ func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID, 
 	if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
 		return err
 	}
+	if s.replay != nil {
+		s.replay.EnqueueUpload(ctx, *room)
+	}
 	if err := s.live.DeletePublishSession(ctx, streamKey); err != nil {
 		return err
 	}
@@ -454,6 +468,12 @@ func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt tim
 		if err := s.appointments.MarkCompletedByRoom(ctx, room.ID, endedAt); err != nil {
 			return err
 		}
+	}
+	if s.replay != nil && room.ReplayUploadEnabled && normalizeReplayStatus(room.ReplayStatus) == model.ReplayStatusNone {
+		if err := s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, ""); err != nil {
+			return err
+		}
+		room.ReplayStatus = model.ReplayStatusPending
 	}
 	return nil
 }

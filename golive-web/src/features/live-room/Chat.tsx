@@ -52,6 +52,9 @@ export interface ChatProps {
   chatMuted?: boolean;
   moderationRole?: 'owner' | 'moderator' | 'viewer' | string;
   onOpenModeration?: (target: ChatModerationTarget) => void;
+  readOnly?: boolean;
+  readOnlyLabel?: string;
+  showViewersTab?: boolean;
 }
 
 const EMOJI_GROUPS = [
@@ -257,9 +260,7 @@ function ChatRow({
           >
             {m.user}
           </span>
-          {isOwner && (
-            <span className="gl-chat-owner-badge">{t('liveRoom.chatPanel.host')}</span>
-          )}
+          {isOwner && <span className="gl-chat-owner-badge">{t('liveRoom.chatPanel.host')}</span>}
           {!isOwner && m.role === 'moderator' && (
             <span className="gl-chat-mod-badge">
               <ShieldCheck size={11} strokeWidth={2.5} />
@@ -293,7 +294,9 @@ function SuperChatCard({ m }: { m: SuperChatMessage }) {
       <div className="gl-sc-head" style={{ background: spec.bg }}>
         <Avatar name={m.user} src={m.avatar} size={28} />
         <span className="gl-sc-user">{m.user}</span>
-        {m.userLevel && <UserLevelBadge level={m.userLevel} size="compact" className="gl-sc-level" />}
+        {m.userLevel && (
+          <UserLevelBadge level={m.userLevel} size="compact" className="gl-sc-level" />
+        )}
         <span className="gl-sc-amt">{formatYenAmount(m.amount)}</span>
       </div>
       {m.text && (
@@ -353,9 +356,7 @@ function PinnedSuperChatCard({
         <ChevronDown className="gl-sc-pin-chevron" size={18} />
       </div>
       {expanded && (
-        <div className="gl-sc-pin-body">
-          {m.text || t('liveRoom.chatPanel.noSuperChatMessage')}
-        </div>
+        <div className="gl-sc-pin-body">{m.text || t('liveRoom.chatPanel.noSuperChatMessage')}</div>
       )}
       <span className="gl-sc-pin-progress" aria-hidden="true" />
     </button>
@@ -505,6 +506,9 @@ export function Chat({
   canModerate,
   chatMuted,
   onOpenModeration,
+  readOnly,
+  readOnlyLabel,
+  showViewersTab = true,
 }: ChatProps) {
   const { t, i18n } = useTranslation('pages');
   const locale = i18n.resolvedLanguage ?? i18n.language;
@@ -528,8 +532,10 @@ export function Chat({
   const isAuthed = useIsAuthed();
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
+  const effectiveTab = showViewersTab ? activeTab : 'chat';
 
   const trySend = () => {
+    if (readOnly) return;
     const text = inputValueRef.current.trim();
     if (!text) return;
     if (!isAuthed) {
@@ -537,7 +543,9 @@ export function Chat({
       return;
     }
     if (chatMuted) {
-      toast.error(t('liveRoom.moderation.youAreMuted', { defaultValue: '你当前已被禁言，暂时不能发言。' }));
+      toast.error(
+        t('liveRoom.moderation.youAreMuted', { defaultValue: '你当前已被禁言，暂时不能发言。' }),
+      );
       return;
     }
     if (charCount(text) > MAX_CHAT_CHARS) {
@@ -560,6 +568,7 @@ export function Chat({
   };
 
   const insertEmoji = (emoji: string) => {
+    if (readOnly) return;
     if (!isAuthed) {
       openLogin();
       return;
@@ -605,7 +614,7 @@ export function Chat({
     const newCount = Math.max(0, nextCount - previousCount);
     lastMessageCountRef.current = nextCount;
 
-    if (activeTab !== 'chat') return;
+    if (effectiveTab !== 'chat') return;
 
     if (forceScrollOnChatOpenRef.current) {
       forceScrollOnChatOpenRef.current = false;
@@ -621,7 +630,13 @@ export function Chat({
     if (newCount > 0) {
       setNewMessageCount((count) => count + newCount);
     }
-  }, [activeTab, messages.length, scrollChatToBottom]);
+  }, [effectiveTab, messages.length, scrollChatToBottom]);
+
+  useEffect(() => {
+    if (!showViewersTab && activeTab !== 'chat') {
+      setActiveTab('chat');
+    }
+  }, [activeTab, showViewersTab]);
 
   useEffect(() => {
     if (!emojiOpen) return;
@@ -670,13 +685,20 @@ export function Chat({
   }, [expandedPinnedId, pinnedSuperChats]);
 
   return (
-    <aside className={cn('gl-chat', sheetMode && 'is-sheet')} aria-label={t('liveRoom.chat')}>
-      <div className="gl-chat-tabs" role="tablist" aria-label={t('liveRoom.chat')}>
+    <aside
+      className={cn('gl-chat', sheetMode && 'is-sheet', readOnly && 'is-readonly')}
+      aria-label={t('liveRoom.chat')}
+    >
+      <div
+        className={cn('gl-chat-tabs', !showViewersTab && 'is-single')}
+        role="tablist"
+        aria-label={t('liveRoom.chat')}
+      >
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'chat'}
-          className={cn('gl-chat-tab-btn', activeTab === 'chat' && 'is-active')}
+          aria-selected={effectiveTab === 'chat'}
+          className={cn('gl-chat-tab-btn', effectiveTab === 'chat' && 'is-active')}
           onClick={() => {
             forceScrollOnChatOpenRef.current = true;
             setActiveTab('chat');
@@ -685,21 +707,23 @@ export function Chat({
           <MessageCircle size={16} />
           <span>{t('liveRoom.chatPanel.chatTab')}</span>
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'viewers'}
-          className={cn('gl-chat-tab-btn', activeTab === 'viewers' && 'is-active')}
-          onClick={() => setActiveTab('viewers')}
-        >
-          <Users size={16} />
-          <span>{t('liveRoom.chatPanel.viewersTab')}</span>
-          <span className="gl-chat-tab-count">
-            {(viewerTotal ?? viewers.length).toLocaleString(locale)}
-          </span>
-        </button>
+        {showViewersTab && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={effectiveTab === 'viewers'}
+            className={cn('gl-chat-tab-btn', effectiveTab === 'viewers' && 'is-active')}
+            onClick={() => setActiveTab('viewers')}
+          >
+            <Users size={16} />
+            <span>{t('liveRoom.chatPanel.viewersTab')}</span>
+            <span className="gl-chat-tab-count">
+              {(viewerTotal ?? viewers.length).toLocaleString(locale)}
+            </span>
+          </button>
+        )}
       </div>
-      {activeTab === 'chat' && pinnedSuperChats.length > 0 && (
+      {effectiveTab === 'chat' && pinnedSuperChats.length > 0 && (
         <div className="gl-sc-pin-stack" aria-label={t('liveRoom.chatPanel.pinnedSuperChats')}>
           {pinnedSuperChats.map(({ message, remainingMs, durationMs }) => (
             <PinnedSuperChatCard
@@ -715,7 +739,7 @@ export function Chat({
           ))}
         </div>
       )}
-      {activeTab === 'chat' ? (
+      {effectiveTab === 'chat' ? (
         <div className="gl-chat-list" ref={listRef} onScroll={handleChatScroll}>
           {messages.map((m) => {
             if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
@@ -724,8 +748,7 @@ export function Chat({
             const chat = m as ChatMessage;
             const isOwner = isOwnerMessage(chat, ownerId, ownerName);
             const isFan =
-              !isOwner &&
-              Boolean(ownerId && chat.fanBadge && chat.fanBadge.creatorId === ownerId);
+              !isOwner && Boolean(ownerId && chat.fanBadge && chat.fanBadge.creatorId === ownerId);
             return (
               <ChatRow
                 key={m.id}
@@ -747,7 +770,7 @@ export function Chat({
         />
       )}
 
-      {activeTab === 'chat' && newMessageCount > 0 && (
+      {effectiveTab === 'chat' && newMessageCount > 0 && (
         <button
           type="button"
           className="gl-chat-new-message"
@@ -767,7 +790,7 @@ export function Chat({
         </button>
       )}
 
-      {activeTab === 'chat' && reconnecting && (
+      {effectiveTab === 'chat' && reconnecting && (
         <div
           className="gl-chat-reconnect-bar flex items-center justify-center gap-2 bg-bg-hover px-3 py-1 text-xs text-text-secondary"
           role="status"
@@ -778,7 +801,14 @@ export function Chat({
         </div>
       )}
 
-      {activeTab === 'chat' && (
+      {effectiveTab === 'chat' && readOnly && (
+        <div className="gl-chat-readonly" role="note">
+          {readOnlyLabel ??
+            t('liveRoom.replay.chatReadOnly', { defaultValue: 'Replay chat is read-only.' })}
+        </div>
+      )}
+
+      {effectiveTab === 'chat' && !readOnly && (
         <div className="gl-chat-input">
           <Avatar
             name={currentUser ? userDisplayName(currentUser) : t('liveRoom.chatPanel.guestViewer')}
@@ -823,10 +853,12 @@ export function Chat({
               }}
               placeholder={
                 chatMuted
-                  ? t('liveRoom.moderation.chatMutedPlaceholder', { defaultValue: '你当前已被禁言' })
+                  ? t('liveRoom.moderation.chatMutedPlaceholder', {
+                      defaultValue: '你当前已被禁言',
+                    })
                   : isAuthed
-                  ? t('liveRoom.sayHi')
-                  : t('liveRoom.signInToChat', { defaultValue: 'Sign in to chat' })
+                    ? t('liveRoom.sayHi')
+                    : t('liveRoom.signInToChat', { defaultValue: 'Sign in to chat' })
               }
               aria-label={t('liveRoom.chatInput')}
               readOnly={!isAuthed || chatMuted}
@@ -907,7 +939,9 @@ export function Chat({
               className="gl-icon-btn sm"
               aria-label={t('liveRoom.send')}
               title={t('liveRoom.send')}
-              disabled={isAuthed && (chatMuted || !input.trim() || charCount(input.trim()) > MAX_CHAT_CHARS)}
+              disabled={
+                isAuthed && (chatMuted || !input.trim() || charCount(input.trim()) > MAX_CHAT_CHARS)
+              }
               onClick={() => {
                 if (!isAuthed) {
                   openLogin();

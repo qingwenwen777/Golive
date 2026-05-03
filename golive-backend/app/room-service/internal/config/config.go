@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -13,6 +14,7 @@ type Config struct {
 	Redis   RedisCfg   `mapstructure:"redis"`
 	JWT     JWTCfg     `mapstructure:"jwt"`
 	Live    LiveCfg    `mapstructure:"live"`
+	Replay  ReplayCfg  `mapstructure:"replay"`
 	Upload  UploadCfg  `mapstructure:"upload"`
 	Users   UsersCfg   `mapstructure:"users"`
 }
@@ -48,6 +50,15 @@ type LiveCfg struct {
 	FlvBase string `mapstructure:"flv_base"`
 }
 
+type ReplayCfg struct {
+	RecordDir       string        `mapstructure:"record_dir"`
+	BunnyLibraryID  string        `mapstructure:"bunny_library_id"`
+	BunnyAPIKey     string        `mapstructure:"bunny_api_key"`
+	BunnyAPIBase    string        `mapstructure:"bunny_api_base"`
+	BunnyPlayerBase string        `mapstructure:"bunny_player_base"`
+	UploadTimeout   time.Duration `mapstructure:"upload_timeout"`
+}
+
 type UploadCfg struct {
 	CoverDir       string `mapstructure:"cover_dir"`
 	CoverPublicURL string `mapstructure:"cover_public_url"`
@@ -70,8 +81,11 @@ func Load(path string) (*Config, error) {
 		v.AddConfigPath("./configs")
 		v.AddConfigPath("./app/room-service/configs")
 	}
-	v.AutomaticEnv()
 	v.SetEnvPrefix("ROOMSVC")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+	_ = v.BindEnv("replay.bunny_library_id")
+	_ = v.BindEnv("replay.bunny_api_key")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

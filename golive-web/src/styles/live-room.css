@@ -6,6 +6,82 @@
   border-radius: 12px;
   overflow: hidden;
 }
+
+.gl-replay-player {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+
+.gl-replay-player iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.gl-replay-player-top {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.gl-replay-player-top span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gl-replay-player-top span::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.gl-replay-player-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.76);
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  padding: 24px;
+}
+
+.gl-replay-info {
+  margin-top: 16px;
+}
+
+.gl-chat.is-readonly .gl-chat-tabs.is-single {
+  grid-template-columns: 1fr;
+}
+
+.gl-chat-readonly {
+  border-top: 1px solid var(--gl-border);
+  background: var(--gl-bg-card);
+  color: var(--gl-text-2);
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.45;
+}
 .gl-video {
   width: 100%;
   height: 100%;
@@ -1070,7 +1146,9 @@
 .gl-chat-line.is-fan .gl-chat-avatar-wrap {
   padding: 2px;
   background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
-  box-shadow: 0 0 0 1px rgba(255, 139, 193, 0.2), 0 0 10px rgba(255, 139, 193, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(255, 139, 193, 0.2),
+    0 0 10px rgba(255, 139, 193, 0.2);
 }
 .gl-chat-line.is-owner .gl-chat-body {
   display: flex;

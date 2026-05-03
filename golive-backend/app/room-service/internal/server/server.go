@@ -16,6 +16,7 @@ type Deps struct {
 	Social         *service.SocialService
 	Posts          *service.PostService
 	Live           *service.LiveService
+	Replay         *service.ReplayService
 	Appointments   *service.AppointmentService
 	Moderation     *service.ModerationService
 	Permission     service.LivePermissionChecker
@@ -37,6 +38,7 @@ func NewRouter(d Deps) *gin.Engine {
 	socialH := handler.NewSocialHandler(d.Social)
 	postH := handler.NewPostHandler(d.Posts, d.Permission, d.PostImageDir, d.PostPublicURL)
 	liveH := handler.NewLiveHandler(d.Live, d.Permission)
+	replayH := handler.NewReplayHandler(d.Replay)
 	appointmentH := handler.NewAppointmentHandler(d.Appointments)
 	moderationH := handler.NewModerationHandler(d.Moderation)
 	srsH := handler.NewSRSHandler(d.Live)
@@ -75,6 +77,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.GET("/channels/:channel/analytics", auth, roomH.ChannelAnalytics)
 		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
 		rooms.GET("/posts/mine", auth, postH.ListMine)
+		rooms.GET("/replays/mine", auth, replayH.ListMine)
 		rooms.POST("/posts", auth, postH.Create)
 		rooms.POST("/posts/images", auth, postH.UploadImage)
 		rooms.PATCH("/posts/:postID", auth, postH.UpdateVisibility)
@@ -109,7 +112,10 @@ func NewRouter(d Deps) *gin.Engine {
 		authed.POST("/live", liveH.GoLive)
 		authed.PATCH("/live", liveH.UpdateLive)
 		authed.DELETE("/live", liveH.StopLive)
+		authed.PATCH("/live/replay", replayH.UpdateActiveSettings)
 		authed.POST("/live/cover", coverH.Upload)
+		authed.PATCH("/replays/:id", replayH.Update)
+		authed.DELETE("/replays/:id", replayH.Delete)
 	}
 
 	uploadDir := d.CoverDir

@@ -1,7 +1,13 @@
 ﻿import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
 import type { QueryKey } from '@tanstack/react-query';
-import type { PaginatedRooms, RoomsQuery, Stream } from '@/types/stream';
+import type {
+  PaginatedRooms,
+  ReplayInfo,
+  ReplayVisibility,
+  RoomsQuery,
+  Stream,
+} from '@/types/stream';
 
 function normalizeCategory(cat?: string): string {
   if (!cat || cat.toLowerCase() === 'all' || cat === 'すべて') return 'all';
@@ -92,6 +98,27 @@ export function useStopLive() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['rooms'] });
+    },
+  });
+}
+
+export interface UpdateLiveReplayPayload {
+  uploadAfterEnd: boolean;
+  visibility: ReplayVisibility;
+}
+
+export function useUpdateLiveReplaySettings() {
+  const qc = useQueryClient();
+  return useMutation<ReplayInfo, Error, UpdateLiveReplayPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.patch<ReplayInfo>('/rooms/live/replay', payload);
+      return data;
+    },
+    onSuccess: (replay) => {
+      qc.setQueryData<Stream>(['room', replay.roomId], (prev) =>
+        prev ? { ...prev, replay } : prev,
+      );
+      void qc.invalidateQueries({ queryKey: ['studio-replays'] });
     },
   });
 }
@@ -299,6 +326,7 @@ export interface LiveHistoryItem {
   revenueCoin: number;
   newSubscribers: number;
   topFan?: FanContribution;
+  replay?: ReplayInfo;
 }
 
 export interface LiveHistoryResp {
@@ -306,6 +334,17 @@ export interface LiveHistoryResp {
   total: number;
   page: number;
   size: number;
+}
+
+export interface ReplayListResp {
+  items: Stream[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface UpdateReplayPayload {
+  visibility: ReplayVisibility;
 }
 
 export interface MonthlyCreatorMetric {
@@ -434,6 +473,58 @@ export function useLiveAnalysis(channelKey: string, recordId: string, enabled = 
   });
 }
 
+export function useStudioReplays(enabled = true, page = 1, size = 12) {
+  return useQuery<ReplayListResp, Error>({
+    queryKey: ['studio-replays', page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<ReplayListResp>('/rooms/replays/mine', {
+        params: { page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useUpdateReplay(roomId: string) {
+  const qc = useQueryClient();
+  return useMutation<ReplayInfo, Error, UpdateReplayPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.patch<ReplayInfo>(
+        `/rooms/replays/${encodeURIComponent(roomId)}`,
+        payload,
+      );
+      return data;
+    },
+    onSuccess: (replay) => {
+      qc.setQueryData<Stream>(['room', roomId], (prev) => (prev ? { ...prev, replay } : prev));
+      void qc.invalidateQueries({ queryKey: ['studio-replays'] });
+      void qc.invalidateQueries({ queryKey: ['channel-live-history'] });
+    },
+  });
+}
+
+export function useDeleteReplay(roomId: string) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.delete<{ ok: boolean }>(
+        `/rooms/replays/${encodeURIComponent(roomId)}`,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['studio-replays'] });
+      void qc.invalidateQueries({ queryKey: ['room', roomId] });
+      void qc.invalidateQueries({ queryKey: ['channel-live-history'] });
+    },
+  });
+}
+
 export function useChannelAppointments(channelKey: string, enabled = true, page = 1, size = 6) {
   return useQuery<AppointmentListResp, Error>({
     queryKey: ['channel-appointments', channelKey, page, size],
@@ -538,18 +629,26 @@ export function useCreateAppointment() {
 }
 
 export function useUpdateAppointment(id: string) {
-  return useAppointmentMutation<AppointmentItem>('patch', `/rooms/appointments/${encodeURIComponent(id)}`);
+  return useAppointmentMutation<AppointmentItem>(
+    'patch',
+    `/rooms/appointments/${encodeURIComponent(id)}`,
+  );
 }
 
 export function useCancelAppointment(id: string) {
-  return useAppointmentMutation<AppointmentItem>('delete', `/rooms/appointments/${encodeURIComponent(id)}`);
+  return useAppointmentMutation<AppointmentItem>(
+    'delete',
+    `/rooms/appointments/${encodeURIComponent(id)}`,
+  );
 }
 
 export function useStartAppointment(id: string) {
   const qc = useQueryClient();
   return useMutation<Stream, Error, void>({
     mutationFn: async () => {
-      const { data } = await http.post<Stream>(`/rooms/appointments/${encodeURIComponent(id)}/start`);
+      const { data } = await http.post<Stream>(
+        `/rooms/appointments/${encodeURIComponent(id)}/start`,
+      );
       return data;
     },
     onSuccess: (stream) => {
@@ -566,7 +665,9 @@ export function useReserveAppointment(id: string) {
   const qc = useQueryClient();
   return useMutation<AppointmentItem, Error, void>({
     mutationFn: async () => {
-      const { data } = await http.post<AppointmentItem>(`/rooms/appointments/${encodeURIComponent(id)}/reservations`);
+      const { data } = await http.post<AppointmentItem>(
+        `/rooms/appointments/${encodeURIComponent(id)}/reservations`,
+      );
       return data;
     },
     onSuccess: () => {
@@ -582,7 +683,9 @@ export function useUnreserveAppointment(id: string) {
   const qc = useQueryClient();
   return useMutation<AppointmentItem, Error, void>({
     mutationFn: async () => {
-      const { data } = await http.delete<AppointmentItem>(`/rooms/appointments/${encodeURIComponent(id)}/reservations`);
+      const { data } = await http.delete<AppointmentItem>(
+        `/rooms/appointments/${encodeURIComponent(id)}/reservations`,
+      );
       return data;
     },
     onSuccess: () => {
@@ -614,9 +717,16 @@ export function useNotifications(enabled = true, page = 1, size = 20) {
 
 export function useMarkNotificationRead() {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean }, Error, string, { prev: Array<[QueryKey, NotificationListResp | undefined]> }>({
+  return useMutation<
+    { ok: boolean },
+    Error,
+    string,
+    { prev: Array<[QueryKey, NotificationListResp | undefined]> }
+  >({
     mutationFn: async (id) => {
-      const { data } = await http.patch<{ ok: boolean }>(`/notifications/${encodeURIComponent(id)}/read`);
+      const { data } = await http.patch<{ ok: boolean }>(
+        `/notifications/${encodeURIComponent(id)}/read`,
+      );
       return data;
     },
     onMutate: async (id) => {
@@ -641,7 +751,12 @@ export function useMarkNotificationRead() {
 
 export function useMarkAllNotificationsRead() {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean }, Error, void, { prev: Array<[QueryKey, NotificationListResp | undefined]> }>({
+  return useMutation<
+    { ok: boolean },
+    Error,
+    void,
+    { prev: Array<[QueryKey, NotificationListResp | undefined]> }
+  >({
     mutationFn: async () => {
       const { data } = await http.patch<{ ok: boolean }>('/notifications/read-all');
       return data;
@@ -684,7 +799,10 @@ function markNotificationListItemRead(
   };
 }
 
-function markNotificationListRead(list: NotificationListResp, readAt: string): NotificationListResp {
+function markNotificationListRead(
+  list: NotificationListResp,
+  readAt: string,
+): NotificationListResp {
   return {
     ...list,
     unread: 0,

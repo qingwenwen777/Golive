@@ -12,6 +12,7 @@ import {
   Clock3,
   FileText,
   ImagePlus,
+  PlayCircle,
   Plus,
   Radio,
   Settings,
@@ -169,7 +170,11 @@ export default function ChannelPage() {
   return (
     <div className="gl-page gl-channel-page">
       <section className="gl-channel-hero-v2">
-        <div className={`gl-channel-cover${channelCover ? ' has-cover' : ''}`}>
+        <div
+          className={['gl-channel-cover', channelCover ? 'has-cover' : '']
+            .filter(Boolean)
+            .join(' ')}
+        >
           {channelCover && (
             <LoadableImage className="gl-channel-cover-img" src={channelCover} alt="" />
           )}
@@ -206,22 +211,14 @@ export default function ChannelPage() {
               ) : (
                 <span>{formatChannelKey(channelKey, t)}</span>
               )}
-              <span>
-                {t('channel.subscribers', { count: subscriberCount })}
-              </span>
-              <span>
-                {t('channel.activeRooms', { count: channelStreams.length })}
-              </span>
+              <span>{t('channel.subscribers', { count: subscriberCount })}</span>
+              <span>{t('channel.activeRooms', { count: channelStreams.length })}</span>
             </div>
 
             <div className="gl-channel-actions">
               {isOwner ? (
                 <>
-                  <button
-                    className="gl-retry-btn"
-                    type="button"
-                    onClick={handleOwnerLiveAction}
-                  >
+                  <button className="gl-retry-btn" type="button" onClick={handleOwnerLiveAction}>
                     {activeLiveId ? <Radio size={16} /> : <Plus size={16} />}
                     {ownerLiveLabel}
                   </button>
@@ -263,7 +260,10 @@ export default function ChannelPage() {
 
         <div className="gl-channel-stats">
           <ChannelStat label={t('channel.stats.liveRooms')} value={String(channelStreams.length)} />
-          <ChannelStat label={t('channel.stats.watchingNow')} value={totalViewers.toLocaleString()} />
+          <ChannelStat
+            label={t('channel.stats.watchingNow')}
+            value={totalViewers.toLocaleString()}
+          />
           <ChannelStat label={t('channel.stats.mainCategory')} value={primaryCategory} />
         </div>
       </section>
@@ -272,7 +272,11 @@ export default function ChannelPage() {
         <div className="gl-section-title-row">
           <div>
             <h2>{t('channel.appointments.title', { defaultValue: 'Live appointments' })}</h2>
-            <span>{t('channel.appointments.subtitle', { defaultValue: 'Reserve or follow upcoming live rooms from this channel.' })}</span>
+            <span>
+              {t('channel.appointments.subtitle', {
+                defaultValue: 'Reserve or follow upcoming live rooms from this channel.',
+              })}
+            </span>
           </div>
         </div>
         {channelAppointments.isPending ? (
@@ -306,8 +310,14 @@ export default function ChannelPage() {
           <div className="gl-channel-empty">
             <CalendarDays size={34} />
             <div>
-              <strong>{t('channel.appointments.empty', { defaultValue: 'No upcoming appointments.' })}</strong>
-              <span>{t('channel.appointments.emptySub', { defaultValue: 'Check back later or browse other creators.' })}</span>
+              <strong>
+                {t('channel.appointments.empty', { defaultValue: 'No upcoming appointments.' })}
+              </strong>
+              <span>
+                {t('channel.appointments.emptySub', {
+                  defaultValue: 'Check back later or browse other creators.',
+                })}
+              </span>
             </div>
           </div>
         )}
@@ -317,7 +327,11 @@ export default function ChannelPage() {
         <div className="gl-section-title-row">
           <div>
             <h2>{t('channel.posts.title', { defaultValue: '帖子动态' })}</h2>
-            <span>{t('channel.posts.subtitle', { defaultValue: '预约直播下方会显示主播最近发布的帖子。' })}</span>
+            <span>
+              {t('channel.posts.subtitle', {
+                defaultValue: '预约直播下方会显示主播最近发布的帖子。',
+              })}
+            </span>
           </div>
         </div>
         {channelPosts.isPending ? (
@@ -348,7 +362,9 @@ export default function ChannelPage() {
             <FileText size={34} />
             <div>
               <strong>{t('channel.posts.empty', { defaultValue: '暂时还没有帖子。' })}</strong>
-              <span>{t('channel.posts.emptySub', { defaultValue: '主播发布后，这里会展示最新动态。' })}</span>
+              <span>
+                {t('channel.posts.emptySub', { defaultValue: '主播发布后，这里会展示最新动态。' })}
+              </span>
             </div>
           </div>
         )}
@@ -374,9 +390,7 @@ export default function ChannelPage() {
           <div className="gl-channel-empty">
             <Video size={34} />
             <div>
-              <strong>
-                {isUnknown ? t('channel.notFound') : t('channel.noLiveRooms')}
-              </strong>
+              <strong>{isUnknown ? t('channel.notFound') : t('channel.noLiveRooms')}</strong>
               <span>
                 {isUnknown
                   ? t('channel.notFoundSub')
@@ -433,9 +447,7 @@ export default function ChannelPage() {
             <div>
               <strong>{t('channel.noHistory')}</strong>
               <span>
-                {isOwner
-                  ? t('channel.noHistoryOwnerSub')
-                  : t('channel.noHistoryViewerSub')}
+                {isOwner ? t('channel.noHistoryOwnerSub') : t('channel.noHistoryViewerSub')}
               </span>
             </div>
           </div>
@@ -526,7 +538,10 @@ function ChannelPostPager({
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
   return (
-    <div className="gl-history-pager gl-channel-post-pager" aria-label={t('channel.posts.pagination', { defaultValue: 'Post pagination' })}>
+    <div
+      className="gl-history-pager gl-channel-post-pager"
+      aria-label={t('channel.posts.pagination', { defaultValue: 'Post pagination' })}
+    >
       <div className="gl-history-pager-count">
         {t('channel.posts.pageCount', {
           start,
@@ -565,9 +580,7 @@ function visibleHistoryPages(page: number, pageCount: number): Array<number | 'g
     return Array.from({ length: pageCount }, (_, index) => index + 1);
   }
   const pages = new Set([1, pageCount, page - 1, page, page + 1]);
-  const sorted = [...pages]
-    .filter((item) => item >= 1 && item <= pageCount)
-    .sort((a, b) => a - b);
+  const sorted = [...pages].filter((item) => item >= 1 && item <= pageCount).sort((a, b) => a - b);
   return sorted.flatMap((item, index) => {
     const prev = sorted[index - 1];
     if (index > 0 && prev !== undefined && item - prev > 1) {
@@ -611,9 +624,7 @@ function ChannelHistoryRow({
         </div>
         <div className="gl-history-sub">
           <span>{record.category || t('channel.tabs.live')}</span>
-          <span>
-            {t('channel.history.revenue', { amount: formatCoin(record.revenueCoin) })}
-          </span>
+          <span>{t('channel.history.revenue', { amount: formatCoin(record.revenueCoin) })}</span>
           <span>
             {record.topFan
               ? t('channel.history.topFan', { name: record.topFan.name })
@@ -630,6 +641,15 @@ function ChannelHistoryRow({
           {t('channel.history.liveAnalysis')}
         </Link>
       )}
+      {record.replay?.canWatch && (
+        <Link
+          className="gl-secondary-btn gl-history-analysis-btn"
+          to={`/live/${encodeURIComponent(record.id)}`}
+        >
+          <PlayCircle size={16} />
+          {t('channel.history.watchReplay', { defaultValue: 'Watch replay' })}
+        </Link>
+      )}
     </article>
   );
 }
@@ -637,7 +657,9 @@ function ChannelHistoryRow({
 function HistoryThumb({ record }: { record: LiveHistoryItem }) {
   const initials = record.title.trim().slice(0, 2).toUpperCase() || 'GL';
   return (
-    <div className={`gl-history-thumb${record.cover ? ' has-image' : ''}`}>
+    <div
+      className={['gl-history-thumb', record.cover ? 'has-image' : ''].filter(Boolean).join(' ')}
+    >
       <div className="gl-history-thumb-fallback">{initials}</div>
       {record.cover && <LoadableImage src={record.cover} alt="" />}
       <span>{record.duration}</span>

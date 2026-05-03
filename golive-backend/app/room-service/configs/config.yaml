@@ -24,6 +24,14 @@ live:
   stream_key_ttl: 4h
   flv_base: "http://localhost:8082/live"
 
+replay:
+  record_dir: "./records"
+  bunny_library_id: ""
+  bunny_api_key: ""
+  bunny_api_base: "https://video.bunnycdn.com"
+  bunny_player_base: "https://player.mediadelivery.net/embed"
+  upload_timeout: 30m
+
 upload:
   cover_dir: "./uploads/covers"
   cover_public_url: "/api/uploads/covers"

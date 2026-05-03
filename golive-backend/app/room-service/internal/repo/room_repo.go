@@ -210,6 +210,9 @@ func (r *RoomRepo) Upsert(ctx context.Context, room *model.Room) error {
 			"title", "title_ja", "description", "category", "category_ja", "cover",
 			"viewers", "peak_viewers", "started_at", "status", "ended_at", "updated_at",
 			"stream_key", "owner_id", "channel", "channel_id", "avatar",
+			"replay_upload_enabled", "replay_status", "replay_visibility",
+			"replay_bunny_video_id", "replay_bunny_library_id", "replay_error",
+			"replay_uploaded_at", "replay_deleted_at",
 		}),
 	}).Create(room).Error
 }
@@ -349,6 +352,28 @@ func (r *RoomRepo) HistoryByOwner(ctx context.Context, ownerID string, page, siz
 	return rooms, total, err
 }
 
+func (r *RoomRepo) ReplayRoomsByOwner(ctx context.Context, ownerID string, page, size int) ([]model.Room, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 || size > 100 {
+		size = 24
+	}
+	tx := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("owner_id = ? AND status = ? AND replay_status <> ?", ownerID, model.StatusEnded, model.ReplayStatusNone)
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rooms []model.Room
+	err := tx.
+		Order("COALESCE(replay_uploaded_at, ended_at, updated_at) DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Find(&rooms).Error
+	return rooms, total, err
+}
+
 func (r *RoomRepo) EndedRoomByOwner(ctx context.Context, ownerID, roomID string) (*model.Room, error) {
 	var room model.Room
 	err := r.db.WithContext(ctx).
@@ -361,6 +386,86 @@ func (r *RoomRepo) EndedRoomByOwner(ctx context.Context, ownerID, roomID string)
 		return nil, err
 	}
 	return &room, nil
+}
+
+func (r *RoomRepo) UpdateReplaySettings(ctx context.Context, id string, uploadAfterEnd bool, visibility, status string) (*model.Room, error) {
+	updates := map[string]any{
+		"replay_upload_enabled": uploadAfterEnd,
+		"replay_visibility":     visibility,
+		"replay_status":         status,
+	}
+	var room model.Room
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Room{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", id).Take(&room).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrRoomNotFound
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+func (r *RoomRepo) UpdateReplayVisibility(ctx context.Context, ownerID, roomID, visibility string) (*model.Room, error) {
+	var room model.Room
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.Room{}).
+			Where("owner_id = ? AND id = ? AND status = ?", ownerID, roomID, model.StatusEnded).
+			Update("replay_visibility", visibility)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrRoomNotFound
+		}
+		if err := tx.Where("owner_id = ? AND id = ? AND status = ?", ownerID, roomID, model.StatusEnded).Take(&room).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrRoomNotFound
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+func (r *RoomRepo) SetReplayStatus(ctx context.Context, roomID, status, message string) error {
+	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", roomID).Updates(map[string]any{
+		"replay_status": status,
+		"replay_error":  message,
+	}).Error
+}
+
+func (r *RoomRepo) SetReplayUploaded(ctx context.Context, roomID, libraryID, videoID, status string, uploadedAt time.Time) error {
+	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", roomID).Updates(map[string]any{
+		"replay_status":           status,
+		"replay_bunny_library_id": libraryID,
+		"replay_bunny_video_id":   videoID,
+		"replay_uploaded_at":      uploadedAt,
+		"replay_deleted_at":       nil,
+		"replay_error":            "",
+	}).Error
+}
+
+func (r *RoomRepo) MarkReplayDeleted(ctx context.Context, roomID string, deletedAt time.Time) error {
+	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", roomID).Updates(map[string]any{
+		"replay_upload_enabled":   false,
+		"replay_status":           model.ReplayStatusDeleted,
+		"replay_bunny_library_id": "",
+		"replay_bunny_video_id":   "",
+		"replay_error":            "",
+		"replay_deleted_at":       deletedAt,
+	}).Error
 }
 
 type RevenueRow struct {

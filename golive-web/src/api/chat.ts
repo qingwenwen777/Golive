@@ -29,6 +29,7 @@ interface SuperChatHistoryItem extends ChatHistoryBase {
   type: 'super_chat';
   amount: string;
   tier?: SuperChatTier;
+  userLevel?: number;
 }
 
 type ChatHistoryItem = DanmuHistoryItem | SuperChatHistoryItem;
@@ -56,11 +57,13 @@ function toSuperChatMessage(item: SuperChatHistoryItem): SuperChatMessage {
   return {
     id: item.id,
     kind: 'super_chat',
+    userId: item.userId,
     user: item.user,
     avatar: item.avatar,
     amount: item.amount,
     tier: item.tier ?? 0,
     text: item.text,
+    userLevel: item.userLevel,
     ts: item.ts,
   };
 }
@@ -83,6 +86,44 @@ export function useDanmuHistory(roomId: string, enabled = true, limit = 50) {
     enabled: enabled && !!roomId,
     staleTime: 0,
     refetchOnMount: 'always',
+    retry: 1,
+  });
+}
+
+export function useReplayMessages(
+  roomId: string,
+  startedAt?: string,
+  endedAt?: string,
+  enabled = true,
+) {
+  return useQuery<Message[], Error>({
+    queryKey: ['replay-messages', roomId, startedAt, endedAt],
+    queryFn: async ({ signal }) => {
+      const startMs = startedAt ? new Date(startedAt).getTime() : 0;
+      const endMs = endedAt ? new Date(endedAt).getTime() : Number.POSITIVE_INFINITY;
+      const items: ChatHistoryItem[] = [];
+      let before = 0;
+
+      for (let page = 0; page < 20; page += 1) {
+        const { data } = await http.get<DanmuHistoryResponse>(
+          `/chat/rooms/${encodeURIComponent(roomId)}/danmus`,
+          { params: { limit: 200, ...(before > 0 ? { before } : {}) }, signal },
+        );
+        const pageItems = data.items ?? [];
+        if (pageItems.length === 0) break;
+        items.push(...pageItems);
+        const oldest = Math.min(...pageItems.map((item) => item.ts).filter(Number.isFinite));
+        if (!Number.isFinite(oldest) || oldest <= startMs) break;
+        before = oldest;
+      }
+
+      return items
+        .filter((item) => item.ts >= startMs && item.ts <= endMs)
+        .sort((a, b) => a.ts - b.ts)
+        .map(toMessage);
+    },
+    enabled: enabled && !!roomId && !!startedAt,
+    staleTime: 60_000,
     retry: 1,
   });
 }

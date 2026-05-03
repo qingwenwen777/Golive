@@ -22,6 +22,14 @@ live:
   stream_key_ttl: 4h
   flv_base: "https://golive.us.ci/live"
 
+replay:
+  record_dir: "/tmp/golive/records"
+  bunny_library_id: ""
+  bunny_api_key: ""
+  bunny_api_base: "https://video.bunnycdn.com"
+  bunny_player_base: "https://player.mediadelivery.net/embed"
+  upload_timeout: 30m
+
 upload:
   cover_dir: "/tmp/golive/covers"
   cover_public_url: "/api/uploads/covers"

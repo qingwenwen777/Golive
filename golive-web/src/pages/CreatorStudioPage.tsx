@@ -65,8 +65,12 @@ import {
   useRoom,
   useRooms,
   useStartAppointment,
+  useDeleteReplay,
+  useStudioReplays,
   useStudioAppointments,
   useStopLive,
+  useUpdateLiveReplaySettings,
+  useUpdateReplay,
   useUpdateAppointment,
   useUpdateLiveMetadata,
   useUploadLiveCover,
@@ -95,7 +99,7 @@ import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStor
 import { LoadableImage } from '@/components/LoadableImage';
 import { PostCard } from '@/features/posts/PostCard';
 import type { Message } from '@/types/message';
-import type { Stream } from '@/types/stream';
+import type { ReplayVisibility, Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
 
 const DEFAULT_CATEGORY = 'Just Chatting';
@@ -164,7 +168,8 @@ export function CreatorStudioShell() {
         icon={<Radio size={24} />}
         title={t('studio.auth.title', { defaultValue: 'Sign in to open Creator Studio' })}
         body={t('studio.auth.body', {
-          defaultValue: 'Your dashboard, stream setup, and analytics are tied to your GoLive account.',
+          defaultValue:
+            'Your dashboard, stream setup, and analytics are tied to your GoLive account.',
         })}
         actionLabel={t('studio.auth.action', { defaultValue: 'Sign in' })}
         onAction={() => openLogin()}
@@ -179,11 +184,14 @@ export function CreatorStudioShell() {
         rejectReason={user?.livePermissionRejectReason}
         applying={apply.isPending}
         onApply={(reason) => {
-          apply.mutate({ reason }, {
-            onSuccess: (resp) => toast.success(resp.message),
-            onError: (err) =>
-              toast.error(err.message || t('createLive.errors.applicationFailed')),
-          });
+          apply.mutate(
+            { reason },
+            {
+              onSuccess: (resp) => toast.success(resp.message),
+              onError: (err) =>
+                toast.error(err.message || t('createLive.errors.applicationFailed')),
+            },
+          );
         }}
       />
     );
@@ -245,7 +253,9 @@ export function CreatorStudioOverviewPage() {
           <div className="gl-creator-panel-head">
             <div>
               <span>{t('studio.overview.quickTitle', { defaultValue: 'Quick actions' })}</span>
-              <h2>{t('studio.overview.quickHeading', { defaultValue: 'Prepare your next live' })}</h2>
+              <h2>
+                {t('studio.overview.quickHeading', { defaultValue: 'Prepare your next live' })}
+              </h2>
             </div>
             <ListChecks size={22} />
           </div>
@@ -253,19 +263,25 @@ export function CreatorStudioOverviewPage() {
             <StudioAction
               icon={<PlayCircle size={18} />}
               title={t('studio.actions.prepare', { defaultValue: 'Open stream setup' })}
-              body={t('studio.actions.prepareSub', { defaultValue: 'Title, cover, category, and OBS checks.' })}
+              body={t('studio.actions.prepareSub', {
+                defaultValue: 'Title, cover, category, and OBS checks.',
+              })}
               onClick={() => navigate('/studio/prepare')}
             />
             <StudioAction
               icon={<BarChart3 size={18} />}
               title={t('studio.actions.analytics', { defaultValue: 'Review analytics' })}
-              body={t('studio.actions.analyticsSub', { defaultValue: 'Revenue, viewers, and finished live reports.' })}
+              body={t('studio.actions.analyticsSub', {
+                defaultValue: 'Revenue, viewers, and finished live reports.',
+              })}
               onClick={() => navigate(`/studio/analytics/${encodeURIComponent(channelKey)}`)}
             />
             <StudioAction
               icon={<Users size={18} />}
               title={t('studio.actions.channel', { defaultValue: 'View channel' })}
-              body={t('studio.actions.channelSub', { defaultValue: 'Check how viewers see your creator page.' })}
+              body={t('studio.actions.channelSub', {
+                defaultValue: 'Check how viewers see your creator page.',
+              })}
               onClick={() => navigate(`/channel/${encodeURIComponent(channelKey)}`)}
             />
           </div>
@@ -275,26 +291,37 @@ export function CreatorStudioOverviewPage() {
           <div className="gl-creator-panel-head">
             <div>
               <span>{t('studio.overview.recentTitle', { defaultValue: 'Latest result' })}</span>
-              <h2>{latest?.title ?? t('studio.overview.noRecent', { defaultValue: 'No stream yet' })}</h2>
+              <h2>
+                {latest?.title ?? t('studio.overview.noRecent', { defaultValue: 'No stream yet' })}
+              </h2>
             </div>
             <Trophy size={22} />
           </div>
           {analytics.isPending ? (
-            <div className="gl-creator-muted-line">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+            <div className="gl-creator-muted-line">
+              {t('studio.loading', { defaultValue: 'Loading studio...' })}
+            </div>
           ) : latest ? (
             <div className="gl-creator-latest">
-              <div className={`gl-creator-latest-cover${latest.cover ? ' has-image' : ''}`}>
+              <div className={cn('gl-creator-latest-cover', latest.cover && 'has-image')}>
                 {latest.cover && <LoadableImage src={latest.cover} alt="" />}
                 <span>{latest.duration}</span>
               </div>
               <div className="gl-creator-latest-meta">
-                <span>{t('studio.overview.latestPeak', { count: latest.peakViewers, defaultValue: '{{count}} peak viewers' })}</span>
+                <span>
+                  {t('studio.overview.latestPeak', {
+                    count: latest.peakViewers,
+                    defaultValue: '{{count}} peak viewers',
+                  })}
+                </span>
                 <span>{formatCoins(latest.revenueCoin)}</span>
               </div>
             </div>
           ) : (
             <div className="gl-creator-empty-soft">
-              {t('studio.overview.emptyRecent', { defaultValue: 'Start a live and the recap will appear here.' })}
+              {t('studio.overview.emptyRecent', {
+                defaultValue: 'Start a live and the recap will appear here.',
+              })}
             </div>
           )}
         </div>
@@ -319,7 +346,9 @@ export function CreatorPreparePage() {
   const [obsChecked, setObsChecked] = useState(false);
   const categories = CATEGORIES_EN.filter((item) => item !== 'All');
   const appointments = useStudioAppointments(Boolean(user), 1, 5);
-  const dueAppointment = appointments.data?.items.find((item) => item.status === 'scheduled' && item.canStart);
+  const dueAppointment = appointments.data?.items.find(
+    (item) => item.status === 'scheduled' && item.canStart,
+  );
 
   useEffect(() => {
     return () => {
@@ -339,12 +368,18 @@ export function CreatorPreparePage() {
   const startLive = async () => {
     if (!done3 || !user) return;
     if (dueAppointment) {
-      toast.info(t('studio.prepare.appointmentRequired', { defaultValue: 'A scheduled appointment is ready. Please start from Live appointments.' }));
+      toast.info(
+        t('studio.prepare.appointmentRequired', {
+          defaultValue: 'A scheduled appointment is ready. Please start from Live appointments.',
+        }),
+      );
       navigate('/studio/appointments');
       return;
     }
     try {
-      const uploadedCover = coverFile ? (await uploadCover.mutateAsync(coverFile)).url : coverPreview;
+      const uploadedCover = coverFile
+        ? (await uploadCover.mutateAsync(coverFile)).url
+        : coverPreview;
       goLive.mutate(
         {
           title: title.trim(),
@@ -357,7 +392,11 @@ export function CreatorPreparePage() {
         {
           onSuccess: (stream) => {
             savePublisherSession(stream);
-            toast.success(t('studio.prepare.created', { defaultValue: 'Live room created. Open OBS and begin publishing.' }));
+            toast.success(
+              t('studio.prepare.created', {
+                defaultValue: 'Live room created. Open OBS and begin publishing.',
+              }),
+            );
             navigate(`/studio/live/${encodeURIComponent(stream.id)}`);
           },
           onError: (err) => toast.error(err.message || t('createLive.errors.startFailed')),
@@ -377,12 +416,18 @@ export function CreatorPreparePage() {
           done={done1}
           locked={false}
           title={t('studio.prepare.steps.info', { defaultValue: 'Fill live info' })}
-          actionLabel={done1 ? undefined : t('studio.prepare.startWriting', { defaultValue: '开始填写' })}
+          actionLabel={
+            done1 ? undefined : t('studio.prepare.startWriting', { defaultValue: '开始填写' })
+          }
           onOpen={() => setStep(1)}
         >
           <label className="gl-creator-field">
             <span>{t('createLive.fields.title')}</span>
-            <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
+            <input
+              value={title}
+              maxLength={120}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </label>
           <label className="gl-creator-field">
             <span>{t('createLive.fields.description')}</span>
@@ -390,11 +435,18 @@ export function CreatorPreparePage() {
               value={description}
               rows={4}
               maxLength={2000}
-              placeholder={t('studio.prepare.descriptionPlaceholder', { defaultValue: 'Tell viewers what this live is about.' })}
+              placeholder={t('studio.prepare.descriptionPlaceholder', {
+                defaultValue: 'Tell viewers what this live is about.',
+              })}
               onChange={(event) => setDescription(event.target.value)}
             />
           </label>
-          <button className="gl-creator-primary" type="button" disabled={!done1} onClick={() => setStep(2)}>
+          <button
+            className="gl-creator-primary"
+            type="button"
+            disabled={!done1}
+            onClick={() => setStep(2)}
+          >
             {t('studio.prepare.next', { defaultValue: 'Next' })}
           </button>
         </StepCard>
@@ -407,11 +459,7 @@ export function CreatorPreparePage() {
           title={t('studio.prepare.steps.cover', { defaultValue: 'Choose cover and category' })}
           onOpen={() => done1 && setStep(2)}
         >
-          <CategoryPicker
-            categories={categories}
-            value={category}
-            onChange={setCategory}
-          />
+          <CategoryPicker categories={categories} value={category} onChange={setCategory} />
           <CoverPicker
             preview={coverPreview}
             onChange={(file) => {
@@ -419,7 +467,12 @@ export function CreatorPreparePage() {
               setCoverPreview(file ? URL.createObjectURL(file) : '');
             }}
           />
-          <button className="gl-creator-primary" type="button" disabled={!done2} onClick={() => setStep(3)}>
+          <button
+            className="gl-creator-primary"
+            type="button"
+            disabled={!done2}
+            onClick={() => setStep(3)}
+          >
             {t('studio.prepare.next', { defaultValue: 'Next' })}
           </button>
         </StepCard>
@@ -429,13 +482,17 @@ export function CreatorPreparePage() {
           active={step === 3}
           done={done3}
           locked={!done2}
-          title={t('studio.prepare.steps.check', { defaultValue: 'Check publishing and permission' })}
+          title={t('studio.prepare.steps.check', {
+            defaultValue: 'Check publishing and permission',
+          })}
           onOpen={() => done2 && setStep(3)}
         >
           <div className="gl-creator-check-list">
             <CheckRow
               ok={user?.livePermissionStatus === 'approved'}
-              label={t('studio.prepare.permissionApproved', { defaultValue: 'Creator permission approved' })}
+              label={t('studio.prepare.permissionApproved', {
+                defaultValue: 'Creator permission approved',
+              })}
             />
             <CheckRow
               ok={obsChecked}
@@ -443,11 +500,20 @@ export function CreatorPreparePage() {
             />
           </div>
           <PublisherPreview rtmpServer={rtmpServer()} />
-          <button className="gl-creator-secondary" type="button" onClick={() => setObsChecked(true)}>
+          <button
+            className="gl-creator-secondary"
+            type="button"
+            onClick={() => setObsChecked(true)}
+          >
             <ClipboardCheck size={16} />
             {t('studio.prepare.runCheck', { defaultValue: 'Mark OBS check complete' })}
           </button>
-          <button className="gl-creator-primary" type="button" disabled={!done3} onClick={() => setStep(4)}>
+          <button
+            className="gl-creator-primary"
+            type="button"
+            disabled={!done3}
+            onClick={() => setStep(4)}
+          >
             {t('studio.prepare.next', { defaultValue: 'Next' })}
           </button>
         </StepCard>
@@ -461,16 +527,32 @@ export function CreatorPreparePage() {
           onOpen={() => done3 && setStep(4)}
         >
           <div className="gl-creator-confirm">
-            <strong>{t('studio.prepare.readyTitle', { defaultValue: 'Ready to create the live room' })}</strong>
-            <span>{t('studio.prepare.readyBody', { defaultValue: 'After confirmation, your stream key is issued and the live control console opens.' })}</span>
+            <strong>
+              {t('studio.prepare.readyTitle', { defaultValue: 'Ready to create the live room' })}
+            </strong>
+            <span>
+              {t('studio.prepare.readyBody', {
+                defaultValue:
+                  'After confirmation, your stream key is issued and the live control console opens.',
+              })}
+            </span>
           </div>
           {dueAppointment && (
             <div className="gl-creator-confirm">
-              <strong>{t('studio.prepare.appointmentRequiredTitle', { defaultValue: 'Start from your appointment' })}</strong>
+              <strong>
+                {t('studio.prepare.appointmentRequiredTitle', {
+                  defaultValue: 'Start from your appointment',
+                })}
+              </strong>
               <span>{dueAppointment.title}</span>
             </div>
           )}
-          <button className="gl-creator-start" type="button" disabled={!done3 || starting} onClick={() => void startLive()}>
+          <button
+            className="gl-creator-start"
+            type="button"
+            disabled={!done3 || starting}
+            onClick={() => void startLive()}
+          >
             <Radio size={17} />
             {starting
               ? t('createLive.starting')
@@ -500,10 +582,234 @@ export function CreatorPreparePage() {
 }
 
 export function CreatorReplayPage() {
+  const { t, i18n } = useTranslation('pages');
   const { user } = useStudioUser();
-  const channelKey = currentChannelKey(user);
-  if (!channelKey) return null;
-  return <Navigate to={`/studio/analytics/${encodeURIComponent(channelKey)}`} replace />;
+  const [page, setPage] = useState(1);
+  const replays = useStudioReplays(Boolean(user), page, 10);
+  const total = replays.data?.total ?? 0;
+  const pageSize = replays.data?.size ?? 10;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  return (
+    <div className="gl-creator-replay-page">
+      <section className="gl-creator-panel">
+        <div className="gl-creator-panel-head">
+          <div>
+            <span>{t('studio.replay.label', { defaultValue: 'Live replay' })}</span>
+            <h2>{t('studio.replay.title', { defaultValue: 'Manage completed live replays' })}</h2>
+          </div>
+          <PlayCircle size={22} />
+        </div>
+
+        {replays.isPending ? (
+          <div className="gl-creator-muted-line">
+            {t('studio.loading', { defaultValue: 'Loading studio...' })}
+          </div>
+        ) : replays.data?.items.length ? (
+          <>
+            <div className="gl-replay-manage-list">
+              {replays.data.items.map((stream) => (
+                <ReplayManageRow key={stream.id} stream={stream} locale={i18n.language} />
+              ))}
+            </div>
+            {pageCount > 1 && (
+              <div className="gl-history-pager gl-appointment-pager">
+                <div className="gl-history-pager-count">
+                  {t('studio.replay.pageCount', {
+                    page,
+                    pageCount,
+                    total,
+                    defaultValue: '{{page}} / {{pageCount}} · {{total}} replays',
+                  })}
+                </div>
+                <div className="gl-history-pager-controls">
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={page >= pageCount}
+                    onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="gl-creator-empty-soft">
+            {t('studio.replay.empty', {
+              defaultValue:
+                'No replay has been uploaded yet. Enable replay upload in a live console before ending the live.',
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ReplayManageRow({ stream, locale }: { stream: Stream; locale: string }) {
+  const { t } = useTranslation('pages');
+  const replay = stream.replay;
+  const [visibility, setVisibility] = useState<ReplayVisibility>(replay?.visibility ?? 'public');
+  const updateReplay = useUpdateReplay(stream.id);
+  const deleteReplay = useDeleteReplay(stream.id);
+
+  useEffect(() => {
+    setVisibility(replay?.visibility ?? 'public');
+  }, [replay?.visibility]);
+
+  const status = replayStatusLabel(replay?.status ?? 'none', t);
+  const uploadedAt = replay?.uploadedAt
+    ? new Intl.DateTimeFormat(locale, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(replay.uploadedAt))
+    : '';
+  const saveVisibility = () => {
+    updateReplay.mutate(
+      { visibility },
+      {
+        onSuccess: () =>
+          toast.success(
+            t('studio.replay.visibilitySaved', { defaultValue: 'Replay visibility updated.' }),
+          ),
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('studio.replay.visibilityFailed', { defaultValue: 'Could not update replay.' }),
+          ),
+      },
+    );
+  };
+  const remove = () => {
+    if (
+      !window.confirm(t('studio.replay.deleteConfirm', { defaultValue: 'Delete this replay?' }))
+    ) {
+      return;
+    }
+    deleteReplay.mutate(undefined, {
+      onSuccess: () =>
+        toast.success(t('studio.replay.deleted', { defaultValue: 'Replay deleted.' })),
+      onError: (err) =>
+        toast.error(
+          err.message ||
+            t('studio.replay.deleteFailed', { defaultValue: 'Could not delete replay.' }),
+        ),
+    });
+  };
+
+  return (
+    <article className="gl-replay-manage-row">
+      <div className={cn('gl-replay-manage-cover', stream.cover && 'has-image')}>
+        {stream.cover && <LoadableImage src={stream.cover} alt="" />}
+        <span>{stream.duration}</span>
+      </div>
+      <div className="gl-replay-manage-main">
+        <div className="gl-replay-manage-title">
+          <strong>{stream.title}</strong>
+          <span className={`gl-replay-status is-${replay?.status ?? 'none'}`}>{status}</span>
+        </div>
+        <div className="gl-replay-manage-meta">
+          <span>{uploadedAt || stream.category}</span>
+          <span>
+            {stream.peakViewers?.toLocaleString() ?? stream.viewers.toLocaleString()} peak
+          </span>
+          {replay?.error && <span className="is-error">{replay.error}</span>}
+        </div>
+        <div className="gl-replay-manage-controls">
+          <VisibilitySelect value={visibility} onChange={setVisibility} />
+          <button
+            type="button"
+            className="gl-creator-secondary"
+            disabled={updateReplay.isPending || visibility === replay?.visibility}
+            onClick={saveVisibility}
+          >
+            <Save size={15} />
+            {t('studio.replay.saveVisibility', { defaultValue: 'Save' })}
+          </button>
+        </div>
+      </div>
+      <div className="gl-replay-manage-actions">
+        {replay?.canWatch && (
+          <NavLink className="gl-creator-secondary" to={`/live/${encodeURIComponent(stream.id)}`}>
+            <PlayCircle size={15} />
+            {t('studio.replay.open', { defaultValue: 'Open' })}
+          </NavLink>
+        )}
+        <button
+          type="button"
+          className="gl-creator-secondary is-danger"
+          disabled={deleteReplay.isPending || replay?.status === 'deleted'}
+          onClick={remove}
+        >
+          <TrashIcon />
+          {t('studio.replay.delete', { defaultValue: 'Delete' })}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function VisibilitySelect({
+  value,
+  onChange,
+}: {
+  value: ReplayVisibility;
+  onChange: (value: ReplayVisibility) => void;
+}) {
+  const { t } = useTranslation('pages');
+  return (
+    <label className="gl-replay-visibility-select">
+      <span>{t('studio.replay.visibility', { defaultValue: 'Visibility' })}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="private">
+          {t('studio.replay.visibility.private', { defaultValue: 'Only me' })}
+        </option>
+        <option value="followers">
+          {t('studio.replay.visibility.followers', { defaultValue: 'Followers only' })}
+        </option>
+        <option value="public">
+          {t('studio.replay.visibility.public', { defaultValue: 'Public' })}
+        </option>
+      </select>
+    </label>
+  );
+}
+
+function replayStatusLabel(status: string, t: TFunction): string {
+  switch (status) {
+    case 'pending':
+      return t('studio.replay.status.pending', { defaultValue: 'Pending upload' });
+    case 'uploading':
+      return t('studio.replay.status.uploading', { defaultValue: 'Uploading' });
+    case 'processing':
+      return t('studio.replay.status.processing', { defaultValue: 'Processing' });
+    case 'ready':
+      return t('studio.replay.status.ready', { defaultValue: 'Ready' });
+    case 'failed':
+      return t('studio.replay.status.failed', { defaultValue: 'Failed' });
+    case 'deleted':
+      return t('studio.replay.status.deleted', { defaultValue: 'Deleted' });
+    default:
+      return t('studio.replay.status.none', { defaultValue: 'Not uploaded' });
+  }
+}
+
+function TrashIcon() {
+  return <X size={15} />;
 }
 
 const APPOINTMENT_STATS_PAGE_SIZE = 100;
@@ -521,8 +827,16 @@ export function CreatorAppointmentsPage() {
   const { user } = useStudioUser();
   const channelKey = currentChannelKey(user);
   const [appointmentPage, setAppointmentPage] = useState(1);
-  const appointmentStats = useStudioAppointments(Boolean(channelKey), 1, APPOINTMENT_STATS_PAGE_SIZE);
-  const appointments = useStudioAppointments(Boolean(channelKey), appointmentPage, APPOINTMENT_LIST_PAGE_SIZE);
+  const appointmentStats = useStudioAppointments(
+    Boolean(channelKey),
+    1,
+    APPOINTMENT_STATS_PAGE_SIZE,
+  );
+  const appointments = useStudioAppointments(
+    Boolean(channelKey),
+    appointmentPage,
+    APPOINTMENT_LIST_PAGE_SIZE,
+  );
   const createAppointment = useCreateAppointment();
   const uploadCover = useUploadLiveCover();
   const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
@@ -595,15 +909,23 @@ export function CreatorAppointmentsPage() {
     const normalizedTitle = title.trim();
     const normalizedDescription = description.trim();
     if (Number.isNaN(scheduled.getTime())) {
-      setError(t('studio.appointments.invalidTime', { defaultValue: 'Please pick a valid future time.' }));
+      setError(
+        t('studio.appointments.invalidTime', { defaultValue: 'Please pick a valid future time.' }),
+      );
       return;
     }
     if (scheduled.getTime() <= Date.now()) {
-      setError(t('studio.appointments.invalidTime', { defaultValue: 'Please pick a valid future time.' }));
+      setError(
+        t('studio.appointments.invalidTime', { defaultValue: 'Please pick a valid future time.' }),
+      );
       return;
     }
     if (!normalizedTitle || !normalizedDescription || !coverPreview.trim()) {
-      setError(t('studio.appointments.formIncomplete', { defaultValue: 'Start time, title, cover, and description are required.' }));
+      setError(
+        t('studio.appointments.formIncomplete', {
+          defaultValue: 'Start time, title, cover, and description are required.',
+        }),
+      );
       return;
     }
     setError('');
@@ -630,21 +952,33 @@ export function CreatorAppointmentsPage() {
       void appointments.refetch();
       void appointmentStats.refetch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('studio.appointments.saveFailed', { defaultValue: 'Could not save the appointment.' }));
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('studio.appointments.saveFailed', {
+              defaultValue: 'Could not save the appointment.',
+            }),
+      );
     }
   };
 
   const items = appointments.data?.items ?? [];
   const statsItems = appointmentStats.data?.items ?? items;
   const total = appointmentStats.data?.total ?? appointments.data?.total ?? 0;
-  const appointmentPageCount = Math.max(1, Math.ceil((appointments.data?.total ?? 0) / APPOINTMENT_LIST_PAGE_SIZE));
+  const appointmentPageCount = Math.max(
+    1,
+    Math.ceil((appointments.data?.total ?? 0) / APPOINTMENT_LIST_PAGE_SIZE),
+  );
   const upcoming = statsItems.filter((item) => item.status === 'scheduled').length;
   const live = statsItems.filter((item) => item.status === 'live').length;
   const completed = statsItems.filter((item) => item.status === 'completed').length;
 
   useEffect(() => {
     if (!appointments.data) return;
-    const nextPageCount = Math.max(1, Math.ceil(appointments.data.total / APPOINTMENT_LIST_PAGE_SIZE));
+    const nextPageCount = Math.max(
+      1,
+      Math.ceil(appointments.data.total / APPOINTMENT_LIST_PAGE_SIZE),
+    );
     if (appointmentPage > nextPageCount) {
       setAppointmentPage(nextPageCount);
     }
@@ -680,7 +1014,11 @@ export function CreatorAppointmentsPage() {
       </section>
 
       <div className="gl-appointments-toolbar">
-        <button type="button" className="gl-creator-primary gl-appointments-create-btn" onClick={openCreateDialog}>
+        <button
+          type="button"
+          className="gl-creator-primary gl-appointments-create-btn"
+          onClick={openCreateDialog}
+        >
           <Plus size={16} />
           {t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}
         </button>
@@ -691,16 +1029,22 @@ export function CreatorAppointmentsPage() {
           <div className="gl-creator-panel-head">
             <div>
               <span>{t('studio.appointments.listLabel', { defaultValue: 'My appointments' })}</span>
-              <h2>{t('studio.appointments.listTitle', { defaultValue: 'All appointment states' })}</h2>
+              <h2>
+                {t('studio.appointments.listTitle', { defaultValue: 'All appointment states' })}
+              </h2>
             </div>
             <Bell size={22} />
           </div>
           <div className="gl-appointment-list-wrap">
             <div className="gl-appointment-list">
               {appointments.isPending ? (
-                <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+                <div className="gl-creator-empty-soft">
+                  {t('studio.loading', { defaultValue: 'Loading studio...' })}
+                </div>
               ) : items.length === 0 ? (
-                <div className="gl-creator-empty-soft">{t('studio.appointments.empty', { defaultValue: 'No appointments yet.' })}</div>
+                <div className="gl-creator-empty-soft">
+                  {t('studio.appointments.empty', { defaultValue: 'No appointments yet.' })}
+                </div>
               ) : (
                 items.map((item) => (
                   <AppointmentStudioRow
@@ -733,9 +1077,17 @@ export function CreatorAppointmentsPage() {
           <div className="gl-appointment-form-panel gl-appointment-dialog-panel">
             <div className="gl-creator-panel-head">
               <div>
-                <span>{t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}</span>
+                <span>
+                  {t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}
+                </span>
                 <DialogTitle asChild>
-                  <h2>{editing ? t('studio.appointments.editTitle', { defaultValue: 'Edit appointment' }) : t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}</h2>
+                  <h2>
+                    {editing
+                      ? t('studio.appointments.editTitle', { defaultValue: 'Edit appointment' })
+                      : t('studio.appointments.createTitle', {
+                          defaultValue: 'Create appointment',
+                        })}
+                  </h2>
                 </DialogTitle>
               </div>
             </div>
@@ -749,7 +1101,11 @@ export function CreatorAppointmentsPage() {
                   </div>
                   <label className="gl-creator-field">
                     <span>{t('createLive.fields.title')}</span>
-                    <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
+                    <input
+                      value={title}
+                      maxLength={120}
+                      onChange={(event) => setTitle(event.target.value)}
+                    />
                   </label>
                 </div>
                 <label className="gl-creator-field">
@@ -758,7 +1114,9 @@ export function CreatorAppointmentsPage() {
                     value={description}
                     rows={4}
                     maxLength={2000}
-                    placeholder={t('studio.appointments.descriptionPlaceholder', { defaultValue: 'Tell viewers what this appointment is about.' })}
+                    placeholder={t('studio.appointments.descriptionPlaceholder', {
+                      defaultValue: 'Tell viewers what this appointment is about.',
+                    })}
                     onChange={(event) => setDescription(event.target.value)}
                   />
                 </label>
@@ -777,10 +1135,24 @@ export function CreatorAppointmentsPage() {
             </div>
             {error && <div className="gl-creator-empty-soft gl-appointment-error">{error}</div>}
             <div className="gl-appointment-dialog-actions">
-              <button type="button" className="gl-creator-secondary" onClick={resetDraft} disabled={!title && !description && !coverPreview && !editing}>
+              <button
+                type="button"
+                className="gl-creator-secondary"
+                onClick={resetDraft}
+                disabled={!title && !description && !coverPreview && !editing}
+              >
                 {t('studio.appointments.reset', { defaultValue: 'Reset' })}
               </button>
-              <button type="button" className="gl-creator-primary gl-appointment-submit" onClick={() => void saveAppointment()} disabled={createAppointment.isPending || updateAppointment.isPending || uploadCover.isPending}>
+              <button
+                type="button"
+                className="gl-creator-primary gl-appointment-submit"
+                onClick={() => void saveAppointment()}
+                disabled={
+                  createAppointment.isPending ||
+                  updateAppointment.isPending ||
+                  uploadCover.isPending
+                }
+              >
                 <Save size={16} />
                 {editing
                   ? t('studio.appointments.saveEdit', { defaultValue: 'Save changes' })
@@ -827,7 +1199,9 @@ export function CreatorPostsPage() {
         break;
       }
       if (!file.type.startsWith('image/')) {
-        toast.error(t('upload.imageTypeError', { defaultValue: 'Please use JPG, PNG, WebP, or GIF images.' }));
+        toast.error(
+          t('upload.imageTypeError', { defaultValue: 'Please use JPG, PNG, WebP, or GIF images.' }),
+        );
         continue;
       }
       if (file.size > 5 << 20) {
@@ -886,7 +1260,11 @@ export function CreatorPostsPage() {
       setPage(1);
       toast.success(t('posts.editor.published', { defaultValue: '帖子已发布。' }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('posts.editor.failed', { defaultValue: '发布失败，请稍后重试。' }));
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : t('posts.editor.failed', { defaultValue: '发布失败，请稍后重试。' }),
+      );
     }
   };
 
@@ -895,7 +1273,10 @@ export function CreatorPostsPage() {
 
   return (
     <div className="gl-studio-posts-page">
-      <section className="gl-creator-kpis gl-post-kpis" aria-label={t('posts.editor.kpis', { defaultValue: 'Post summary' })}>
+      <section
+        className="gl-creator-kpis gl-post-kpis"
+        aria-label={t('posts.editor.kpis', { defaultValue: 'Post summary' })}
+      >
         <StudioKpi
           icon={<FileText size={18} />}
           label={t('posts.editor.total', { defaultValue: '全部帖子' })}
@@ -923,7 +1304,11 @@ export function CreatorPostsPage() {
       </section>
 
       <div className="gl-post-toolbar">
-        <button type="button" className="gl-creator-primary gl-post-create-btn" onClick={() => setPostDialogOpen(true)}>
+        <button
+          type="button"
+          className="gl-creator-primary gl-post-create-btn"
+          onClick={() => setPostDialogOpen(true)}
+        >
           <Plus size={16} />
           {t('posts.editor.title', { defaultValue: '发布帖子' })}
         </button>
@@ -940,11 +1325,15 @@ export function CreatorPostsPage() {
           </div>
           <div className="gl-post-feed-list">
             {posts.isPending ? (
-              Array.from({ length: 2 }).map((_, index) => <div className="gl-post-card is-loading" key={index} />)
+              Array.from({ length: 2 }).map((_, index) => (
+                <div className="gl-post-card is-loading" key={index} />
+              ))
             ) : pageItems.length ? (
               pageItems.map((post) => <PostCard key={post.id} post={post} context="studio" />)
             ) : (
-              <div className="gl-creator-empty-soft">{t('posts.editor.emptyList', { defaultValue: '还没有发布过帖子。' })}</div>
+              <div className="gl-creator-empty-soft">
+                {t('posts.editor.emptyList', { defaultValue: '还没有发布过帖子。' })}
+              </div>
             )}
           </div>
           {total > STUDIO_POST_PAGE_SIZE && (
@@ -986,22 +1375,39 @@ export function CreatorPostsPage() {
                     rows={7}
                     maxLength={2000}
                     value={content}
-                    placeholder={t('posts.editor.placeholder', { defaultValue: '写下直播预告、幕后花絮或想对粉丝说的话。' })}
+                    placeholder={t('posts.editor.placeholder', {
+                      defaultValue: '写下直播预告、幕后花絮或想对粉丝说的话。',
+                    })}
                     onChange={(event) => setContent(event.target.value)}
                   />
                 </label>
 
                 <div className="gl-post-editor-controls">
-                  <div className="gl-post-segmented" aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}>
-                    <button type="button" className={visibility === 'public' ? 'is-active' : undefined} onClick={() => setVisibility('public')}>
+                  <div
+                    className="gl-post-segmented"
+                    aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}
+                  >
+                    <button
+                      type="button"
+                      className={visibility === 'public' ? 'is-active' : undefined}
+                      onClick={() => setVisibility('public')}
+                    >
                       <Globe2 size={15} />
                       {t('posts.visibility.public', { defaultValue: '公开' })}
                     </button>
-                    <button type="button" className={visibility === 'followers' ? 'is-active' : undefined} onClick={() => setVisibility('followers')}>
+                    <button
+                      type="button"
+                      className={visibility === 'followers' ? 'is-active' : undefined}
+                      onClick={() => setVisibility('followers')}
+                    >
                       <Users size={15} />
                       {t('posts.visibility.followersTitle', { defaultValue: '仅粉丝可见' })}
                     </button>
-                    <button type="button" className={visibility === 'private' ? 'is-active' : undefined} onClick={() => setVisibility('private')}>
+                    <button
+                      type="button"
+                      className={visibility === 'private' ? 'is-active' : undefined}
+                      onClick={() => setVisibility('private')}
+                    >
                       <LockKeyhole size={15} />
                       {t('posts.visibility.privateTitle', { defaultValue: '仅自己可见' })}
                     </button>
@@ -1014,16 +1420,22 @@ export function CreatorPostsPage() {
                         checked={commentsEnabled}
                         onChange={(event) => setCommentsEnabled(event.target.checked)}
                       />
-                      <span>{t('posts.editor.enableComments', { defaultValue: '开启评论区' })}</span>
+                      <span>
+                        {t('posts.editor.enableComments', { defaultValue: '开启评论区' })}
+                      </span>
                     </label>
                     <label className={cn('gl-post-toggle', !commentsEnabled && 'is-disabled')}>
                       <input
                         type="checkbox"
                         checked={commentMode === 'followers'}
                         disabled={!commentsEnabled}
-                        onChange={(event) => setCommentMode(event.target.checked ? 'followers' : 'everyone')}
+                        onChange={(event) =>
+                          setCommentMode(event.target.checked ? 'followers' : 'everyone')
+                        }
                       />
-                      <span>{t('posts.editor.followersOnlyComments', { defaultValue: '仅粉丝评论' })}</span>
+                      <span>
+                        {t('posts.editor.followersOnlyComments', { defaultValue: '仅粉丝评论' })}
+                      </span>
                     </label>
                   </div>
                 </div>
@@ -1031,7 +1443,9 @@ export function CreatorPostsPage() {
 
               <div className="gl-creator-field gl-post-image-field">
                 <span>{t('posts.editor.addImages', { defaultValue: '添加图片' })}</span>
-                <label className={cn('gl-post-image-picker', imageDrafts.length >= 6 && 'is-disabled')}>
+                <label
+                  className={cn('gl-post-image-picker', imageDrafts.length >= 6 && 'is-disabled')}
+                >
                   <ImagePlus size={22} />
                   <strong>{t('posts.editor.addImages', { defaultValue: '添加图片' })}</strong>
                   <input
@@ -1051,7 +1465,11 @@ export function CreatorPostsPage() {
                     {imageDrafts.map((item) => (
                       <div className="gl-post-draft-image" key={item.id}>
                         <img src={item.preview} alt="" />
-                        <button type="button" aria-label={t('posts.editor.removeImage', { defaultValue: '移除图片' })} onClick={() => removeImage(item.id)}>
+                        <button
+                          type="button"
+                          aria-label={t('posts.editor.removeImage', { defaultValue: '移除图片' })}
+                          onClick={() => removeImage(item.id)}
+                        >
                           <X size={15} />
                         </button>
                       </div>
@@ -1062,10 +1480,20 @@ export function CreatorPostsPage() {
             </div>
 
             <div className="gl-appointment-dialog-actions">
-              <button type="button" className="gl-creator-secondary" disabled={publishing || (!content && imageDrafts.length === 0)} onClick={clearDraft}>
+              <button
+                type="button"
+                className="gl-creator-secondary"
+                disabled={publishing || (!content && imageDrafts.length === 0)}
+                onClick={clearDraft}
+              >
                 {t('studio.appointments.reset', { defaultValue: 'Reset' })}
               </button>
-              <button type="button" className="gl-creator-primary gl-post-submit" disabled={!canPublish} onClick={() => void publish()}>
+              <button
+                type="button"
+                className="gl-creator-primary gl-post-submit"
+                disabled={!canPublish}
+                onClick={() => void publish()}
+              >
                 <Send size={16} />
                 {publishing
                   ? t('posts.editor.publishing', { defaultValue: '发布中...' })
@@ -1088,7 +1516,12 @@ export function CreatorRoomModeratorsPage() {
   const [query, setQuery] = useState('');
   const [followerPage, setFollowerPage] = useState(1);
   const [logPage, setLogPage] = useState(1);
-  const followers = useModeratorFollowers(query.trim(), followerPage, MOD_FOLLOWER_PAGE_SIZE, Boolean(user));
+  const followers = useModeratorFollowers(
+    query.trim(),
+    followerPage,
+    MOD_FOLLOWER_PAGE_SIZE,
+    Boolean(user),
+  );
   const moderators = useRoomModerators(1, 100, Boolean(user));
   const logs = useModeratorLogs(logPage, MOD_LOG_PAGE_SIZE, Boolean(user));
   const addModerator = useAddModerator();
@@ -1097,7 +1530,10 @@ export function CreatorRoomModeratorsPage() {
     () => new Set((moderators.data?.items ?? []).map((item) => item.id)),
     [moderators.data?.items],
   );
-  const followerPageCount = Math.max(1, Math.ceil((followers.data?.total ?? 0) / MOD_FOLLOWER_PAGE_SIZE));
+  const followerPageCount = Math.max(
+    1,
+    Math.ceil((followers.data?.total ?? 0) / MOD_FOLLOWER_PAGE_SIZE),
+  );
   const logPageCount = Math.max(1, Math.ceil((logs.data?.total ?? 0) / MOD_LOG_PAGE_SIZE));
 
   useEffect(() => {
@@ -1114,7 +1550,9 @@ export function CreatorRoomModeratorsPage() {
           }),
         ),
       onError: (err) =>
-        toast.error(err.message || t('studio.moderators.addFailed', { defaultValue: '添加房管失败。' })),
+        toast.error(
+          err.message || t('studio.moderators.addFailed', { defaultValue: '添加房管失败。' }),
+        ),
     });
   };
 
@@ -1128,7 +1566,9 @@ export function CreatorRoomModeratorsPage() {
           }),
         ),
       onError: (err) =>
-        toast.error(err.message || t('studio.moderators.removeFailed', { defaultValue: '取消房管失败。' })),
+        toast.error(
+          err.message || t('studio.moderators.removeFailed', { defaultValue: '取消房管失败。' }),
+        ),
     });
   };
 
@@ -1171,17 +1611,23 @@ export function CreatorRoomModeratorsPage() {
             <Users size={22} />
           </div>
           <label className="gl-room-mod-search">
-            <span>{t('studio.moderators.searchPlaceholder', { defaultValue: '搜索粉丝用户名' })}</span>
+            <span>
+              {t('studio.moderators.searchPlaceholder', { defaultValue: '搜索粉丝用户名' })}
+            </span>
             <input
               value={query}
               maxLength={64}
-              placeholder={t('studio.moderators.searchPlaceholder', { defaultValue: '搜索粉丝用户名' })}
+              placeholder={t('studio.moderators.searchPlaceholder', {
+                defaultValue: '搜索粉丝用户名',
+              })}
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
           <div className="gl-room-mod-list">
             {followers.isPending ? (
-              <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+              <div className="gl-creator-empty-soft">
+                {t('studio.loading', { defaultValue: 'Loading studio...' })}
+              </div>
             ) : followers.data?.items.length ? (
               followers.data.items.map((item) => (
                 <ModerationUserRow
@@ -1224,7 +1670,9 @@ export function CreatorRoomModeratorsPage() {
           </div>
           <div className="gl-room-mod-list">
             {moderators.isPending ? (
-              <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+              <div className="gl-creator-empty-soft">
+                {t('studio.loading', { defaultValue: 'Loading studio...' })}
+              </div>
             ) : moderators.data?.items.length ? (
               moderators.data.items.map((item) => (
                 <ModerationUserRow
@@ -1256,7 +1704,9 @@ export function CreatorRoomModeratorsPage() {
         </div>
         <div className="gl-room-mod-log-list">
           {logs.isPending ? (
-            <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+            <div className="gl-creator-empty-soft">
+              {t('studio.loading', { defaultValue: 'Loading studio...' })}
+            </div>
           ) : logs.data?.items.length ? (
             logs.data.items.map((item) => (
               <ModerationLogRow key={item.id} item={item} locale={i18n.language} />
@@ -1387,30 +1837,54 @@ function AppointmentStudioRow({
         startAppointment.mutate(undefined, {
           onSuccess: (stream) => {
             savePublisherSession(stream);
-            toast.success(t('studio.appointments.started', { defaultValue: 'Appointment live started.' }));
+            toast.success(
+              t('studio.appointments.started', { defaultValue: 'Appointment live started.' }),
+            );
             navigate(`/studio/live/${encodeURIComponent(stream.id)}`);
           },
-          onError: (err) => toast.error(err.message || t('studio.appointments.startFailed', { defaultValue: 'Could not start the appointment.' })),
+          onError: (err) =>
+            toast.error(
+              err.message ||
+                t('studio.appointments.startFailed', {
+                  defaultValue: 'Could not start the appointment.',
+                }),
+            ),
         });
       }}
       onEdit={() => {
         if (!mutable) {
-          toast.info(t('studio.appointments.locked', { defaultValue: 'This appointment can no longer be edited.' }));
+          toast.info(
+            t('studio.appointments.locked', {
+              defaultValue: 'This appointment can no longer be edited.',
+            }),
+          );
           return;
         }
         onEdit();
       }}
       onDelete={() => {
         if (!mutable) {
-          toast.info(t('studio.appointments.locked', { defaultValue: 'This appointment can no longer be edited.' }));
+          toast.info(
+            t('studio.appointments.locked', {
+              defaultValue: 'This appointment can no longer be edited.',
+            }),
+          );
           return;
         }
         cancelAppointment.mutate(undefined, {
           onSuccess: () => {
-            toast.success(t('studio.appointments.deleted', { defaultValue: 'Appointment deleted.' }));
+            toast.success(
+              t('studio.appointments.deleted', { defaultValue: 'Appointment deleted.' }),
+            );
             onUpdated();
           },
-          onError: (err) => toast.error(err.message || t('studio.appointments.deleteFailed', { defaultValue: 'Could not delete the appointment.' })),
+          onError: (err) =>
+            toast.error(
+              err.message ||
+                t('studio.appointments.deleteFailed', {
+                  defaultValue: 'Could not delete the appointment.',
+                }),
+            ),
         });
       }}
     />
@@ -1426,7 +1900,10 @@ function AppointmentDateTimePicker({
 }) {
   const { t, i18n } = useTranslation('pages');
   const [open, setOpen] = useState(false);
-  const selected = useMemo(() => parseLocalDateTimeValue(value) ?? new Date(Date.now() + 60 * 60 * 1000), [value]);
+  const selected = useMemo(
+    () => parseLocalDateTimeValue(value) ?? new Date(Date.now() + 60 * 60 * 1000),
+    [value],
+  );
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(selected));
   const monthDays = useMemo(() => calendarMonthDays(viewMonth), [viewMonth]);
   const weekdays = useMemo(() => weekdayLabels(i18n.language), [i18n.language]);
@@ -1457,11 +1934,21 @@ function AppointmentDateTimePicker({
       {open && (
         <div className="gl-appointment-datetime-popover">
           <div className="gl-appointment-calendar-head">
-            <button type="button" aria-label={t('studio.appointments.previousMonth', { defaultValue: 'Previous month' })} onClick={() => setViewMonth(addMonths(viewMonth, -1))}>
+            <button
+              type="button"
+              aria-label={t('studio.appointments.previousMonth', {
+                defaultValue: 'Previous month',
+              })}
+              onClick={() => setViewMonth(addMonths(viewMonth, -1))}
+            >
               <ChevronLeft size={17} />
             </button>
             <strong>{formatMonthLabel(viewMonth, i18n.language)}</strong>
-            <button type="button" aria-label={t('studio.appointments.nextMonth', { defaultValue: 'Next month' })} onClick={() => setViewMonth(addMonths(viewMonth, 1))}>
+            <button
+              type="button"
+              aria-label={t('studio.appointments.nextMonth', { defaultValue: 'Next month' })}
+              onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+            >
               <ChevronRight size={17} />
             </button>
           </div>
@@ -1490,24 +1977,44 @@ function AppointmentDateTimePicker({
           <div className="gl-appointment-time-row">
             <label>
               <span>{t('studio.appointments.hour', { defaultValue: 'Hour' })}</span>
-              <select value={selectedHour} onChange={(event) => onChange(replaceTimePart(value, event.target.value, selectedMinute))}>
+              <select
+                value={selectedHour}
+                onChange={(event) =>
+                  onChange(replaceTimePart(value, event.target.value, selectedMinute))
+                }
+              >
                 {Array.from({ length: 24 }).map((_, index) => {
                   const hour = pad2(index);
-                  return <option key={hour} value={hour}>{hour}</option>;
+                  return (
+                    <option key={hour} value={hour}>
+                      {hour}
+                    </option>
+                  );
                 })}
               </select>
             </label>
             <label>
               <span>{t('studio.appointments.minute', { defaultValue: 'Minute' })}</span>
-              <select value={selectedMinute} onChange={(event) => onChange(replaceTimePart(value, selectedHour, event.target.value))}>
+              <select
+                value={selectedMinute}
+                onChange={(event) =>
+                  onChange(replaceTimePart(value, selectedHour, event.target.value))
+                }
+              >
                 {minuteOptions(selectedMinute).map((minute) => (
-                  <option key={minute} value={minute}>{minute}</option>
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
                 ))}
               </select>
             </label>
           </div>
           <div className="gl-appointment-datetime-actions">
-            <button type="button" className="gl-creator-secondary" onClick={() => onChange(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)))}>
+            <button
+              type="button"
+              className="gl-creator-secondary"
+              onClick={() => onChange(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)))}
+            >
               {t('studio.appointments.oneHourLater', { defaultValue: '1 hour later' })}
             </button>
             <button type="button" className="gl-creator-primary" onClick={() => setOpen(false)}>
@@ -1537,7 +2044,10 @@ function StudioAppointmentPager({
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
   return (
-    <div className="gl-history-pager gl-appointment-pager" aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}>
+    <div
+      className="gl-history-pager gl-appointment-pager"
+      aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}
+    >
       <div className="gl-history-pager-count">
         {t('appointments.pageCount', {
           start,
@@ -1555,7 +2065,9 @@ function StudioAppointmentPager({
         >
           <ChevronLeft size={16} />
         </button>
-        <span className="gl-appointment-pager-current">{page} / {pageCount}</span>
+        <span className="gl-appointment-pager-current">
+          {page} / {pageCount}
+        </span>
         <button
           type="button"
           aria-label={t('appointments.next', { defaultValue: 'Next page' })}
@@ -1586,7 +2098,10 @@ function StudioPostPager({
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
   return (
-    <div className="gl-history-pager gl-appointment-pager" aria-label={t('posts.editor.pagination', { defaultValue: 'Post pagination' })}>
+    <div
+      className="gl-history-pager gl-appointment-pager"
+      aria-label={t('posts.editor.pagination', { defaultValue: 'Post pagination' })}
+    >
       <div className="gl-history-pager-count">
         {t('posts.editor.pageCount', {
           start,
@@ -1647,7 +2162,10 @@ function addMonths(value: Date, amount: number): Date {
 function calendarMonthDays(month: Date): Date[] {
   const start = startOfMonth(month);
   start.setDate(start.getDate() - start.getDay());
-  return Array.from({ length: 42 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index));
+  return Array.from(
+    { length: 42 },
+    (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index),
+  );
 }
 
 function weekdayLabels(locale: string): string[] {
@@ -1673,7 +2191,11 @@ function formatDateTimeLabel(value: string, locale: string): string {
 }
 
 function isSameDate(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
 function replaceDatePart(value: string, date: Date): string {
@@ -1710,7 +2232,9 @@ export function CreatorLiveConsolePage() {
   );
   const roomIsLive = Boolean(stream && (isStreamLive(stream) || directoryStream));
   const streamEnded = Boolean(stream && !roomIsLive && stream.status === 'ended');
-  const ownsStream = Boolean(stream?.ownerId && currentUser?.id && stream.ownerId === currentUser.id);
+  const ownsStream = Boolean(
+    stream?.ownerId && currentUser?.id && stream.ownerId === currentUser.id,
+  );
   const [ended, setEnded] = useState(false);
   const [moderationTarget, setModerationTarget] = useState<ChatModerationTarget | null>(null);
   const realtime = useRoomRealtime(id, Boolean(id && stream), {
@@ -1761,7 +2285,9 @@ export function CreatorLiveConsolePage() {
       <StudioAccessPage
         icon={<Radio size={24} />}
         title={t('studio.console.notFound', { defaultValue: 'Live room unavailable' })}
-        body={t('studio.console.notFoundBody', { defaultValue: 'The live room could not be loaded.' })}
+        body={t('studio.console.notFoundBody', {
+          defaultValue: 'The live room could not be loaded.',
+        })}
         actionLabel={t('notFound.back')}
         onAction={() => navigate('/studio/overview')}
       />
@@ -1773,7 +2299,9 @@ export function CreatorLiveConsolePage() {
       <StudioAccessPage
         icon={<ShieldCheck size={24} />}
         title={t('studio.console.ownerOnly', { defaultValue: 'Owner console only' })}
-        body={t('studio.console.ownerOnlyBody', { defaultValue: 'Only the channel owner can control this live.' })}
+        body={t('studio.console.ownerOnlyBody', {
+          defaultValue: 'Only the channel owner can control this live.',
+        })}
         actionLabel={t('notFound.back')}
         onAction={() => navigate('/studio/overview')}
       />
@@ -1786,7 +2314,8 @@ export function CreatorLiveConsolePage() {
         icon={<Square size={24} />}
         title={t('studio.console.ended', { defaultValue: 'Live ended.' })}
         body={t('studio.console.endFinished', {
-          defaultValue: 'This live has already finished. Open the studio overview to start a new one.',
+          defaultValue:
+            'This live has already finished. Open the studio overview to start a new one.',
         })}
         actionLabel={t('notFound.back')}
         onAction={() => navigate('/studio/overview')}
@@ -1801,7 +2330,8 @@ export function CreatorLiveConsolePage() {
         toast.success(t('studio.console.ended', { defaultValue: 'Live ended.' }));
         navigate('/studio/overview');
       },
-      onError: () => toast.error(t('studio.console.endFailed', { defaultValue: 'Could not end the live.' })),
+      onError: () =>
+        toast.error(t('studio.console.endFailed', { defaultValue: 'Could not end the live.' })),
     });
   };
   const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
@@ -1858,12 +2388,25 @@ export function CreatorLiveConsolePage() {
         <div className="gl-live-console-status-main">
           <span className={cn('gl-live-console-pill', roomIsLive ? 'is-live' : 'is-waiting')}>
             <span />
-            {roomIsLive ? t('studio.console.live', { defaultValue: 'LIVE' }) : t('studio.console.waiting', { defaultValue: 'Waiting' })}
+            {roomIsLive
+              ? t('studio.console.live', { defaultValue: 'LIVE' })
+              : t('studio.console.waiting', { defaultValue: 'Waiting' })}
           </span>
-          <StatusMetric label={t('studio.console.duration', { defaultValue: 'Duration' })} value={elapsed} />
-          <StatusMetric label={t('studio.console.online', { defaultValue: 'Online' })} value={viewerCount.toLocaleString()} />
+          <StatusMetric
+            label={t('studio.console.duration', { defaultValue: 'Duration' })}
+            value={elapsed}
+          />
+          <StatusMetric
+            label={t('studio.console.online', { defaultValue: 'Online' })}
+            value={viewerCount.toLocaleString()}
+          />
         </div>
-        <button type="button" className="gl-owner-end-live" disabled={stopLive.isPending} onClick={stop}>
+        <button
+          type="button"
+          className="gl-owner-end-live"
+          disabled={stopLive.isPending}
+          onClick={stop}
+        >
           <Square size={15} />
           {stopLive.isPending
             ? t('studio.console.ending', { defaultValue: 'Ending...' })
@@ -1890,6 +2433,7 @@ export function CreatorLiveConsolePage() {
               void liveRooms.refetch();
             }}
           />
+          <LiveReplaySettingsPanel stream={stream} />
           {session && (
             <ConsolePublisherPanel
               session={session}
@@ -1918,12 +2462,21 @@ export function CreatorLiveConsolePage() {
           viewers={realtime.viewers}
           viewerCount={viewerCount}
           bulletsCount={realtime.bullets.length}
-          onClearBullets={() => realtime.bullets.forEach((bullet) => realtime.clearBullet(bullet.id))}
+          onClearBullets={() =>
+            realtime.bullets.forEach((bullet) => realtime.clearBullet(bullet.id))
+          }
           onSendChat={realtime.sendChat}
           canModerate
           onOpenModeration={setModerationTarget}
           reconnecting={realtime.readyState !== 'open'}
-          reconnectingLabel={realtime.readyState === 'reconnecting' ? t('studio.console.reconnecting', { count: realtime.retryCount, defaultValue: 'Reconnecting #{{count}}' }) : t('studio.console.disconnected', { defaultValue: 'Disconnected' })}
+          reconnectingLabel={
+            realtime.readyState === 'reconnecting'
+              ? t('studio.console.reconnecting', {
+                  count: realtime.retryCount,
+                  defaultValue: 'Reconnecting #{{count}}',
+                })
+              : t('studio.console.disconnected', { defaultValue: 'Disconnected' })
+          }
         />
       </div>
       <ConsoleMuteUserDialog
@@ -1949,7 +2502,9 @@ function StudioHeader({ user }: { user?: User | null }) {
       <Avatar name={userDisplayName(user)} src={user?.avatar} size={58} />
       <div>
         <span>{t('studio.brand', { defaultValue: 'Creator Studio' })}</span>
-        <h1>{t('studio.title', { name: userDisplayName(user), defaultValue: '{{name}} workspace' })}</h1>
+        <h1>
+          {t('studio.title', { name: userDisplayName(user), defaultValue: '{{name}} workspace' })}
+        </h1>
       </div>
     </header>
   );
@@ -1958,13 +2513,24 @@ function StudioHeader({ user }: { user?: User | null }) {
 function StudioTabs() {
   const { t } = useTranslation('pages');
   return (
-    <nav className="gl-creator-tabs" aria-label={t('studio.tabs.label', { defaultValue: 'Creator Studio sections' })}>
-      <NavLink to="/studio/overview">{t('studio.tabs.overview', { defaultValue: 'Overview' })}</NavLink>
-      <NavLink to="/studio/prepare">{t('studio.tabs.prepare', { defaultValue: 'Stream setup' })}</NavLink>
+    <nav
+      className="gl-creator-tabs"
+      aria-label={t('studio.tabs.label', { defaultValue: 'Creator Studio sections' })}
+    >
+      <NavLink to="/studio/overview">
+        {t('studio.tabs.overview', { defaultValue: 'Overview' })}
+      </NavLink>
+      <NavLink to="/studio/prepare">
+        {t('studio.tabs.prepare', { defaultValue: 'Stream setup' })}
+      </NavLink>
       <NavLink to="/studio/posts">{t('studio.tabs.posts', { defaultValue: '帖子动态' })}</NavLink>
-      <NavLink to="/studio/appointments">{t('studio.tabs.appointments', { defaultValue: 'Live appointments' })}</NavLink>
-      <NavLink to="/studio/moderators">{t('studio.tabs.moderators', { defaultValue: '房间房管' })}</NavLink>
-      <NavLink to="/studio/replay">{t('studio.tabs.replay', { defaultValue: 'Data replay' })}</NavLink>
+      <NavLink to="/studio/appointments">
+        {t('studio.tabs.appointments', { defaultValue: 'Live appointments' })}
+      </NavLink>
+      <NavLink to="/studio/moderators">
+        {t('studio.tabs.moderators', { defaultValue: '房间房管' })}
+      </NavLink>
+      <NavLink to="/studio/replay">{t('studio.tabs.replay', { defaultValue: '直播回放' })}</NavLink>
     </nav>
   );
 }
@@ -1990,14 +2556,23 @@ function StudioPermissionPage({
       ? t('studio.permission.rejected.title', { defaultValue: 'Application was rejected' })
       : t('studio.permission.none.title', { defaultValue: 'Apply for creator access' });
   const body = pending
-    ? t('studio.permission.pending.body', { defaultValue: 'We are checking your channel and account status.' })
+    ? t('studio.permission.pending.body', {
+        defaultValue: 'We are checking your channel and account status.',
+      })
     : rejected
-      ? t('studio.permission.rejected.body', { defaultValue: 'Reason: your channel information needs another review before live access can be enabled.' })
-      : t('studio.permission.none.body', { defaultValue: 'Creator access is required before opening the streaming workspace.' });
+      ? t('studio.permission.rejected.body', {
+          defaultValue:
+            'Reason: your channel information needs another review before live access can be enabled.',
+        })
+      : t('studio.permission.none.body', {
+          defaultValue: 'Creator access is required before opening the streaming workspace.',
+        });
 
   return (
     <StudioAccessPage
-      icon={pending ? <Timer size={24} /> : rejected ? <ShieldCheck size={24} /> : <Send size={24} />}
+      icon={
+        pending ? <Timer size={24} /> : rejected ? <ShieldCheck size={24} /> : <Send size={24} />
+      }
       title={title}
       body={body}
       actionLabel={
@@ -2012,26 +2587,39 @@ function StudioPermissionPage({
       actionDisabled={pending || applying || (!pending && !reason.trim())}
       onAction={() => onApply(reason.trim())}
       details={[
-        t('studio.permission.reviewTime', { defaultValue: 'Estimated review time: within 1 business day.' }),
-        t('studio.permission.notice', { defaultValue: 'Keep your channel name, avatar, and cover ready for review.' }),
+        t('studio.permission.reviewTime', {
+          defaultValue: 'Estimated review time: within 1 business day.',
+        }),
+        t('studio.permission.notice', {
+          defaultValue: 'Keep your channel name, avatar, and cover ready for review.',
+        }),
         rejected
           ? t('studio.permission.rejected.reason', {
-              reason: rejectReason || t('studio.permission.rejected.reasonFallback', { defaultValue: 'Channel readiness did not meet the current creator policy.' }),
+              reason:
+                rejectReason ||
+                t('studio.permission.rejected.reasonFallback', {
+                  defaultValue: 'Channel readiness did not meet the current creator policy.',
+                }),
               defaultValue: 'Rejected reason: {{reason}}',
             })
-          : t('studio.permission.progress', { defaultValue: 'Progress: submitted -> manual review -> result.' }),
+          : t('studio.permission.progress', {
+              defaultValue: 'Progress: submitted -> manual review -> result.',
+            }),
       ]}
     >
       {!pending && (
         <label className="gl-creator-access-reason">
-          <span>{t('studio.permission.reasonLabel', { defaultValue: 'Why do you want to go live?' })}</span>
+          <span>
+            {t('studio.permission.reasonLabel', { defaultValue: 'Why do you want to go live?' })}
+          </span>
           <textarea
             value={reason}
             rows={5}
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}
             placeholder={t('studio.permission.reasonPlaceholder', {
-              defaultValue: 'Tell admins your live content plan and why this channel needs live access.',
+              defaultValue:
+                'Tell admins your live content plan and why this channel needs live access.',
             })}
           />
         </label>
@@ -2073,7 +2661,12 @@ function StudioAccessPage({
           </div>
         )}
         {children}
-        <button className="gl-creator-primary" type="button" disabled={actionDisabled} onClick={onAction}>
+        <button
+          className="gl-creator-primary"
+          type="button"
+          disabled={actionDisabled}
+          onClick={onAction}
+        >
           {actionLabel}
         </button>
       </section>
@@ -2089,7 +2682,17 @@ function StudioLoading({ label }: { label: string }) {
   );
 }
 
-function StudioKpi({ icon, label, value, sub }: { icon: ReactNode; label: string; value: string; sub: string }) {
+function StudioKpi({
+  icon,
+  label,
+  value,
+  sub,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+}) {
   return (
     <div className="gl-creator-kpi">
       <div className="gl-creator-kpi-icon">{icon}</div>
@@ -2100,7 +2703,17 @@ function StudioKpi({ icon, label, value, sub }: { icon: ReactNode; label: string
   );
 }
 
-function StudioAction({ icon, title, body, onClick }: { icon: ReactNode; title: string; body: string; onClick: () => void }) {
+function StudioAction({
+  icon,
+  title,
+  body,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  body: string;
+  onClick: () => void;
+}) {
   return (
     <button type="button" className="gl-creator-action" onClick={onClick}>
       <span>{icon}</span>
@@ -2130,7 +2743,14 @@ function StepCard({
   children: ReactNode;
 }) {
   return (
-    <section className={cn('gl-creator-step', active && 'is-active', done && 'is-done', locked && 'is-locked')}>
+    <section
+      className={cn(
+        'gl-creator-step',
+        active && 'is-active',
+        done && 'is-done',
+        locked && 'is-locked',
+      )}
+    >
       <button type="button" className="gl-creator-step-head" disabled={locked} onClick={onOpen}>
         <span>{done ? <CheckCircle2 size={16} /> : number}</span>
         <strong>{title}</strong>
@@ -2141,7 +2761,13 @@ function StepCard({
   );
 }
 
-function CoverPicker({ preview, onChange }: { preview: string; onChange: (file: File | null) => void }) {
+function CoverPicker({
+  preview,
+  onChange,
+}: {
+  preview: string;
+  onChange: (file: File | null) => void;
+}) {
   const { t } = useTranslation('pages');
   return (
     <label className="gl-creator-cover-picker">
@@ -2175,7 +2801,11 @@ function CategoryPicker({
   return (
     <div className="gl-creator-category-picker">
       <span>{t('createLive.fields.category')}</span>
-      <div className="gl-creator-category-list" role="listbox" aria-label={t('createLive.fields.category')}>
+      <div
+        className="gl-creator-category-list"
+        role="listbox"
+        aria-label={t('createLive.fields.category')}
+      >
         {categories.map((item) => {
           const active = item === value;
           return (
@@ -2219,7 +2849,10 @@ function LiveSetupPreview({
       <div className="gl-creator-live-preview-copy">
         <strong>{title || t('createLive.defaultTitle')}</strong>
         <span>{category}</span>
-        <p>{description || t('studio.prepare.noDescription', { defaultValue: 'Description will appear here.' })}</p>
+        <p>
+          {description ||
+            t('studio.prepare.noDescription', { defaultValue: 'Description will appear here.' })}
+        </p>
       </div>
     </div>
   );
@@ -2238,10 +2871,16 @@ function PublisherPreview({ rtmpServer }: { rtmpServer: string }) {
   const { t } = useTranslation('pages');
   return (
     <div className="gl-creator-publisher-preview">
-      <PublisherLine label={t('studio.publisher.server', { defaultValue: 'OBS server' })} value={rtmpServer} copyLabel="OBS server" />
+      <PublisherLine
+        label={t('studio.publisher.server', { defaultValue: 'OBS server' })}
+        value={rtmpServer}
+        copyLabel="OBS server"
+      />
       <div className="gl-creator-key-placeholder">
         <span>{t('studio.publisher.key', { defaultValue: 'Stream key' })}</span>
-        <strong>{t('studio.publisher.keyAfterStart', { defaultValue: 'Issued after confirmation' })}</strong>
+        <strong>
+          {t('studio.publisher.keyAfterStart', { defaultValue: 'Issued after confirmation' })}
+        </strong>
       </div>
     </div>
   );
@@ -2271,14 +2910,34 @@ function ConsolePublisherPanel({
               : t('studio.publisher.waiting', { defaultValue: 'Waiting for OBS' })}
           </h2>
         </div>
-        <button type="button" className="gl-creator-icon-button" onClick={onRefresh} aria-label={t('studio.publisher.refresh', { defaultValue: 'Refresh status' })}>
+        <button
+          type="button"
+          className="gl-creator-icon-button"
+          onClick={onRefresh}
+          aria-label={t('studio.publisher.refresh', { defaultValue: 'Refresh status' })}
+        >
           <ClipboardCheck size={17} />
         </button>
       </div>
       <div className="gl-creator-publisher-grid">
-        <PublisherLine label={t('studio.publisher.server', { defaultValue: 'OBS server' })} value={session.rtmpServer} copyLabel="OBS server" />
-        <PublisherLine label={t('studio.publisher.key', { defaultValue: 'Stream key' })} value={session.streamKey} secret copyLabel="Stream key" />
-        {streamUrl && <PublisherLine label={t('studio.publisher.playback', { defaultValue: 'Playback URL' })} value={streamUrl} copyLabel="Playback URL" />}
+        <PublisherLine
+          label={t('studio.publisher.server', { defaultValue: 'OBS server' })}
+          value={session.rtmpServer}
+          copyLabel="OBS server"
+        />
+        <PublisherLine
+          label={t('studio.publisher.key', { defaultValue: 'Stream key' })}
+          value={session.streamKey}
+          secret
+          copyLabel="Stream key"
+        />
+        {streamUrl && (
+          <PublisherLine
+            label={t('studio.publisher.playback', { defaultValue: 'Playback URL' })}
+            value={streamUrl}
+            copyLabel="Playback URL"
+          />
+        )}
       </div>
     </section>
   );
@@ -2298,7 +2957,9 @@ function PublisherLine({
   const copy = async () => {
     try {
       const method = await copyText(value, copyLabel);
-      toast.success(method === 'manual' ? `${copyLabel} opened for manual copy.` : `${copyLabel} copied.`);
+      toast.success(
+        method === 'manual' ? `${copyLabel} opened for manual copy.` : `${copyLabel} copied.`,
+      );
     } catch {
       toast.error(`Could not copy ${copyLabel.toLowerCase()}.`);
     }
@@ -2321,20 +2982,20 @@ function WaitingPreview({ stream }: { stream: Stream }) {
       {stream.cover && <LoadableImage src={stream.cover} alt="" />}
       <div>
         <Radio size={34} />
-        <strong>{t('studio.console.waitingPreview', { defaultValue: 'Waiting for publisher' })}</strong>
-        <span>{t('studio.console.waitingPreviewBody', { defaultValue: 'Add the stream server and key in OBS, then start streaming.' })}</span>
+        <strong>
+          {t('studio.console.waitingPreview', { defaultValue: 'Waiting for publisher' })}
+        </strong>
+        <span>
+          {t('studio.console.waitingPreviewBody', {
+            defaultValue: 'Add the stream server and key in OBS, then start streaming.',
+          })}
+        </span>
       </div>
     </div>
   );
 }
 
-function LiveMetadataEditor({
-  stream,
-  onUpdated,
-}: {
-  stream: Stream;
-  onUpdated: () => void;
-}) {
+function LiveMetadataEditor({ stream, onUpdated }: { stream: Stream; onUpdated: () => void }) {
   const { t } = useTranslation('pages');
   const uploadCover = useUploadLiveCover();
   const updateLive = useUpdateLiveMetadata();
@@ -2372,7 +3033,9 @@ function LiveMetadataEditor({
 
   const saveMetadata = async () => {
     if (!normalizedTitle) {
-      toast.error(t('studio.console.metadataTitleRequired', { defaultValue: 'Title is required.' }));
+      toast.error(
+        t('studio.console.metadataTitleRequired', { defaultValue: 'Title is required.' }),
+      );
       return;
     }
     try {
@@ -2392,7 +3055,9 @@ function LiveMetadataEditor({
       toast.error(
         err instanceof Error
           ? err.message
-          : t('studio.console.metadataFailed', { defaultValue: 'Could not update live room info.' }),
+          : t('studio.console.metadataFailed', {
+              defaultValue: 'Could not update live room info.',
+            }),
       );
     }
   };
@@ -2466,6 +3131,91 @@ function LiveMetadataEditor({
   );
 }
 
+function LiveReplaySettingsPanel({ stream }: { stream: Stream }) {
+  const { t } = useTranslation('pages');
+  const updateReplay = useUpdateLiveReplaySettings();
+  const [uploadAfterEnd, setUploadAfterEnd] = useState(Boolean(stream.replay?.uploadAfterEnd));
+  const [visibility, setVisibility] = useState<ReplayVisibility>(
+    stream.replay?.visibility ?? 'public',
+  );
+
+  useEffect(() => {
+    setUploadAfterEnd(Boolean(stream.replay?.uploadAfterEnd));
+    setVisibility(stream.replay?.visibility ?? 'public');
+  }, [stream.id, stream.replay?.uploadAfterEnd, stream.replay?.visibility]);
+
+  const dirty =
+    uploadAfterEnd !== Boolean(stream.replay?.uploadAfterEnd) ||
+    visibility !== (stream.replay?.visibility ?? 'public');
+
+  const save = () => {
+    updateReplay.mutate(
+      { uploadAfterEnd, visibility },
+      {
+        onSuccess: () =>
+          toast.success(
+            t('studio.replay.liveSaved', { defaultValue: 'Replay upload preference saved.' }),
+          ),
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('studio.replay.liveSaveFailed', {
+                defaultValue: 'Could not save replay preference.',
+              }),
+          ),
+      },
+    );
+  };
+
+  return (
+    <section className="gl-creator-panel gl-live-replay-panel">
+      <div className="gl-creator-panel-head">
+        <div>
+          <span>{t('studio.replay.liveLabel', { defaultValue: 'Replay upload' })}</span>
+          <h2>{t('studio.replay.liveTitle', { defaultValue: 'After this live ends' })}</h2>
+        </div>
+        <PlayCircle size={22} />
+      </div>
+      <div className="gl-live-replay-settings">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={uploadAfterEnd}
+          className={cn('gl-live-replay-toggle', uploadAfterEnd && 'is-on')}
+          onClick={() => setUploadAfterEnd((value) => !value)}
+        >
+          <span>
+            <strong>
+              {uploadAfterEnd
+                ? t('studio.replay.uploadOn', { defaultValue: 'Upload replay after ending' })
+                : t('studio.replay.uploadOff', { defaultValue: 'Do not upload replay' })}
+            </strong>
+            <small>
+              {t('studio.replay.uploadStatus', {
+                status: replayStatusLabel(stream.replay?.status ?? 'none', t),
+                defaultValue: 'Current status: {{status}}',
+              })}
+            </small>
+          </span>
+          <i aria-hidden />
+        </button>
+        <VisibilitySelect value={visibility} onChange={setVisibility} />
+        <button
+          type="button"
+          className="gl-creator-primary"
+          disabled={!dirty || updateReplay.isPending}
+          onClick={save}
+        >
+          <Save size={16} />
+          {updateReplay.isPending
+            ? t('studio.replay.saving', { defaultValue: 'Saving...' })
+            : t('studio.replay.saveLive', { defaultValue: 'Save replay settings' })}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function StudioInteractionRail({
   stream,
   messages,
@@ -2493,7 +3243,10 @@ function StudioInteractionRail({
 }) {
   const { t } = useTranslation('pages');
   const gifts = summarizeGifts(messages);
-  const superChats = messages.filter((item) => item.kind === 'super_chat').slice(-3).reverse();
+  const superChats = messages
+    .filter((item) => item.kind === 'super_chat')
+    .slice(-3)
+    .reverse();
 
   return (
     <aside className="gl-live-console-rail">
@@ -2506,7 +3259,12 @@ function StudioInteractionRail({
           <MessageSquare size={22} />
         </div>
         <div className="gl-live-console-danmu-row">
-          <span>{t('studio.console.activeBullets', { count: bulletsCount, defaultValue: '{{count}} active bullets' })}</span>
+          <span>
+            {t('studio.console.activeBullets', {
+              count: bulletsCount,
+              defaultValue: '{{count}} active bullets',
+            })}
+          </span>
           <button type="button" onClick={onClearBullets} disabled={bulletsCount === 0}>
             {t('studio.console.clearPreview', { defaultValue: 'Clear preview' })}
           </button>
@@ -2546,7 +3304,9 @@ function StudioInteractionRail({
               </div>
             ))
           ) : (
-            <div className="gl-creator-empty-soft">{t('studio.console.noGifts', { defaultValue: 'No gifts yet.' })}</div>
+            <div className="gl-creator-empty-soft">
+              {t('studio.console.noGifts', { defaultValue: 'No gifts yet.' })}
+            </div>
           )}
         </div>
       </section>
@@ -2569,7 +3329,9 @@ function StudioInteractionRail({
               </div>
             ))
           ) : (
-            <div className="gl-creator-empty-soft">{t('studio.console.noSuperChat', { defaultValue: 'No SuperChat pinned.' })}</div>
+            <div className="gl-creator-empty-soft">
+              {t('studio.console.noSuperChat', { defaultValue: 'No SuperChat pinned.' })}
+            </div>
           )}
         </div>
       </section>
@@ -2706,7 +3468,9 @@ function summarizeGifts(messages: Message[]) {
     if (item.giftIcon) current.icon = item.giftIcon;
     map.set(key, current);
   }
-  const items = Array.from(map.values()).sort((a, b) => b.totalCoin - a.totalCoin).slice(0, 5);
+  const items = Array.from(map.values())
+    .sort((a, b) => b.totalCoin - a.totalCoin)
+    .slice(0, 5);
   return { items, totalCoin };
 }
 

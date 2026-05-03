@@ -11,16 +11,53 @@ export interface Stream {
   avatar: string;
   cover: string;
   viewers: number;
+  peakViewers?: number;
   duration: string;
   category: string;
   categoryJa?: string;
   startedAt: string;
+  endedAt?: string;
   isLive?: boolean;
   ownerId?: string;
   playbackUrl?: string;
   streamKey?: string;
-  status?: 'scheduled' | 'publishing' | 'live' | 'ending' | 'ended' | 'expired' | 'canceled' | string;
+  status?:
+    | 'scheduled'
+    | 'publishing'
+    | 'live'
+    | 'ending'
+    | 'ended'
+    | 'expired'
+    | 'canceled'
+    | string;
   subscriberCount?: number;
+  replay?: ReplayInfo;
+}
+
+export type ReplayStatus =
+  | 'none'
+  | 'pending'
+  | 'uploading'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+  | 'deleted'
+  | string;
+
+export type ReplayVisibility = 'public' | 'followers' | 'private' | string;
+
+export interface ReplayInfo {
+  roomId: string;
+  status: ReplayStatus;
+  visibility: ReplayVisibility;
+  uploadAfterEnd: boolean;
+  embedUrl?: string;
+  bunnyVideoId?: string;
+  uploadedAt?: string;
+  deletedAt?: string;
+  error?: string;
+  canWatch: boolean;
+  canManage: boolean;
 }
 
 export interface PaginatedRooms {
