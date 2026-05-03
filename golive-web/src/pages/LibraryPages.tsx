@@ -1230,7 +1230,7 @@ function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
   const lookupItems = useMemo(
     () =>
       items
-        .filter((item) => item.status === 'ended' && !item.replay?.canWatch)
+        .filter((item) => item.status === 'ended')
         .slice(0, 60),
     [items],
   );
@@ -1244,25 +1244,30 @@ function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
         return data;
       },
       enabled: Boolean(item.id),
-      staleTime: 30_000,
+      staleTime: 0,
+      refetchOnMount: 'always' as const,
+      refetchOnWindowFocus: true,
       retry: false,
     })),
   });
 
   const replayRooms = new Map<string, Stream>();
   lookups.forEach((query, index) => {
-    if (query.data?.replay?.canWatch) {
+    if (query.data) {
       replayRooms.set(lookupItems[index].id, query.data);
     }
   });
 
-  if (replayRooms.size === 0) return items;
+  if (lookupItems.length === 0) return items;
+  const lookupIds = new Set(lookupItems.map((item) => item.id));
   return items.map((item) => {
+    if (item.status !== 'ended' || !lookupIds.has(item.id)) return item;
     const replayRoom = replayRooms.get(item.id);
-    if (!replayRoom) return item;
+    if (!replayRoom) return { ...item, replay: undefined, isLive: false, status: 'ended' };
     return {
       ...item,
       ...replayRoom,
+      replay: replayRoom.replay,
     };
   });
 }
