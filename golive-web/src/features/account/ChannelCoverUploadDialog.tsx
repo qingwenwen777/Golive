@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ImagePlus, Save } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,6 +10,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  ImageCropField,
+  cropSelectionToFile,
+  type ImageCropSelection,
+} from '@/features/media/ImageCropField';
 import type { User } from '@/types/user';
 import { userDisplayName } from '@/types/user';
 
@@ -30,69 +35,51 @@ export function ChannelCoverUploadDialog({
 }: ChannelCoverUploadDialogProps) {
   const { t } = useTranslation('pages');
   const uploadCover = useUploadChannelCover();
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState('');
+  const [selection, setSelection] = useState<ImageCropSelection | null>(null);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const displayName = userDisplayName(user);
 
   useEffect(() => {
-    if (!file) {
-      setPreview('');
-      return;
-    }
-    const next = URL.createObjectURL(file);
-    setPreview(next);
-    return () => URL.revokeObjectURL(next);
-  }, [file]);
-
-  useEffect(() => {
     if (!open) {
-      setFile(null);
+      setSelection(null);
+      setProcessing(false);
       setError(null);
     }
   }, [open]);
 
-  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const next = e.target.files?.[0] ?? null;
-    e.target.value = '';
-    setError(null);
-    if (!next) {
-      setFile(null);
-      return;
-    }
-    if (!isAllowedCover(next)) {
-      setFile(null);
-      setError(t('upload.imageTypeError'));
-      return;
-    }
-    if (next.size > MAX_COVER_SIZE) {
-      setFile(null);
-      setError(t('upload.cover.sizeError'));
-      return;
-    }
-    setFile(next);
-  };
-
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) {
       setError(t('upload.cover.signInError'));
       return;
     }
-    if (!file) {
+    if (!selection) {
       setError(t('upload.chooseFirst'));
       return;
     }
-    uploadCover.mutate(file, {
-      onSuccess: () => {
-        toast.success(t('upload.cover.success'));
-        onOpenChange(false);
-      },
-      onError: (err) => setError(err.message || t('upload.cover.failed')),
-    });
+
+    setProcessing(true);
+    setError(null);
+    try {
+      const cropped = await cropSelectionToFile(selection, CHANNEL_COVER_CROP_CONFIG, 'channel-cover');
+      uploadCover.mutate(cropped, {
+        onSuccess: () => {
+          toast.success(t('upload.cover.success'));
+          onOpenChange(false);
+        },
+        onError: (err) => {
+          setProcessing(false);
+          setError(err.message || t('upload.cover.failed'));
+        },
+      });
+    } catch {
+      setProcessing(false);
+      setError(t('upload.cover.failed'));
+    }
   };
 
-  const cover = preview || user?.cover || '';
+  const cover = user?.cover || '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,27 +100,34 @@ export function ChannelCoverUploadDialog({
             </div>
           </div>
 
-          <label className="gl-cover-picker">
-            <span className="gl-cover-preview">
-              {cover ? (
-                <img src={cover} alt="" />
-              ) : (
-                <span>
-                  <ImagePlus size={24} />
-                  {t('upload.cover.add')}
-                </span>
-              )}
-            </span>
-            <span className="gl-avatar-pick-btn">
-              <ImagePlus size={16} />
-              {t('upload.chooseImage')}
-            </span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={handleFile}
-            />
-          </label>
+          <ImageCropField
+            active={open}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="gl-cover-crop"
+            config={CHANNEL_COVER_CROP_CONFIG}
+            disabled={uploadCover.isPending || processing}
+            emptyLabel={t('upload.cover.add')}
+            fallback={
+              <span className="gl-cover-preview">
+                {cover ? (
+                  <img src={cover} alt="" />
+                ) : (
+                  <span>
+                    <ImagePlus size={24} />
+                    {t('upload.cover.add')}
+                  </span>
+                )}
+              </span>
+            }
+            pickLabel={t('upload.chooseImage')}
+            validateFile={(next) => {
+              if (!isAllowedCover(next)) return t('upload.imageTypeError');
+              if (next.size > MAX_COVER_SIZE) return t('upload.cover.sizeError');
+              return null;
+            }}
+            onError={setError}
+            onSelectionChange={setSelection}
+          />
 
           {error && (
             <div className="gl-auth-error" role="alert">
@@ -141,15 +135,27 @@ export function ChannelCoverUploadDialog({
             </div>
           )}
 
-          <button type="submit" disabled={!file || uploadCover.isPending} className="gl-auth-submit">
+          <button
+            type="submit"
+            disabled={!selection || uploadCover.isPending || processing}
+            className="gl-auth-submit"
+          >
             <Save size={18} />
-            <span>{uploadCover.isPending ? t('upload.saving') : t('upload.cover.save')}</span>
+            <span>{uploadCover.isPending || processing ? t('upload.saving') : t('upload.cover.save')}</span>
           </button>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
+
+const CHANNEL_COVER_CROP_CONFIG = {
+  aspectRatio: 16 / 5,
+  outputWidth: 1600,
+  outputHeight: 500,
+  quality: 0.93,
+  mimeType: 'image/jpeg',
+} as const;
 
 function isAllowedCover(file: File): boolean {
   if (COVER_TYPES.has(file.type)) return true;

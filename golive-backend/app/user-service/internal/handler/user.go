@@ -141,8 +141,8 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
 		return
 	}
-	if len([]rune(req.NewPassword)) < 6 {
-		errcode.Respond(c, errcode.New(http.StatusBadRequest, "password must be at least 6 characters").WithReason("invalid_password"))
+	if err := service.ValidatePasswordPolicy(req.NewPassword); err != nil {
+		errcode.Respond(c, err)
 		return
 	}
 	u, err := h.users.FindByID(c.Request.Context(), uid)

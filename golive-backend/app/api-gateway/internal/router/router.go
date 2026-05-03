@@ -101,6 +101,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 // match Gin's FullPath() format (with the parameter name preserved).
 func publicRoutes() []middleware.PublicRoute {
 	return []middleware.PublicRoute{
+		{Method: http.MethodGet, Path: "/api/auth/*action"},
 		{Method: http.MethodPost, Path: "/api/auth/*action"},
 		// Public user profiles power creator/channel pages.
 		{Method: http.MethodGet, Path: "/api/users/*action"},

@@ -15,9 +15,25 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CATEGORIES_EN } from '@/constants/catalog';
+import {
+  ImageCropField,
+  cropSelectionToFile,
+  type ImageCropSelection,
+} from '@/features/media/ImageCropField';
 import { savePublisherSession } from '@/features/creator/publisherSession';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
+
+const MAX_LIVE_COVER_SIZE = 5 * 1024 * 1024;
+const LIVE_COVER_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const LIVE_COVER_EXT = /\.(jpe?g|png|webp|gif)$/i;
+const LIVE_COVER_CROP_CONFIG = {
+  aspectRatio: 16 / 9,
+  outputWidth: 1280,
+  outputHeight: 720,
+  quality: 0.93,
+  mimeType: 'image/jpeg',
+} as const;
 
 function createCategoryKey(category: string): string {
   return category.toLowerCase().replace(/\s+/g, '');
@@ -74,8 +90,8 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const [description, setDescription] = useState('');
   const [applicationReason, setApplicationReason] = useState('');
   const [category, setCategory] = useState('Just Chatting');
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState('');
+  const [coverSelection, setCoverSelection] = useState<ImageCropSelection | null>(null);
+  const [processingCover, setProcessingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentUser = meUser ?? user;
   const channelName = useMemo(() => userDisplayName(currentUser), [currentUser]);
@@ -83,7 +99,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const livePermissionStatus = currentUser?.livePermissionStatus ?? 'none';
   const canGoLive = livePermissionStatus === 'approved';
 
-  const isPending = goLive.isPending || uploadCover.isPending;
+  const isPending = goLive.isPending || uploadCover.isPending || processingCover;
   const perm = permissionCopy(livePermissionStatus, t);
 
   useEffect(() => {
@@ -109,7 +125,12 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
     setError(null);
 
     try {
-      const uploadedCover = coverFile ? (await uploadCover.mutateAsync(coverFile)).url : '';
+      setProcessingCover(true);
+      const croppedCover = coverSelection
+        ? await cropSelectionToFile(coverSelection, LIVE_COVER_CROP_CONFIG, 'live-cover')
+        : null;
+      const uploadedCover = croppedCover ? (await uploadCover.mutateAsync(croppedCover)).url : '';
+      setProcessingCover(false);
       goLive.mutate(
         {
           title: title.trim(),
@@ -132,6 +153,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
         },
       );
     } catch (err) {
+      setProcessingCover(false);
       setError(err instanceof Error ? liveErrorMessage(err, t) : t('createLive.errors.coverUpload'));
     }
   };
@@ -222,28 +244,37 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
               </select>
             </label>
 
-            <label className="gl-auth-field">
+            <div className="gl-auth-field">
               <span className="gl-auth-label">{t('createLive.fields.cover')}</span>
-              <span className="gl-live-cover-picker">
-                {coverPreview ? (
-                  <img src={coverPreview} alt="" />
-                ) : (
-                  <span className="gl-live-cover-empty">
-                    <ImagePlus size={22} />
-                    <span>{t('createLive.addCover')}</span>
+              <ImageCropField
+                active={open && canGoLive}
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="gl-live-cover-crop"
+                config={LIVE_COVER_CROP_CONFIG}
+                disabled={isPending}
+                emptyLabel={t('createLive.addCover')}
+                fallback={
+                  <span className="gl-live-cover-picker">
+                    <span className="gl-live-cover-empty">
+                      <ImagePlus size={22} />
+                      <span>{t('createLive.addCover')}</span>
+                    </span>
                   </span>
-                )}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null;
-                    setCoverFile(file);
-                    setCoverPreview(file ? URL.createObjectURL(file) : '');
-                  }}
-                />
-              </span>
-            </label>
+                }
+                pickLabel={t('upload.chooseImage', { defaultValue: '选择图片' })}
+                validateFile={(file) => {
+                  if (!isAllowedLiveCover(file)) {
+                    return t('upload.imageTypeError', { defaultValue: '请使用 JPG、PNG、WebP 或 GIF 图片。' });
+                  }
+                  if (file.size > MAX_LIVE_COVER_SIZE) {
+                    return t('upload.cover.sizeError', { defaultValue: '封面必须小于等于 5MB。' });
+                  }
+                  return null;
+                }}
+                onError={setError}
+                onSelectionChange={setCoverSelection}
+              />
+            </div>
 
             <label className="gl-auth-field">
               <span className="gl-auth-label">{t('createLive.fields.description')}</span>
@@ -272,4 +303,9 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
       </DialogContent>
     </Dialog>
   );
+}
+
+function isAllowedLiveCover(file: File): boolean {
+  if (LIVE_COVER_TYPES.has(file.type)) return true;
+  return LIVE_COVER_EXT.test(file.name);
 }

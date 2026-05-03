@@ -1,6 +1,6 @@
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, ImagePlus, Save } from 'lucide-react';
+import { Camera, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUploadAvatar } from '@/api/auth';
 import { Avatar } from '@/components/Avatar';
@@ -11,6 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  ImageCropField,
+  cropSelectionToFile,
+  type ImageCropSelection,
+} from '@/features/media/ImageCropField';
 import type { User } from '@/types/user';
 import { userDisplayName } from '@/types/user';
 
@@ -27,66 +32,48 @@ export interface AvatarUploadDialogProps {
 export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDialogProps) {
   const { t } = useTranslation('pages');
   const uploadAvatar = useUploadAvatar();
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState('');
+  const [selection, setSelection] = useState<ImageCropSelection | null>(null);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const displayName = userDisplayName(user);
 
   useEffect(() => {
-    if (!file) {
-      setPreview('');
-      return;
-    }
-    const next = URL.createObjectURL(file);
-    setPreview(next);
-    return () => URL.revokeObjectURL(next);
-  }, [file]);
-
-  useEffect(() => {
     if (!open) {
-      setFile(null);
+      setSelection(null);
+      setProcessing(false);
       setError(null);
     }
   }, [open]);
 
-  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const next = e.target.files?.[0] ?? null;
-    e.target.value = '';
-    setError(null);
-    if (!next) {
-      setFile(null);
-      return;
-    }
-    if (!isAllowedAvatar(next)) {
-      setFile(null);
-      setError(t('upload.imageTypeError'));
-      return;
-    }
-    if (next.size > MAX_AVATAR_SIZE) {
-      setFile(null);
-      setError(t('upload.avatar.sizeError'));
-      return;
-    }
-    setFile(next);
-  };
-
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) {
       setError(t('upload.avatar.signInError'));
       return;
     }
-    if (!file) {
+    if (!selection) {
       setError(t('upload.chooseFirst'));
       return;
     }
-    uploadAvatar.mutate(file, {
-      onSuccess: () => {
-        toast.success(t('upload.avatar.success'));
-        onOpenChange(false);
-      },
-      onError: (err) => setError(err.message || t('upload.avatar.failed')),
-    });
+
+    setProcessing(true);
+    setError(null);
+    try {
+      const cropped = await cropSelectionToFile(selection, AVATAR_CROP_CONFIG, 'avatar');
+      uploadAvatar.mutate(cropped, {
+        onSuccess: () => {
+          toast.success(t('upload.avatar.success'));
+          onOpenChange(false);
+        },
+        onError: (err) => {
+          setProcessing(false);
+          setError(err.message || t('upload.avatar.failed'));
+        },
+      });
+    } catch {
+      setProcessing(false);
+      setError(t('upload.avatar.failed'));
+    }
   };
 
   return (
@@ -108,24 +95,28 @@ export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDia
             </div>
           </div>
 
-          <label className="gl-avatar-picker">
-            <span className="gl-avatar-preview">
-              {preview ? (
-                <img src={preview} alt="" />
-              ) : (
+          <ImageCropField
+            active={open}
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="gl-avatar-crop"
+            config={AVATAR_CROP_CONFIG}
+            disabled={uploadAvatar.isPending || processing}
+            emptyLabel={t('upload.chooseImage')}
+            fallback={
+              <span className="gl-avatar-preview">
                 <Avatar name={displayName} src={user?.avatar} size={116} />
-              )}
-            </span>
-            <span className="gl-avatar-pick-btn">
-              <ImagePlus size={16} />
-              {t('upload.chooseImage')}
-            </span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={handleFile}
-            />
-          </label>
+              </span>
+            }
+            pickLabel={t('upload.chooseImage')}
+            shape="circle"
+            validateFile={(next) => {
+              if (!isAllowedAvatar(next)) return t('upload.imageTypeError');
+              if (next.size > MAX_AVATAR_SIZE) return t('upload.avatar.sizeError');
+              return null;
+            }}
+            onError={setError}
+            onSelectionChange={setSelection}
+          />
 
           {error && (
             <div className="gl-auth-error" role="alert">
@@ -133,15 +124,27 @@ export function AvatarUploadDialog({ open, onOpenChange, user }: AvatarUploadDia
             </div>
           )}
 
-          <button type="submit" disabled={!file || uploadAvatar.isPending} className="gl-auth-submit">
+          <button
+            type="submit"
+            disabled={!selection || uploadAvatar.isPending || processing}
+            className="gl-auth-submit"
+          >
             <Save size={18} />
-            <span>{uploadAvatar.isPending ? t('upload.saving') : t('upload.avatar.save')}</span>
+            <span>{uploadAvatar.isPending || processing ? t('upload.saving') : t('upload.avatar.save')}</span>
           </button>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
+
+const AVATAR_CROP_CONFIG = {
+  aspectRatio: 1,
+  outputWidth: 512,
+  outputHeight: 512,
+  quality: 0.94,
+  mimeType: 'image/jpeg',
+} as const;
 
 function isAllowedAvatar(file: File): boolean {
   if (AVATAR_TYPES.has(file.type)) return true;

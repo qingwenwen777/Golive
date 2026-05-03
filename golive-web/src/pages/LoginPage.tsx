@@ -8,7 +8,7 @@ export default function LoginPage() {
     <div className="gl-auth-page">
       <div className="gl-auth-page-inner">
         <AuthPanel
-          onAuthenticated={(resp) => navigate(resp.user.role === 'admin' ? '/admin' : '/')}
+          onAuthenticated={(resp) => navigate(resp.user.role === 'admin' ? '/admin/applications' : '/')}
         />
         <aside className="gl-auth-preview" aria-label="GoLive preview">
           <img src="https://picsum.photos/seed/golive-auth/720/405" alt="" />

@@ -17,6 +17,7 @@ const (
 type User struct {
 	ID                         string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	Username                   string     `gorm:"uniqueIndex;type:varchar(64);not null" json:"username"`
+	Email                      string     `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
 	DisplayName                string     `gorm:"type:varchar(64)" json:"displayName,omitempty"`
 	PasswordHash               string     `gorm:"type:varchar(100);not null" json:"-"`
 	UsernameUpdatedAt          *time.Time `gorm:"index" json:"-"`
@@ -32,6 +33,18 @@ type User struct {
 }
 
 func (User) TableName() string { return "users" }
+
+type InviteCode struct {
+	ID        string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	Code      string     `gorm:"uniqueIndex;type:varchar(32);not null" json:"code"`
+	CreatedBy string     `gorm:"index;type:varchar(36);not null" json:"createdBy"`
+	UsedBy    string     `gorm:"index;type:varchar(36)" json:"usedBy,omitempty"`
+	UsedAt    *time.Time `gorm:"index" json:"usedAt,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+}
+
+func (InviteCode) TableName() string { return "invite_codes" }
 
 type CreatorApplication struct {
 	ID           string     `gorm:"primaryKey;type:varchar(36)" json:"id"`

@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/uploadimage"
 )
 
 const maxCoverSize = 5 << 20
@@ -65,16 +65,17 @@ func (h *CoverUploadHandler) Upload(c *gin.Context) {
 		}
 	}
 
-	if err := os.MkdirAll(h.dir, 0o755); err != nil {
-		errcode.Respond(c, fmt.Errorf("create upload dir: %w", err))
-		return
-	}
-	name := time.Now().UTC().Format("20060102") + "-" + uuid.NewString() + ext
-	url := h.publicURL + "/" + name
-	if err := c.SaveUploadedFile(file, filepath.Join(h.dir, name)); err != nil {
+	base := time.Now().UTC().Format("20060102") + "-" + uuid.NewString()
+	name, err := uploadimage.SaveOptimized(file, h.dir, base, ext, uploadimage.Options{
+		MaxWidth:  1600,
+		MaxHeight: 900,
+		Quality:   93,
+	})
+	if err != nil {
 		errcode.Respond(c, fmt.Errorf("save cover: %w", err))
 		return
 	}
+	url := h.publicURL + "/" + name
 
 	u, err := h.users.UpdateCover(c.Request.Context(), uid, url)
 	if err != nil {

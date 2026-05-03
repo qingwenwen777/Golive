@@ -8,12 +8,29 @@ import type { LoginResp, User } from '@/types/user';
 export interface LoginPayload {
   username: string;
   password: string;
+  captchaId: string;
+  captchaCode: string;
 }
 
 export interface RegisterPayload {
   username: string;
   password: string;
   displayName: string;
+  email: string;
+  inviteCode: string;
+  captchaId: string;
+  captchaCode: string;
+}
+
+export interface CaptchaChallenge {
+  id: string;
+  image: string;
+  expiresIn: number;
+}
+
+export interface ResetPasswordPayload {
+  email: string;
+  newPassword: string;
 }
 
 export interface UpdateProfilePayload {
@@ -54,6 +71,20 @@ export function useRegisterMutation() {
     onSuccess: (data) => {
       login(data);
       void qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export async function fetchCaptcha(): Promise<CaptchaChallenge> {
+  const { data } = await http.get<CaptchaChallenge>('/auth/captcha');
+  return data;
+}
+
+export function useResetPasswordMutation() {
+  return useMutation<{ ok: boolean }, Error, ResetPasswordPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<{ ok: boolean }>('/auth/password/reset', payload);
+      return data;
     },
   });
 }

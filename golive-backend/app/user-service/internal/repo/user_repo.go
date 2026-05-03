@@ -2,18 +2,23 @@ package repo
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
 )
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrUsernameTaken = errors.New("username already exists")
+var ErrEmailTaken = errors.New("email already exists")
+var ErrInviteNotFound = errors.New("invite code not found")
+var ErrInviteUsed = errors.New("invite code already used")
 var ErrUsernameCooldown = errors.New("username change cooldown")
 var ErrApplicationNotFound = errors.New("creator application not found")
 var ErrApplicationAlreadyReviewed = errors.New("creator application already reviewed")
@@ -32,12 +37,24 @@ func NewUserRepo(db *gorm.DB) *UserRepo { return &UserRepo{db: db} }
 
 // AutoMigrate creates / updates the users table.
 func (r *UserRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.User{}, &model.CreatorApplication{}, &model.CoinTransaction{})
+	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.CoinTransaction{})
 }
 
 func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*model.User, error) {
 	var u model.User
 	err := r.db.WithContext(ctx).Where("username = ?", username).Take(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Where("email = ?", email).Take(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrUserNotFound
 	}
@@ -61,6 +78,81 @@ func (r *UserRepo) FindByID(ctx context.Context, id string) (*model.User, error)
 
 func (r *UserRepo) Create(ctx context.Context, u *model.User) error {
 	return r.db.WithContext(ctx).Create(u).Error
+}
+
+func (r *UserRepo) RegisterWithInvite(ctx context.Context, u *model.User, inviteCode string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing model.User
+		err := tx.Where("username = ?", u.Username).Take(&existing).Error
+		if err == nil {
+			return ErrUsernameTaken
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		err = tx.Where("email = ?", u.Email).Take(&existing).Error
+		if err == nil {
+			return ErrEmailTaken
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		var invite model.InviteCode
+		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("code = ?", strings.ToUpper(strings.TrimSpace(inviteCode))).
+			Take(&invite).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrInviteNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if invite.UsedAt != nil || invite.UsedBy != "" {
+			return ErrInviteUsed
+		}
+
+		if err := tx.Create(u).Error; err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		return tx.Model(&invite).Updates(map[string]any{
+			"used_by": u.ID,
+			"used_at": &now,
+		}).Error
+	})
+}
+
+func (r *UserRepo) ResetPasswordByEmail(ctx context.Context, email, hash string) error {
+	res := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("email = ?", email).
+		Update("password_hash", hash)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *UserRepo) BackfillMissingEmails(ctx context.Context) error {
+	var users []model.User
+	if err := r.db.WithContext(ctx).
+		Where("email IS NULL OR email = ?", "").
+		Find(&users).Error; err != nil {
+		return err
+	}
+	for _, u := range users {
+		email := strings.ToLower(strings.TrimSpace(u.Username)) + "@gmail.com"
+		if err := r.db.WithContext(ctx).Model(&model.User{}).
+			Where("id = ?", u.ID).
+			Update("email", email).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *UserRepo) UpdateProfile(
@@ -129,6 +221,65 @@ func (r *UserRepo) CreateAdmin(ctx context.Context, u *model.User) error {
 	u.LivePermissionStatus = model.LivePermissionApproved
 	u.Verified = true
 	return r.Create(ctx, u)
+}
+
+func (r *UserRepo) CreateInviteCode(ctx context.Context, createdBy string) (*model.InviteCode, error) {
+	for i := 0; i < 8; i++ {
+		code, err := randomInviteCode(10)
+		if err != nil {
+			return nil, err
+		}
+		var existing model.InviteCode
+		err = r.db.WithContext(ctx).Where("code = ?", code).Take(&existing).Error
+		if err == nil {
+			continue
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		invite := &model.InviteCode{
+			ID:        newID(),
+			Code:      code,
+			CreatedBy: createdBy,
+		}
+		if err := r.db.WithContext(ctx).Create(invite).Error; err != nil {
+			return nil, err
+		}
+		return invite, nil
+	}
+	return nil, errors.New("could not generate unique invite code")
+}
+
+type InviteCodeView struct {
+	ID              string     `json:"id"`
+	Code            string     `json:"code"`
+	CreatedBy       string     `json:"createdBy"`
+	Used            bool       `json:"used"`
+	UsedBy          string     `json:"usedBy,omitempty"`
+	UsedUsername    string     `json:"usedUsername,omitempty"`
+	UsedDisplayName string     `json:"usedDisplayName,omitempty"`
+	UsedEmail       string     `json:"usedEmail,omitempty"`
+	UsedAt          *time.Time `json:"usedAt,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
+}
+
+func (r *UserRepo) ListInviteCodes(ctx context.Context) ([]InviteCodeView, error) {
+	rows := make([]InviteCodeView, 0)
+	err := r.db.WithContext(ctx).
+		Table("invite_codes AS ic").
+		Select(`ic.id, ic.code, ic.created_by, ic.used_by,
+			users.username AS used_username, users.display_name AS used_display_name, users.email AS used_email,
+			ic.used_at, ic.created_at`).
+		Joins("LEFT JOIN users ON users.id = ic.used_by").
+		Order("ic.created_at DESC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		rows[i].Used = rows[i].UsedAt != nil || rows[i].UsedBy != ""
+	}
+	return rows, nil
 }
 
 func (r *UserRepo) EnsureAdmin(ctx context.Context, username string) error {
@@ -223,7 +374,7 @@ type CreatorApplicationView struct {
 }
 
 func (r *UserRepo) ListCreatorApplications(ctx context.Context) ([]CreatorApplicationView, error) {
-	var rows []CreatorApplicationView
+	rows := make([]CreatorApplicationView, 0)
 	err := r.db.WithContext(ctx).
 		Table("creator_applications AS ca").
 		Select(`ca.id, ca.user_id, users.username, users.display_name, users.avatar,
@@ -299,7 +450,7 @@ type LiveCreatorView struct {
 }
 
 func (r *UserRepo) ListLiveCreators(ctx context.Context) ([]LiveCreatorView, error) {
-	var rows []LiveCreatorView
+	rows := make([]LiveCreatorView, 0)
 	err := r.db.WithContext(ctx).
 		Table("users").
 		Select("id, username, display_name, avatar, live_permission_status, updated_at").
@@ -520,4 +671,16 @@ func (r *UserRepo) UpdateCover(ctx context.Context, id, cover string) (*model.Us
 
 func newID() string {
 	return uuid.NewString()
+}
+
+func randomInviteCode(length int) (string, error) {
+	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	buf := make([]byte, length)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	for i, b := range buf {
+		buf[i] = alphabet[int(b)%len(alphabet)]
+	}
+	return string(buf), nil
 }

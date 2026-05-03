@@ -120,3 +120,47 @@ export function useUpdateLivePermission() {
     },
   });
 }
+
+export interface AdminInviteCode {
+  id: string;
+  code: string;
+  createdBy: string;
+  used: boolean;
+  usedBy?: string;
+  usedUsername?: string;
+  usedDisplayName?: string;
+  usedEmail?: string;
+  usedAt?: string;
+  createdAt: string;
+}
+
+export interface AdminInviteCodesResp {
+  items: AdminInviteCode[];
+}
+
+export function useAdminInviteCodes(enabled = true) {
+  return useQuery<AdminInviteCodesResp, Error>({
+    queryKey: ['admin-invite-codes'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminInviteCodesResp>('/admin/invite-codes', {
+        signal,
+      });
+      return data;
+    },
+    staleTime: 15_000,
+    enabled,
+  });
+}
+
+export function useCreateInviteCode() {
+  const qc = useQueryClient();
+  return useMutation<{ inviteCode: AdminInviteCode }, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.post<{ inviteCode: AdminInviteCode }>('/admin/invite-codes');
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-invite-codes'] });
+    },
+  });
+}

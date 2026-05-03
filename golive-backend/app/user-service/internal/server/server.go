@@ -13,6 +13,7 @@ import (
 
 type Deps struct {
 	Auth            *service.AuthService
+	Captcha         *service.CaptchaService
 	Users           *repo.UserRepo
 	AvatarDir       string
 	AvatarPublicURL string
@@ -30,7 +31,7 @@ func NewRouter(d Deps) *gin.Engine {
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
-	authH := handler.NewAuthHandler(d.Auth)
+	authH := handler.NewAuthHandler(d.Auth, d.Captcha)
 	userH := handler.NewUserHandler(d.Users)
 	creatorH := handler.NewCreatorHandler(d.Users)
 	adminH := handler.NewAdminHandler(d.Users)
@@ -40,8 +41,10 @@ func NewRouter(d Deps) *gin.Engine {
 
 	auth := r.Group("/auth")
 	{
+		auth.GET("/captcha", authH.Captcha)
 		auth.POST("/login", authH.Login)
 		auth.POST("/register", authH.Register)
+		auth.POST("/password/reset", authH.ResetPassword)
 		auth.POST("/refresh", authH.Refresh)
 		auth.POST("/logout", authH.Logout)
 		auth.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
@@ -67,6 +70,8 @@ func NewRouter(d Deps) *gin.Engine {
 
 	admin := r.Group("/admin", handler.AuthRequired(d.Auth), handler.AdminRequired(d.Users))
 	{
+		admin.GET("/invite-codes", adminH.ListInviteCodes)
+		admin.POST("/invite-codes", adminH.CreateInviteCode)
 		admin.GET("/live-creators", adminH.ListLiveCreators)
 		admin.POST("/users/:id/live-permission", adminH.UpdateLivePermission)
 		admin.GET("/creator-applications", adminH.ListCreatorApplications)

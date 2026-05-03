@@ -539,8 +539,8 @@ export function SettingsPage() {
       openLogin();
       return;
     }
-    if (newPassword.length < 6) {
-      toast.error('新密码至少需要 6 位。');
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword)) {
+      toast.error('新密码至少 8 位，且必须同时包含字母和数字。');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -823,6 +823,9 @@ function SecuritySettings({
               value={newPassword}
               onChange={(event) => onNewPasswordChange(event.target.value)}
               autoComplete="new-password"
+              minLength={8}
+              pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}"
+              title="至少 8 位，包含英文和数字"
               className="gl-settings-input"
             />
           </label>
@@ -833,6 +836,9 @@ function SecuritySettings({
               value={confirmPassword}
               onChange={(event) => onConfirmPasswordChange(event.target.value)}
               autoComplete="new-password"
+              minLength={8}
+              pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}"
+              title="至少 8 位，包含英文和数字"
               className="gl-settings-input"
             />
           </label>

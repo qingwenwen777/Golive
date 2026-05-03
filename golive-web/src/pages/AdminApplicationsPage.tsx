@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Ban, Check, RefreshCw, Shield, X } from 'lucide-react';
+import { Ban, Check, Clipboard, Plus, RefreshCw, Shield, Ticket, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useAdminCreatorApplications,
+  useAdminInviteCodes,
   useAdminLiveCreators,
+  useCreateInviteCode,
   useReviewCreatorApplication,
   useUpdateLivePermission,
+  type AdminInviteCode,
   type CreatorApplication,
   type LiveCreator,
 } from '@/api/creator';
 import { Avatar } from '@/components/Avatar';
 import { useAuthStore } from '@/stores/useAuthStore';
 
-type AdminTab = 'permissions' | 'applications';
+type AdminTab = 'permissions' | 'applications' | 'invites';
 
 function statusText(status: CreatorApplication['status'], t: ReturnType<typeof useTranslation>['t']) {
   if (status === 'pending') return t('admin.status.pending', { defaultValue: 'Pending' });
@@ -45,9 +48,14 @@ export default function AdminApplicationsPage() {
   const [tab, setTab] = useState<AdminTab>('permissions');
   const apps = useAdminCreatorApplications(isAdmin);
   const creators = useAdminLiveCreators(isAdmin);
+  const invites = useAdminInviteCodes(isAdmin);
   const approve = useReviewCreatorApplication('approve');
   const reject = useReviewCreatorApplication('reject');
   const updatePermission = useUpdateLivePermission();
+  const createInvite = useCreateInviteCode();
+  const appItems = apps.data?.items ?? [];
+  const creatorItems = creators.data?.items ?? [];
+  const inviteItems = invites.data?.items ?? [];
 
   if (!isAdmin) {
     return (
@@ -67,6 +75,7 @@ export default function AdminApplicationsPage() {
   const refresh = () => {
     void apps.refetch();
     void creators.refetch();
+    void invites.refetch();
   };
 
   return (
@@ -92,7 +101,7 @@ export default function AdminApplicationsPage() {
           onClick={() => setTab('permissions')}
         >
           {t('admin.tabs.permissions', { defaultValue: 'Permission users' })}
-          <span>{creators.data?.items.length ?? 0}</span>
+          <span>{creatorItems.length}</span>
         </button>
         <button
           type="button"
@@ -100,13 +109,21 @@ export default function AdminApplicationsPage() {
           onClick={() => setTab('applications')}
         >
           {t('admin.tabs.applications', { defaultValue: 'Applications' })}
-          <span>{apps.data?.items.filter((item) => item.status === 'pending').length ?? 0}</span>
+          <span>{appItems.filter((item) => item.status === 'pending').length}</span>
+        </button>
+        <button
+          type="button"
+          className={tab === 'invites' ? 'is-active' : ''}
+          onClick={() => setTab('invites')}
+        >
+          {t('admin.tabs.invites', { defaultValue: 'Invite codes' })}
+          <span>{inviteItems.filter((item) => !item.used).length}</span>
         </button>
       </div>
 
       {tab === 'permissions' ? (
         <PermissionPanel
-          items={creators.data?.items ?? []}
+          items={creatorItems}
           loading={creators.isLoading}
           error={creators.isError}
           busy={updatePermission.isPending}
@@ -127,9 +144,9 @@ export default function AdminApplicationsPage() {
             );
           }}
         />
-      ) : (
+      ) : tab === 'applications' ? (
         <ApplicationsPanel
-          items={apps.data?.items ?? []}
+          items={appItems}
           loading={apps.isLoading}
           error={apps.isError}
           approveBusy={approve.isPending}
@@ -151,6 +168,26 @@ export default function AdminApplicationsPage() {
                 onError: (err) => toast.error(err.message || t('admin.applications.reviewFailed', { defaultValue: 'Review failed.' })),
               },
             );
+          }}
+        />
+      ) : (
+        <InvitesPanel
+          items={inviteItems}
+          loading={invites.isLoading}
+          error={invites.isError}
+          busy={createInvite.isPending}
+          onCreate={() => {
+            createInvite.mutate(undefined, {
+              onSuccess: ({ inviteCode }) => {
+                toast.success(
+                  t('admin.invites.created', {
+                    code: inviteCode.code,
+                    defaultValue: 'Invite code {{code}} created.',
+                  }),
+                );
+              },
+              onError: (err) => toast.error(err.message || t('admin.invites.createFailed', { defaultValue: 'Could not create invite code.' })),
+            });
           }}
         />
       )}
@@ -323,6 +360,93 @@ function ApplicationsPanel({
         </div>
       ) : (
         <div className="gl-yt-shelf-empty">{t('admin.applications.empty', { defaultValue: 'No creator applications yet.' })}</div>
+      )}
+    </section>
+  );
+}
+
+function InvitesPanel({
+  items,
+  loading,
+  error,
+  busy,
+  onCreate,
+}: {
+  items: AdminInviteCode[];
+  loading: boolean;
+  error: boolean;
+  busy: boolean;
+  onCreate: () => void;
+}) {
+  const { t } = useTranslation('pages');
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success(t('admin.invites.copied', { defaultValue: 'Invite code copied.' }));
+    } catch {
+      toast.error(t('admin.invites.copyFailed', { defaultValue: 'Could not copy invite code.' }));
+    }
+  };
+
+  return (
+    <section className="gl-admin-panel">
+      <div className="gl-admin-panel-head">
+        <div>
+          <span>{t('admin.invites.eyebrow', { defaultValue: 'Registration access' })}</span>
+          <h2>{t('admin.invites.title', { defaultValue: 'Invite codes' })}</h2>
+        </div>
+        <button type="button" className="gl-admin-action-text approve" disabled={busy} onClick={onCreate}>
+          <Plus size={16} />
+          {t('admin.invites.create', { defaultValue: 'Create invite' })}
+        </button>
+      </div>
+      {loading ? (
+        <div className="gl-yt-shelf-empty">{t('admin.invites.loading', { defaultValue: 'Loading invite codes...' })}</div>
+      ) : error ? (
+        <div className="gl-yt-shelf-empty">{t('admin.invites.error', { defaultValue: 'Could not load invite codes.' })}</div>
+      ) : items.length ? (
+        <div className="gl-admin-invite-list">
+          {items.map((item) => (
+            <article className="gl-admin-invite-row" key={item.id}>
+              <div className="gl-admin-invite-code">
+                <Ticket size={18} />
+                <strong>{item.code}</strong>
+              </div>
+              <span className={`gl-admin-status is-${item.used ? 'approved' : 'pending'}`}>
+                {item.used
+                  ? t('admin.invites.used', { defaultValue: 'Used' })
+                  : t('admin.invites.unused', { defaultValue: 'Unused' })}
+              </span>
+              <div className="gl-admin-invite-user">
+                {item.used ? (
+                  <>
+                    <strong>{item.usedDisplayName || item.usedUsername || item.usedBy}</strong>
+                    <span>
+                      @{item.usedUsername || item.usedBy?.slice(0, 8)} / {item.usedEmail || '-'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <strong>{t('admin.invites.noUser', { defaultValue: 'No account yet' })}</strong>
+                    <span>{t('admin.invites.available', { defaultValue: 'Available for one registration' })}</span>
+                  </>
+                )}
+              </div>
+              <span className="gl-admin-muted">
+                {item.usedAt
+                  ? t('admin.invites.usedAt', { time: formatDate(item.usedAt), defaultValue: 'Used {{time}}' })
+                  : t('admin.invites.createdAt', { time: formatDate(item.createdAt), defaultValue: 'Created {{time}}' })}
+              </span>
+              <button type="button" className="gl-admin-action-text" onClick={() => copyCode(item.code)}>
+                <Clipboard size={16} />
+                {t('admin.invites.copy', { defaultValue: 'Copy' })}
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="gl-yt-shelf-empty">{t('admin.invites.empty', { defaultValue: 'No invite codes have been created.' })}</div>
       )}
     </section>
   );

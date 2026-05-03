@@ -87,6 +87,29 @@ func NewAdminHandler(users *repo.UserRepo) *AdminHandler {
 	return &AdminHandler{users: users}
 }
 
+func (h *AdminHandler) CreateInviteCode(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	invite, err := h.users.CreateInviteCode(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"inviteCode": invite})
+}
+
+func (h *AdminHandler) ListInviteCodes(c *gin.Context) {
+	items, err := h.users.ListInviteCodes(c.Request.Context())
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
 func (h *AdminHandler) ListCreatorApplications(c *gin.Context) {
 	items, err := h.users.ListCreatorApplications(c.Request.Context())
 	if err != nil {
@@ -212,6 +235,7 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 	u := &model.User{
 		ID:                   uuid.NewString(),
 		Username:             username,
+		Email:                strings.ToLower(username) + "@gmail.com",
 		DisplayName:          displayName,
 		PasswordHash:         hash,
 		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + url.QueryEscape(displayName),

@@ -8,6 +8,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,6 +60,9 @@ func main() {
 	if err := userRepo.AutoMigrate(); err != nil {
 		log.Fatal("auto migrate", zap.Error(err))
 	}
+	if err := userRepo.BackfillMissingEmails(context.Background()); err != nil {
+		log.Warn("backfill user emails", zap.Error(err))
+	}
 	if cfg.Bootstrap.DemoUser.Enabled {
 		if err := seedDemoUser(context.Background(), userRepo, cfg.Bootstrap.DemoUser); err != nil {
 			log.Warn("seed demo user", zap.Error(err))
@@ -71,6 +75,7 @@ func main() {
 	}
 
 	tokenRepo := repo.NewTokenRepo(rdb)
+	captcha := service.NewCaptchaService(rdb, 5*time.Minute)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
 		JWTSecret:  cfg.JWT.Secret,
 		AccessTTL:  cfg.JWT.AccessTTL,
@@ -79,6 +84,7 @@ func main() {
 
 	r := server.NewRouter(server.Deps{
 		Auth:            auth,
+		Captcha:         captcha,
 		Users:           userRepo,
 		AvatarDir:       cfg.Upload.AvatarDir,
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,
@@ -153,6 +159,7 @@ func seedDemoUser(ctx context.Context, ur *repo.UserRepo, c config.DemoUserCfg) 
 	return ur.Create(ctx, &model.User{
 		ID:                   uuid.NewString(),
 		Username:             c.Username,
+		Email:                strings.ToLower(c.Username) + "@gmail.com",
 		DisplayName:          c.Username,
 		PasswordHash:         hash,
 		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
@@ -183,6 +190,7 @@ func seedAdminUser(ctx context.Context, ur *repo.UserRepo, c config.AdminCfg) er
 	return ur.Create(ctx, &model.User{
 		ID:                   uuid.NewString(),
 		Username:             c.Username,
+		Email:                strings.ToLower(c.Username) + "@gmail.com",
 		DisplayName:          displayName,
 		PasswordHash:         hash,
 		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=admin",

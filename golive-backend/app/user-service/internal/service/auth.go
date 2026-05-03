@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strings"
 	"time"
@@ -28,6 +29,11 @@ var (
 	ErrUnauthorized       = errcode.New(401, "Unauthorized")
 	ErrInvalidRegister    = errcode.New(http.StatusBadRequest, "Invalid registration details")
 	ErrUsernameTaken      = errcode.New(http.StatusConflict, "Username already exists")
+	ErrEmailTaken         = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
+	ErrEmailNotFound      = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
+	ErrInvalidInvite      = errcode.New(http.StatusBadRequest, "Invalid invite code").WithReason("invalid_invite")
+	ErrInviteUsed         = errcode.New(http.StatusConflict, "Invite code already used").WithReason("invite_used")
+	ErrInvalidPassword    = errcode.New(http.StatusBadRequest, "Password must be at least 8 characters and include letters and numbers").WithReason("invalid_password")
 )
 
 type UserStore interface {
@@ -37,6 +43,14 @@ type UserStore interface {
 
 type userCreator interface {
 	Create(ctx context.Context, u *model.User) error
+}
+
+type inviteRegistrar interface {
+	RegisterWithInvite(ctx context.Context, u *model.User, inviteCode string) error
+}
+
+type passwordResetter interface {
+	ResetPasswordByEmail(ctx context.Context, email, hash string) error
 }
 
 type TokenStore interface {
@@ -130,17 +144,7 @@ func (s *AuthService) Register(ctx context.Context, username, password, displayN
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	u := &model.User{
-		ID:                   uuid.NewString(),
-		Username:             username,
-		DisplayName:          displayName,
-		PasswordHash:         hash,
-		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + urlSafeSeed(displayName),
-		CoinBalance:          1200,
-		Verified:             false,
-		Role:                 model.RoleUser,
-		LivePermissionStatus: model.LivePermissionNone,
-	}
+	u := newLocalUser(username, strings.ToLower(username)+"@gmail.com", displayName, hash)
 	creator, ok := s.users.(userCreator)
 	if !ok {
 		return nil, errors.New("user store cannot create users")
@@ -162,6 +166,90 @@ func (s *AuthService) Register(ctx context.Context, username, password, displayN
 		RefreshToken: refresh,
 		User:         u.Public(),
 	}, nil
+}
+
+func (s *AuthService) RegisterWithInvite(ctx context.Context, username, password, displayName, email, inviteCode string) (*LoginResp, error) {
+	username = strings.TrimSpace(username)
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		displayName = username
+	}
+	cleanEmail, ok := normalizeEmail(email)
+	if !ok {
+		return nil, ErrInvalidRegister.WithReason("invalid_email")
+	}
+	inviteCode = strings.ToUpper(strings.TrimSpace(inviteCode))
+	if len(username) < 3 || len(password) < 3 || displayName == "" || inviteCode == "" {
+		return nil, ErrInvalidRegister
+	}
+
+	if err := ValidatePasswordPolicy(password); err != nil {
+		return nil, err
+	}
+
+	hash, err := HashPassword(password)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	u := newLocalUser(username, cleanEmail, displayName, hash)
+	registrar, ok := s.users.(inviteRegistrar)
+	if !ok {
+		return nil, errors.New("user store cannot register with invites")
+	}
+	if err := registrar.RegisterWithInvite(ctx, u, inviteCode); err != nil {
+		switch {
+		case errors.Is(err, repo.ErrUsernameTaken):
+			return nil, ErrUsernameTaken
+		case errors.Is(err, repo.ErrEmailTaken):
+			return nil, ErrEmailTaken
+		case errors.Is(err, repo.ErrInviteNotFound):
+			return nil, ErrInvalidInvite
+		case errors.Is(err, repo.ErrInviteUsed):
+			return nil, ErrInviteUsed
+		default:
+			return nil, fmt.Errorf("register with invite: %w", err)
+		}
+	}
+
+	access, err := s.signAccess(u.ID)
+	if err != nil {
+		return nil, fmt.Errorf("sign access: %w", err)
+	}
+	refresh := uuid.NewString()
+	if err := s.tokens.SaveRefresh(ctx, refresh, u.ID, s.refreshTTL); err != nil {
+		return nil, fmt.Errorf("save refresh: %w", err)
+	}
+	return &LoginResp{
+		Token:        access,
+		RefreshToken: refresh,
+		User:         u.Public(),
+	}, nil
+}
+
+func (s *AuthService) ResetPasswordByEmail(ctx context.Context, email, newPassword string) error {
+	cleanEmail, ok := normalizeEmail(email)
+	if !ok {
+		return ErrInvalidRegister.WithReason("invalid_email")
+	}
+	if err := ValidatePasswordPolicy(newPassword); err != nil {
+		return err
+	}
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	resetter, ok := s.users.(passwordResetter)
+	if !ok {
+		return errors.New("user store cannot reset passwords")
+	}
+	if err := resetter.ResetPasswordByEmail(ctx, cleanEmail, hash); err != nil {
+		if errors.Is(err, repo.ErrUserNotFound) {
+			return ErrEmailNotFound
+		}
+		return fmt.Errorf("reset password: %w", err)
+	}
+	return nil
 }
 
 // RefreshResp is what /api/auth/refresh returns. No `user` per contract.
@@ -264,6 +352,54 @@ func HashPassword(plain string) (string, error) {
 		return "", err
 	}
 	return string(h), nil
+}
+
+func ValidatePasswordPolicy(password string) error {
+	if len([]rune(password)) < 8 {
+		return ErrInvalidPassword
+	}
+	var hasLetter, hasDigit bool
+	for _, r := range password {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			hasLetter = true
+		case r >= 'a' && r <= 'z':
+			hasLetter = true
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		}
+	}
+	if !hasLetter || !hasDigit {
+		return ErrInvalidPassword
+	}
+	return nil
+}
+
+func newLocalUser(username, email, displayName, hash string) *model.User {
+	return &model.User{
+		ID:                   uuid.NewString(),
+		Username:             username,
+		Email:                email,
+		DisplayName:          displayName,
+		PasswordHash:         hash,
+		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + urlSafeSeed(displayName),
+		CoinBalance:          1200,
+		Verified:             false,
+		Role:                 model.RoleUser,
+		LivePermissionStatus: model.LivePermissionNone,
+	}
+}
+
+func normalizeEmail(raw string) (string, bool) {
+	email := strings.ToLower(strings.TrimSpace(raw))
+	if email == "" || len(email) > 254 || strings.ContainsAny(email, " <>") {
+		return "", false
+	}
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email {
+		return "", false
+	}
+	return email, true
 }
 
 func urlSafeSeed(seed string) string {

@@ -160,7 +160,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {currentUser?.role === 'admin' && (
-                    <DropdownMenuItem onClick={() => navigate('/admin')}>
+                    <DropdownMenuItem onClick={() => navigate('/admin/applications')}>
                       {t('account.adminDashboard')}
                     </DropdownMenuItem>
                   )}

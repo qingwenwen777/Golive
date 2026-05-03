@@ -80,20 +80,20 @@ func TestChangePasswordRequiresCurrentPassword(t *testing.T) {
 	login, err := auth.Register(context.Background(), "demo", "demo", "Demo Creator")
 	require.NoError(t, err)
 
-	bad := httptest.NewRequest(http.MethodPost, "/users/me/password", bytes.NewBufferString(`{"currentPassword":"wrong","newPassword":"new-secret"}`))
+	bad := httptest.NewRequest(http.MethodPost, "/users/me/password", bytes.NewBufferString(`{"currentPassword":"wrong","newPassword":"new-secret1"}`))
 	bad.Header.Set("Authorization", "Bearer "+login.Token)
 	bad.Header.Set("Content-Type", "application/json")
 	badRec := httptest.NewRecorder()
 	router.ServeHTTP(badRec, bad)
 	require.Equal(t, http.StatusUnauthorized, badRec.Code)
 
-	good := httptest.NewRequest(http.MethodPost, "/users/me/password", bytes.NewBufferString(`{"currentPassword":"demo","newPassword":"new-secret"}`))
+	good := httptest.NewRequest(http.MethodPost, "/users/me/password", bytes.NewBufferString(`{"currentPassword":"demo","newPassword":"new-secret1"}`))
 	good.Header.Set("Authorization", "Bearer "+login.Token)
 	good.Header.Set("Content-Type", "application/json")
 	goodRec := httptest.NewRecorder()
 	router.ServeHTTP(goodRec, good)
 	require.Equal(t, http.StatusOK, goodRec.Code)
 
-	_, err = auth.Login(context.Background(), "demo", "new-secret")
+	_, err = auth.Login(context.Background(), "demo", "new-secret1")
 	require.NoError(t, err)
 }

@@ -15,7 +15,7 @@ export function LoginModal() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => (v ? undefined : close())}>
-      <DialogContent className="gl-auth-dialog p-0 sm:max-w-[420px]">
+      <DialogContent className="gl-auth-dialog max-h-[calc(100dvh-24px)] w-[min(440px,calc(100vw-24px))] max-w-[440px] overflow-hidden p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Sign in to GoLive</DialogTitle>
           <DialogDescription>Sign in or register for a GoLive account.</DialogDescription>
