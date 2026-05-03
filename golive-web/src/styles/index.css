@@ -6210,11 +6210,15 @@ button.gl-fan-badge-empty {
 .gl-notification-head button {
   border: 0;
   background: transparent;
-  color: #1c62b9;
+  color: #4b5563;
   font-size: 12px;
   font-weight: 850;
   cursor: pointer;
   padding: 0;
+}
+
+.gl-notification-head button:hover {
+  color: var(--gl-text);
 }
 
 .gl-notification-head button:disabled {
@@ -6223,7 +6227,11 @@ button.gl-fan-badge-empty {
 }
 
 .dark .gl-notification-head button {
-  color: #5ea0ff;
+  color: #d1d5db;
+}
+
+.dark .gl-notification-head button:hover {
+  color: var(--gl-text);
 }
 
 .gl-notification-menu [role='separator'] {
@@ -6259,11 +6267,25 @@ button.gl-fan-badge-empty {
   white-space: normal;
   cursor: pointer;
   min-height: 0;
+  color: var(--gl-text);
 }
 
-.gl-notification-item:focus,
-.gl-notification-item:hover {
-  background: var(--gl-bg-hover);
+.gl-notification-menu .gl-notification-item:focus,
+.gl-notification-menu .gl-notification-item:focus-visible,
+.gl-notification-menu .gl-notification-item:hover,
+.gl-notification-menu .gl-notification-item[data-highlighted] {
+  background: #eeeeee;
+  border-color: #e5e7eb;
+  color: var(--gl-text);
+}
+
+.dark .gl-notification-menu .gl-notification-item:focus,
+.dark .gl-notification-menu .gl-notification-item:focus-visible,
+.dark .gl-notification-menu .gl-notification-item:hover,
+.dark .gl-notification-menu .gl-notification-item[data-highlighted] {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--gl-text);
 }
 
 .gl-notification-dot {
@@ -6296,9 +6318,27 @@ button.gl-fan-badge-empty {
   line-height: 1.35;
 }
 
+.gl-notification-menu .gl-notification-item:focus strong,
+.gl-notification-menu .gl-notification-item:focus-visible strong,
+.gl-notification-menu .gl-notification-item:hover strong,
+.gl-notification-menu .gl-notification-item[data-highlighted] strong {
+  color: var(--gl-text);
+}
+
+.gl-notification-menu .gl-notification-item:focus small,
+.gl-notification-menu .gl-notification-item:focus time,
+.gl-notification-menu .gl-notification-item:focus-visible small,
+.gl-notification-menu .gl-notification-item:focus-visible time,
+.gl-notification-menu .gl-notification-item:hover small,
+.gl-notification-menu .gl-notification-item:hover time,
+.gl-notification-menu .gl-notification-item[data-highlighted] small,
+.gl-notification-menu .gl-notification-item[data-highlighted] time {
+  color: var(--gl-text-2);
+}
+
 .gl-notification-item.is-unread {
-  border-color: rgba(28, 98, 185, 0.14);
-  background: rgba(28, 98, 185, 0.07);
+  border-color: #e5e7eb;
+  background: #f7f7f7;
 }
 
 .gl-notification-item.is-unread .gl-notification-dot {
@@ -6306,8 +6346,8 @@ button.gl-fan-badge-empty {
 }
 
 .dark .gl-notification-item.is-unread {
-  border-color: rgba(94, 160, 255, 0.22);
-  background: rgba(94, 160, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .gl-home-my-appointments,
