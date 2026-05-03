@@ -1,4 +1,4 @@
-import { Crown, Gem, Sparkles, ShieldCheck } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { normalizeLevelInfo, userLevelToneClass } from '@/lib/userLevel';
 import type { UserLevelInfo } from '@/types/user';
@@ -20,7 +20,6 @@ export function UserLevelBadge({
 }) {
   const info = normalizeLevelInfo(levelInfo);
   const resolvedLevel = Math.max(1, Math.min(info.maxLevel, Math.floor(level ?? info.level)));
-  const Icon = levelIcon(resolvedLevel);
 
   return (
     <span
@@ -34,15 +33,8 @@ export function UserLevelBadge({
       )}
       title={title ?? `Lv.${resolvedLevel}`}
     >
-      <Icon size={size === 'hero' ? 15 : size === 'compact' ? 11 : 13} strokeWidth={2.5} />
+      <Star size={size === 'hero' ? 15 : size === 'compact' ? 11 : 13} strokeWidth={2.5} />
       <span>Lv.{resolvedLevel}</span>
     </span>
   );
-}
-
-function levelIcon(level: number) {
-  if (level >= 80) return Gem;
-  if (level >= 50) return Crown;
-  if (level >= 20) return Sparkles;
-  return ShieldCheck;
 }

@@ -3768,6 +3768,8 @@ button.gl-fan-badge-empty {
 .gl-user-level-badge svg {
   flex: 0 0 auto;
   color: var(--user-badge-icon);
+  fill: currentColor;
+  fill-opacity: 0.2;
 }
 .gl-user-level-badge.is-compact {
   height: 18px;
@@ -3783,6 +3785,10 @@ button.gl-fan-badge-empty {
 .gl-user-level-badge.is-elite {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--user-badge-border) 60%, transparent),
     0 10px 20px rgba(15, 23, 42, 0.14);
+}
+.gl-user-level-badge.is-elite svg {
+  fill-opacity: 0.36;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--user-badge-icon) 38%, transparent));
 }
 .gl-user-level-badge.is-tone-1 {
   --user-badge-border: rgba(148, 163, 184, 0.34);
