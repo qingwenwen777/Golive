@@ -112,6 +112,16 @@ func (h *GiftHandler) Send(c *gin.Context) {
 		errcode.Respond(c, errcode.New(404, "Gift not found"))
 		return
 	}
+	var locked *service.GiftLevelLockedError
+	if sErr != nil && errors.As(sErr, &locked) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"message":       "Gift unlock level not reached",
+			"reason":        "gift_level_locked",
+			"requiredLevel": locked.RequiredLevel,
+			"userLevel":     locked.UserLevel,
+		})
+		return
+	}
 
 	// 3) Render + cache.
 	switch {

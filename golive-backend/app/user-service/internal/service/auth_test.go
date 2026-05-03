@@ -69,6 +69,9 @@ func expectFindByUsername(mock sqlmock.Sqlmock, username, hash string) {
 	mock.ExpectQuery(`SELECT \* FROM .users. WHERE username = \? LIMIT \?`).
 		WithArgs(username, 1).
 		WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM .coin_transactions. WHERE user_id = \? AND type = \? AND amount > 0`).
+		WithArgs("u-1", "topup").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(int64(0)))
 }
 
 func expectFindByUsernameNotFound(mock sqlmock.Sqlmock, username string) {

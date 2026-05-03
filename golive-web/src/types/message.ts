@@ -18,6 +18,7 @@ export interface ChatMessage {
   color?: string;
   role?: 'moderator' | string;
   fanBadge?: ChatFanBadge;
+  userLevel?: number;
 }
 
 export interface SuperChatMessage {
@@ -29,6 +30,7 @@ export interface SuperChatMessage {
   amount: string;
   tier: SuperChatTier;
   text: string;
+  userLevel?: number;
   ts: number;
   pending?: boolean;
   requestId?: string;
@@ -52,6 +54,7 @@ export interface GiftMessage {
   giftIcon?: string;
   count?: number;
   tier?: 0 | 1 | 2 | 3;
+  userLevel?: number;
   totalCoin?: number;
   ts: number;
   self?: boolean;

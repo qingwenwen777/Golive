@@ -63,9 +63,13 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 	orderID := "sc-" + uuid.NewString()
 	username := s.broadcastName(ctx, req)
 	avatar, _ := s.orders.AvatarForUser(ctx, req.UserID)
+	userLevel, err := s.orders.UserLevel(ctx, req.UserID)
+	if err != nil {
+		return nil, false, fmt.Errorf("user level: %w", err)
+	}
 
 	payload, err := repo.MarshalSuperChatOutbox(orderID, req.UserID, username, avatar,
-		strconv.FormatInt(req.Amount, 10), tier, req.Text, now.UnixMilli())
+		strconv.FormatInt(req.Amount, 10), tier, userLevel, req.Text, now.UnixMilli())
 	if err != nil {
 		return nil, false, err
 	}

@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/qingwenwen777/golive/pkg/userlevel"
+)
 
 const (
 	RoleUser  = "user"
@@ -24,6 +28,7 @@ type User struct {
 	Avatar                     string     `gorm:"type:varchar(500)" json:"avatar"`
 	Cover                      string     `gorm:"type:varchar(500)" json:"cover"`
 	CoinBalance                int64      `gorm:"not null;default:0" json:"coinBalance"`
+	TotalTopupCoins            int64      `gorm:"-" json:"-"`
 	Verified                   bool       `gorm:"not null;default:false" json:"verified,omitempty"`
 	Role                       string     `gorm:"type:varchar(16);not null;default:user" json:"role"`
 	LivePermissionStatus       string     `gorm:"type:varchar(16);not null;default:none" json:"livePermissionStatus"`
@@ -64,18 +69,19 @@ func (CreatorApplication) TableName() string { return "creator_applications" }
 // src/types/user.ts. We re-marshal explicitly to be safe against future
 // internal-only fields creeping in.
 type PublicUser struct {
-	ID                         string `json:"id"`
-	Username                   string `json:"username"`
-	DisplayName                string `json:"displayName,omitempty"`
-	UsernameUpdatedAt          string `json:"usernameUpdatedAt,omitempty"`
-	UsernameChangeAvailableAt  string `json:"usernameChangeAvailableAt,omitempty"`
-	Avatar                     string `json:"avatar"`
-	Cover                      string `json:"cover"`
-	CoinBalance                int64  `json:"coinBalance"`
-	Verified                   bool   `json:"verified,omitempty"`
-	Role                       string `json:"role"`
-	LivePermissionStatus       string `json:"livePermissionStatus"`
-	LivePermissionRejectReason string `json:"livePermissionRejectReason,omitempty"`
+	ID                         string             `json:"id"`
+	Username                   string             `json:"username"`
+	DisplayName                string             `json:"displayName,omitempty"`
+	UsernameUpdatedAt          string             `json:"usernameUpdatedAt,omitempty"`
+	UsernameChangeAvailableAt  string             `json:"usernameChangeAvailableAt,omitempty"`
+	Avatar                     string             `json:"avatar"`
+	Cover                      string             `json:"cover"`
+	CoinBalance                int64              `json:"coinBalance"`
+	LevelInfo                  userlevel.Snapshot `json:"levelInfo"`
+	Verified                   bool               `json:"verified,omitempty"`
+	Role                       string             `json:"role"`
+	LivePermissionStatus       string             `json:"livePermissionStatus"`
+	LivePermissionRejectReason string             `json:"livePermissionRejectReason,omitempty"`
 }
 
 func (u *User) Public() PublicUser {
@@ -94,6 +100,7 @@ func (u *User) Public() PublicUser {
 		Avatar:                     u.Avatar,
 		Cover:                      u.Cover,
 		CoinBalance:                u.CoinBalance,
+		LevelInfo:                  userlevel.SnapshotForTotalTopup(u.TotalTopupCoins),
 		Verified:                   u.Verified,
 		Role:                       role,
 		LivePermissionStatus:       liveStatus,

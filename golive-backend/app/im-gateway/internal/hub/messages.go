@@ -14,16 +14,17 @@ type SystemMsg struct {
 }
 
 type ChatMsg struct {
-	Type     string           `json:"type"` // "chat"
-	ID       string           `json:"id"`
-	UserID   string           `json:"userId,omitempty"`
-	User     string           `json:"user"`
-	Avatar   string           `json:"avatar,omitempty"`
-	Text     string           `json:"text"`
-	Color    string           `json:"color,omitempty"`
-	Role     string           `json:"role,omitempty"`
-	FanBadge *FanBadgePayload `json:"fanBadge,omitempty"`
-	Ts       int64            `json:"ts"`
+	Type      string           `json:"type"` // "chat"
+	ID        string           `json:"id"`
+	UserID    string           `json:"userId,omitempty"`
+	User      string           `json:"user"`
+	Avatar    string           `json:"avatar,omitempty"`
+	Text      string           `json:"text"`
+	Color     string           `json:"color,omitempty"`
+	Role      string           `json:"role,omitempty"`
+	FanBadge  *FanBadgePayload `json:"fanBadge,omitempty"`
+	UserLevel int              `json:"userLevel,omitempty"`
+	Ts        int64            `json:"ts"`
 }
 
 type FanBadgePayload struct {
@@ -32,10 +33,11 @@ type FanBadgePayload struct {
 }
 
 type ViewerProfile struct {
-	UserID  string `json:"userId,omitempty"`
-	User    string `json:"user"`
-	Avatar  string `json:"avatar,omitempty"`
-	IsOwner bool   `json:"-"`
+	UserID    string `json:"userId,omitempty"`
+	User      string `json:"user"`
+	Avatar    string `json:"avatar,omitempty"`
+	UserLevel int    `json:"userLevel,omitempty"`
+	IsOwner   bool   `json:"-"`
 }
 
 type ViewerListItem struct {
@@ -43,6 +45,7 @@ type ViewerListItem struct {
 	User         string `json:"user"`
 	Avatar       string `json:"avatar,omitempty"`
 	Contribution int64  `json:"contribution"`
+	UserLevel    int    `json:"userLevel,omitempty"`
 }
 
 type ViewerListMsg struct {
@@ -90,6 +93,7 @@ type Inbound struct {
 	ClientID      string           `json:"clientId,omitempty"`
 	LastMessageID string           `json:"lastMessageId,omitempty"`
 	FanBadge      *FanBadgePayload `json:"fanBadge,omitempty"`
+	UserLevel     int              `json:"userLevel,omitempty"`
 }
 
 // EncodeSystem builds a welcome / notice message.
@@ -98,17 +102,18 @@ func EncodeSystem(text string) []byte {
 	return b
 }
 
-func EncodeChat(id, userID, user, avatar, text string, ts int64, fanBadge *FanBadgePayload, role string) []byte {
+func EncodeChat(id, userID, user, avatar, text string, ts int64, fanBadge *FanBadgePayload, role string, userLevel int) []byte {
 	b, _ := json.Marshal(ChatMsg{
-		Type:     "chat",
-		ID:       id,
-		UserID:   userID,
-		User:     user,
-		Avatar:   avatar,
-		Text:     text,
-		Role:     role,
-		FanBadge: fanBadge,
-		Ts:       ts,
+		Type:      "chat",
+		ID:        id,
+		UserID:    userID,
+		User:      user,
+		Avatar:    avatar,
+		Text:      text,
+		Role:      role,
+		FanBadge:  fanBadge,
+		UserLevel: userLevel,
+		Ts:        ts,
 	})
 	return b
 }

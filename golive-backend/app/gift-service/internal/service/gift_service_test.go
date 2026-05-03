@@ -14,6 +14,7 @@ import (
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/userlevel"
 )
 
 // newTestDB returns an isolated in-memory SQLite with the schema migrated
@@ -81,6 +82,18 @@ func seedGift(t *testing.T, db *gorm.DB, id string, price int64) {
 	t.Helper()
 	require.NoError(t, db.Save(&model.Gift{
 		ID: id, Name: id, Icon: "x", PriceCoin: price, Category: "basic",
+	}).Error)
+}
+
+func seedTopupTotal(t *testing.T, db *gorm.DB, uid string, amount int64) {
+	t.Helper()
+	require.NoError(t, db.Create(&model.CoinTransaction{
+		ID:           "topup-" + uid,
+		UserID:       uid,
+		Type:         model.CoinTxTopup,
+		Amount:       amount,
+		BalanceAfter: amount,
+		Title:        "topup",
 	}).Error)
 }
 
@@ -208,6 +221,28 @@ func TestGiftSend_GiftNotFound(t *testing.T) {
 		UserID: "u-demo", RoomID: "r", GiftID: "ghost", Count: 1, RequestID: "rq",
 	})
 	require.True(t, errors.Is(err, service.ErrGiftNotFound))
+}
+
+func TestGiftSend_LevelLockedGift(t *testing.T) {
+	db := newTestDB(t, 1000)
+	require.NoError(t, db.Save(&model.Gift{
+		ID: "aurora", Name: "Aurora", Icon: "x", PriceCoin: 10, Category: "premium", UnlockLevel: 12,
+	}).Error)
+	svc := service.NewGiftService(repo.NewGiftRepo(db), repo.NewOrderRepo(db))
+
+	_, _, err := svc.Send(context.Background(), service.SendGiftReq{
+		UserID: "u-demo", RoomID: "r", GiftID: "aurora", Count: 1, RequestID: "locked",
+	})
+	require.ErrorIs(t, err, service.ErrGiftLevelLocked)
+	require.EqualValues(t, 1000, balanceOf(t, db, "u-demo"))
+
+	seedTopupTotal(t, db, "u-demo", userlevel.RequiredCoinsForLevel(12))
+	order, replayed, err := svc.Send(context.Background(), service.SendGiftReq{
+		UserID: "u-demo", RoomID: "r", GiftID: "aurora", Count: 1, RequestID: "unlocked",
+	})
+	require.NoError(t, err)
+	require.False(t, replayed)
+	require.Equal(t, model.StatusSuccess, order.Status)
 }
 
 // 4) Outbox row gets written alongside successful order.

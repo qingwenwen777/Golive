@@ -45,16 +45,17 @@ func New(rdb *redis.Client, danmus *repo.DanmuRepo) *Subscriber {
 // We only care about chat-type messages; super_chat / gift / system are
 // either already persisted elsewhere or have no need to be stored.
 type inboundChat struct {
-	Type     string                 `json:"type"`
-	ID       string                 `json:"id"`
-	UserID   string                 `json:"userId,omitempty"`
-	User     string                 `json:"user"`
-	Avatar   string                 `json:"avatar,omitempty"`
-	Text     string                 `json:"text"`
-	Color    string                 `json:"color,omitempty"`
-	Role     string                 `json:"role,omitempty"`
-	FanBadge *model.FanBadgePayload `json:"fanBadge,omitempty"`
-	Ts       int64                  `json:"ts"`
+	Type      string                 `json:"type"`
+	ID        string                 `json:"id"`
+	UserID    string                 `json:"userId,omitempty"`
+	User      string                 `json:"user"`
+	Avatar    string                 `json:"avatar,omitempty"`
+	Text      string                 `json:"text"`
+	Color     string                 `json:"color,omitempty"`
+	Role      string                 `json:"role,omitempty"`
+	FanBadge  *model.FanBadgePayload `json:"fanBadge,omitempty"`
+	UserLevel int                    `json:"userLevel,omitempty"`
+	Ts        int64                  `json:"ts"`
 }
 
 // Run blocks until ctx is canceled. It reconnects implicitly via go-redis on
@@ -103,15 +104,16 @@ func (s *Subscriber) handle(ctx context.Context, msg *redis.Message) {
 		return
 	}
 	d := &model.Danmu{
-		ID:       ev.ID,
-		RoomID:   roomID,
-		UserID:   ev.UserID,
-		Username: ev.User,
-		Avatar:   ev.Avatar,
-		Text:     ev.Text,
-		Color:    ev.Color,
-		Role:     safeRole(ev.Role),
-		Ts:       ev.Ts,
+		ID:        ev.ID,
+		RoomID:    roomID,
+		UserID:    ev.UserID,
+		Username:  ev.User,
+		Avatar:    ev.Avatar,
+		Text:      ev.Text,
+		Color:     ev.Color,
+		Role:      safeRole(ev.Role),
+		UserLevel: safeUserLevel(ev.UserLevel),
+		Ts:        ev.Ts,
 	}
 	if ev.FanBadge != nil {
 		d.FanBadgeCreatorID = ev.FanBadge.CreatorID
@@ -147,4 +149,14 @@ func safeRole(role string) string {
 		return role
 	}
 	return ""
+}
+
+func safeUserLevel(level int) int {
+	if level < 1 {
+		return 0
+	}
+	if level > 99 {
+		return 99
+	}
+	return level
 }

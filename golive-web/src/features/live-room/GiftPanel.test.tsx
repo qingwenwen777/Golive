@@ -48,7 +48,7 @@ vi.mock('@/components/ui/sheet', () => ({
   SheetDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-function rocket(priceCoin: number): Gift {
+function rocket(priceCoin: number, extra: Partial<Gift> = {}): Gift {
   return {
     id: 'rocket',
     name: 'Rocket',
@@ -56,6 +56,7 @@ function rocket(priceCoin: number): Gift {
     priceCoin,
     category: 'premium',
     tier: 2,
+    ...extra,
   };
 }
 
@@ -88,6 +89,28 @@ describe('GiftPanel', () => {
     fireEvent.click(screen.getByText('Rocket'));
     fireEvent.click(screen.getByRole('button', { name: 'Top up' }));
 
+    expect(giftApiMock.mutate).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(navigateMock).toHaveBeenCalledWith('/coins?focus=recharge');
+  });
+
+  it('routes to recharge instead of mutating when the gift level is locked', () => {
+    giftApiMock.gifts = [rocket(100, { unlockLevel: 6 })];
+    giftApiMock.balance = 1000;
+    const onOpenChange = vi.fn();
+
+    render(
+      <GiftPanel
+        open
+        onOpenChange={onOpenChange}
+        roomId="room-1"
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Rocket'));
+    fireEvent.click(screen.getByRole('button', { name: 'Top up' }));
+
+    expect(screen.getByText('Lv.6')).toBeTruthy();
     expect(giftApiMock.mutate).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(navigateMock).toHaveBeenCalledWith('/coins?focus=recharge');

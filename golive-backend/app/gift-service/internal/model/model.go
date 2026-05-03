@@ -4,14 +4,15 @@ import "time"
 
 // Gift is the catalog entry. JSON tags match src/types/gift.ts.
 type Gift struct {
-	ID        string `gorm:"primaryKey;type:varchar(64)"      json:"id"`
-	Name      string `gorm:"type:varchar(64);not null"        json:"name"`
-	NameJa    string `gorm:"type:varchar(64)"                 json:"nameJa,omitempty"`
-	Icon      string `gorm:"type:varchar(255);not null"       json:"icon"`
-	PriceCoin int64  `gorm:"not null"                         json:"priceCoin"`
-	Category  string `gorm:"type:varchar(16);not null"        json:"category"`
-	Animation string `gorm:"type:varchar(16)"                 json:"animation,omitempty"`
-	Tier      int    `gorm:"not null;default:0"               json:"tier"`
+	ID          string `gorm:"primaryKey;type:varchar(64)"      json:"id"`
+	Name        string `gorm:"type:varchar(64);not null"        json:"name"`
+	NameJa      string `gorm:"type:varchar(64)"                 json:"nameJa,omitempty"`
+	Icon        string `gorm:"type:varchar(255);not null"       json:"icon"`
+	PriceCoin   int64  `gorm:"not null"                         json:"priceCoin"`
+	Category    string `gorm:"type:varchar(16);not null"        json:"category"`
+	Animation   string `gorm:"type:varchar(16)"                 json:"animation,omitempty"`
+	Tier        int    `gorm:"not null;default:0"               json:"tier"`
+	UnlockLevel int    `gorm:"not null;default:1"               json:"unlockLevel"`
 }
 
 func (Gift) TableName() string { return "gifts" }

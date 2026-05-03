@@ -927,6 +927,7 @@ input:focus-visible,
   gap: 10px;
 }
 .gl-gift-card {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 136px;
@@ -941,6 +942,66 @@ input:focus-visible,
   transition:
     border-color 0.15s ease,
     background-color 0.15s ease;
+}
+.gl-gift-card.is-level-gift {
+  border-color: rgba(99, 102, 241, 0.24);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(238, 242, 255, 0.82)),
+    var(--gl-bg-hover);
+}
+.gl-gift-card.is-level-gift.is-active {
+  border-color: rgba(99, 102, 241, 0.72);
+}
+.gl-gift-card.is-locked {
+  color: color-mix(in srgb, var(--gl-text) 58%, transparent);
+}
+.gl-gift-card.is-locked > span:not(.gl-gift-lock-mark):not(.gl-gift-level-chip) {
+  opacity: 0.58;
+}
+.gl-gift-lock-mark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+}
+.gl-gift-level-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dark .gl-gift-card.is-level-gift {
+  border-color: rgba(129, 140, 248, 0.24);
+  background:
+    linear-gradient(145deg, rgba(30, 41, 59, 0.72), rgba(67, 56, 202, 0.24)),
+    var(--gl-bg-hover);
+}
+.dark .gl-gift-lock-mark {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+}
+.dark .gl-gift-level-chip {
+  background: rgba(129, 140, 248, 0.18);
+  color: #c7d2fe;
 }
 .gl-gift-card.is-active {
   border-color: #1c62b9;
@@ -3680,6 +3741,238 @@ button.gl-fan-badge-empty {
 .dark .gl-fan-badge-level svg {
   color: var(--fan-badge-dark-icon);
 }
+.gl-user-level-badge {
+  --user-badge-border: rgba(148, 163, 184, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.92));
+  --user-badge-color: #334155;
+  --user-badge-icon: #0f172a;
+  --user-badge-dark-border: rgba(148, 163, 184, 0.3);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.78), rgba(51, 65, 85, 0.56));
+  --user-badge-dark-color: #e2e8f0;
+  --user-badge-dark-icon: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 20px;
+  border: 1px solid var(--user-badge-border);
+  border-radius: 999px;
+  background: var(--user-badge-bg);
+  color: var(--user-badge-color);
+  padding: 0 8px 0 7px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+.gl-user-level-badge svg {
+  flex: 0 0 auto;
+  color: var(--user-badge-icon);
+}
+.gl-user-level-badge.is-compact {
+  height: 18px;
+  padding-inline: 6px;
+  font-size: 10px;
+}
+.gl-user-level-badge.is-hero {
+  height: 26px;
+  padding-inline: 10px;
+  font-size: 12px;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+}
+.gl-user-level-badge.is-elite {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--user-badge-border) 60%, transparent),
+    0 10px 20px rgba(15, 23, 42, 0.14);
+}
+.gl-user-level-badge.is-tone-1 {
+  --user-badge-border: rgba(148, 163, 184, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.92));
+  --user-badge-color: #334155;
+  --user-badge-icon: #0f172a;
+  --user-badge-dark-border: rgba(148, 163, 184, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.72), rgba(30, 41, 59, 0.58));
+  --user-badge-dark-color: #f8fafc;
+  --user-badge-dark-icon: #f8fafc;
+}
+.gl-user-level-badge.is-tone-2 {
+  --user-badge-border: rgba(34, 197, 94, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(240, 253, 244, 0.98), rgba(220, 252, 231, 0.92));
+  --user-badge-color: #166534;
+  --user-badge-icon: #14532d;
+  --user-badge-dark-border: rgba(74, 222, 128, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(20, 83, 45, 0.7), rgba(22, 101, 52, 0.52));
+  --user-badge-dark-color: #dcfce7;
+  --user-badge-dark-icon: #f0fdf4;
+}
+.gl-user-level-badge.is-tone-3 {
+  --user-badge-border: rgba(14, 165, 233, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(240, 249, 255, 0.98), rgba(224, 242, 254, 0.92));
+  --user-badge-color: #0369a1;
+  --user-badge-icon: #0f172a;
+  --user-badge-dark-border: rgba(56, 189, 248, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(8, 47, 73, 0.7), rgba(14, 116, 144, 0.52));
+  --user-badge-dark-color: #e0f2fe;
+  --user-badge-dark-icon: #bae6fd;
+}
+.gl-user-level-badge.is-tone-4 {
+  --user-badge-border: rgba(99, 102, 241, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(221, 214, 254, 0.92));
+  --user-badge-color: #4f46e5;
+  --user-badge-icon: #312e81;
+  --user-badge-dark-border: rgba(129, 140, 248, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(67, 56, 202, 0.46));
+  --user-badge-dark-color: #e0e7ff;
+  --user-badge-dark-icon: #c7d2fe;
+}
+.gl-user-level-badge.is-tone-5 {
+  --user-badge-border: rgba(168, 85, 247, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(250, 245, 255, 0.98), rgba(243, 232, 255, 0.92));
+  --user-badge-color: #7e22ce;
+  --user-badge-icon: #581c87;
+  --user-badge-dark-border: rgba(196, 181, 253, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(88, 28, 135, 0.74), rgba(109, 40, 217, 0.44));
+  --user-badge-dark-color: #f3e8ff;
+  --user-badge-dark-icon: #e9d5ff;
+}
+.gl-user-level-badge.is-tone-6 {
+  --user-badge-border: rgba(244, 114, 182, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(255, 241, 245, 0.98), rgba(254, 215, 226, 0.92));
+  --user-badge-color: #be185d;
+  --user-badge-icon: #831843;
+  --user-badge-dark-border: rgba(251, 113, 133, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(131, 24, 67, 0.74), rgba(190, 24, 93, 0.44));
+  --user-badge-dark-color: #ffe4e6;
+  --user-badge-dark-icon: #fff1f2;
+}
+.gl-user-level-badge.is-tone-7 {
+  --user-badge-border: rgba(245, 158, 11, 0.36);
+  --user-badge-bg: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(254, 243, 199, 0.92));
+  --user-badge-color: #b45309;
+  --user-badge-icon: #78350f;
+  --user-badge-dark-border: rgba(251, 191, 36, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(120, 53, 15, 0.74), rgba(180, 83, 9, 0.42));
+  --user-badge-dark-color: #fef3c7;
+  --user-badge-dark-icon: #fffbeb;
+}
+.gl-user-level-badge.is-tone-8 {
+  --user-badge-border: rgba(20, 184, 166, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(240, 253, 250, 0.98), rgba(204, 251, 241, 0.92));
+  --user-badge-color: #0f766e;
+  --user-badge-icon: #134e4a;
+  --user-badge-dark-border: rgba(45, 212, 191, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(19, 78, 74, 0.74), rgba(15, 118, 110, 0.42));
+  --user-badge-dark-color: #ccfbf1;
+  --user-badge-dark-icon: #f0fdfa;
+}
+.gl-user-level-badge.is-tone-9 {
+  --user-badge-border: rgba(59, 130, 246, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.92));
+  --user-badge-color: #2563eb;
+  --user-badge-icon: #1e3a8a;
+  --user-badge-dark-border: rgba(96, 165, 250, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(30, 64, 175, 0.74), rgba(37, 99, 235, 0.44));
+  --user-badge-dark-color: #dbeafe;
+  --user-badge-dark-icon: #eff6ff;
+}
+.gl-user-level-badge.is-tone-10 {
+  --user-badge-border: rgba(217, 70, 239, 0.34);
+  --user-badge-bg: linear-gradient(135deg, rgba(253, 244, 255, 0.98), rgba(250, 232, 255, 0.92));
+  --user-badge-color: #c026d3;
+  --user-badge-icon: #701a75;
+  --user-badge-dark-border: rgba(232, 121, 249, 0.28);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(112, 26, 117, 0.74), rgba(192, 38, 211, 0.44));
+  --user-badge-dark-color: #fae8ff;
+  --user-badge-dark-icon: #fdf4ff;
+}
+.gl-user-level-badge.is-tone-11 {
+  --user-badge-border: rgba(202, 138, 4, 0.38);
+  --user-badge-bg: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(254, 249, 195, 0.92));
+  --user-badge-color: #a16207;
+  --user-badge-icon: #713f12;
+  --user-badge-dark-border: rgba(250, 204, 21, 0.3);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(113, 63, 18, 0.74), rgba(161, 98, 7, 0.44));
+  --user-badge-dark-color: #fef9c3;
+  --user-badge-dark-icon: #fefce8;
+}
+.gl-user-level-badge.is-tone-12 {
+  --user-badge-border: rgba(24, 24, 27, 0.36);
+  --user-badge-bg: linear-gradient(135deg, rgba(250, 250, 250, 0.98), rgba(228, 228, 231, 0.94));
+  --user-badge-color: #18181b;
+  --user-badge-icon: #ca8a04;
+  --user-badge-dark-border: rgba(250, 204, 21, 0.34);
+  --user-badge-dark-bg: linear-gradient(135deg, rgba(24, 24, 27, 0.9), rgba(113, 63, 18, 0.46));
+  --user-badge-dark-color: #fef9c3;
+  --user-badge-dark-icon: #fde68a;
+}
+.dark .gl-user-level-badge {
+  border-color: var(--user-badge-dark-border);
+  background: var(--user-badge-dark-bg);
+  color: var(--user-badge-dark-color);
+}
+.dark .gl-user-level-badge svg {
+  color: var(--user-badge-dark-icon);
+}
+.gl-yt-you-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.gl-yt-you-title > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.gl-you-level-progress {
+  width: min(100%, 640px);
+  margin-top: 16px;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.96)),
+    var(--gl-bg-card);
+  padding: 14px 16px;
+}
+.dark .gl-you-level-progress {
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.96)),
+    var(--gl-bg-card);
+}
+.gl-you-level-progress-top,
+.gl-you-level-progress-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.gl-you-level-progress-top {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-you-level-progress-top strong {
+  color: var(--gl-text);
+  font-size: 13px;
+}
+.gl-you-level-bar {
+  height: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+}
+.gl-you-level-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1c62b9, #8b5cf6 45%, #f59e0b 100%);
+}
+.gl-you-level-progress-bottom {
+  margin-top: 10px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
 .gl-quick-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -3915,8 +4208,12 @@ button.gl-fan-badge-empty {
   font-weight: 900;
   line-height: 1.12;
 }
-.gl-channel-profile-main h1 span {
+.gl-channel-profile-main h1 > span:first-child {
   overflow-wrap: anywhere;
+}
+.gl-channel-profile-main h1 .gl-user-level-badge,
+.gl-info-chan-name .gl-user-level-badge {
+  flex: 0 0 auto;
 }
 .gl-channel-handle {
   display: flex;
@@ -6072,7 +6369,7 @@ button.gl-fan-badge-empty {
   color: var(--gl-text);
   font-size: 36px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.1;
 }
 .gl-yt-you-meta {

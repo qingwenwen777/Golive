@@ -45,8 +45,10 @@ export function useFanBadges(enabled = true, userId?: string) {
 }
 
 export interface GiftError {
-  reason: 'insufficient_coin' | 'network' | 'unknown';
+  reason: 'insufficient_coin' | 'gift_level_locked' | 'network' | 'unknown';
   message: string;
+  requiredLevel?: number;
+  userLevel?: number;
 }
 
 function toGiftError(err: unknown): GiftError {
@@ -54,6 +56,15 @@ function toGiftError(err: unknown): GiftError {
     const data = err.response?.data as { reason?: string; message?: string } | undefined;
     if (data?.reason === 'insufficient_coin') {
       return { reason: 'insufficient_coin', message: data.message ?? 'Insufficient coins' };
+    }
+    if (data?.reason === 'gift_level_locked') {
+      const locked = data as { message?: string; requiredLevel?: number; userLevel?: number };
+      return {
+        reason: 'gift_level_locked',
+        message: locked.message ?? 'Gift unlock level not reached',
+        requiredLevel: locked.requiredLevel,
+        userLevel: locked.userLevel,
+      };
     }
     if (!err.response) return { reason: 'network', message: 'Network error' };
     return { reason: 'unknown', message: data?.message ?? err.message };

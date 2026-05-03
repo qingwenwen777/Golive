@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Coins } from 'lucide-react';
+import { Coins, LockKeyhole, Sparkles } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -13,14 +13,16 @@ import { useMe } from '@/api/auth';
 import { useGifts, useSendGift, newRequestId } from '@/api/gift';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/cn';
+import { normalizeLevelInfo } from '@/lib/userLevel';
+import { UserLevelBadge } from '@/components/UserLevelBadge';
 import type { Gift } from '@/types/gift';
 
 const PRICE_TABS = [
   { id: 'all', label: 'All', min: 0, max: Infinity },
-  { id: 't50', label: '≤50', min: 0, max: 50 },
-  { id: 't100', label: '≤100', min: 0, max: 100 },
-  { id: 't500', label: '≤500', min: 0, max: 500 },
-  { id: 't1000', label: '≤1000', min: 0, max: 1000 },
+  { id: 't50', label: '<=50', min: 0, max: 50 },
+  { id: 't100', label: '<=100', min: 0, max: 100 },
+  { id: 't500', label: '<=500', min: 0, max: 500 },
+  { id: 't1000', label: '<=1000', min: 0, max: 1000 },
 ] as const;
 
 const COUNT_PRESETS = [1, 10, 52, 99, 520, 1314] as const;
@@ -38,6 +40,8 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
   const { data: gifts, isPending } = useGifts();
   const me = useMe();
   const balance = me.data?.coinBalance ?? 0;
+  const levelInfo = normalizeLevelInfo(me.data?.levelInfo);
+  const userLevel = levelInfo.level;
 
   const [tab, setTab] = useState<(typeof PRICE_TABS)[number]['id']>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,9 +57,16 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
   const selected = gifts?.find((g) => g.id === selectedId) ?? null;
   const total = selected ? selected.priceCoin * count : 0;
   const insufficient = selected ? total > balance : false;
+  const requiredLevel = selected?.unlockLevel ?? 1;
+  const locked = selected ? requiredLevel > userLevel : false;
 
   const handleSend = () => {
     if (!selected) return;
+    if (locked) {
+      onOpenChange(false);
+      navigate('/coins?focus=recharge');
+      return;
+    }
     if (insufficient) {
       onOpenChange(false);
       navigate('/coins?focus=recharge');
@@ -70,12 +81,14 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
             toast.error('Insufficient coins');
             return;
           }
-          toast.success(`Sent ${selected.name} ×${count}`);
+          toast.success(`Sent ${selected.name} x${count}`);
           onSent?.({ gift: selected, count, requestId });
         },
         onError: (err) => {
           if (err.reason === 'insufficient_coin') {
             toast.error('Insufficient coins');
+          } else if (err.reason === 'gift_level_locked') {
+            toast.error(`Unlocks at Lv.${err.requiredLevel ?? requiredLevel}`);
           } else {
             toast.error(err.message || 'Failed to send gift');
           }
@@ -94,8 +107,11 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
       >
         <SheetHeader className="border-b border-border px-4 py-3">
           <SheetTitle>Gifts</SheetTitle>
-          <SheetDescription className="flex items-center gap-1 text-xs text-text-secondary">
-            <Coins size={14} /> <span>{balance.toLocaleString()} coins</span>
+          <SheetDescription className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
+            <span className="inline-flex items-center gap-1">
+              <Coins size={14} /> <span>{balance.toLocaleString()} coins</span>
+            </span>
+            <UserLevelBadge levelInfo={levelInfo} size="compact" />
           </SheetDescription>
         </SheetHeader>
 
@@ -127,6 +143,8 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
             <div className="gl-gift-grid">
               {filtered.map((g) => {
                 const active = g.id === selectedId;
+                const giftRequiredLevel = g.unlockLevel ?? 1;
+                const giftLocked = giftRequiredLevel > userLevel;
                 return (
                   <button
                     key={g.id}
@@ -137,9 +155,16 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                     className={cn(
                       'gl-gift-card',
                       g.id === 'fan_light' && 'is-fan-light',
+                      giftRequiredLevel > 1 && 'is-level-gift',
+                      giftLocked && 'is-locked',
                       active ? 'is-active' : 'hover:bg-bg-hover/70 bg-bg-hover',
                     )}
                   >
+                    {giftLocked && (
+                      <span className="gl-gift-lock-mark" aria-hidden>
+                        <LockKeyhole size={12} />
+                      </span>
+                    )}
                     <span className="text-3xl" aria-hidden>
                       {g.icon}
                     </span>
@@ -147,6 +172,11 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                     <span className="flex items-center gap-1 text-[11px] text-text-secondary">
                       <Coins size={10} /> {g.priceCoin}
                     </span>
+                    {giftRequiredLevel > 1 && (
+                      <span className="gl-gift-level-chip">
+                        <Sparkles size={10} /> Lv.{giftRequiredLevel}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -166,7 +196,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                     count === n ? 'bg-accent text-white' : 'bg-bg-hover text-text-secondary',
                   )}
                 >
-                  ×{n}
+                  x{n}
                 </button>
               ))}
             </div>
@@ -177,11 +207,16 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
               <div className="flex-1">
                 <div className="text-sm font-medium">{selected.name}</div>
                 <div
-                  className={cn('text-xs', insufficient ? 'text-red-500' : 'text-text-secondary')}
+                  className={cn(
+                    'text-xs',
+                    locked || insufficient ? 'text-red-500' : 'text-text-secondary',
+                  )}
                 >
-                  {insufficient
-                    ? `Need ${total - balance} more coins`
-                    : `Total ${total.toLocaleString()} coins`}
+                  {locked
+                    ? `Unlocks at Lv.${requiredLevel}. Recharge to level up.`
+                    : insufficient
+                      ? `Need ${total - balance} more coins`
+                      : `Total ${total.toLocaleString()} coins`}
                 </div>
               </div>
               <button
@@ -189,13 +224,13 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                 onClick={handleSend}
                 className={cn(
                   'rounded-full px-5 py-2 text-sm font-semibold transition',
-                  insufficient
+                  locked || insufficient
                     ? 'bg-bg-hover text-text-secondary'
                     : 'bg-accent text-white hover:bg-accent/90',
                   sendGift.isPending && 'opacity-60',
                 )}
               >
-                {insufficient ? 'Top up' : sendGift.isPending ? 'Sending…' : 'Send'}
+                {locked || insufficient ? 'Top up' : sendGift.isPending ? 'Sending...' : 'Send'}
               </button>
             </div>
           </div>

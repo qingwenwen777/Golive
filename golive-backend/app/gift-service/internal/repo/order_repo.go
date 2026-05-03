@@ -27,6 +27,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
+	"github.com/qingwenwen777/golive/pkg/userlevel"
 )
 
 var (
@@ -154,6 +155,20 @@ func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.F
 		Order("level DESC, total_contribution DESC, updated_at DESC").
 		Find(&badges).Error
 	return badges, err
+}
+
+func (r *OrderRepo) UserLevel(ctx context.Context, userID string) (int, error) {
+	var total int64
+	err := r.db.WithContext(ctx).
+		Model(&model.CoinTransaction{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where("user_id = ? AND type = ? AND amount > 0", userID, model.CoinTxTopup).
+		Row().
+		Scan(&total)
+	if err != nil {
+		return 1, err
+	}
+	return userlevel.LevelForTotalTopup(total), nil
 }
 
 type BetOptionSummary struct {
@@ -810,7 +825,7 @@ func (r *OrderRepo) PersistSuperChatFailure(ctx context.Context, o *model.SuperC
 // MarshalGiftOutbox / MarshalSuperChatOutbox build the payload that downstream
 // (kafka consumer → Redis publish) will broadcast. Field names match
 // im-gateway/internal/hub/messages.go.
-func MarshalGiftOutbox(id, requestID, userID, username, avatar, giftName, giftIcon string, count, tier int, totalCoin, ts int64) ([]byte, error) {
+func MarshalGiftOutbox(id, requestID, userID, username, avatar, giftName, giftIcon string, count, tier, userLevel int, totalCoin, ts int64) ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"type":      "gift",
 		"id":        id,
@@ -822,21 +837,23 @@ func MarshalGiftOutbox(id, requestID, userID, username, avatar, giftName, giftIc
 		"giftIcon":  giftIcon,
 		"count":     count,
 		"tier":      tier,
+		"userLevel": userLevel,
 		"totalCoin": totalCoin,
 		"ts":        ts,
 	})
 }
 
-func MarshalSuperChatOutbox(id, userID, user, avatar, amount string, tier int, text string, ts int64) ([]byte, error) {
+func MarshalSuperChatOutbox(id, userID, user, avatar, amount string, tier, userLevel int, text string, ts int64) ([]byte, error) {
 	payload := map[string]any{
-		"type":   "super_chat",
-		"id":     id,
-		"userId": userID,
-		"user":   user,
-		"amount": amount,
-		"tier":   tier,
-		"text":   text,
-		"ts":     ts,
+		"type":      "super_chat",
+		"id":        id,
+		"userId":    userID,
+		"user":      user,
+		"amount":    amount,
+		"tier":      tier,
+		"userLevel": userLevel,
+		"text":      text,
+		"ts":        ts,
 	}
 	if avatar != "" {
 		payload["avatar"] = avatar

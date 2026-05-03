@@ -250,9 +250,10 @@ func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 		item := byViewer[key]
 		if item.User == "" {
 			item = ViewerListItem{
-				UserID: profile.UserID,
-				User:   user,
-				Avatar: profile.Avatar,
+				UserID:    profile.UserID,
+				User:      user,
+				Avatar:    profile.Avatar,
+				UserLevel: profile.UserLevel,
 			}
 		} else {
 			if item.UserID == "" && profile.UserID != "" {
@@ -263,6 +264,9 @@ func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 			}
 			if item.Avatar == "" && profile.Avatar != "" {
 				item.Avatar = profile.Avatar
+			}
+			if item.UserLevel == 0 && profile.UserLevel > 0 {
+				item.UserLevel = profile.UserLevel
 			}
 		}
 		item.Contribution = r.contributions[contributionKey(profile)]

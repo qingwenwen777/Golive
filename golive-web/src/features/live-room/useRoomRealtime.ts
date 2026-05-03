@@ -29,6 +29,7 @@ interface ServerChat {
   color?: string;
   role?: string;
   fanBadge?: ChatFanBadge;
+  userLevel?: number;
   ts?: number;
 }
 interface ServerSuperChat {
@@ -40,6 +41,7 @@ interface ServerSuperChat {
   amount: string;
   tier: SuperChatTier;
   text: string;
+  userLevel?: number;
   ts?: number;
 }
 interface ServerGift {
@@ -53,6 +55,7 @@ interface ServerGift {
   giftIcon?: string;
   count?: number;
   tier?: 0 | 1 | 2 | 3;
+  userLevel?: number;
   totalCoin?: number;
   ts?: number;
 }
@@ -68,6 +71,7 @@ interface ServerViewerList {
     user: string;
     avatar?: string;
     contribution?: number;
+    userLevel?: number;
   }>;
   ts?: number;
 }
@@ -124,7 +128,12 @@ export interface UseRoomRealtimeReturn {
   viewers: ReturnType<typeof useRoomSlice>['viewers'];
   bullets: ReturnType<typeof useRoomSlice>['bullets'];
   sendChat: (text: string) => boolean;
-  sendSuperChat: (payload: { amount: string; tier: SuperChatTier; text: string }) => boolean;
+  sendSuperChat: (payload: {
+    amount: string;
+    tier: SuperChatTier;
+    text: string;
+    userLevel?: number;
+  }) => boolean;
   clearBullet: (id: string) => void;
 }
 
@@ -204,6 +213,7 @@ export function useRoomRealtime(
       type: 'viewer_profile',
       user: currentUser ? userDisplayName(currentUser) : 'Guest',
       avatar: currentUser?.avatar,
+      userLevel: currentUser?.levelInfo?.level,
     });
   }, [readyState, sendMessage, currentUser]);
 
@@ -242,6 +252,7 @@ export function useRoomRealtime(
           color: parsed.color,
           role: parsed.role,
           fanBadge: parsed.fanBadge,
+          userLevel: parsed.userLevel,
           ts: parsed.ts ?? now,
         };
         const alreadySeen = useRealtimeStore
@@ -270,6 +281,7 @@ export function useRoomRealtime(
           amount: parsed.amount,
           tier: parsed.tier,
           text: parsed.text,
+          userLevel: parsed.userLevel,
           ts: parsed.ts ?? now,
         });
         break;
@@ -308,6 +320,7 @@ export function useRoomRealtime(
           giftIcon: parsed.giftIcon,
           count,
           tier: parsed.tier,
+          userLevel: parsed.userLevel,
           totalCoin: parsed.totalCoin,
           ts: parsed.ts ?? now,
         });
@@ -325,6 +338,7 @@ export function useRoomRealtime(
             user: viewer.user,
             avatar: viewer.avatar,
             contribution: viewer.contribution ?? 0,
+            userLevel: viewer.userLevel,
           })),
           parsed.total,
         );
@@ -450,6 +464,7 @@ export function useRoomRealtime(
       user,
       avatar,
       fanBadge,
+      userLevel: currentUser?.levelInfo?.level,
       clientId: id,
       ts: now,
     });
@@ -457,7 +472,12 @@ export function useRoomRealtime(
     return true;
   };
 
-  const sendSuperChat = (payload: { amount: string; tier: SuperChatTier; text: string }) =>
+  const sendSuperChat = (payload: {
+    amount: string;
+    tier: SuperChatTier;
+    text: string;
+    userLevel?: number;
+  }) =>
     sendMessage({ type: 'super_chat', roomId, ...payload, ts: Date.now() });
 
   const clearBullet = (id: string) => clearBulletFn(roomId, id);

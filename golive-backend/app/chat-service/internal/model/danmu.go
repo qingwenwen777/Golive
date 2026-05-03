@@ -16,6 +16,7 @@ type Danmu struct {
 	Role              string `gorm:"type:varchar(16)"`
 	FanBadgeCreatorID string `gorm:"type:varchar(80)"`
 	FanBadgeLevel     int
+	UserLevel         int
 	Ts                int64 `gorm:"not null;index"` // ms epoch
 	CreatedAt         time.Time
 }
@@ -23,18 +24,19 @@ type Danmu struct {
 // Public is the wire-shape served via GET /rooms/:id/danmus and Redis pub/sub.
 // History can also include SuperChat fields.
 type Public struct {
-	Type     string           `json:"type"` // "chat" or "super_chat"
-	ID       string           `json:"id"`
-	UserID   string           `json:"userId,omitempty"`
-	User     string           `json:"user"`
-	Avatar   string           `json:"avatar,omitempty"`
-	Text     string           `json:"text"`
-	Color    string           `json:"color,omitempty"`
-	Role     string           `json:"role,omitempty"`
-	FanBadge *FanBadgePayload `json:"fanBadge,omitempty"`
-	Amount   string           `json:"amount,omitempty"`
-	Tier     *int             `json:"tier,omitempty"`
-	Ts       int64            `json:"ts"`
+	Type      string           `json:"type"` // "chat" or "super_chat"
+	ID        string           `json:"id"`
+	UserID    string           `json:"userId,omitempty"`
+	User      string           `json:"user"`
+	Avatar    string           `json:"avatar,omitempty"`
+	Text      string           `json:"text"`
+	Color     string           `json:"color,omitempty"`
+	Role      string           `json:"role,omitempty"`
+	FanBadge  *FanBadgePayload `json:"fanBadge,omitempty"`
+	UserLevel int              `json:"userLevel,omitempty"`
+	Amount    string           `json:"amount,omitempty"`
+	Tier      *int             `json:"tier,omitempty"`
+	Ts        int64            `json:"ts"`
 }
 
 type FanBadgePayload struct {
@@ -44,15 +46,16 @@ type FanBadgePayload struct {
 
 func (d *Danmu) ToPublic() Public {
 	out := Public{
-		Type:   "chat",
-		ID:     d.ID,
-		UserID: d.UserID,
-		User:   d.Username,
-		Avatar: d.Avatar,
-		Text:   d.Text,
-		Color:  d.Color,
-		Role:   d.Role,
-		Ts:     d.Ts,
+		Type:      "chat",
+		ID:        d.ID,
+		UserID:    d.UserID,
+		User:      d.Username,
+		Avatar:    d.Avatar,
+		Text:      d.Text,
+		Color:     d.Color,
+		Role:      d.Role,
+		UserLevel: d.UserLevel,
+		Ts:        d.Ts,
 	}
 	if d.FanBadgeCreatorID != "" && d.FanBadgeLevel > 0 {
 		out.FanBadge = &FanBadgePayload{

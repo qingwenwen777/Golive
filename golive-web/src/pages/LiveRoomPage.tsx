@@ -734,6 +734,7 @@ export default function LiveRoomPage() {
                   user: currentName,
                   avatar: currentUser.avatar,
                   contribution: 0,
+                  userLevel: currentUser.levelInfo?.level,
                 },
                 totalCoin,
               );
@@ -758,6 +759,7 @@ export default function LiveRoomPage() {
               giftIcon: gift.icon,
               count,
               tier: gift.tier,
+              userLevel: currentUser?.levelInfo?.level,
               totalCoin,
               self: true,
               ts: Date.now(),
@@ -926,13 +928,14 @@ export default function LiveRoomPage() {
             incrementViewerContribution(
               roomId,
               {
-                userId: currentUser.id,
-                user: currentName,
-                avatar: currentUser.avatar,
-                contribution: 0,
-              },
-              totalCoin,
-            );
+              userId: currentUser.id,
+              user: currentName,
+              avatar: currentUser.avatar,
+              contribution: 0,
+              userLevel: currentUser.levelInfo?.level,
+            },
+            totalCoin,
+          );
           }
           updateLocalFanBadge(totalCoin, gift.id === 'fan_light');
           setFlying((prev) => [
@@ -954,6 +957,7 @@ export default function LiveRoomPage() {
             giftIcon: gift.icon,
             count,
             tier: gift.tier,
+            userLevel: currentUser?.levelInfo?.level,
             totalCoin,
             self: true,
             ts: Date.now(),

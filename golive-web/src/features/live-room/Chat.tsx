@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
+import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { tierSpec } from '@/constants/chat';
 import type {
   Message,
@@ -265,6 +266,7 @@ function ChatRow({
               {t('liveRoom.chatPanel.moderatorBadge', { defaultValue: '房管' })}
             </span>
           )}
+          {!isOwner && m.userLevel && <UserLevelBadge level={m.userLevel} size="compact" />}
           {isFan && m.fanBadge && (
             <span
               className={cn('gl-chat-fan-badge', fanBadgeToneClass(m.fanBadge.level))}
@@ -291,6 +293,7 @@ function SuperChatCard({ m }: { m: SuperChatMessage }) {
       <div className="gl-sc-head" style={{ background: spec.bg }}>
         <Avatar name={m.user} src={m.avatar} size={28} />
         <span className="gl-sc-user">{m.user}</span>
+        {m.userLevel && <UserLevelBadge level={m.userLevel} size="compact" className="gl-sc-level" />}
         <span className="gl-sc-amt">{formatYenAmount(m.amount)}</span>
       </div>
       {m.text && (
@@ -385,6 +388,7 @@ function GiftNotice({ m }: { m: GiftMessage }) {
           <span className="gl-gift-notice-user">
             {m.self ? t('liveRoom.chatPanel.you') : m.user}
           </span>
+          {m.userLevel && <UserLevelBadge level={m.userLevel} size="compact" />}
           <span>{t('liveRoom.chatPanel.sentGift')}</span>
         </div>
         <div className="gl-gift-notice-meta">
@@ -467,7 +471,10 @@ function ViewerRankList({
                   <Avatar name={viewer.user} src={viewer.avatar} size={34} />
                 </button>
                 <div className="gl-viewer-main">
-                  <span className="gl-viewer-name">{viewer.user}</span>
+                  <span className="gl-viewer-name">
+                    <span>{viewer.user}</span>
+                    {viewer.userLevel && <UserLevelBadge level={viewer.userLevel} size="compact" />}
+                  </span>
                   <span className="gl-viewer-sub">{t('liveRoom.chatPanel.online')}</span>
                 </div>
                 <div className="gl-viewer-score">

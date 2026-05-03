@@ -14,6 +14,7 @@ export interface RoomViewer {
   user: string;
   avatar?: string;
   contribution: number;
+  userLevel?: number;
 }
 
 interface RoomSlice {
@@ -40,6 +41,7 @@ function mergeMessageFields(current: Message | undefined, incoming: Message): Me
     color: incoming.color ?? current.color,
     role: incoming.role ?? current.role,
     fanBadge: incoming.fanBadge ?? current.fanBadge,
+    userLevel: incoming.userLevel ?? current.userLevel,
   };
 }
 
@@ -178,6 +180,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
             userId: viewer.userId ?? item.userId,
             user: viewer.user || item.user,
             avatar: viewer.avatar ?? item.avatar,
+            userLevel: viewer.userLevel ?? item.userLevel,
             contribution: item.contribution + contributionDelta,
           };
         });

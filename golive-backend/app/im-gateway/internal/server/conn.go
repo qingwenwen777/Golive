@@ -165,16 +165,16 @@ func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
 		_ = c.Send(hub.EncodeSystem("resumed"))
 		return
 	case "viewer_profile":
-		c.handleViewerProfile(in.User, in.Avatar)
+		c.handleViewerProfile(in.User, in.Avatar, in.UserLevel)
 		return
 	case "chat":
-		c.handleChat(ctx, in.Text, in.User, in.Avatar, in.ClientID, in.FanBadge)
+		c.handleChat(ctx, in.Text, in.User, in.Avatar, in.ClientID, in.FanBadge, in.UserLevel)
 	default:
 		metrics.MessagesDropped.WithLabelValues("unknown_type").Inc()
 	}
 }
 
-func (c *Conn) handleViewerProfile(username, avatar string) {
+func (c *Conn) handleViewerProfile(username, avatar string, userLevel int) {
 	if c.hub == nil {
 		return
 	}
@@ -187,10 +187,11 @@ func (c *Conn) handleViewerProfile(username, avatar string) {
 		}
 	}
 	c.hub.UpdateViewer(c.roomID, c.id, hub.ViewerProfile{
-		UserID:  c.identity.UserID,
-		User:    username,
-		Avatar:  avatar,
-		IsOwner: c.isOwner(),
+		UserID:    c.identity.UserID,
+		User:      username,
+		Avatar:    avatar,
+		UserLevel: safeUserLevel(userLevel),
+		IsOwner:   c.isOwner(),
 	})
 }
 
@@ -210,7 +211,7 @@ func (c *Conn) isOwner() bool {
 	return c.ownerID != "" && c.identity.UserID != "" && c.ownerID == c.identity.UserID
 }
 
-func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string, fanBadge *hub.FanBadgePayload) {
+func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string, fanBadge *hub.FanBadgePayload, userLevel int) {
 	if !c.identity.CanChat() {
 		_ = c.Send(hub.EncodeSystem("login required to chat"))
 		metrics.MessagesDropped.WithLabelValues("anonymous_chat").Inc()
@@ -246,16 +247,18 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 	username = safeUsername(username)
 	avatar = safeAvatar(avatar)
 	hubFanBadge, producerFanBadge := safeFanBadge(fanBadge)
+	userLevel = safeUserLevel(userLevel)
 	if err := c.producer.PublishChat(ctx, producer.ChatEvent{
-		RoomID:   c.roomID,
-		UserID:   c.identity.UserID,
-		Username: username,
-		Avatar:   avatar,
-		ClientID: id,
-		Text:     text,
-		Role:     role,
-		FanBadge: producerFanBadge,
-		Ts:       now,
+		RoomID:    c.roomID,
+		UserID:    c.identity.UserID,
+		Username:  username,
+		Avatar:    avatar,
+		ClientID:  id,
+		Text:      text,
+		Role:      role,
+		FanBadge:  producerFanBadge,
+		UserLevel: userLevel,
+		Ts:        now,
 	}); err != nil {
 		logger.L().Warn("publish chat", zap.Error(err))
 		metrics.MessagesDropped.WithLabelValues("producer_err").Inc()
@@ -269,7 +272,7 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		if display == "" {
 			display = c.identity.UserID
 		}
-		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now, hubFanBadge, role))
+		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now, hubFanBadge, role, userLevel))
 	}
 }
 
@@ -301,6 +304,16 @@ func safeFanBadge(in *hub.FanBadgePayload) (*hub.FanBadgePayload, *producer.FanB
 	}
 	return &hub.FanBadgePayload{CreatorID: creatorID, Level: level},
 		&producer.FanBadgePayload{CreatorID: creatorID, Level: level}
+}
+
+func safeUserLevel(level int) int {
+	if level < 1 {
+		return 0
+	}
+	if level > 99 {
+		return 99
+	}
+	return level
 }
 
 func safeClientID(id string) string {

@@ -3,6 +3,7 @@ package model
 import "time"
 
 const (
+	CoinTxTopup                  = "topup"
 	CoinTxGiftSpend              = "gift_spend"
 	CoinTxSuperChatSpend         = "super_chat_spend"
 	CoinTxBetWager               = "bet_wager"

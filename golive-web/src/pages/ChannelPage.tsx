@@ -33,6 +33,7 @@ import {
 } from '@/api/room';
 import { useChannelPosts } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
+import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
@@ -197,6 +198,7 @@ export default function ChannelPage() {
             <h1>
               <span>{channelName}</span>
               {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
+              {profile?.levelInfo && <UserLevelBadge levelInfo={profile.levelInfo} />}
             </h1>
             <div className="gl-channel-handle">
               {profile?.username ? (

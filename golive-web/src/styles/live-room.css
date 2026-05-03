@@ -647,6 +647,9 @@
   gap: 2px;
 }
 .gl-viewer-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
   color: var(--gl-text);
@@ -654,6 +657,11 @@
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.gl-viewer-name > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gl-viewer-sub {
   color: var(--gl-text-2);
@@ -1100,6 +1108,10 @@
 .gl-chat-meta .gl-chat-user {
   margin-right: 0;
 }
+.gl-chat-meta .gl-user-level-badge,
+.gl-gift-notice-title .gl-user-level-badge {
+  vertical-align: middle;
+}
 .gl-chat-line.is-owner .gl-chat-user {
   color: var(--gl-text);
   font-weight: 800;
@@ -1436,6 +1448,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: 0.1px;
+}
+.gl-sc-level {
+  flex: 0 0 auto;
 }
 .gl-sc-amt {
   font-size: 16px;

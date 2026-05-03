@@ -64,6 +64,9 @@ func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
 	var got model.PublicUser
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
 	require.Equal(t, int64(2200), got.CoinBalance)
+	require.Equal(t, 1, got.LevelInfo.Level)
+	require.Equal(t, int64(1000), got.LevelInfo.TotalTopupCoins)
+	require.Greater(t, got.LevelInfo.CoinsToNextLevel, int64(0))
 
 	persisted, err := users.FindByID(ctx, login.User.ID)
 	require.NoError(t, err)

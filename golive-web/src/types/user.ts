@@ -1,3 +1,12 @@
+export interface UserLevelInfo {
+  level: number;
+  maxLevel: number;
+  totalTopupCoins: number;
+  currentLevelMinCoins: number;
+  nextLevelTargetCoins: number;
+  coinsToNextLevel: number;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -7,6 +16,7 @@ export interface User {
   avatar: string;
   cover?: string;
   coinBalance: number;
+  levelInfo?: UserLevelInfo;
   verified?: boolean;
   role: 'user' | 'admin';
   livePermissionStatus: 'none' | 'pending' | 'approved' | 'rejected';

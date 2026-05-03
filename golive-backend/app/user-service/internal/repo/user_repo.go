@@ -40,6 +40,24 @@ func (r *UserRepo) AutoMigrate() error {
 	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.CoinTransaction{})
 }
 
+func (r *UserRepo) hydrateUserLevel(ctx context.Context, u *model.User) error {
+	if u == nil || strings.TrimSpace(u.ID) == "" {
+		return nil
+	}
+	var total int64
+	err := r.db.WithContext(ctx).
+		Model(&model.CoinTransaction{}).
+		Select("COALESCE(SUM(amount), 0)").
+		Where("user_id = ? AND type = ? AND amount > 0", u.ID, model.CoinTxTopup).
+		Row().
+		Scan(&total)
+	if err != nil {
+		return err
+	}
+	u.TotalTopupCoins = total
+	return nil
+}
+
 func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*model.User, error) {
 	var u model.User
 	err := r.db.WithContext(ctx).Where("username = ?", username).Take(&u).Error
@@ -47,6 +65,9 @@ func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*model.
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -61,6 +82,9 @@ func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*model.User, 
 	if err != nil {
 		return nil, err
 	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, err
+	}
 	return &u, nil
 }
 
@@ -71,6 +95,9 @@ func (r *UserRepo) FindByID(ctx context.Context, id string) (*model.User, error)
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -205,6 +232,9 @@ func (r *UserRepo) UpdateProfile(
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -355,6 +385,9 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 	if err != nil {
 		return nil, nil, false, err
 	}
+	if err := r.hydrateUserLevel(ctx, &user); err != nil {
+		return nil, nil, false, err
+	}
 	return &app, &user, created, nil
 }
 
@@ -437,6 +470,9 @@ func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID,
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := r.hydrateUserLevel(ctx, &user); err != nil {
+		return nil, nil, err
+	}
 	return &app, &user, nil
 }
 
@@ -487,6 +523,9 @@ func (r *UserRepo) SetLivePermissionStatus(ctx context.Context, userID, status s
 	if err != nil {
 		return nil, err
 	}
+	if err := r.hydrateUserLevel(ctx, &user); err != nil {
+		return nil, err
+	}
 	return &user, nil
 }
 
@@ -505,6 +544,9 @@ func (r *UserRepo) IncrementCoins(ctx context.Context, id string, delta int64) (
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -553,6 +595,9 @@ func (r *UserRepo) IncrementCoinsWithTransaction(
 		return nil, nil, ErrUserNotFound
 	}
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, nil, err
 	}
 	return &u, coinTx, nil
@@ -610,6 +655,9 @@ func (r *UserRepo) ClaimDailyCoinReward(
 	if err != nil {
 		return nil, nil, false, err
 	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, nil, false, err
+	}
 	return &u, &coinTx, created, nil
 }
 
@@ -646,6 +694,9 @@ func (r *UserRepo) UpdateAvatar(ctx context.Context, id, avatar string) (*model.
 	if err != nil {
 		return nil, err
 	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, err
+	}
 	return &u, nil
 }
 
@@ -664,6 +715,9 @@ func (r *UserRepo) UpdateCover(ctx context.Context, id, cover string) (*model.Us
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil

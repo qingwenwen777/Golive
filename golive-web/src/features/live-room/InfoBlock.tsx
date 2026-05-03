@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ThumbsUp, ThumbsDown, Share2, Bookmark, Bell, Gift } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
+import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { Icons } from '@/components/Icons';
 import { useLangStore } from '@/stores/useLangStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useFollowState, useFollow, useUnfollow, useLikeState, useLike } from '@/api/room';
+import { usePublicUser } from '@/api/auth';
 import { cn } from '@/lib/cn';
 import { copyText } from '@/lib/clipboard';
 import {
@@ -56,6 +58,8 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   const like = useLike(streamId);
   const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
   const [localLiked, setLocalLiked] = useState(() => isInLibrary(LIKED_STREAMS_KEY, stream.id));
+  const ownerProfile = usePublicUser(stream.ownerId ?? '');
+  const ownerLevelInfo = isOwnChannel ? currentUser?.levelInfo : ownerProfile.data?.levelInfo;
 
   useEffect(() => {
     setSaved(isInLibrary(WATCH_LATER_KEY, stream.id));
@@ -160,6 +164,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             <div className="gl-info-chan-name">
               <span className="truncate">{channelName}</span>
               {stream.verified && <Icons.BadgeCheck size={14} className="text-text-secondary" />}
+              <UserLevelBadge levelInfo={ownerLevelInfo} size="compact" />
             </div>
             <div className="gl-info-chan-subs">
               {t('liveRoom.subscribers', { count: displaySubscriberCount })}

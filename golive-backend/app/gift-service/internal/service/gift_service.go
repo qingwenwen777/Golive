@@ -66,7 +66,16 @@ func (s *GiftService) ListFanBadges(ctx context.Context, userID string) ([]model
 var (
 	ErrGiftNotFound     = errors.New("gift not found")
 	ErrInsufficientCoin = errors.New("insufficient coin")
+	ErrGiftLevelLocked  = errors.New("gift level locked")
 )
+
+type GiftLevelLockedError struct {
+	RequiredLevel int
+	UserLevel     int
+}
+
+func (e *GiftLevelLockedError) Error() string { return ErrGiftLevelLocked.Error() }
+func (e *GiftLevelLockedError) Unwrap() error { return ErrGiftLevelLocked }
 
 func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrder, bool, error) {
 	// End-to-end span: this is the parent for everything that happens during
@@ -91,6 +100,16 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 		}
 		return nil, false, fmt.Errorf("get gift: %w", err)
 	}
+	userLevel, err := s.orders.UserLevel(ctx, req.UserID)
+	if err != nil {
+		return nil, false, fmt.Errorf("user level: %w", err)
+	}
+	if gift.UnlockLevel > 1 && userLevel < gift.UnlockLevel {
+		return nil, false, &GiftLevelLockedError{
+			RequiredLevel: gift.UnlockLevel,
+			UserLevel:     userLevel,
+		}
+	}
 
 	totalCoin := gift.PriceCoin * int64(req.Count)
 	now := time.Now().UTC()
@@ -108,6 +127,7 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 		gift.Icon,
 		req.Count,
 		gift.Tier,
+		userLevel,
 		totalCoin,
 		now.UnixMilli(),
 	)

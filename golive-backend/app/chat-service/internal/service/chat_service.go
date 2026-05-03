@@ -29,15 +29,16 @@ import (
 
 // Event is the Kafka payload im-gateway puts on the danmu topic.
 type Event struct {
-	RoomID   string                 `json:"roomId"`
-	UserID   string                 `json:"userId"`
-	ClientID string                 `json:"clientId,omitempty"`
-	Username string                 `json:"username,omitempty"`
-	Avatar   string                 `json:"avatar,omitempty"`
-	Text     string                 `json:"text"`
-	Role     string                 `json:"role,omitempty"`
-	FanBadge *model.FanBadgePayload `json:"fanBadge,omitempty"`
-	Ts       int64                  `json:"ts"`
+	RoomID    string                 `json:"roomId"`
+	UserID    string                 `json:"userId"`
+	ClientID  string                 `json:"clientId,omitempty"`
+	Username  string                 `json:"username,omitempty"`
+	Avatar    string                 `json:"avatar,omitempty"`
+	Text      string                 `json:"text"`
+	Role      string                 `json:"role,omitempty"`
+	FanBadge  *model.FanBadgePayload `json:"fanBadge,omitempty"`
+	UserLevel int                    `json:"userLevel,omitempty"`
+	Ts        int64                  `json:"ts"`
 }
 
 // ErrRateLimited is returned to the caller when an event is dropped by the
@@ -86,14 +87,15 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 	fanBadge := safeFanBadge(ev.FanBadge)
 
 	d := &model.Danmu{
-		ID:       id,
-		RoomID:   ev.RoomID,
-		UserID:   ev.UserID,
-		Username: username,
-		Avatar:   ev.Avatar,
-		Text:     cleanText,
-		Role:     safeRole(ev.Role),
-		Ts:       ev.Ts,
+		ID:        id,
+		RoomID:    ev.RoomID,
+		UserID:    ev.UserID,
+		Username:  username,
+		Avatar:    ev.Avatar,
+		Text:      cleanText,
+		Role:      safeRole(ev.Role),
+		UserLevel: safeUserLevel(ev.UserLevel),
+		Ts:        ev.Ts,
 	}
 	if fanBadge != nil {
 		d.FanBadgeCreatorID = fanBadge.CreatorID
@@ -146,6 +148,16 @@ func safeRole(role string) string {
 		return role
 	}
 	return ""
+}
+
+func safeUserLevel(level int) int {
+	if level < 1 {
+		return 0
+	}
+	if level > 99 {
+		return 99
+	}
+	return level
 }
 
 // History serves GET /rooms/:id/danmus.

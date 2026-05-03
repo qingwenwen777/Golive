@@ -34,12 +34,14 @@ import { useFanBadges } from '@/api/gift';
 import { useSubscriptionPosts } from '@/api/posts';
 import { useRooms, useSubscriptions, useSubscriptionAppointments } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { PostCard } from '@/features/posts/PostCard';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
+import { levelProgressRatio, normalizeLevelInfo } from '@/lib/userLevel';
 import {
   LIKED_STREAMS_KEY,
   WATCH_HISTORY_KEY,
@@ -277,6 +279,8 @@ export function YouPage() {
   const displayName = userDisplayName(user);
   const ownLive = rooms.data?.items.find((stream) => stream.ownerId === user?.id);
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
+  const levelInfo = normalizeLevelInfo(me.data?.levelInfo ?? user?.levelInfo);
+  const levelProgress = levelProgressRatio(levelInfo);
 
   const handleOpenCoins = () => {
     if (!user) {
@@ -293,7 +297,10 @@ export function YouPage() {
       <section className="gl-yt-you-head">
         <Avatar name={displayName} src={user?.avatar} size={112} />
         <div className="gl-yt-you-main">
-          <h1>{displayName}</h1>
+          <h1 className="gl-yt-you-title">
+            <span>{displayName}</span>
+            {isAuthed && <UserLevelBadge levelInfo={levelInfo} size="hero" />}
+          </h1>
           <div className="gl-yt-you-meta">
             {isAuthed && user?.username && <span>@{user.username}</span>}
             {isAuthed ? (
@@ -330,6 +337,25 @@ export function YouPage() {
               <Settings size={14} /> {t('library.you.settings')}
             </Link>
           </div>
+          {isAuthed && (
+            <div className="gl-you-level-progress">
+              <div className="gl-you-level-progress-top">
+                <span>Lv.{levelInfo.level} 等级身份</span>
+                <strong>
+                  {levelInfo.level >= levelInfo.maxLevel
+                    ? '已满级'
+                    : `距离 Lv.${levelInfo.level + 1} 还需 ${levelInfo.coinsToNextLevel.toLocaleString()} coins`}
+                </strong>
+              </div>
+              <div className="gl-you-level-bar" aria-hidden>
+                <i style={{ width: `${Math.round(levelProgress * 100)}%` }} />
+              </div>
+              <div className="gl-you-level-progress-bottom">
+                <span>累计充值 {levelInfo.totalTopupCoins.toLocaleString()} coins</span>
+                <span>目标 {levelInfo.nextLevelTargetCoins.toLocaleString()} coins</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

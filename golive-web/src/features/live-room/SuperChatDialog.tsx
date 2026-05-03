@@ -79,6 +79,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
       amount: String(amount),
       tier,
       text: payloadText,
+      userLevel: user.levelInfo?.level,
       ts: now,
       pending: true,
       requestId,
@@ -104,6 +105,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             amount: String(amount),
             tier,
             text: payloadText,
+            userLevel: user.levelInfo?.level,
             ts: now,
           });
           setText('');
