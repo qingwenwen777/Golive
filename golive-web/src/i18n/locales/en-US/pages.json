@@ -135,9 +135,16 @@
       "title": "Mute user",
       "muted": "{{user}} muted for {{minutes}} minutes.",
       "muteFailed": "Could not mute this user.",
+      "unmuted": "{{user}} was unmuted.",
+      "unmuteFailed": "Could not unmute this user.",
       "blocked": "Creators, moderators, and yourself cannot be muted.",
+      "checkingMute": "Checking mute status...",
+      "alreadyMuted": "This user is currently muted. You can unmute them.",
       "pickDuration": "Choose mute duration",
-      "minutes": "{{count}} minutes"
+      "minutes": "{{count}} minutes",
+      "unmuteAction": "Unmute",
+      "youAreMuted": "You are muted and cannot chat yet.",
+      "chatMutedPlaceholder": "You are muted"
     }
   },
   "player": {
@@ -628,7 +635,8 @@
       "noLogs": "No action records yet.",
       "actionAdd": "Added moderator",
       "actionRemove": "Removed moderator",
-      "actionMute": "Muted {{minutes}} minutes"
+      "actionMute": "Muted {{minutes}} minutes",
+      "actionUnmute": "Unmuted user"
     },
     "publisher": {
       "title": "Publishing",

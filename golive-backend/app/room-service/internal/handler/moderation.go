@@ -78,6 +78,15 @@ func (h *ModerationHandler) RoomState(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *ModerationHandler) MuteState(c *gin.Context) {
+	resp, err := h.svc.MuteState(c.Request.Context(), c.Param("id"), UserIDFromCtx(c), c.Param("userID"))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *ModerationHandler) Mute(c *gin.Context) {
 	var req service.MuteReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -85,6 +94,15 @@ func (h *ModerationHandler) Mute(c *gin.Context) {
 		return
 	}
 	resp, err := h.svc.Mute(c.Request.Context(), c.Param("id"), UserIDFromCtx(c), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) Unmute(c *gin.Context) {
+	resp, err := h.svc.Unmute(c.Request.Context(), c.Param("id"), UserIDFromCtx(c), c.Param("userID"))
 	if err != nil {
 		errcode.Respond(c, err)
 		return

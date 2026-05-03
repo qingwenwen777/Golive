@@ -48,6 +48,7 @@ export interface ChatProps {
   onSendChat?: (text: string) => boolean | void;
   onComposerFocusChange?: (focused: boolean) => void;
   canModerate?: boolean;
+  chatMuted?: boolean;
   moderationRole?: 'owner' | 'moderator' | 'viewer' | string;
   onOpenModeration?: (target: ChatModerationTarget) => void;
 }
@@ -466,6 +467,7 @@ export function Chat({
   onSendChat,
   onComposerFocusChange,
   canModerate,
+  chatMuted,
   onOpenModeration,
 }: ChatProps) {
   const { t, i18n } = useTranslation('pages');
@@ -498,6 +500,10 @@ export function Chat({
       openLogin();
       return;
     }
+    if (chatMuted) {
+      toast.error(t('liveRoom.moderation.youAreMuted', { defaultValue: '你当前已被禁言，暂时不能发言。' }));
+      return;
+    }
     if (charCount(text) > MAX_CHAT_CHARS) {
       toast.error(t('liveRoom.chatPanel.messageTooLong', { max: MAX_CHAT_CHARS }));
       return;
@@ -522,6 +528,7 @@ export function Chat({
       openLogin();
       return;
     }
+    if (chatMuted) return;
     const el = inputRef.current;
     const current = inputValueRef.current;
     const start = el?.selectionStart ?? current.length;
@@ -742,7 +749,7 @@ export function Chat({
               ref={inputRef}
               value={input}
               onChange={(e) => {
-                if (!isAuthed) return;
+                if (!isAuthed || chatMuted) return;
                 inputValueRef.current = e.target.value;
                 setInput(e.target.value);
               }}
@@ -774,12 +781,14 @@ export function Chat({
                 trySend();
               }}
               placeholder={
-                isAuthed
+                chatMuted
+                  ? t('liveRoom.moderation.chatMutedPlaceholder', { defaultValue: '你当前已被禁言' })
+                  : isAuthed
                   ? t('liveRoom.sayHi')
                   : t('liveRoom.signInToChat', { defaultValue: 'Sign in to chat' })
               }
               aria-label={t('liveRoom.chatInput')}
-              readOnly={!isAuthed}
+              readOnly={!isAuthed || chatMuted}
             />
             <div className="gl-emoji-wrap" ref={emojiWrapRef}>
               <button
@@ -793,6 +802,7 @@ export function Chat({
                     openLogin();
                     return;
                   }
+                  if (chatMuted) return;
                   setEmojiOpen((open) => !open);
                 }}
               >
@@ -856,7 +866,7 @@ export function Chat({
               className="gl-icon-btn sm"
               aria-label={t('liveRoom.send')}
               title={t('liveRoom.send')}
-              disabled={isAuthed && (!input.trim() || charCount(input.trim()) > MAX_CHAT_CHARS)}
+              disabled={isAuthed && (chatMuted || !input.trim() || charCount(input.trim()) > MAX_CHAT_CHARS)}
               onClick={() => {
                 if (!isAuthed) {
                   openLogin();

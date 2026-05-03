@@ -45,6 +45,9 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   const channelId = stream.channelId || stream.channel;
   const streamId = stream.id;
   const channelName = streamChannelName(stream, currentUser);
+  const isOwnChannel = Boolean(
+    currentUser?.id && (stream.ownerId === currentUser.id || channelId === `ch-${currentUser.id}`),
+  );
 
   const followState = useFollowState(channelId, !!channelId);
   const likeState = useLikeState(streamId, isAuthed);
@@ -72,6 +75,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   const disliked = likeInfo?.disliked ?? false;
 
   const handleSubscribe = () => {
+    if (isOwnChannel) return;
     if (!isAuthed) {
       openLogin(() => follow.mutate());
       return;
@@ -161,21 +165,23 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
               {t('liveRoom.subscribers', { count: displaySubscriberCount })}
             </div>
           </div>
-          <button
-            className={cn('gl-sub-btn', subscribed && 'is-on')}
-            onClick={handleSubscribe}
-            disabled={follow.isPending || unfollow.isPending}
-            aria-pressed={subscribed}
-          >
-            {subscribed ? (
-              <>
-                <Bell size={16} />
-                <span>{t('liveRoom.subscribed')}</span>
-              </>
-            ) : (
-              <span>{t('liveRoom.subscribe')}</span>
-            )}
-          </button>
+          {!isOwnChannel && (
+            <button
+              className={cn('gl-sub-btn', subscribed && 'is-on')}
+              onClick={handleSubscribe}
+              disabled={follow.isPending || unfollow.isPending}
+              aria-pressed={subscribed}
+            >
+              {subscribed ? (
+                <>
+                  <Bell size={16} />
+                  <span>{t('liveRoom.subscribed')}</span>
+                </>
+              ) : (
+                <span>{t('liveRoom.subscribe')}</span>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="gl-info-actions">

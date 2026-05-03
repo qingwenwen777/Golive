@@ -4247,7 +4247,7 @@ button.gl-fan-badge-empty {
 }
 .gl-room-mod-user-row {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+  grid-template-columns: 38px minmax(0, 1fr) 70px 112px;
   align-items: center;
   gap: 10px;
   min-height: 62px;
@@ -4258,6 +4258,11 @@ button.gl-fan-badge-empty {
 }
 .gl-room-mod-user-row > div {
   min-width: 0;
+}
+.gl-room-mod-user-row > button {
+  grid-column: 4;
+  justify-self: end;
+  min-width: 96px;
 }
 .gl-room-mod-user-row strong,
 .gl-room-mod-log-row strong {
@@ -4281,17 +4286,24 @@ button.gl-fan-badge-empty {
   white-space: nowrap;
 }
 .gl-room-mod-status {
+  grid-column: 3;
   display: inline-flex;
+  align-self: center;
   align-items: center;
   justify-content: center;
-  height: 24px;
+  justify-self: center;
+  min-width: 48px;
+  height: 26px;
+  box-sizing: border-box;
   border: 1px solid rgba(22, 163, 74, 0.3);
   border-radius: 999px;
   background: rgba(22, 163, 74, 0.08);
   color: #15803d !important;
   font-size: 11px !important;
   font-weight: 900;
-  padding: 0 8px;
+  line-height: 1;
+  padding: 0 10px;
+  white-space: nowrap;
 }
 .gl-room-mod-log-row {
   display: grid;

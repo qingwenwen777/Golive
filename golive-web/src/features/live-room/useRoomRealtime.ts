@@ -452,27 +452,6 @@ export function useRoomRealtime(
       ts: now,
     });
     if (!ok) return false;
-
-    const msg: ChatMessage = {
-      id,
-      kind: 'chat',
-      userId: currentUser?.id,
-      user,
-      avatar,
-      text,
-      fanBadge,
-      ts: now,
-    };
-    appendMessage(roomId, msg);
-    saveRecentChatMessage(roomId, msg);
-    if (danmuOnRef.current) {
-      appendBullet(roomId, {
-        id: genId('b'),
-        text: `${user}: ${text}`,
-        user,
-        ts: now,
-      });
-    }
     return true;
   };
 

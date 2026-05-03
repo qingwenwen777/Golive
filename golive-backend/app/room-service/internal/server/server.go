@@ -70,7 +70,9 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
 		rooms.GET("/recommended-creators", optionalAuth, socialH.RecommendedCreators)
 		rooms.GET("/:id/moderation/state", optionalAuth, moderationH.RoomState)
+		rooms.GET("/:id/moderation/mutes/:userID", auth, moderationH.MuteState)
 		rooms.POST("/:id/moderation/mutes", auth, moderationH.Mute)
+		rooms.DELETE("/:id/moderation/mutes/:userID", auth, moderationH.Unmute)
 		rooms.GET("/:id", optionalAuth, roomH.Get)
 		rooms.GET("/:id/follow", optionalAuth, socialH.GetFollow)
 

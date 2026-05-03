@@ -6,6 +6,7 @@ const (
 	ModeratorActionAdd    = "add_moderator"
 	ModeratorActionRemove = "remove_moderator"
 	ModeratorActionMute   = "mute"
+	ModeratorActionUnmute = "unmute"
 )
 
 type RoomModerator struct {

@@ -252,6 +252,80 @@ func (r *ModerationRepo) MuteUser(ctx context.Context, ownerID, roomID, operator
 	return mute, nil
 }
 
+func (r *ModerationRepo) CurrentMute(ctx context.Context, roomID, targetUserID string, now time.Time) (*model.RoomMute, error) {
+	if roomID == "" || targetUserID == "" {
+		return nil, nil
+	}
+	var mute model.RoomMute
+	err := r.db.WithContext(ctx).
+		Where("room_id = ? AND target_user_id = ? AND expires_at > ?", roomID, targetUserID, now).
+		Order("expires_at DESC").
+		Take(&mute).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if r.rdb != nil {
+		if ttl := mute.ExpiresAt.Sub(now); ttl > 0 {
+			_ = r.rdb.Set(ctx, roomMuteKey(roomID, targetUserID), mute.ExpiresAt.UTC().Format(time.RFC3339), ttl).Err()
+		}
+	}
+	return &mute, nil
+}
+
+func (r *ModerationRepo) UnmuteUser(ctx context.Context, ownerID, roomID, operatorID, targetUserID, targetName, targetAvatar string, now time.Time) (*model.RoomMute, error) {
+	actor, err := r.UserProfile(ctx, operatorID)
+	if err != nil {
+		return nil, err
+	}
+	current, err := r.CurrentMute(ctx, roomID, targetUserID, now)
+	if err != nil {
+		return nil, err
+	}
+	target, err := r.UserProfile(ctx, targetUserID)
+	if err == nil {
+		targetName = target.Name
+		targetAvatar = target.Avatar
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		target = ModerationUser{ID: targetUserID, Name: strings.TrimSpace(targetName), Avatar: strings.TrimSpace(targetAvatar)}
+		if target.Name == "" && current != nil {
+			target.Name = current.TargetName
+			target.Avatar = current.TargetAvatar
+		}
+		if target.Name == "" {
+			target.Name = targetUserID
+		}
+	} else {
+		return nil, err
+	}
+	if current == nil {
+		if r.rdb != nil {
+			_ = r.rdb.Del(ctx, roomMuteKey(roomID, targetUserID)).Err()
+		}
+		return nil, nil
+	}
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.RoomMute{}).
+			Where("room_id = ? AND target_user_id = ? AND expires_at > ?", roomID, targetUserID, now).
+			Update("expires_at", now).Error; err != nil {
+			return err
+		}
+		return tx.Create(actionLog(ownerID, roomID, actor, target, model.ModeratorActionUnmute, 0, now)).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	if r.rdb != nil {
+		if err := r.rdb.Del(ctx, roomMuteKey(roomID, targetUserID)).Err(); err != nil {
+			return nil, err
+		}
+	}
+	current.ExpiresAt = now
+	return current, nil
+}
+
 func (r *ModerationRepo) Logs(ctx context.Context, ownerID string, page, size int) ([]ModerationLogRow, int64, error) {
 	page, size = normalizeModerationPage(page, size)
 	q := r.db.WithContext(ctx).Model(&model.ModeratorActionLog{}).Where("owner_id = ?", ownerID)

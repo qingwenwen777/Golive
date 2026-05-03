@@ -46,6 +46,9 @@ export interface RoomModerationState {
   ownerId: string;
   role: 'owner' | 'moderator' | 'viewer' | string;
   canModerate: boolean;
+  muted?: boolean;
+  muteExpiresAt?: string;
+  muteRemainingSeconds?: number;
 }
 
 export interface MuteUserPayload {
@@ -61,6 +64,16 @@ export interface MuteUserResp {
   targetName: string;
   durationMinutes: number;
   expiresAt: string;
+}
+
+export interface RoomMuteState {
+  roomId: string;
+  targetUserId: string;
+  targetName?: string;
+  targetAvatar?: string;
+  muted: boolean;
+  muteExpiresAt?: string;
+  muteRemainingSeconds?: number;
 }
 
 export function useModeratorFollowers(query: string, page = 1, size = 10, enabled = true) {
@@ -153,15 +166,33 @@ export function useRemoveModerator() {
 export function useRoomModerationState(roomId: string, enabled = true) {
   return useQuery<RoomModerationState, Error>({
     queryKey: ['room-moderation-state', roomId],
+    queryFn: ({ signal }) => getRoomModerationState(roomId, signal),
+    enabled: enabled && !!roomId,
+    staleTime: 10_000,
+    retry: 1,
+  });
+}
+
+export async function getRoomModerationState(roomId: string, signal?: AbortSignal) {
+  const { data } = await http.get<RoomModerationState>(
+    `/rooms/${encodeURIComponent(roomId)}/moderation/state`,
+    { signal },
+  );
+  return data;
+}
+
+export function useRoomMuteState(roomId: string, targetUserId: string, enabled = true) {
+  return useQuery<RoomMuteState, Error>({
+    queryKey: ['room-mute-state', roomId, targetUserId],
     queryFn: async ({ signal }) => {
-      const { data } = await http.get<RoomModerationState>(
-        `/rooms/${encodeURIComponent(roomId)}/moderation/state`,
+      const { data } = await http.get<RoomMuteState>(
+        `/rooms/${encodeURIComponent(roomId)}/moderation/mutes/${encodeURIComponent(targetUserId)}`,
         { signal },
       );
       return data;
     },
-    enabled: enabled && !!roomId,
-    staleTime: 10_000,
+    enabled: enabled && !!roomId && !!targetUserId,
+    staleTime: 2_000,
     retry: 1,
   });
 }
@@ -176,8 +207,27 @@ export function useMuteRoomUser(roomId: string) {
       );
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, payload) => {
       void qc.invalidateQueries({ queryKey: ['moderation-logs'] });
+      void qc.invalidateQueries({ queryKey: ['room-mute-state', roomId, payload.targetUserId] });
+      void qc.invalidateQueries({ queryKey: ['room-moderation-state', roomId] });
+    },
+  });
+}
+
+export function useUnmuteRoomUser(roomId: string) {
+  const qc = useQueryClient();
+  return useMutation<RoomMuteState, Error, string>({
+    mutationFn: async (targetUserId) => {
+      const { data } = await http.delete<RoomMuteState>(
+        `/rooms/${encodeURIComponent(roomId)}/moderation/mutes/${encodeURIComponent(targetUserId)}`,
+      );
+      return data;
+    },
+    onSuccess: (_data, targetUserId) => {
+      void qc.invalidateQueries({ queryKey: ['moderation-logs'] });
+      void qc.invalidateQueries({ queryKey: ['room-mute-state', roomId, targetUserId] });
+      void qc.invalidateQueries({ queryKey: ['room-moderation-state', roomId] });
     },
   });
 }

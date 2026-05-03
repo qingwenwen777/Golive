@@ -33,7 +33,13 @@ import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStor
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
 import { useLatestBet } from '@/api/bet';
-import { useMuteRoomUser, useRoomModerationState, type MuteUserPayload } from '@/api/moderation';
+import {
+  useMuteRoomUser,
+  useRoomModerationState,
+  useRoomMuteState,
+  useUnmuteRoomUser,
+  type MuteUserPayload,
+} from '@/api/moderation';
 import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
 import {
   useChannelAppointments,
@@ -124,13 +130,20 @@ export default function LiveRoomPage() {
   }, [fanBadges.data, stream?.ownerId]);
   const moderationState = useRoomModerationState(roomId, Boolean(isAuthed && roomCanWatch && roomId));
   const muteUser = useMuteRoomUser(roomId);
+  const unmuteUser = useUnmuteRoomUser(roomId);
   const moderationRole =
     currentUser?.id && stream?.ownerId === currentUser.id
       ? 'owner'
       : (moderationState.data?.role ?? 'viewer');
   const canModerate = moderationRole === 'owner' || moderationRole === 'moderator';
+  const targetMuteState = useRoomMuteState(
+    roomId,
+    moderationTarget?.userId ?? '',
+    Boolean(moderationTarget && canModerate && roomId),
+  );
   const chatModerationProps = {
     canModerate,
+    chatMuted: Boolean(moderationState.data?.muted),
     onOpenModeration: setModerationTarget,
   };
   const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
@@ -161,6 +174,25 @@ export default function LiveRoomPage() {
       },
     );
   };
+  const submitUnmute = () => {
+    if (!moderationTarget) return;
+    unmuteUser.mutate(moderationTarget.userId, {
+      onSuccess: () => {
+        toast.success(
+          t('liveRoom.moderation.unmuted', {
+            user: moderationTarget.user,
+            defaultValue: `${moderationTarget.user} 已解除禁言。`,
+          }),
+        );
+        setModerationTarget(null);
+      },
+      onError: (err) =>
+        toast.error(
+          err.message ||
+            t('liveRoom.moderation.unmuteFailed', { defaultValue: '无法解除该用户的禁言。' }),
+        ),
+    });
+  };
 
   const handleLiveEnded = useCallback(() => {
     if (liveEndedRef.current) return;
@@ -183,6 +215,19 @@ export default function LiveRoomPage() {
 
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
     useRoomRealtime(roomId, roomCanWatch, { onLiveEnded: handleLiveEnded, activeFanBadge });
+
+  const guardedSendChat = useCallback(
+    (text: string) => {
+      if (moderationState.data?.muted) {
+        toast.error(
+          t('liveRoom.moderation.youAreMuted', { defaultValue: '你当前已被禁言，暂时不能发言。' }),
+        );
+        return false;
+      }
+      return sendChat(text);
+    },
+    [moderationState.data?.muted, sendChat, t],
+  );
 
   useEffect(() => {
     liveEndedRef.current = false;
@@ -367,11 +412,14 @@ export default function LiveRoomPage() {
       target={moderationTarget}
       actorRole={moderationRole}
       currentUserId={currentUser?.id}
-      pending={muteUser.isPending}
+      muted={Boolean(targetMuteState.data?.muted)}
+      statePending={targetMuteState.isFetching}
+      pending={muteUser.isPending || unmuteUser.isPending}
       onOpenChange={(open) => {
         if (!open) setModerationTarget(null);
       }}
       onMute={submitMute}
+      onUnmute={submitUnmute}
     />
   );
 
@@ -447,7 +495,7 @@ export default function LiveRoomPage() {
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
-                  onSendChat={sendChat}
+                  onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
@@ -466,7 +514,7 @@ export default function LiveRoomPage() {
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
                 ownerName={ownerName}
-                onSendChat={sendChat}
+                onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
@@ -496,7 +544,7 @@ export default function LiveRoomPage() {
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
-                  onSendChat={sendChat}
+                  onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
@@ -606,7 +654,7 @@ export default function LiveRoomPage() {
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
-                  onSendChat={sendChat}
+                  onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
@@ -625,7 +673,7 @@ export default function LiveRoomPage() {
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
                 ownerName={ownerName}
-                onSendChat={sendChat}
+                onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
@@ -655,7 +703,7 @@ export default function LiveRoomPage() {
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
-                  onSendChat={sendChat}
+                  onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
@@ -782,7 +830,7 @@ export default function LiveRoomPage() {
             viewerTotal={effectiveViewers}
             ownerId={stream.ownerId}
             ownerName={ownerName}
-            onSendChat={sendChat}
+            onSendChat={guardedSendChat}
             onSendSuperChat={openSuperChat}
             reconnecting={reconnecting}
             reconnectingLabel={reconnectingLabel}
@@ -818,7 +866,7 @@ export default function LiveRoomPage() {
               viewerTotal={effectiveViewers}
               ownerId={stream.ownerId}
               ownerName={ownerName}
-              onSendChat={sendChat}
+              onSendChat={guardedSendChat}
               onSendSuperChat={openSuperChat}
               reconnecting={reconnecting}
               reconnectingLabel={reconnectingLabel}
@@ -851,7 +899,7 @@ export default function LiveRoomPage() {
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
                 ownerName={ownerName}
-                onSendChat={sendChat}
+                onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
@@ -1038,16 +1086,22 @@ function MuteUserDialog({
   target,
   actorRole,
   currentUserId,
+  muted,
+  statePending,
   pending,
   onOpenChange,
   onMute,
+  onUnmute,
 }: {
   target: ChatModerationTarget | null;
   actorRole: string;
   currentUserId?: string;
+  muted: boolean;
+  statePending: boolean;
   pending: boolean;
   onOpenChange: (open: boolean) => void;
   onMute: (duration: MuteUserPayload['durationMinutes']) => void;
+  onUnmute: () => void;
 }) {
   const { t } = useTranslation('pages');
   const targetRole = target?.role ?? 'viewer';
@@ -1058,6 +1112,13 @@ function MuteUserDialog({
     targetRole === 'moderator' ||
     (actorRole !== 'owner' && actorRole !== 'moderator');
   const durations: MuteUserPayload['durationMinutes'][] = [5, 10, 30, 60];
+  const statusText = blocked
+    ? t('liveRoom.moderation.blocked', { defaultValue: '主播、房管或你自己不能被禁言。' })
+    : statePending
+      ? t('liveRoom.moderation.checkingMute', { defaultValue: '正在检查禁言状态...' })
+      : muted
+        ? t('liveRoom.moderation.alreadyMuted', { defaultValue: '该用户当前已被禁言，可解除禁言。' })
+        : t('liveRoom.moderation.pickDuration', { defaultValue: '选择禁言时长' });
 
   return (
     <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
@@ -1067,28 +1128,35 @@ function MuteUserDialog({
           <ShieldCheck size={22} />
           <div>
             <strong>{target?.user ?? ''}</strong>
-            <span>
-              {blocked
-                ? t('liveRoom.moderation.blocked', { defaultValue: '主播、房管或你自己不能被禁言。' })
-                : t('liveRoom.moderation.pickDuration', { defaultValue: '选择禁言时长' })}
-            </span>
+            <span>{statusText}</span>
           </div>
         </div>
-        <div className="gl-mute-duration-grid">
-          {durations.map((duration) => (
-            <button
-              key={duration}
-              type="button"
-              disabled={blocked || pending}
-              onClick={() => onMute(duration)}
-            >
-              {t('liveRoom.moderation.minutes', {
-                count: duration,
-                defaultValue: '{{count}} 分钟',
-              })}
-            </button>
-          ))}
-        </div>
+        {muted && !blocked ? (
+          <button
+            type="button"
+            className="gl-mute-unmute-btn"
+            disabled={pending || statePending}
+            onClick={onUnmute}
+          >
+            {t('liveRoom.moderation.unmuteAction', { defaultValue: '解除禁言' })}
+          </button>
+        ) : (
+          <div className="gl-mute-duration-grid">
+            {durations.map((duration) => (
+              <button
+                key={duration}
+                type="button"
+                disabled={blocked || pending || statePending}
+                onClick={() => onMute(duration)}
+              >
+                {t('liveRoom.moderation.minutes', {
+                  count: duration,
+                  defaultValue: '{{count}} 分钟',
+                })}
+              </button>
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

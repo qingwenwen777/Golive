@@ -1360,9 +1360,33 @@
   cursor: default;
   opacity: 0.52;
 }
+.gl-mute-unmute-btn {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(220, 38, 38, 0.26);
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.06);
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 900;
+}
+.gl-mute-unmute-btn:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.1);
+}
+.gl-mute-unmute-btn:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
 .dark .gl-mute-target > svg {
   background: rgba(20, 184, 166, 0.16);
   color: #99f6e4;
+}
+.dark .gl-mute-unmute-btn {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
 }
 
 .gl-sc {

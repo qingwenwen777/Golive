@@ -135,9 +135,16 @@
       "title": "禁言用户",
       "muted": "{{user}} 已禁言 {{minutes}} 分钟。",
       "muteFailed": "无法禁言该用户。",
+      "unmuted": "{{user}} 已解除禁言。",
+      "unmuteFailed": "无法解除该用户的禁言。",
       "blocked": "主播、房管或你自己不能被禁言。",
+      "checkingMute": "正在检查禁言状态...",
+      "alreadyMuted": "该用户当前已被禁言，可解除禁言。",
       "pickDuration": "选择禁言时长",
-      "minutes": "{{count}} 分钟"
+      "minutes": "{{count}} 分钟",
+      "unmuteAction": "解除禁言",
+      "youAreMuted": "你当前已被禁言，暂时不能发言。",
+      "chatMutedPlaceholder": "你当前已被禁言"
     }
   },
   "player": {
@@ -629,7 +636,8 @@
       "noLogs": "暂无操作记录。",
       "actionAdd": "添加房管",
       "actionRemove": "取消房管",
-      "actionMute": "禁言 {{minutes}} 分钟"
+      "actionMute": "禁言 {{minutes}} 分钟",
+      "actionUnmute": "解除禁言"
     },
     "publisher": {
       "title": "推流",

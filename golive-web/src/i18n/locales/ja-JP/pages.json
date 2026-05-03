@@ -135,9 +135,16 @@
       "title": "ユーザーをミュート",
       "muted": "{{user}} を {{minutes}} 分ミュートしました。",
       "muteFailed": "このユーザーをミュートできませんでした。",
+      "unmuted": "{{user}} のミュートを解除しました。",
+      "unmuteFailed": "このユーザーのミュートを解除できませんでした。",
       "blocked": "配信者、モデレーター、自分自身はミュートできません。",
+      "checkingMute": "ミュート状態を確認中...",
+      "alreadyMuted": "このユーザーは現在ミュート中です。解除できます。",
       "pickDuration": "ミュート時間を選択",
-      "minutes": "{{count}} 分"
+      "minutes": "{{count}} 分",
+      "unmuteAction": "ミュート解除",
+      "youAreMuted": "現在ミュート中のため、チャットできません。",
+      "chatMutedPlaceholder": "現在ミュート中です"
     }
   },
   "player": {
@@ -628,7 +635,8 @@
       "noLogs": "操作記録はまだありません。",
       "actionAdd": "モデレーター追加",
       "actionRemove": "モデレーター解除",
-      "actionMute": "{{minutes}} 分ミュート"
+      "actionMute": "{{minutes}} 分ミュート",
+      "actionUnmute": "ミュート解除"
     },
     "publisher": {
       "title": "配信",

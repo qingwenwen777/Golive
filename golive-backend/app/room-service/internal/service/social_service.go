@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/errcode"
 )
 
 type SocialService struct {
@@ -33,18 +35,41 @@ type FollowState struct {
 }
 
 func (s *SocialService) GetFollow(ctx context.Context, uid, channelID string) (*FollowState, error) {
-	on, err := s.social.IsFollowing(ctx, uid, channelID)
+	selfChannel, err := s.isSelfChannel(ctx, uid, channelID)
 	if err != nil {
 		return nil, err
+	}
+	on := false
+	if uid != "" && !selfChannel {
+		on, err = s.social.IsFollowing(ctx, uid, channelID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	count, err := s.social.FollowerCount(ctx, channelID)
 	if err != nil {
 		return nil, err
 	}
+	if selfChannel {
+		selfFollowing, err := s.social.IsFollowing(ctx, uid, channelID)
+		if err != nil {
+			return nil, err
+		}
+		if selfFollowing && count > 0 {
+			count--
+		}
+	}
 	return &FollowState{ChannelID: channelID, Following: on, SubscriberCount: count}, nil
 }
 
 func (s *SocialService) Follow(ctx context.Context, uid, channelID string) (*FollowState, error) {
+	selfChannel, err := s.isSelfChannel(ctx, uid, channelID)
+	if err != nil {
+		return nil, err
+	}
+	if selfChannel {
+		return nil, errcode.New(409, "cannot follow your own channel").WithReason("self_follow")
+	}
 	if err := s.social.Follow(ctx, uid, channelID); err != nil {
 		return nil, err
 	}
@@ -106,6 +131,13 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 
 	items := make([]SubscriptionChannel, 0, len(channelIDs))
 	for _, channelID := range channelIDs {
+		selfChannel, err := s.isSelfChannel(ctx, uid, channelID)
+		if err != nil {
+			return nil, err
+		}
+		if selfChannel {
+			continue
+		}
 		count, err := s.social.FollowerCount(ctx, channelID)
 		if err != nil {
 			return nil, err
@@ -253,6 +285,33 @@ func recommendationScore(candidate repo.CreatorRecommendationCandidate, subscrib
 		score += 6
 	}
 	return score
+}
+
+func (s *SocialService) isSelfChannel(ctx context.Context, uid, channelID string) (bool, error) {
+	if uid == "" || channelID == "" {
+		return false, nil
+	}
+	if ownerIDFromChannelID(channelID) == uid {
+		return true, nil
+	}
+	if s.rooms == nil {
+		return false, nil
+	}
+	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return ownerID == uid, nil
+}
+
+func ownerIDFromChannelID(channelID string) string {
+	if strings.HasPrefix(channelID, "ch-") {
+		return strings.TrimPrefix(channelID, "ch-")
+	}
+	return ""
 }
 
 func fallbackChannelName(channelID string) string {

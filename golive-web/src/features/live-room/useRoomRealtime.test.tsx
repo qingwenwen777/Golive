@@ -101,7 +101,7 @@ describe('useRoomRealtime', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
   });
 
-  it('sends chat with identity and keeps the optimistic message in store and cache', () => {
+  it('sends chat with identity without optimistic local echo', () => {
     seedAuthedUser();
     const { result } = renderRealtime();
 
@@ -121,17 +121,9 @@ describe('useRoomRealtime', () => {
     );
 
     const slice = useRealtimeStore.getState().rooms['room-1'];
-    expect(slice.messages).toHaveLength(1);
-    expect(slice.messages[0]).toMatchObject({
-      kind: 'chat',
-      userId: 'u-self',
-      user: 'XHB',
-      text: 'hello room',
-      fanBadge: { creatorId: 'creator-1', level: 3 },
-    });
-    expect(slice.bullets).toHaveLength(1);
-    expect(slice.bullets[0]).toMatchObject({ text: 'XHB: hello room', user: 'XHB' });
-    expect(loadRecentChatMessages('room-1', 1_700_000_000_000)).toHaveLength(1);
+    expect(slice.messages).toHaveLength(0);
+    expect(slice.bullets).toHaveLength(0);
+    expect(loadRecentChatMessages('room-1', 1_700_000_000_000)).toHaveLength(0);
   });
 
   it('turns server chat into one chat message and one danmu bullet', async () => {

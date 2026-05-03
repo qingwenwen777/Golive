@@ -1045,6 +1045,9 @@ function formatModeratorAction(item: ModerationLog, t: TFunction<'pages'>): stri
       defaultValue: `禁言 ${item.durationMinutes ?? 0} 分钟`,
     });
   }
+  if (item.action === 'unmute') {
+    return t('studio.moderators.actionUnmute', { defaultValue: '解除禁言' });
+  }
   return item.action;
 }
 

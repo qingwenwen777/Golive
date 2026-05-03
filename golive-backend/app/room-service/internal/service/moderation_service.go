@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/pkg/errcode"
 )
@@ -80,10 +81,13 @@ type ModerationLogListResp struct {
 }
 
 type RoomModerationState struct {
-	RoomID      string `json:"roomId"`
-	OwnerID     string `json:"ownerId"`
-	Role        string `json:"role"`
-	CanModerate bool   `json:"canModerate"`
+	RoomID               string `json:"roomId"`
+	OwnerID              string `json:"ownerId"`
+	Role                 string `json:"role"`
+	CanModerate          bool   `json:"canModerate"`
+	Muted                bool   `json:"muted"`
+	MuteExpiresAt        string `json:"muteExpiresAt,omitempty"`
+	MuteRemainingSeconds int64  `json:"muteRemainingSeconds,omitempty"`
 }
 
 type MuteReq struct {
@@ -101,11 +105,22 @@ type MuteResp struct {
 	ExpiresAt       string `json:"expiresAt"`
 }
 
+type MuteStateResp struct {
+	RoomID               string `json:"roomId"`
+	TargetUserID         string `json:"targetUserId"`
+	TargetName           string `json:"targetName,omitempty"`
+	TargetAvatar         string `json:"targetAvatar,omitempty"`
+	Muted                bool   `json:"muted"`
+	MuteExpiresAt        string `json:"muteExpiresAt,omitempty"`
+	MuteRemainingSeconds int64  `json:"muteRemainingSeconds,omitempty"`
+}
+
 func (s *ModerationService) ListFollowers(ctx context.Context, ownerID, query string, page, size int) (*ModerationUserListResp, error) {
 	followerIDs, err := s.social.Followers(ctx, "ch-"+ownerID)
 	if err != nil {
 		return nil, err
 	}
+	followerIDs = excludeUserID(followerIDs, ownerID)
 	items, total, err := s.moderation.ListFollowers(ctx, ownerID, query, page, size, followerIDs)
 	if err != nil {
 		return nil, err
@@ -207,6 +222,7 @@ func (s *ModerationService) RoomState(ctx context.Context, roomID, userID string
 		}
 		return nil, err
 	}
+	now := s.now()
 	role := moderationRoleViewer
 	if userID != "" && userID == room.OwnerID {
 		role = moderationRoleOwner
@@ -219,12 +235,27 @@ func (s *ModerationService) RoomState(ctx context.Context, roomID, userID string
 			role = moderationRoleModerator
 		}
 	}
-	return &RoomModerationState{
+	resp := &RoomModerationState{
 		RoomID:      room.ID,
 		OwnerID:     room.OwnerID,
 		Role:        role,
 		CanModerate: role == moderationRoleOwner || role == moderationRoleModerator,
-	}, nil
+	}
+	if userID != "" {
+		mute, err := s.moderation.CurrentMute(ctx, room.ID, userID, now)
+		if err != nil {
+			return nil, err
+		}
+		resp.Muted = mute != nil
+		if mute != nil {
+			resp.MuteExpiresAt = mute.ExpiresAt.UTC().Format(time.RFC3339)
+			resp.MuteRemainingSeconds = int64(mute.ExpiresAt.Sub(now).Seconds())
+			if resp.MuteRemainingSeconds < 0 {
+				resp.MuteRemainingSeconds = 0
+			}
+		}
+	}
+	return resp, nil
 }
 
 func (s *ModerationService) Mute(ctx context.Context, roomID, actorID string, req MuteReq) (*MuteResp, error) {
@@ -256,18 +287,9 @@ func (s *ModerationService) Mute(ctx context.Context, roomID, actorID string, re
 		return nil, errcode.New(409, "cannot mute a room moderator").WithReason("target_is_moderator")
 	}
 
-	role := moderationRoleViewer
-	if actorID == room.OwnerID {
-		role = moderationRoleOwner
-	} else {
-		ok, err := s.moderation.IsModerator(ctx, room.OwnerID, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, errcode.New(403, "not allowed to mute in this room")
-		}
-		role = moderationRoleModerator
+	role, err := s.moderationActorRole(ctx, room, actorID)
+	if err != nil {
+		return nil, err
 	}
 	if actorID == targetUserID {
 		return nil, errcode.New(409, "cannot mute yourself")
@@ -297,12 +319,110 @@ func (s *ModerationService) Mute(ctx context.Context, roomID, actorID string, re
 	}, nil
 }
 
+func (s *ModerationService) MuteState(ctx context.Context, roomID, actorID, targetUserID string) (*MuteStateResp, error) {
+	targetUserID = strings.TrimSpace(targetUserID)
+	if targetUserID == "" {
+		return nil, errcode.New(400, "target user is required")
+	}
+	room, err := s.rooms.GetByID(ctx, roomID)
+	if err != nil {
+		if errors.Is(err, repo.ErrRoomNotFound) {
+			return nil, errcode.New(404, "room not found")
+		}
+		return nil, err
+	}
+	if _, err := s.moderationActorRole(ctx, room, actorID); err != nil {
+		return nil, err
+	}
+	mute, err := s.moderation.CurrentMute(ctx, room.ID, targetUserID, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return muteStateResp(room.ID, targetUserID, mute, s.now()), nil
+}
+
+func (s *ModerationService) Unmute(ctx context.Context, roomID, actorID, targetUserID string) (*MuteStateResp, error) {
+	targetUserID = strings.TrimSpace(targetUserID)
+	if targetUserID == "" {
+		return nil, errcode.New(400, "target user is required")
+	}
+	room, err := s.rooms.GetByID(ctx, roomID)
+	if err != nil {
+		if errors.Is(err, repo.ErrRoomNotFound) {
+			return nil, errcode.New(404, "room not found")
+		}
+		return nil, err
+	}
+	if _, err := s.moderationActorRole(ctx, room, actorID); err != nil {
+		return nil, err
+	}
+	if actorID == targetUserID {
+		return nil, errcode.New(409, "cannot unmute yourself")
+	}
+	if _, err := s.moderation.UnmuteUser(ctx, room.OwnerID, room.ID, actorID, targetUserID, "", "", s.now()); err != nil {
+		return nil, err
+	}
+	return &MuteStateResp{
+		RoomID:       room.ID,
+		TargetUserID: targetUserID,
+		Muted:        false,
+	}, nil
+}
+
 func (s *ModerationService) syncOwnerActiveRooms(ctx context.Context, ownerID string) error {
 	rooms, err := s.rooms.ActiveRoomsByOwner(ctx, ownerID)
 	if err != nil {
 		return err
 	}
 	return s.moderation.SyncActiveRooms(ctx, rooms)
+}
+
+func (s *ModerationService) moderationActorRole(ctx context.Context, room *model.Room, actorID string) (string, error) {
+	if actorID == "" {
+		return "", errcode.New(401, "Unauthorized")
+	}
+	if actorID == room.OwnerID {
+		return moderationRoleOwner, nil
+	}
+	ok, err := s.moderation.IsModerator(ctx, room.OwnerID, actorID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", errcode.New(403, "not allowed to moderate in this room")
+	}
+	return moderationRoleModerator, nil
+}
+
+func muteStateResp(roomID, targetUserID string, mute *model.RoomMute, now time.Time) *MuteStateResp {
+	resp := &MuteStateResp{
+		RoomID:       roomID,
+		TargetUserID: targetUserID,
+		Muted:        mute != nil,
+	}
+	if mute != nil {
+		resp.TargetName = mute.TargetName
+		resp.TargetAvatar = mute.TargetAvatar
+		resp.MuteExpiresAt = mute.ExpiresAt.UTC().Format(time.RFC3339)
+		resp.MuteRemainingSeconds = int64(mute.ExpiresAt.Sub(now).Seconds())
+		if resp.MuteRemainingSeconds < 0 {
+			resp.MuteRemainingSeconds = 0
+		}
+	}
+	return resp
+}
+
+func excludeUserID(ids []string, userID string) []string {
+	if userID == "" || len(ids) == 0 {
+		return ids
+	}
+	out := ids[:0]
+	for _, id := range ids {
+		if id != userID {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 func moderationUsers(rows []repo.ModerationUser) []ModerationUserDTO {
