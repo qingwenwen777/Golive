@@ -124,6 +124,7 @@ func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit in
 	if limit < 1 {
 		limit = 50
 	}
+	actualLiveStatuses := []string{model.StatusLive, model.StatusEnded}
 	var rows []CreatorRecommendationCandidate
 	err := r.db.WithContext(ctx).
 		Table("users AS u").
@@ -136,31 +137,38 @@ func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit in
 			u.updated_at,
 			COALESCE((
 				SELECT r.channel_id FROM rooms r
-				WHERE r.owner_id = u.id
+				WHERE r.owner_id = u.id AND r.status IN ?
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			), '') AS channel_id,
 			COALESCE((
 				SELECT r.channel FROM rooms r
-				WHERE r.owner_id = u.id
+				WHERE r.owner_id = u.id AND r.status IN ?
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			), '') AS channel,
 			(
 				SELECT r.started_at FROM rooms r
-				WHERE r.owner_id = u.id
+				WHERE r.owner_id = u.id AND r.status IN ?
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			) AS last_live_at,
 			COALESCE((
 				SELECT r.title FROM rooms r
-				WHERE r.owner_id = u.id
+				WHERE r.owner_id = u.id AND r.status IN ?
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			), '') AS last_title,
-			(SELECT COUNT(*) FROM rooms r WHERE r.owner_id = u.id) AS stream_count,
-			COALESCE((SELECT MAX(r.peak_viewers) FROM rooms r WHERE r.owner_id = u.id), 0) AS peak_viewers
-		`).
+			(SELECT COUNT(*) FROM rooms r WHERE r.owner_id = u.id AND r.status IN ?) AS stream_count,
+			COALESCE((SELECT MAX(r.peak_viewers) FROM rooms r WHERE r.owner_id = u.id AND r.status IN ?), 0) AS peak_viewers
+		`,
+			actualLiveStatuses,
+			actualLiveStatuses,
+			actualLiveStatuses,
+			actualLiveStatuses,
+			actualLiveStatuses,
+			actualLiveStatuses,
+		).
 		Where("u.live_permission_status = ?", "approved").
 		Order("u.updated_at DESC").
 		Limit(limit).

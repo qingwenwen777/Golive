@@ -103,6 +103,10 @@ CREATE TABLE users (
 		`INSERT INTO users (id, username, display_name, avatar, verified, live_permission_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		"viewer-1", "viewer", "Viewer", "", false, "approved", now,
 	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, live_permission_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"creator-c", "nora", "Nora", "", false, "approved", now.Add(-3*time.Hour),
+	).Error)
 
 	require.NoError(t, rooms.Upsert(ctx, &model.Room{
 		ID:          "live-a-old",
@@ -117,6 +121,16 @@ CREATE TABLE users (
 		PeakViewers: 100,
 	}))
 	require.NoError(t, rooms.Upsert(ctx, &model.Room{
+		ID:        "appt-a-future",
+		Title:     "Luna future appointment",
+		Channel:   "Luna Space",
+		ChannelID: "ch-creator-a",
+		Category:  "Scheduled",
+		StartedAt: now.Add(15 * 24 * time.Hour),
+		Status:    model.StatusScheduled,
+		OwnerID:   "creator-a",
+	}))
+	require.NoError(t, rooms.Upsert(ctx, &model.Room{
 		ID:          "live-b-old",
 		Title:       "Mika archive",
 		Channel:     "Mika Lab",
@@ -126,6 +140,16 @@ CREATE TABLE users (
 		Status:      model.StatusEnded,
 		OwnerID:     "creator-b",
 		PeakViewers: 10,
+	}))
+	require.NoError(t, rooms.Upsert(ctx, &model.Room{
+		ID:        "appt-c-only",
+		Title:     "Nora future appointment",
+		Channel:   "Nora Studio",
+		ChannelID: "ch-creator-c",
+		Category:  "Scheduled",
+		StartedAt: now.Add(7 * 24 * time.Hour),
+		Status:    model.StatusScheduled,
+		OwnerID:   "creator-c",
 	}))
 
 	mr := miniredis.RunT(t)
@@ -139,7 +163,7 @@ CREATE TABLE users (
 
 	resp, err := svc.RecommendedCreators(ctx, "viewer-1", 4)
 	require.NoError(t, err)
-	require.Len(t, resp.Items, 2)
+	require.Len(t, resp.Items, 3)
 	require.Equal(t, "creator-a", resp.Items[0].ID)
 	require.Equal(t, "ch-creator-a", resp.Items[0].ChannelID)
 	require.Equal(t, "Luna Space", resp.Items[0].Name)
@@ -147,7 +171,11 @@ CREATE TABLE users (
 	require.True(t, resp.Items[0].Following)
 	require.NotEmpty(t, resp.Items[0].LastLiveAt)
 	require.Equal(t, "Luna comeback", resp.Items[0].LastTitle)
+	require.Equal(t, now.Add(-24*time.Hour).Format(time.RFC3339), resp.Items[0].LastLiveAt)
 	require.Equal(t, "creator-b", resp.Items[1].ID)
+	require.Equal(t, "creator-c", resp.Items[2].ID)
+	require.Empty(t, resp.Items[2].LastLiveAt)
+	require.Empty(t, resp.Items[2].LastTitle)
 }
 
 // The big one: like / dislike state machine. We replay the same sequence the
