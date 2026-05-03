@@ -60,6 +60,10 @@ func main() {
 	if err := appointmentRepo.AutoMigrate(); err != nil {
 		log.Fatal("appointment automigrate", zap.Error(err))
 	}
+	moderationRepo := repo.NewModerationRepo(db, rdb)
+	if err := moderationRepo.AutoMigrate(); err != nil {
+		log.Fatal("moderation automigrate", zap.Error(err))
+	}
 	if n, err := roomRepo.FixUUIDChannels(context.Background()); err != nil {
 		log.Warn("fix uuid channels", zap.Error(err))
 	} else if n > 0 {
@@ -72,8 +76,18 @@ func main() {
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 	liveSvc.SetAppointmentRepo(appointmentRepo)
+	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
+	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
 	permission := service.NewUserPermissionClient(cfg.Users.ServiceURL)
+	if activeRooms, err := roomRepo.ActiveRooms(context.Background()); err != nil {
+		log.Warn("load active rooms for moderation cache", zap.Error(err))
+	} else if err := moderationRepo.SyncActiveRooms(context.Background(), activeRooms); err != nil {
+		log.Warn("sync moderation cache", zap.Error(err))
+	}
+	if err := moderationRepo.SyncActiveMutes(context.Background(), time.Now()); err != nil {
+		log.Warn("sync active mutes", zap.Error(err))
+	}
 
 	r := server.NewRouter(server.Deps{
 		JWTSecret:      cfg.JWT.Secret,
@@ -81,6 +95,7 @@ func main() {
 		Social:         socialSvc,
 		Live:           liveSvc,
 		Appointments:   appointmentSvc,
+		Moderation:     moderationSvc,
 		Permission:     permission,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,

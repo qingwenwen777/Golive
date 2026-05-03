@@ -27,6 +27,7 @@ interface ServerChat {
   avatar?: string;
   text: string;
   color?: string;
+  role?: string;
   fanBadge?: ChatFanBadge;
   ts?: number;
 }
@@ -237,6 +238,7 @@ export function useRoomRealtime(
           avatar: parsed.avatar,
           text: parsed.text,
           color: parsed.color,
+          role: parsed.role,
           fanBadge: parsed.fanBadge,
           ts: parsed.ts ?? now,
         };

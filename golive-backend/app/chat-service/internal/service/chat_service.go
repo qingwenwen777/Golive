@@ -35,6 +35,7 @@ type Event struct {
 	Username string                 `json:"username,omitempty"`
 	Avatar   string                 `json:"avatar,omitempty"`
 	Text     string                 `json:"text"`
+	Role     string                 `json:"role,omitempty"`
 	FanBadge *model.FanBadgePayload `json:"fanBadge,omitempty"`
 	Ts       int64                  `json:"ts"`
 }
@@ -91,6 +92,7 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 		Username: username,
 		Avatar:   ev.Avatar,
 		Text:     cleanText,
+		Role:     safeRole(ev.Role),
 		Ts:       ev.Ts,
 	}
 	if fanBadge != nil {
@@ -136,6 +138,14 @@ func safeFanBadge(in *model.FanBadgePayload) *model.FanBadgePayload {
 		level = 99
 	}
 	return &model.FanBadgePayload{CreatorID: creatorID, Level: level}
+}
+
+func safeRole(role string) string {
+	role = strings.TrimSpace(role)
+	if role == "moderator" {
+		return role
+	}
+	return ""
 }
 
 // History serves GET /rooms/:id/danmus.

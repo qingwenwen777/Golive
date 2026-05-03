@@ -374,6 +374,11 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 	if err := s.live.live.Save(ctx, streamKey, room.ID, s.live.keyTTL); err != nil {
 		return nil, err
 	}
+	if s.live.moderation != nil {
+		if err := s.live.moderation.SyncRoomModerators(ctx, room.ID, ownerID); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.appointments.MarkLive(ctx, appt.ID, now); err != nil {
 		return nil, err
 	}

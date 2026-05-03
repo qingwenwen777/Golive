@@ -16,6 +16,7 @@ type Deps struct {
 	Social         *service.SocialService
 	Live           *service.LiveService
 	Appointments   *service.AppointmentService
+	Moderation     *service.ModerationService
 	Permission     service.LivePermissionChecker
 	CoverDir       string
 	CoverPublicURL string
@@ -33,6 +34,7 @@ func NewRouter(d Deps) *gin.Engine {
 	socialH := handler.NewSocialHandler(d.Social)
 	liveH := handler.NewLiveHandler(d.Live, d.Permission)
 	appointmentH := handler.NewAppointmentHandler(d.Appointments)
+	moderationH := handler.NewModerationHandler(d.Moderation)
 	srsH := handler.NewSRSHandler(d.Live)
 	coverH := handler.NewCoverUploadHandler(d.CoverDir, d.CoverPublicURL)
 
@@ -57,11 +59,18 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.POST("/appointments/:id/start", auth, appointmentH.Start)
 		rooms.POST("/appointments/:id/reservations", auth, appointmentH.Reserve)
 		rooms.DELETE("/appointments/:id/reservations", auth, appointmentH.Unreserve)
+		rooms.GET("/moderation/followers", auth, moderationH.ListFollowers)
+		rooms.GET("/moderation/moderators", auth, moderationH.ListModerators)
+		rooms.POST("/moderation/moderators/:userID", auth, moderationH.AddModerator)
+		rooms.DELETE("/moderation/moderators/:userID", auth, moderationH.RemoveModerator)
+		rooms.GET("/moderation/logs", auth, moderationH.Logs)
 		rooms.GET("/channels/:channel/history", optionalAuth, roomH.ChannelHistory)
 		rooms.GET("/channels/:channel/appointments", optionalAuth, appointmentH.ListChannel)
 		rooms.GET("/channels/:channel/analytics", auth, roomH.ChannelAnalytics)
 		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
 		rooms.GET("/recommended-creators", optionalAuth, socialH.RecommendedCreators)
+		rooms.GET("/:id/moderation/state", optionalAuth, moderationH.RoomState)
+		rooms.POST("/:id/moderation/mutes", auth, moderationH.Mute)
 		rooms.GET("/:id", optionalAuth, roomH.Get)
 		rooms.GET("/:id/follow", optionalAuth, socialH.GetFollow)
 

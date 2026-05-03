@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Users,
   Crown,
+  ShieldCheck,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { tierSpec } from '@/constants/chat';
@@ -46,6 +47,9 @@ export interface ChatProps {
   reconnectingLabel?: string;
   onSendChat?: (text: string) => boolean | void;
   onComposerFocusChange?: (focused: boolean) => void;
+  canModerate?: boolean;
+  moderationRole?: 'owner' | 'moderator' | 'viewer' | string;
+  onOpenModeration?: (target: ChatModerationTarget) => void;
 }
 
 const EMOJI_GROUPS = [
@@ -114,6 +118,13 @@ const CHAT_BOTTOM_THRESHOLD_PX = 48;
 const SC_PIN_REFRESH_MS = 1000;
 
 type ChatPanelTab = 'chat' | 'viewers';
+
+export interface ChatModerationTarget {
+  userId: string;
+  user: string;
+  avatar?: string;
+  role?: 'owner' | 'moderator' | 'viewer' | string;
+}
 
 function parseAmountValue(amount: string): number {
   const raw = amount.replace(/[^\d]/g, '');
@@ -199,17 +210,42 @@ function ChatRow({
   m,
   isOwner,
   isFan,
+  canModerate,
+  onOpenModeration,
 }: {
   m: ChatMessage;
   isOwner?: boolean;
   isFan?: boolean;
+  canModerate?: boolean;
+  onOpenModeration?: (target: ChatModerationTarget) => void;
 }) {
   const { t } = useTranslation('pages');
+  const role = isOwner ? 'owner' : m.role;
+  const canOpenModeration = Boolean(canModerate && m.userId);
 
   return (
     <div className={cn('gl-chat-line', isOwner && 'is-owner', isFan && 'is-fan')}>
       <div className="gl-chat-avatar-wrap">
-        <Avatar name={m.user} src={m.avatar} size={24} />
+        <button
+          type="button"
+          className="gl-chat-avatar-btn"
+          disabled={!canOpenModeration}
+          onClick={() => {
+            if (!m.userId) return;
+            onOpenModeration?.({
+              userId: m.userId,
+              user: m.user,
+              avatar: m.avatar,
+              role,
+            });
+          }}
+          aria-label={t('liveRoom.chatPanel.moderateUser', {
+            user: m.user,
+            defaultValue: `Moderate ${m.user}`,
+          })}
+        >
+          <Avatar name={m.user} src={m.avatar} size={24} />
+        </button>
       </div>
       <div className="gl-chat-body">
         <span className="gl-chat-meta">
@@ -221,6 +257,12 @@ function ChatRow({
           </span>
           {isOwner && (
             <span className="gl-chat-owner-badge">{t('liveRoom.chatPanel.host')}</span>
+          )}
+          {!isOwner && m.role === 'moderator' && (
+            <span className="gl-chat-mod-badge">
+              <ShieldCheck size={11} strokeWidth={2.5} />
+              {t('liveRoom.chatPanel.moderatorBadge', { defaultValue: '房管' })}
+            </span>
           )}
           {isFan && m.fanBadge && (
             <span
@@ -423,6 +465,8 @@ export function Chat({
   reconnectingLabel,
   onSendChat,
   onComposerFocusChange,
+  canModerate,
+  onOpenModeration,
 }: ChatProps) {
   const { t, i18n } = useTranslation('pages');
   const locale = i18n.resolvedLanguage ?? i18n.language;
@@ -645,6 +689,8 @@ export function Chat({
                 m={chat}
                 isOwner={isOwner}
                 isFan={isFan}
+                canModerate={canModerate}
+                onOpenModeration={onOpenModeration}
               />
             );
           })}

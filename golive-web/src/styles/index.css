@@ -4178,10 +4178,153 @@ button.gl-fan-badge-empty {
 .gl-creator-secondary:hover {
   background: var(--gl-bg-hover);
 }
+.gl-creator-secondary.is-danger,
+.gl-secondary-btn.is-danger {
+  border-color: rgba(220, 38, 38, 0.26);
+  background: rgba(220, 38, 38, 0.06);
+  color: #b91c1c;
+}
+.gl-creator-secondary.is-danger:hover,
+.gl-secondary-btn.is-danger:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
 .gl-creator-start {
   min-height: 40px;
   background: var(--gl-btn-primary);
   color: var(--gl-btn-primary-text);
+}
+
+.gl-room-mod-page {
+  display: flex;
+  width: min(1380px, 100%);
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+.gl-room-mod-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, 0.88fr);
+  align-items: start;
+  gap: 16px;
+}
+.gl-room-mod-search-panel,
+.gl-room-mod-current-panel,
+.gl-room-mod-log-panel {
+  min-width: 0;
+}
+.gl-room-mod-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.gl-room-mod-search span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-room-mod-search input {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 14px;
+  outline: 0;
+  padding: 0 12px;
+}
+.gl-room-mod-search input:focus {
+  border-color: #1c62b9;
+  box-shadow: inset 0 0 0 1px #1c62b9;
+}
+.gl-room-mod-list,
+.gl-room-mod-log-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+.gl-room-mod-user-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  padding: 10px;
+}
+.gl-room-mod-user-row > div {
+  min-width: 0;
+}
+.gl-room-mod-user-row strong,
+.gl-room-mod-log-row strong {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-room-mod-user-row span,
+.gl-room-mod-log-row span {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-room-mod-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.08);
+  color: #15803d !important;
+  font-size: 11px !important;
+  font-weight: 900;
+  padding: 0 8px;
+}
+.gl-room-mod-log-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  padding: 12px;
+}
+.gl-room-mod-log-actor {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.gl-room-mod-log-action {
+  min-width: 0;
+  border-left: 1px solid var(--gl-border);
+  padding-left: 14px;
+}
+.dark .gl-creator-secondary.is-danger,
+.dark .gl-secondary-btn.is-danger {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
+}
+.dark .gl-room-mod-status {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(34, 197, 94, 0.14);
+  color: #bbf7d0 !important;
 }
 .gl-creator-check-list,
 .gl-creator-publisher-preview,
@@ -5807,6 +5950,7 @@ button.gl-fan-badge-empty {
   }
   .gl-creator-dashboard-grid,
   .gl-creator-prepare,
+  .gl-room-mod-grid,
   .gl-live-console-grid {
     grid-template-columns: 1fr;
   }
@@ -5909,6 +6053,22 @@ button.gl-fan-badge-empty {
   }
   .gl-live-console-rail .gl-chat {
     height: 520px;
+  }
+  .gl-room-mod-user-row {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+  .gl-room-mod-user-row button {
+    grid-column: 2 / -1;
+    width: 100%;
+  }
+  .gl-room-mod-log-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .gl-room-mod-log-action {
+    border-left: 0;
+    border-top: 1px solid var(--gl-border);
+    padding: 10px 0 0;
   }
   .gl-fan-badge-grid {
     grid-template-columns: 1fr;

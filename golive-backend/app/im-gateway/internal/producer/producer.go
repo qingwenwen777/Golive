@@ -24,6 +24,7 @@ type ChatEvent struct {
 	Avatar   string           `json:"avatar,omitempty"`
 	ClientID string           `json:"clientId,omitempty"`
 	Text     string           `json:"text"`
+	Role     string           `json:"role,omitempty"`
 	FanBadge *FanBadgePayload `json:"fanBadge,omitempty"`
 	Ts       int64            `json:"ts"` // ms
 }

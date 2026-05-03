@@ -16,6 +16,7 @@ export interface ChatMessage {
   text: string;
   ts: number;
   color?: string;
+  role?: 'moderator' | string;
   fanBadge?: ChatFanBadge;
 }
 

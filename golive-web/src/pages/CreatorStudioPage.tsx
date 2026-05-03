@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -32,6 +33,15 @@ import {
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
 import { useSubmitCreatorApplication } from '@/api/creator';
+import {
+  useAddModerator,
+  useModeratorFollowers,
+  useModeratorLogs,
+  useRemoveModerator,
+  useRoomModerators,
+  type ModerationLog,
+  type ModerationUser,
+} from '@/api/moderation';
 import {
   useCancelAppointment,
   useCreateAppointment,
@@ -760,6 +770,284 @@ export function CreatorAppointmentsPage() {
   );
 }
 
+const MOD_FOLLOWER_PAGE_SIZE = 8;
+const MOD_LOG_PAGE_SIZE = 10;
+
+export function CreatorRoomModeratorsPage() {
+  const { t, i18n } = useTranslation('pages');
+  const { user } = useStudioUser();
+  const [query, setQuery] = useState('');
+  const [followerPage, setFollowerPage] = useState(1);
+  const [logPage, setLogPage] = useState(1);
+  const followers = useModeratorFollowers(query.trim(), followerPage, MOD_FOLLOWER_PAGE_SIZE, Boolean(user));
+  const moderators = useRoomModerators(1, 100, Boolean(user));
+  const logs = useModeratorLogs(logPage, MOD_LOG_PAGE_SIZE, Boolean(user));
+  const addModerator = useAddModerator();
+  const removeModerator = useRemoveModerator();
+  const moderatorIds = useMemo(
+    () => new Set((moderators.data?.items ?? []).map((item) => item.id)),
+    [moderators.data?.items],
+  );
+  const followerPageCount = Math.max(1, Math.ceil((followers.data?.total ?? 0) / MOD_FOLLOWER_PAGE_SIZE));
+  const logPageCount = Math.max(1, Math.ceil((logs.data?.total ?? 0) / MOD_LOG_PAGE_SIZE));
+
+  useEffect(() => {
+    setFollowerPage(1);
+  }, [query]);
+
+  const add = (target: ModerationUser) => {
+    addModerator.mutate(target.id, {
+      onSuccess: () =>
+        toast.success(
+          t('studio.moderators.added', {
+            name: target.name,
+            defaultValue: `${target.name} 已成为房间房管。`,
+          }),
+        ),
+      onError: (err) =>
+        toast.error(err.message || t('studio.moderators.addFailed', { defaultValue: '添加房管失败。' })),
+    });
+  };
+
+  const remove = (target: ModerationUser) => {
+    removeModerator.mutate(target.id, {
+      onSuccess: () =>
+        toast.success(
+          t('studio.moderators.removed', {
+            name: target.name,
+            defaultValue: `${target.name} 已取消房管资格。`,
+          }),
+        ),
+      onError: (err) =>
+        toast.error(err.message || t('studio.moderators.removeFailed', { defaultValue: '取消房管失败。' })),
+    });
+  };
+
+  return (
+    <div className="gl-room-mod-page">
+      <section className="gl-creator-kpis">
+        <StudioKpi
+          icon={<ShieldCheck size={18} />}
+          label={t('studio.moderators.active', { defaultValue: '房间房管' })}
+          value={(moderators.data?.total ?? 0).toLocaleString()}
+          sub={t('studio.moderators.activeSub', { defaultValue: '当前有效' })}
+        />
+        <StudioKpi
+          icon={<Users size={18} />}
+          label={t('studio.moderators.followers', { defaultValue: '可选粉丝' })}
+          value={(followers.data?.total ?? 0).toLocaleString()}
+          sub={t('studio.moderators.followersSub', { defaultValue: '按用户名搜索' })}
+        />
+        <StudioKpi
+          icon={<Clock3 size={18} />}
+          label={t('studio.moderators.logs', { defaultValue: '操作记录' })}
+          value={(logs.data?.total ?? 0).toLocaleString()}
+          sub={t('studio.moderators.logsSub', { defaultValue: '分页记录' })}
+        />
+        <StudioKpi
+          icon={<MessageSquare size={18} />}
+          label={t('studio.moderators.muteOptions', { defaultValue: '禁言时长' })}
+          value="5 / 10 / 30 / 60"
+          sub={t('studio.moderators.muteOptionsSub', { defaultValue: '分钟' })}
+        />
+      </section>
+
+      <section className="gl-room-mod-grid">
+        <div className="gl-creator-panel gl-room-mod-search-panel">
+          <div className="gl-creator-panel-head">
+            <div>
+              <span>{t('studio.moderators.searchLabel', { defaultValue: '粉丝列表' })}</span>
+              <h2>{t('studio.moderators.searchTitle', { defaultValue: '添加房间房管' })}</h2>
+            </div>
+            <Users size={22} />
+          </div>
+          <label className="gl-room-mod-search">
+            <span>{t('studio.moderators.searchPlaceholder', { defaultValue: '搜索粉丝用户名' })}</span>
+            <input
+              value={query}
+              maxLength={64}
+              placeholder={t('studio.moderators.searchPlaceholder', { defaultValue: '搜索粉丝用户名' })}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          <div className="gl-room-mod-list">
+            {followers.isPending ? (
+              <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+            ) : followers.data?.items.length ? (
+              followers.data.items.map((item) => (
+                <ModerationUserRow
+                  key={item.id}
+                  user={item}
+                  active={moderatorIds.has(item.id)}
+                  pending={addModerator.isPending || removeModerator.isPending}
+                  actionLabel={
+                    moderatorIds.has(item.id)
+                      ? t('studio.moderators.alreadyModerator', { defaultValue: '已是房管' })
+                      : t('studio.moderators.add', { defaultValue: '添加' })
+                  }
+                  onAction={() => add(item)}
+                />
+              ))
+            ) : (
+              <div className="gl-creator-empty-soft">
+                {t('studio.moderators.noFollowers', { defaultValue: '没有找到可添加的粉丝。' })}
+              </div>
+            )}
+          </div>
+          {followers.data && followers.data.total > MOD_FOLLOWER_PAGE_SIZE && (
+            <StudioAppointmentPager
+              page={followerPage}
+              pageCount={followerPageCount}
+              total={followers.data.total}
+              pageSize={MOD_FOLLOWER_PAGE_SIZE}
+              onPageChange={setFollowerPage}
+            />
+          )}
+        </div>
+
+        <div className="gl-creator-panel gl-room-mod-current-panel">
+          <div className="gl-creator-panel-head">
+            <div>
+              <span>{t('studio.moderators.currentLabel', { defaultValue: '当前名单' })}</span>
+              <h2>{t('studio.moderators.currentTitle', { defaultValue: '正在值守的房管' })}</h2>
+            </div>
+            <ShieldCheck size={22} />
+          </div>
+          <div className="gl-room-mod-list">
+            {moderators.isPending ? (
+              <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+            ) : moderators.data?.items.length ? (
+              moderators.data.items.map((item) => (
+                <ModerationUserRow
+                  key={item.id}
+                  user={item}
+                  active
+                  pending={removeModerator.isPending}
+                  actionLabel={t('studio.moderators.remove', { defaultValue: '取消资格' })}
+                  danger
+                  onAction={() => remove(item)}
+                />
+              ))
+            ) : (
+              <div className="gl-creator-empty-soft">
+                {t('studio.moderators.noModerators', { defaultValue: '还没有房间房管。' })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="gl-creator-panel gl-room-mod-log-panel">
+        <div className="gl-creator-panel-head">
+          <div>
+            <span>{t('studio.moderators.logLabel', { defaultValue: '操作记录' })}</span>
+            <h2>{t('studio.moderators.logTitle', { defaultValue: '房管操作流水' })}</h2>
+          </div>
+          <Clock3 size={22} />
+        </div>
+        <div className="gl-room-mod-log-list">
+          {logs.isPending ? (
+            <div className="gl-creator-empty-soft">{t('studio.loading', { defaultValue: 'Loading studio...' })}</div>
+          ) : logs.data?.items.length ? (
+            logs.data.items.map((item) => (
+              <ModerationLogRow key={item.id} item={item} locale={i18n.language} />
+            ))
+          ) : (
+            <div className="gl-creator-empty-soft">
+              {t('studio.moderators.noLogs', { defaultValue: '暂无操作记录。' })}
+            </div>
+          )}
+        </div>
+        {logs.data && logs.data.total > MOD_LOG_PAGE_SIZE && (
+          <StudioAppointmentPager
+            page={logPage}
+            pageCount={logPageCount}
+            total={logs.data.total}
+            pageSize={MOD_LOG_PAGE_SIZE}
+            onPageChange={setLogPage}
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ModerationUserRow({
+  user,
+  active,
+  pending,
+  actionLabel,
+  danger,
+  onAction,
+}: {
+  user: ModerationUser;
+  active: boolean;
+  pending: boolean;
+  actionLabel: string;
+  danger?: boolean;
+  onAction: () => void;
+}) {
+  return (
+    <div className="gl-room-mod-user-row">
+      <Avatar name={user.name} src={user.avatar} size={38} />
+      <div>
+        <strong>{user.name}</strong>
+        <span>{user.username ? `@${user.username}` : user.id}</span>
+      </div>
+      {active && <span className="gl-room-mod-status">房管</span>}
+      <button
+        type="button"
+        className={danger ? 'gl-secondary-btn is-danger' : 'gl-creator-secondary'}
+        disabled={pending || (!danger && active)}
+        onClick={onAction}
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function ModerationLogRow({ item, locale }: { item: ModerationLog; locale: string }) {
+  const { t } = useTranslation('pages');
+  const created = new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(item.createdAt));
+  return (
+    <div className="gl-room-mod-log-row">
+      <div className="gl-room-mod-log-actor">
+        <Avatar name={item.actorName} src={item.actorAvatar} size={32} />
+        <div>
+          <strong>{item.actorName}</strong>
+          <span>{created}</span>
+        </div>
+      </div>
+      <div className="gl-room-mod-log-action">
+        <strong>{formatModeratorAction(item, t)}</strong>
+        <span>{item.targetName}</span>
+      </div>
+    </div>
+  );
+}
+
+function formatModeratorAction(item: ModerationLog, t: TFunction<'pages'>): string {
+  if (item.action === 'add_moderator') {
+    return t('studio.moderators.actionAdd', { defaultValue: '添加房管' });
+  }
+  if (item.action === 'remove_moderator') {
+    return t('studio.moderators.actionRemove', { defaultValue: '取消房管' });
+  }
+  if (item.action === 'mute') {
+    return t('studio.moderators.actionMute', {
+      minutes: item.durationMinutes ?? 0,
+      defaultValue: `禁言 ${item.durationMinutes ?? 0} 分钟`,
+    });
+  }
+  return item.action;
+}
+
 function AppointmentStudioRow({
   item,
   onEdit,
@@ -1241,6 +1529,7 @@ function StudioTabs() {
       <NavLink to="/studio/overview">{t('studio.tabs.overview', { defaultValue: 'Overview' })}</NavLink>
       <NavLink to="/studio/prepare">{t('studio.tabs.prepare', { defaultValue: 'Stream setup' })}</NavLink>
       <NavLink to="/studio/appointments">{t('studio.tabs.appointments', { defaultValue: 'Live appointments' })}</NavLink>
+      <NavLink to="/studio/moderators">{t('studio.tabs.moderators', { defaultValue: '房间房管' })}</NavLink>
       <NavLink to="/studio/replay">{t('studio.tabs.replay', { defaultValue: 'Data replay' })}</NavLink>
     </nav>
   );

@@ -13,6 +13,7 @@ type Danmu struct {
 	Avatar            string `gorm:"type:varchar(500)"`
 	Text              string `gorm:"type:varchar(500);not null"`
 	Color             string `gorm:"type:varchar(16)"`
+	Role              string `gorm:"type:varchar(16)"`
 	FanBadgeCreatorID string `gorm:"type:varchar(80)"`
 	FanBadgeLevel     int
 	Ts                int64 `gorm:"not null;index"` // ms epoch
@@ -29,6 +30,7 @@ type Public struct {
 	Avatar   string           `json:"avatar,omitempty"`
 	Text     string           `json:"text"`
 	Color    string           `json:"color,omitempty"`
+	Role     string           `json:"role,omitempty"`
 	FanBadge *FanBadgePayload `json:"fanBadge,omitempty"`
 	Amount   string           `json:"amount,omitempty"`
 	Tier     *int             `json:"tier,omitempty"`
@@ -49,6 +51,7 @@ func (d *Danmu) ToPublic() Public {
 		Avatar: d.Avatar,
 		Text:   d.Text,
 		Color:  d.Color,
+		Role:   d.Role,
 		Ts:     d.Ts,
 	}
 	if d.FanBadgeCreatorID != "" && d.FanBadgeLevel > 0 {

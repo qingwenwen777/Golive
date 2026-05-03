@@ -11,6 +11,7 @@ import {
   MessageSquare,
   PlayCircle,
   Radio,
+  ShieldCheck,
   Square,
   Trophy,
   UserPlus,
@@ -18,8 +19,9 @@ import {
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Player } from '@/features/live-room/Player';
-import { Chat } from '@/features/live-room/Chat';
+import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { InfoBlock } from '@/features/live-room/InfoBlock';
 import { GiftPanel } from '@/features/live-room/GiftPanel';
 import { SuperChatDialog } from '@/features/live-room/SuperChatDialog';
@@ -31,6 +33,7 @@ import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStor
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useRoom, useStopLive } from '@/api/room';
 import { useLatestBet } from '@/api/bet';
+import { useMuteRoomUser, useRoomModerationState, type MuteUserPayload } from '@/api/moderation';
 import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
 import {
   useChannelAppointments,
@@ -77,6 +80,7 @@ export default function LiveRoomPage() {
   const [mobileComposerFocused, setMobileComposerFocused] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [superChatOpen, setSuperChatOpen] = useState(false);
+  const [moderationTarget, setModerationTarget] = useState<ChatModerationTarget | null>(null);
   const [flying, setFlying] = useState<FlyingGift[]>([]);
   const isAuthed = useIsAuthed();
   const authHydrated = useAuthHydrated();
@@ -118,6 +122,45 @@ export default function LiveRoomPage() {
     if (!badge) return null;
     return { creatorId: badge.creatorId, level: badge.level };
   }, [fanBadges.data, stream?.ownerId]);
+  const moderationState = useRoomModerationState(roomId, Boolean(isAuthed && roomCanWatch && roomId));
+  const muteUser = useMuteRoomUser(roomId);
+  const moderationRole =
+    currentUser?.id && stream?.ownerId === currentUser.id
+      ? 'owner'
+      : (moderationState.data?.role ?? 'viewer');
+  const canModerate = moderationRole === 'owner' || moderationRole === 'moderator';
+  const chatModerationProps = {
+    canModerate,
+    onOpenModeration: setModerationTarget,
+  };
+  const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
+    if (!moderationTarget) return;
+    muteUser.mutate(
+      {
+        targetUserId: moderationTarget.userId,
+        targetName: moderationTarget.user,
+        targetAvatar: moderationTarget.avatar,
+        durationMinutes,
+      },
+      {
+        onSuccess: (resp) => {
+          toast.success(
+            t('liveRoom.moderation.muted', {
+              user: resp.targetName,
+              minutes: resp.durationMinutes,
+              defaultValue: `${resp.targetName} muted for ${resp.durationMinutes} minutes.`,
+            }),
+          );
+          setModerationTarget(null);
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('liveRoom.moderation.muteFailed', { defaultValue: 'Could not mute this user.' }),
+          ),
+      },
+    );
+  };
 
   const handleLiveEnded = useCallback(() => {
     if (liveEndedRef.current) return;
@@ -319,6 +362,18 @@ export default function LiveRoomPage() {
       onError: () => toast.error('Could not end the live.'),
     });
   };
+  const moderationDialog = (
+    <MuteUserDialog
+      target={moderationTarget}
+      actorRole={moderationRole}
+      currentUserId={currentUser?.id}
+      pending={muteUser.isPending}
+      onOpenChange={(open) => {
+        if (!open) setModerationTarget(null);
+      }}
+      onMute={submitMute}
+    />
+  );
 
   if (!roomIsLive && !isScheduledRoom && !roomIsStarting) {
     if (!canShowPublisherPanel) {
@@ -396,6 +451,7 @@ export default function LiveRoomPage() {
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
+                  {...chatModerationProps}
                   onComposerFocusChange={setMobileComposerFocused}
                 />
               </div>
@@ -414,6 +470,7 @@ export default function LiveRoomPage() {
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
+                {...chatModerationProps}
               />
             </div>
           )}
@@ -443,12 +500,14 @@ export default function LiveRoomPage() {
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
+                  {...chatModerationProps}
                   sheetMode
                 />
               </SheetContent>
             </Sheet>
           </>
         )}
+        {moderationDialog}
       </>
     );
   }
@@ -551,6 +610,7 @@ export default function LiveRoomPage() {
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
+                  {...chatModerationProps}
                   onComposerFocusChange={setMobileComposerFocused}
                 />
               </div>
@@ -569,6 +629,7 @@ export default function LiveRoomPage() {
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
+                {...chatModerationProps}
               />
             </div>
           )}
@@ -598,6 +659,7 @@ export default function LiveRoomPage() {
                   onSendSuperChat={openSuperChat}
                   reconnecting={reconnecting}
                   reconnectingLabel={reconnectingLabel}
+                  {...chatModerationProps}
                   sheetMode
                 />
               </SheetContent>
@@ -657,6 +719,7 @@ export default function LiveRoomPage() {
           items={flying}
           onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
         />
+        {moderationDialog}
       </>
     );
   }
@@ -723,6 +786,7 @@ export default function LiveRoomPage() {
             onSendSuperChat={openSuperChat}
             reconnecting={reconnecting}
             reconnectingLabel={reconnectingLabel}
+            {...chatModerationProps}
             onComposerFocusChange={setMobileComposerFocused}
           />
         </div>
@@ -758,6 +822,7 @@ export default function LiveRoomPage() {
               onSendSuperChat={openSuperChat}
               reconnecting={reconnecting}
               reconnectingLabel={reconnectingLabel}
+              {...chatModerationProps}
             />
           </div>
         )}
@@ -790,6 +855,7 @@ export default function LiveRoomPage() {
                 onSendSuperChat={openSuperChat}
                 reconnecting={reconnecting}
                 reconnectingLabel={reconnectingLabel}
+                {...chatModerationProps}
                 sheetMode
               />
             </SheetContent>
@@ -849,6 +915,7 @@ export default function LiveRoomPage() {
         items={flying}
         onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
       />
+      {moderationDialog}
     </>
   );
 }
@@ -964,6 +1031,66 @@ function BetEntryNotice({ question, onClick }: { question: string; onClick: () =
         {t('betting.entryView', { defaultValue: 'View' })}
       </span>
     </button>
+  );
+}
+
+function MuteUserDialog({
+  target,
+  actorRole,
+  currentUserId,
+  pending,
+  onOpenChange,
+  onMute,
+}: {
+  target: ChatModerationTarget | null;
+  actorRole: string;
+  currentUserId?: string;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMute: (duration: MuteUserPayload['durationMinutes']) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const targetRole = target?.role ?? 'viewer';
+  const blocked =
+    !target ||
+    target.userId === currentUserId ||
+    targetRole === 'owner' ||
+    targetRole === 'moderator' ||
+    (actorRole !== 'owner' && actorRole !== 'moderator');
+  const durations: MuteUserPayload['durationMinutes'][] = [5, 10, 30, 60];
+
+  return (
+    <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
+      <DialogContent className="gl-mute-dialog">
+        <DialogTitle>{t('liveRoom.moderation.title', { defaultValue: '禁言用户' })}</DialogTitle>
+        <div className="gl-mute-target">
+          <ShieldCheck size={22} />
+          <div>
+            <strong>{target?.user ?? ''}</strong>
+            <span>
+              {blocked
+                ? t('liveRoom.moderation.blocked', { defaultValue: '主播、房管或你自己不能被禁言。' })
+                : t('liveRoom.moderation.pickDuration', { defaultValue: '选择禁言时长' })}
+            </span>
+          </div>
+        </div>
+        <div className="gl-mute-duration-grid">
+          {durations.map((duration) => (
+            <button
+              key={duration}
+              type="button"
+              disabled={blocked || pending}
+              onClick={() => onMute(duration)}
+            >
+              {t('liveRoom.moderation.minutes', {
+                count: duration,
+                defaultValue: '{{count}} 分钟',
+              })}
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/config"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/pubsub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/server"
@@ -74,7 +75,7 @@ func main() {
 		PongWait:        cfg.WS.PongWait,
 		MaxMessageRate:  cfg.WS.MaxMessageRate,
 	}
-	wsH := server.NewWSHandler(h, verifier, p, wsCfg, cfg.Room.WelcomeText)
+	wsH := server.NewWSHandler(h, verifier, p, moderation.NewRedisChecker(rdb), wsCfg, cfg.Room.WelcomeText)
 	mux := server.NewMux(wsH, h)
 
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: mux}

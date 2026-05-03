@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
@@ -32,10 +34,11 @@ type Conn struct {
 	closed atomic.Bool
 	once   sync.Once
 
-	hub      *hub.Hub
-	producer producer.Producer
-	limiter  *rate.Limiter
-	cfg      WSConfig
+	hub        *hub.Hub
+	producer   producer.Producer
+	moderation moderation.Checker
+	limiter    *rate.Limiter
+	cfg        WSConfig
 }
 
 type WSConfig struct {
@@ -47,16 +50,17 @@ type WSConfig struct {
 	MaxMessageRate  float64
 }
 
-func newConn(ws *websocket.Conn, roomID string, identity auth.Identity, h *hub.Hub, p producer.Producer, cfg WSConfig) *Conn {
+func newConn(ws *websocket.Conn, roomID string, identity auth.Identity, h *hub.Hub, p producer.Producer, m moderation.Checker, cfg WSConfig) *Conn {
 	c := &Conn{
-		id:       uuid.NewString(),
-		roomID:   roomID,
-		identity: identity,
-		ws:       ws,
-		send:     make(chan []byte, cfg.SendBuffer),
-		hub:      h,
-		producer: p,
-		cfg:      cfg,
+		id:         uuid.NewString(),
+		roomID:     roomID,
+		identity:   identity,
+		ws:         ws,
+		send:       make(chan []byte, cfg.SendBuffer),
+		hub:        h,
+		producer:   p,
+		moderation: m,
+		cfg:        cfg,
 	}
 	if cfg.MaxMessageRate > 0 {
 		// burst = 1 second's allowance, minimum 1.
@@ -202,6 +206,22 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		metrics.MessagesDropped.WithLabelValues("bad_chat").Inc()
 		return
 	}
+	role := ""
+	if c.moderation != nil {
+		state, err := c.moderation.State(ctx, c.roomID, c.identity.UserID)
+		if err != nil {
+			logger.L().Warn("load moderation state", zap.String("room", c.roomID), zap.Error(err))
+		} else {
+			if state.Muted {
+				_ = c.Send(hub.EncodeSystem("You are muted for " + formatMuteTTL(state.MuteTTL) + "."))
+				metrics.MessagesDropped.WithLabelValues("muted").Inc()
+				return
+			}
+			if state.IsModerator {
+				role = "moderator"
+			}
+		}
+	}
 	now := time.Now().UnixMilli()
 	id := safeClientID(clientID)
 	username = safeUsername(username)
@@ -214,6 +234,7 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		Avatar:   avatar,
 		ClientID: id,
 		Text:     text,
+		Role:     role,
 		FanBadge: producerFanBadge,
 		Ts:       now,
 	}); err != nil {
@@ -229,8 +250,22 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		if display == "" {
 			display = c.identity.UserID
 		}
-		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now, hubFanBadge))
+		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now, hubFanBadge, role))
 	}
+}
+
+func formatMuteTTL(ttl time.Duration) string {
+	if ttl <= 0 {
+		return "a moment"
+	}
+	minutes := int(ttl.Minutes())
+	if minutes < 1 {
+		return "less than 1 minute"
+	}
+	if minutes == 1 {
+		return "1 minute"
+	}
+	return strconv.Itoa(minutes) + " minutes"
 }
 
 func safeFanBadge(in *hub.FanBadgePayload) (*hub.FanBadgePayload, *producer.FanBadgePayload) {

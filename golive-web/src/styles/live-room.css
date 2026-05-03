@@ -1012,6 +1012,26 @@
   flex: 0 0 auto;
   border-radius: 50%;
 }
+.gl-chat-avatar-btn {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.gl-chat-avatar-btn:not(:disabled) {
+  cursor: pointer;
+}
+.gl-chat-avatar-btn:not(:disabled):hover {
+  box-shadow: 0 0 0 3px rgba(28, 98, 185, 0.14);
+}
+.gl-chat-avatar-btn:disabled {
+  cursor: default;
+}
 .gl-chat-line.is-owner .gl-chat-avatar-wrap {
   padding: 2px;
   background: conic-gradient(from 210deg, #ffcf5a, #45d483, #39c6f4, #8f7cff, #ff8bb3, #ffcf5a);
@@ -1072,6 +1092,23 @@
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
+}
+.gl-chat-mod-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  border: 1px solid rgba(20, 184, 166, 0.36);
+  border-radius: 999px;
+  background: rgba(20, 184, 166, 0.1);
+  color: #0f766e;
+  padding: 0 7px 0 6px;
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
+}
+.gl-chat-mod-badge svg {
+  color: #0f766e;
 }
 .gl-chat-fan-badge,
 .gl-fan-badge-level {
@@ -1252,6 +1289,80 @@
 }
 .dark .gl-chat-fan-badge svg {
   color: var(--fan-badge-dark-icon);
+}
+.dark .gl-chat-avatar-btn:not(:disabled):hover {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+.dark .gl-chat-mod-badge {
+  border-color: rgba(45, 212, 191, 0.32);
+  background: rgba(20, 184, 166, 0.16);
+  color: #99f6e4;
+}
+.dark .gl-chat-mod-badge svg {
+  color: #ccfbf1;
+}
+
+.gl-mute-dialog {
+  width: min(420px, calc(100vw - 28px));
+  border-radius: 12px;
+}
+.gl-mute-target {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  padding: 12px;
+}
+.gl-mute-target > svg {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(20, 184, 166, 0.1);
+  color: #0f766e;
+  padding: 10px;
+}
+.gl-mute-target strong {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-mute-target span {
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.gl-mute-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.gl-mute-duration-grid button {
+  min-height: 42px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+.gl-mute-duration-grid button:hover:not(:disabled) {
+  border-color: #1c62b9;
+  background: var(--gl-bg-hover);
+}
+.gl-mute-duration-grid button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+.dark .gl-mute-target > svg {
+  background: rgba(20, 184, 166, 0.16);
+  color: #99f6e4;
 }
 
 .gl-sc {

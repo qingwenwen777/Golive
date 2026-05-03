@@ -123,11 +123,21 @@
       "you": "You",
       "sentGift": "sent",
       "guestViewer": "You Viewer",
+      "moderateUser": "Moderate {{user}}",
+      "moderatorBadge": "MOD",
       "emojiGroups": {
         "faces": "Faces",
         "gestures": "Gestures",
         "stream": "Stream"
       }
+    },
+    "moderation": {
+      "title": "Mute user",
+      "muted": "{{user}} muted for {{minutes}} minutes.",
+      "muteFailed": "Could not mute this user.",
+      "blocked": "Creators, moderators, and yourself cannot be muted.",
+      "pickDuration": "Choose mute duration",
+      "minutes": "{{count}} minutes"
     }
   },
   "player": {
@@ -413,7 +423,8 @@
       "overview": "Overview",
       "prepare": "Stream setup",
       "replay": "Data replay",
-      "appointments": "Live appointments"
+      "appointments": "Live appointments",
+      "moderators": "Room moderators"
     },
     "auth": {
       "title": "Sign in to open Creator Studio",
@@ -588,6 +599,36 @@
       "minute": "Minute",
       "oneHourLater": "1 hour later",
       "done": "Done"
+    },
+    "moderators": {
+      "added": "{{name}} is now a room moderator.",
+      "addFailed": "Could not add moderator.",
+      "removed": "{{name}} is no longer a room moderator.",
+      "removeFailed": "Could not remove moderator.",
+      "active": "Room moderators",
+      "activeSub": "Active now",
+      "followers": "Eligible followers",
+      "followersSub": "Search by username",
+      "logs": "Action records",
+      "logsSub": "Paginated",
+      "muteOptions": "Mute durations",
+      "muteOptionsSub": "Minutes",
+      "searchLabel": "Follower list",
+      "searchTitle": "Add room moderator",
+      "searchPlaceholder": "Search follower username",
+      "alreadyModerator": "Already mod",
+      "add": "Add",
+      "noFollowers": "No eligible followers found.",
+      "currentLabel": "Current list",
+      "currentTitle": "Active moderators",
+      "remove": "Remove",
+      "noModerators": "No room moderators yet.",
+      "logLabel": "Action records",
+      "logTitle": "Moderator action log",
+      "noLogs": "No action records yet.",
+      "actionAdd": "Added moderator",
+      "actionRemove": "Removed moderator",
+      "actionMute": "Muted {{minutes}} minutes"
     },
     "publisher": {
       "title": "Publishing",

@@ -25,6 +25,7 @@ type LiveService struct {
 	rooms          *repo.RoomRepo
 	live           *repo.LiveRepo
 	appointments   *repo.AppointmentRepo
+	moderation     *repo.ModerationRepo
 	keySecret      []byte
 	keyTTL         time.Duration
 	flvBase        string
@@ -64,6 +65,10 @@ func NewLiveService(rooms *repo.RoomRepo, live *repo.LiveRepo, secret string, tt
 
 func (s *LiveService) SetAppointmentRepo(appointments *repo.AppointmentRepo) {
 	s.appointments = appointments
+}
+
+func (s *LiveService) SetModerationRepo(moderation *repo.ModerationRepo) {
+	s.moderation = moderation
 }
 
 // GoLiveReq is the body of POST /rooms/live.
@@ -135,6 +140,11 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	}
 	if err := s.live.Save(ctx, streamKey, roomID, s.keyTTL); err != nil {
 		return nil, err
+	}
+	if s.moderation != nil {
+		if err := s.moderation.SyncRoomModerators(ctx, room.ID, ownerID); err != nil {
+			return nil, err
+		}
 	}
 
 	st := room.ToStream(now)

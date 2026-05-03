@@ -213,6 +213,15 @@ func (r *RoomRepo) ActiveRoomsByOwner(ctx context.Context, ownerID string) ([]mo
 	return rooms, err
 }
 
+func (r *RoomRepo) ActiveRooms(ctx context.Context) ([]model.Room, error) {
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).
+		Where("status IN ?", []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Order("started_at DESC, created_at DESC").
+		Find(&rooms).Error
+	return rooms, err
+}
+
 func (r *RoomRepo) UpdateMetadata(ctx context.Context, id, title, description, cover string) error {
 	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(map[string]any{
 		"title":       title,

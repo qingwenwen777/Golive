@@ -74,6 +74,13 @@ func (s *SocialRepo) Following(ctx context.Context, uid string) ([]string, error
 	return s.rdb.ZRevRange(ctx, userFollowsKey(uid), 0, -1).Result()
 }
 
+func (s *SocialRepo) Followers(ctx context.Context, channelID string) ([]string, error) {
+	if channelID == "" {
+		return nil, nil
+	}
+	return s.rdb.ZRevRange(ctx, channelFansKey(channelID), 0, -1).Result()
+}
+
 func (s *SocialRepo) Follow(ctx context.Context, uid, channelID string) error {
 	now := float64(time.Now().UnixMilli())
 	pipe := s.rdb.TxPipeline()

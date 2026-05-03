@@ -123,11 +123,21 @@
       "you": "あなた",
       "sentGift": "送信",
       "guestViewer": "あなた",
+      "moderateUser": "{{user}} を管理",
+      "moderatorBadge": "モデレーター",
       "emojiGroups": {
         "faces": "表情",
         "gestures": "ジェスチャー",
         "stream": "配信"
       }
+    },
+    "moderation": {
+      "title": "ユーザーをミュート",
+      "muted": "{{user}} を {{minutes}} 分ミュートしました。",
+      "muteFailed": "このユーザーをミュートできませんでした。",
+      "blocked": "配信者、モデレーター、自分自身はミュートできません。",
+      "pickDuration": "ミュート時間を選択",
+      "minutes": "{{count}} 分"
     }
   },
   "player": {
@@ -413,7 +423,8 @@
       "overview": "概要",
       "prepare": "配信準備",
       "replay": "データ振り返り",
-      "appointments": "ライブ予約"
+      "appointments": "ライブ予約",
+      "moderators": "ルームモデレーター"
     },
     "auth": {
       "title": "ログインして配信者ワークスペースを開く",
@@ -588,6 +599,36 @@
       "minute": "分",
       "oneHourLater": "1時間後",
       "done": "完了"
+    },
+    "moderators": {
+      "added": "{{name}} をルームモデレーターにしました。",
+      "addFailed": "モデレーターを追加できませんでした。",
+      "removed": "{{name}} のモデレーター権限を解除しました。",
+      "removeFailed": "モデレーターを解除できませんでした。",
+      "active": "ルームモデレーター",
+      "activeSub": "現在有効",
+      "followers": "選択できるフォロワー",
+      "followersSub": "ユーザー名で検索",
+      "logs": "操作記録",
+      "logsSub": "ページ分け",
+      "muteOptions": "ミュート時間",
+      "muteOptionsSub": "分",
+      "searchLabel": "フォロワー一覧",
+      "searchTitle": "ルームモデレーターを追加",
+      "searchPlaceholder": "フォロワーのユーザー名を検索",
+      "alreadyModerator": "設定済み",
+      "add": "追加",
+      "noFollowers": "追加できるフォロワーが見つかりません。",
+      "currentLabel": "現在の一覧",
+      "currentTitle": "稼働中のモデレーター",
+      "remove": "解除",
+      "noModerators": "ルームモデレーターはまだいません。",
+      "logLabel": "操作記録",
+      "logTitle": "モデレーター操作ログ",
+      "noLogs": "操作記録はまだありません。",
+      "actionAdd": "モデレーター追加",
+      "actionRemove": "モデレーター解除",
+      "actionMute": "{{minutes}} 分ミュート"
     },
     "publisher": {
       "title": "配信",

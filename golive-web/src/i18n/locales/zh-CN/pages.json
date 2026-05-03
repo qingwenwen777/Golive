@@ -123,11 +123,21 @@
       "you": "你",
       "sentGift": "送出",
       "guestViewer": "你",
+      "moderateUser": "管理 {{user}}",
+      "moderatorBadge": "房管",
       "emojiGroups": {
         "faces": "表情",
         "gestures": "手势",
         "stream": "直播"
       }
+    },
+    "moderation": {
+      "title": "禁言用户",
+      "muted": "{{user}} 已禁言 {{minutes}} 分钟。",
+      "muteFailed": "无法禁言该用户。",
+      "blocked": "主播、房管或你自己不能被禁言。",
+      "pickDuration": "选择禁言时长",
+      "minutes": "{{count}} 分钟"
     }
   },
   "player": {
@@ -414,7 +424,8 @@
       "overview": "概览",
       "prepare": "开播准备",
       "replay": "数据复盘",
-      "appointments": "直播预约"
+      "appointments": "直播预约",
+      "moderators": "房间房管"
     },
     "auth": {
       "title": "登录后进入主播工作台",
@@ -589,6 +600,36 @@
       "minute": "分钟",
       "oneHourLater": "一小时后",
       "done": "完成"
+    },
+    "moderators": {
+      "added": "{{name}} 已成为房间房管。",
+      "addFailed": "添加房管失败。",
+      "removed": "{{name}} 已取消房管资格。",
+      "removeFailed": "取消房管失败。",
+      "active": "房间房管",
+      "activeSub": "当前有效",
+      "followers": "可选粉丝",
+      "followersSub": "按用户名搜索",
+      "logs": "操作记录",
+      "logsSub": "分页记录",
+      "muteOptions": "禁言时长",
+      "muteOptionsSub": "分钟",
+      "searchLabel": "粉丝列表",
+      "searchTitle": "添加房间房管",
+      "searchPlaceholder": "搜索粉丝用户名",
+      "alreadyModerator": "已是房管",
+      "add": "添加",
+      "noFollowers": "没有找到可添加的粉丝。",
+      "currentLabel": "当前名单",
+      "currentTitle": "正在值守的房管",
+      "remove": "取消资格",
+      "noModerators": "还没有房间房管。",
+      "logLabel": "操作记录",
+      "logTitle": "房管操作流水",
+      "noLogs": "暂无操作记录。",
+      "actionAdd": "添加房管",
+      "actionRemove": "取消房管",
+      "actionMute": "禁言 {{minutes}} 分钟"
     },
     "publisher": {
       "title": "推流",

@@ -21,6 +21,7 @@ interface ChatHistoryBase {
 interface DanmuHistoryItem extends ChatHistoryBase {
   type: 'chat';
   color?: string;
+  role?: string;
   fanBadge?: ChatFanBadge;
 }
 
@@ -45,6 +46,7 @@ function toChatMessage(item: DanmuHistoryItem): ChatMessage {
     avatar: item.avatar,
     text: item.text,
     color: item.color,
+    role: item.role,
     fanBadge: item.fanBadge,
     ts: item.ts,
   };

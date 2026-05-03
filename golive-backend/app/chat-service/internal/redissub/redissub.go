@@ -52,6 +52,7 @@ type inboundChat struct {
 	Avatar   string                 `json:"avatar,omitempty"`
 	Text     string                 `json:"text"`
 	Color    string                 `json:"color,omitempty"`
+	Role     string                 `json:"role,omitempty"`
 	FanBadge *model.FanBadgePayload `json:"fanBadge,omitempty"`
 	Ts       int64                  `json:"ts"`
 }
@@ -109,6 +110,7 @@ func (s *Subscriber) handle(ctx context.Context, msg *redis.Message) {
 		Avatar:   ev.Avatar,
 		Text:     ev.Text,
 		Color:    ev.Color,
+		Role:     safeRole(ev.Role),
 		Ts:       ev.Ts,
 	}
 	if ev.FanBadge != nil {
@@ -137,4 +139,12 @@ func isDuplicateKey(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "Duplicate entry") ||
 		strings.Contains(msg, "duplicate key")
+}
+
+func safeRole(role string) string {
+	role = strings.TrimSpace(role)
+	if role == "moderator" {
+		return role
+	}
+	return ""
 }

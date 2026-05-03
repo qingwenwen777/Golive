@@ -38,6 +38,7 @@ function mergeMessageFields(current: Message | undefined, incoming: Message): Me
     ...incoming,
     avatar: incoming.avatar ?? current.avatar,
     color: incoming.color ?? current.color,
+    role: incoming.role ?? current.role,
     fanBadge: incoming.fanBadge ?? current.fanBadge,
   };
 }
@@ -78,8 +79,12 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
     set((state) =>
       updateRoom(state, roomId, (slice) => {
         if (slice.messages.some((x) => x.id === m.id)) {
+          const messages = slice.messages.map((x) =>
+            x.id === m.id ? mergeMessageFields(x, m) : x,
+          );
           return {
             ...slice,
+            messages,
             lastServerTs: Math.max(slice.lastServerTs, m.ts),
           };
         }
