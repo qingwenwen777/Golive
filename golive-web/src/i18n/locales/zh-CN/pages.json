@@ -31,6 +31,35 @@
       "signInSub": "把即将开播的直播统一收在这里。",
       "viewAll": "查看全部",
       "empty": "还没有预约。"
+    },
+    "levelGifts": {
+      "title": "等级礼物展示",
+      "subtitle": "累计充值提升等级，解锁更有身份感的直播礼物。",
+      "unlockLevel": "Lv.{{level}} 解锁",
+      "tier": "档位 {{tier}}",
+      "price": "{{coins}} coins",
+      "empty": "暂无等级礼物。"
+    }
+  },
+  "giftCatalog": {
+    "names": {
+      "flower": "小花",
+      "donut": "甜甜圈",
+      "cake": "蛋糕",
+      "ramen": "拉面",
+      "rocket": "火箭",
+      "starlight": "星光",
+      "fan_light": "粉丝之光",
+      "crown": "皇冠",
+      "gem": "宝石",
+      "aurora": "极光",
+      "yacht": "游艇",
+      "castle": "城堡",
+      "meteor": "流星",
+      "galaxy_ship": "银河飞船",
+      "royal_crown": "皇家皇冠",
+      "nebula_ring": "星云戒指",
+      "eternal_scepter": "永恒权杖"
     }
   },
   "liveRoom": {
@@ -145,6 +174,41 @@
       "unmuteAction": "解除禁言",
       "youAreMuted": "你当前已被禁言，暂时不能发言。",
       "chatMutedPlaceholder": "你当前已被禁言"
+    },
+    "giftPanel": {
+      "title": "礼物",
+      "balance": "{{coins}} coins",
+      "tabs": {
+        "all": "全部"
+      },
+      "sent": "已送出 {{name}} x{{count}}",
+      "insufficientCoins": "coins 不足",
+      "unlockToast": "Lv.{{level}} 解锁",
+      "failed": "礼物发送失败",
+      "levelChip": "Lv.{{level}}",
+      "unlockHint": "Lv.{{level}} 解锁，充值升级后可使用。",
+      "needCoins": "还差 {{coins}} coins",
+      "totalCoins": "合计 {{coins}} coins",
+      "topUp": "去充值",
+      "sending": "发送中...",
+      "send": "发送"
+    },
+    "superChatDialog": {
+      "title": "发送 SuperChat",
+      "balance": "可用 {{coins}} coins",
+      "tierUnlockHint": "档位 {{tier}} 在 {{amount}}+ 解锁留言",
+      "amount": "金额",
+      "tierMaxChars": "档位 {{tier}} · 最多 {{count}} 字",
+      "amountAria": "SuperChat 金额",
+      "textPlaceholder": "说点什么...",
+      "upgradeTextPlaceholder": "升级到档位 1+ 后可附带留言",
+      "insufficientCoins": "coins 不足",
+      "failed": "SuperChat 发送失败",
+      "insufficientBalance": "余额不足（还差 {{coins}}）。",
+      "cancel": "取消",
+      "topUp": "去充值",
+      "sending": "发送中...",
+      "send": "发送"
     }
   },
   "player": {
@@ -273,7 +337,14 @@
       "startLive": "开播",
       "noHistory": "还没有观看历史。",
       "noWatchLater": "保存直播间后会显示在这里。",
-      "noLiked": "喜欢的直播间会显示在这里。"
+      "noLiked": "喜欢的直播间会显示在这里。",
+      "levelProgress": {
+        "title": "Lv.{{level}} 等级身份",
+        "maxLevel": "已满级",
+        "toNext": "距离 Lv.{{level}} 还需 {{coins}} coins",
+        "charged": "累计充值 {{coins}} coins",
+        "target": "目标 {{coins}} coins"
+      }
     },
     "fanBadges": {
       "signIn": "登录后查看你的粉丝徽章。",

@@ -49,6 +49,7 @@ import {
 } from '@/api/room';
 import { copyText } from '@/lib/clipboard';
 import { addDailyCoinWatchSeconds, markDailyCoinRoomWatched } from '@/lib/coinActivity';
+import { localizedGiftName } from '@/lib/gift';
 import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
 import {
   clearPublisherSession,
@@ -77,7 +78,7 @@ function fanBadgeLevel(totalContribution: number): number {
 
 export default function LiveRoomPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const { t } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isNarrow = useMediaQuery('(max-width: 1279px)');
@@ -100,6 +101,7 @@ export default function LiveRoomPage() {
   const [publisherSession, setPublisherSession] = useState<PublisherSession | null>(() =>
     loadPublisherSession(),
   );
+  const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
   const isScheduledRoom = stream?.status === 'scheduled';
@@ -128,7 +130,10 @@ export default function LiveRoomPage() {
     if (!badge) return null;
     return { creatorId: badge.creatorId, level: badge.level };
   }, [fanBadges.data, stream?.ownerId]);
-  const moderationState = useRoomModerationState(roomId, Boolean(isAuthed && roomCanWatch && roomId));
+  const moderationState = useRoomModerationState(
+    roomId,
+    Boolean(isAuthed && roomCanWatch && roomId),
+  );
   const muteUser = useMuteRoomUser(roomId);
   const unmuteUser = useUnmuteRoomUser(roomId);
   const moderationRole =
@@ -472,7 +477,9 @@ export default function LiveRoomPage() {
       <>
         <div
           className={[
-            isNarrow ? 'grid grid-cols-1 gap-6 px-4 pb-20' : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
+            isNarrow
+              ? 'grid grid-cols-1 gap-6 px-4 pb-20'
+              : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
             isMobile && mobileComposerFocused ? 'gl-live-room-chatting' : '',
           ]
             .filter(Boolean)
@@ -569,7 +576,9 @@ export default function LiveRoomPage() {
       <>
         <div
           className={[
-            isNarrow ? 'grid grid-cols-1 gap-6 px-4 pb-20' : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
+            isNarrow
+              ? 'grid grid-cols-1 gap-6 px-4 pb-20'
+              : 'grid grid-cols-[1fr_402px] gap-6 px-6 pb-20',
             isMobile && mobileComposerFocused ? 'gl-live-room-chatting' : '',
           ]
             .filter(Boolean)
@@ -588,24 +597,52 @@ export default function LiveRoomPage() {
                   return;
                 }
                 reserveAppointment.mutate(undefined, {
-                  onSuccess: () => toast.success(t('liveRoom.appointmentReserved', { defaultValue: 'Appointment reserved.' })),
-                  onError: (err) => toast.error(err.message || t('liveRoom.appointmentReserveFailed', { defaultValue: 'Could not reserve this appointment.' })),
+                  onSuccess: () =>
+                    toast.success(
+                      t('liveRoom.appointmentReserved', { defaultValue: 'Appointment reserved.' }),
+                    ),
+                  onError: (err) =>
+                    toast.error(
+                      err.message ||
+                        t('liveRoom.appointmentReserveFailed', {
+                          defaultValue: 'Could not reserve this appointment.',
+                        }),
+                    ),
                 });
               }}
               onUnreserve={() => {
                 unreserveAppointment.mutate(undefined, {
-                  onSuccess: () => toast.success(t('liveRoom.appointmentUnreserved', { defaultValue: 'Reservation removed.' })),
-                  onError: (err) => toast.error(err.message || t('liveRoom.appointmentReserveFailed', { defaultValue: 'Could not update reservation.' })),
+                  onSuccess: () =>
+                    toast.success(
+                      t('liveRoom.appointmentUnreserved', { defaultValue: 'Reservation removed.' }),
+                    ),
+                  onError: (err) =>
+                    toast.error(
+                      err.message ||
+                        t('liveRoom.appointmentReserveFailed', {
+                          defaultValue: 'Could not update reservation.',
+                        }),
+                    ),
                 });
               }}
               onStart={() => {
                 startAppointment.mutate(undefined, {
                   onSuccess: (next) => {
                     savePublisherSession(next);
-                    toast.success(t('liveRoom.appointmentStartSuccess', { defaultValue: 'Appointment live started.' }));
+                    toast.success(
+                      t('liveRoom.appointmentStartSuccess', {
+                        defaultValue: 'Appointment live started.',
+                      }),
+                    );
                     navigate(`/studio/live/${encodeURIComponent(next.id)}`);
                   },
-                  onError: (err) => toast.error(err.message || t('liveRoom.appointmentStartFailed', { defaultValue: 'Could not start this appointment.' })),
+                  onError: (err) =>
+                    toast.error(
+                      err.message ||
+                        t('liveRoom.appointmentStartFailed', {
+                          defaultValue: 'Could not start this appointment.',
+                        }),
+                    ),
                 });
               }}
             />
@@ -626,8 +663,17 @@ export default function LiveRoomPage() {
             {ownsStream && (
               <div className="gl-owner-live-actions">
                 <div>
-                  <h2>{t('liveRoom.appointmentOwnerTitle', { defaultValue: 'Appointment management' })}</h2>
-                  <p>{t('liveRoom.appointmentOwnerSub', { defaultValue: 'Start the appointment within 30 minutes of the scheduled time.' })}</p>
+                  <h2>
+                    {t('liveRoom.appointmentOwnerTitle', {
+                      defaultValue: 'Appointment management',
+                    })}
+                  </h2>
+                  <p>
+                    {t('liveRoom.appointmentOwnerSub', {
+                      defaultValue:
+                        'Start the appointment within 30 minutes of the scheduled time.',
+                    })}
+                  </p>
                 </div>
                 {appointment?.canStart && (
                   <button
@@ -639,13 +685,23 @@ export default function LiveRoomPage() {
                           savePublisherSession(next);
                           navigate(`/studio/live/${encodeURIComponent(next.id)}`);
                         },
-                        onError: (err) => toast.error(err.message || t('liveRoom.appointmentStartFailed', { defaultValue: 'Could not start this appointment.' })),
+                        onError: (err) =>
+                          toast.error(
+                            err.message ||
+                              t('liveRoom.appointmentStartFailed', {
+                                defaultValue: 'Could not start this appointment.',
+                              }),
+                          ),
                       });
                     }}
                     disabled={startAppointment.isPending}
                   >
                     <PlayCircle size={15} />
-                    <span>{startAppointment.isPending ? t('liveRoom.starting', { defaultValue: 'Starting...' }) : t('liveRoom.startLive', { defaultValue: 'Start live' })}</span>
+                    <span>
+                      {startAppointment.isPending
+                        ? t('liveRoom.starting', { defaultValue: 'Starting...' })
+                        : t('liveRoom.startLive', { defaultValue: 'Start live' })}
+                    </span>
                   </button>
                 )}
               </div>
@@ -725,6 +781,7 @@ export default function LiveRoomPage() {
           roomId={roomId}
           onSent={({ gift, count, requestId }) => {
             const totalCoin = gift.priceCoin * count;
+            const giftName = localizedGiftName(gift, locale, t);
             const currentName = currentUser ? userDisplayName(currentUser) : 'You';
             if (currentUser) {
               incrementViewerContribution(
@@ -745,7 +802,7 @@ export default function LiveRoomPage() {
               {
                 id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 icon: gift.icon,
-                label: `${gift.name} x${count}`,
+                label: `${giftName} x${count}`,
               },
             ]);
             appendMessage(roomId, {
@@ -755,7 +812,7 @@ export default function LiveRoomPage() {
               userId: currentUser?.id,
               user: currentName,
               avatar: currentUser?.avatar,
-              giftName: gift.name,
+              giftName,
               giftIcon: gift.icon,
               count,
               tier: gift.tier,
@@ -923,19 +980,20 @@ export default function LiveRoomPage() {
         roomId={roomId}
         onSent={({ gift, count, requestId }) => {
           const totalCoin = gift.priceCoin * count;
+          const giftName = localizedGiftName(gift, locale, t);
           const currentName = currentUser ? userDisplayName(currentUser) : 'You';
           if (currentUser) {
             incrementViewerContribution(
               roomId,
               {
-              userId: currentUser.id,
-              user: currentName,
-              avatar: currentUser.avatar,
-              contribution: 0,
-              userLevel: currentUser.levelInfo?.level,
-            },
-            totalCoin,
-          );
+                userId: currentUser.id,
+                user: currentName,
+                avatar: currentUser.avatar,
+                contribution: 0,
+                userLevel: currentUser.levelInfo?.level,
+              },
+              totalCoin,
+            );
           }
           updateLocalFanBadge(totalCoin, gift.id === 'fan_light');
           setFlying((prev) => [
@@ -943,7 +1001,7 @@ export default function LiveRoomPage() {
             {
               id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               icon: gift.icon,
-              label: `${gift.name} x${count}`,
+              label: `${giftName} x${count}`,
             },
           ]);
           appendMessage(roomId, {
@@ -953,7 +1011,7 @@ export default function LiveRoomPage() {
             userId: currentUser?.id,
             user: currentName,
             avatar: currentUser?.avatar,
-            giftName: gift.name,
+            giftName,
             giftIcon: gift.icon,
             count,
             tier: gift.tier,
@@ -981,7 +1039,11 @@ function StartingRoomPlayer({ stream }: { stream: Stream }) {
   return (
     <section className="gl-scheduled-player gl-starting-player">
       <div className="gl-scheduled-player-cover">
-        {stream.cover ? <LoadableImage src={stream.cover} alt="" /> : <div className="gl-scheduled-player-fallback" />}
+        {stream.cover ? (
+          <LoadableImage src={stream.cover} alt="" />
+        ) : (
+          <div className="gl-scheduled-player-fallback" />
+        )}
         <div className="gl-scheduled-player-overlay">
           <span className="gl-scheduled-player-badge">
             <Radio size={14} />
@@ -1026,7 +1088,11 @@ function ScheduledRoomPlayer({
   return (
     <section className="gl-scheduled-player">
       <div className="gl-scheduled-player-cover">
-        {stream.cover ? <LoadableImage src={stream.cover} alt="" /> : <div className="gl-scheduled-player-fallback" />}
+        {stream.cover ? (
+          <LoadableImage src={stream.cover} alt="" />
+        ) : (
+          <div className="gl-scheduled-player-fallback" />
+        )}
         <div className="gl-scheduled-player-overlay">
           <span className="gl-scheduled-player-badge">
             <CalendarClock size={14} />
@@ -1037,7 +1103,10 @@ function ScheduledRoomPlayer({
           <div className="gl-scheduled-player-meta">
             <span>
               <Bell size={14} />
-              {t('liveRoom.scheduledReserved', { count: reservationCount, defaultValue: '{{count}} reserved' })}
+              {t('liveRoom.scheduledReserved', {
+                count: reservationCount,
+                defaultValue: '{{count}} reserved',
+              })}
             </span>
             <span>
               <CheckCircle2 size={14} />
@@ -1050,12 +1119,22 @@ function ScheduledRoomPlayer({
           </div>
           <div className="gl-scheduled-player-actions">
             {owner ? (
-              <button type="button" className="gl-retry-btn" disabled={pending || !canStart} onClick={onStart}>
+              <button
+                type="button"
+                className="gl-retry-btn"
+                disabled={pending || !canStart}
+                onClick={onStart}
+              >
                 <PlayCircle size={16} />
                 {t('liveRoom.startLive', { defaultValue: 'Start live' })}
               </button>
             ) : reserved ? (
-              <button type="button" className="gl-secondary-btn" disabled={pending} onClick={onUnreserve}>
+              <button
+                type="button"
+                className="gl-secondary-btn"
+                disabled={pending}
+                onClick={onUnreserve}
+              >
                 <X size={16} />
                 {t('liveRoom.cancelReserve', { defaultValue: 'Cancel reservation' })}
               </button>
@@ -1125,7 +1204,9 @@ function MuteUserDialog({
     : statePending
       ? t('liveRoom.moderation.checkingMute', { defaultValue: '正在检查禁言状态...' })
       : muted
-        ? t('liveRoom.moderation.alreadyMuted', { defaultValue: '该用户当前已被禁言，可解除禁言。' })
+        ? t('liveRoom.moderation.alreadyMuted', {
+            defaultValue: '该用户当前已被禁言，可解除禁言。',
+          })
         : t('liveRoom.moderation.pickDuration', { defaultValue: '选择禁言时长' });
 
   return (

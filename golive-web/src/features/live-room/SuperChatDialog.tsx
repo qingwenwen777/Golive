@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Coins } from 'lucide-react';
@@ -31,6 +32,7 @@ const MAX = 50000;
 const QUICK_AMOUNTS = [200, 500, 1000, 2000, 5000, 10000];
 
 export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogProps) {
+  const { t, i18n } = useTranslation('pages');
   const isMobile = useMediaQuery('(max-width: 640px)');
   const navigate = useNavigate();
   const me = useMe();
@@ -50,6 +52,8 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
   const maxText = SC_MAX_TEXT_BY_TIER[tier];
   const insufficient = amount > balance;
   const disabled = send.isPending || amount < MIN;
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const amountLabel = formatSuperChatAmount(amount, locale);
 
   const updateAmount = (value: number) => {
     const next = Math.min(MAX, Math.max(MIN, Math.round(value / 100) * 100));
@@ -93,7 +97,11 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         onSuccess: (order) => {
           if (order.status !== 'success') {
             removeMessage(roomId, pendingId);
-            toast.error('Insufficient coins');
+            toast.error(
+              t('liveRoom.superChatDialog.insufficientCoins', {
+                defaultValue: 'Insufficient coins',
+              }),
+            );
             return;
           }
           replaceMessage(roomId, pendingId, {
@@ -112,8 +120,18 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         },
         onError: (err) => {
           removeMessage(roomId, pendingId);
-          if (err.reason === 'insufficient_coin') toast.error('Insufficient coins');
-          else toast.error(err.message || 'Failed to send SuperChat');
+          if (err.reason === 'insufficient_coin') {
+            toast.error(
+              t('liveRoom.superChatDialog.insufficientCoins', {
+                defaultValue: 'Insufficient coins',
+              }),
+            );
+          } else {
+            toast.error(
+              err.message ||
+                t('liveRoom.superChatDialog.failed', { defaultValue: 'Failed to send SuperChat' }),
+            );
+          }
         },
       },
     );
@@ -123,16 +141,24 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn('gl-sc-dialog max-w-md', isMobile && 'is-mobile')}>
         <DialogHeader className="gl-sc-dialog-head">
-          <DialogTitle>Send SuperChat</DialogTitle>
+          <DialogTitle>
+            {t('liveRoom.superChatDialog.title', { defaultValue: 'Send SuperChat' })}
+          </DialogTitle>
           <DialogDescription className="flex items-center gap-1 text-xs">
-            <Coins size={12} /> <span>{balance.toLocaleString()} coins available</span>
+            <Coins size={12} />
+            <span>
+              {t('liveRoom.superChatDialog.balance', {
+                coins: balance.toLocaleString(locale),
+                defaultValue: '{{coins}} coins available',
+              })}
+            </span>
           </DialogDescription>
         </DialogHeader>
 
         <div className="gl-sc-preview rounded-md p-3 text-white" style={{ background: spec.bg }}>
           <div className="flex items-center justify-between">
             <span className="font-semibold">{userDisplayName(user)}</span>
-            <span className="font-bold">¥{amount.toLocaleString()}</span>
+            <span className="font-bold">{amountLabel}</span>
           </div>
           {canText && text.trim() && (
             <div
@@ -144,16 +170,26 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
           )}
           {!canText && (
             <div className="mt-2 text-xs opacity-80">
-              Tier {tier} · text messages unlock at ¥200+
+              {t('liveRoom.superChatDialog.tierUnlockHint', {
+                tier,
+                amount: formatSuperChatAmount(MIN, locale),
+                defaultValue: 'Tier {{tier}} text messages unlock at {{amount}}+',
+              })}
             </div>
           )}
         </div>
 
         <div className="gl-sc-amount-block space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-text-secondary">Amount</span>
+            <span className="text-text-secondary">
+              {t('liveRoom.superChatDialog.amount', { defaultValue: 'Amount' })}
+            </span>
             <span className="font-medium">
-              tier {tier} · max {maxText || 0} chars
+              {t('liveRoom.superChatDialog.tierMaxChars', {
+                tier,
+                count: maxText || 0,
+                defaultValue: 'Tier {{tier}} · max {{count}} chars',
+              })}
             </span>
           </div>
           <label className="gl-sc-amount-input">
@@ -167,7 +203,9 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
                 if (Number.isFinite(next)) setAmount(Math.min(MAX, next || MIN));
               }}
               onBlur={() => updateAmount(amount)}
-              aria-label="SuperChat amount"
+              aria-label={t('liveRoom.superChatDialog.amountAria', {
+                defaultValue: 'SuperChat amount',
+              })}
             />
           </label>
           <input
@@ -189,7 +227,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
                   amount === v ? 'bg-accent text-white' : 'bg-bg-hover text-text-secondary',
                 )}
               >
-                ¥{v.toLocaleString()}
+                {formatSuperChatAmount(v, locale)}
               </button>
             ))}
           </div>
@@ -203,7 +241,15 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
               if (e.target.value.length > maxText) return;
               setText(e.target.value);
             }}
-            placeholder={canText ? 'Say something…' : 'Upgrade to tier 1+ to include a message'}
+            placeholder={
+              canText
+                ? t('liveRoom.superChatDialog.textPlaceholder', {
+                    defaultValue: 'Say something...',
+                  })
+                : t('liveRoom.superChatDialog.upgradeTextPlaceholder', {
+                    defaultValue: 'Upgrade to tier 1+ to include a message',
+                  })
+            }
             disabled={!canText}
             rows={3}
             className="gl-sc-textarea w-full resize-none rounded-md border border-border bg-bg-primary p-2 text-sm outline-none focus:border-accent disabled:opacity-50"
@@ -217,7 +263,10 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
 
         {insufficient && (
           <div className="text-red-500 text-xs">
-            Insufficient balance (need {(amount - balance).toLocaleString()} more).
+            {t('liveRoom.superChatDialog.insufficientBalance', {
+              coins: (amount - balance).toLocaleString(locale),
+              defaultValue: 'Insufficient balance (need {{coins}} more).',
+            })}
           </div>
         )}
 
@@ -226,7 +275,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             onClick={() => onOpenChange(false)}
             className="gl-sc-cancel rounded-full px-4 py-2 text-sm text-text-secondary hover:bg-bg-hover"
           >
-            Cancel
+            {t('liveRoom.superChatDialog.cancel', { defaultValue: 'Cancel' })}
           </button>
           <button
             disabled={disabled}
@@ -236,10 +285,18 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
               disabled ? 'bg-accent/40' : 'bg-accent hover:bg-accent/90',
             )}
           >
-            {insufficient ? 'Top up' : send.isPending ? 'Sending...' : 'Send'}
+            {insufficient
+              ? t('liveRoom.superChatDialog.topUp', { defaultValue: 'Top up' })
+              : send.isPending
+                ? t('liveRoom.superChatDialog.sending', { defaultValue: 'Sending...' })
+                : t('liveRoom.superChatDialog.send', { defaultValue: 'Send' })}
           </button>
         </div>
       </DialogContent>
     </Dialog>
   );
+}
+
+function formatSuperChatAmount(value: number, locale: string): string {
+  return `\u00a5${value.toLocaleString(locale)}`;
 }

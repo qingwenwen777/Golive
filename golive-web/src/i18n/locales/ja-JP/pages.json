@@ -31,6 +31,35 @@
       "signInSub": "これから始まるライブをまとめて確認できます。",
       "viewAll": "すべて見る",
       "empty": "予約はまだありません。"
+    },
+    "levelGifts": {
+      "title": "レベルギフト",
+      "subtitle": "チャージでレベルを上げ、特別なライブギフトを解放できます。",
+      "unlockLevel": "Lv.{{level}}で解放",
+      "tier": "ティア {{tier}}",
+      "price": "{{coins}} coins",
+      "empty": "レベルギフトはまだありません。"
+    }
+  },
+  "giftCatalog": {
+    "names": {
+      "flower": "フラワー",
+      "donut": "ドーナツ",
+      "cake": "ケーキ",
+      "ramen": "ラーメン",
+      "rocket": "ロケット",
+      "starlight": "スターライト",
+      "fan_light": "ファンライト",
+      "crown": "クラウン",
+      "gem": "ジェム",
+      "aurora": "オーロラ",
+      "yacht": "ヨット",
+      "castle": "キャッスル",
+      "meteor": "流星",
+      "galaxy_ship": "銀河シップ",
+      "royal_crown": "ロイヤルクラウン",
+      "nebula_ring": "星雲リング",
+      "eternal_scepter": "永遠のセプター"
     }
   },
   "liveRoom": {
@@ -145,6 +174,41 @@
       "unmuteAction": "ミュート解除",
       "youAreMuted": "現在ミュート中のため、チャットできません。",
       "chatMutedPlaceholder": "現在ミュート中です"
+    },
+    "giftPanel": {
+      "title": "ギフト",
+      "balance": "{{coins}} coins",
+      "tabs": {
+        "all": "すべて"
+      },
+      "sent": "{{name}} x{{count}} を送りました",
+      "insufficientCoins": "coins が不足しています",
+      "unlockToast": "Lv.{{level}}で解放",
+      "failed": "ギフトの送信に失敗しました",
+      "levelChip": "Lv.{{level}}",
+      "unlockHint": "Lv.{{level}}で解放。チャージしてレベルを上げましょう。",
+      "needCoins": "あと {{coins}} coins 必要です",
+      "totalCoins": "合計 {{coins}} coins",
+      "topUp": "チャージ",
+      "sending": "送信中...",
+      "send": "送信"
+    },
+    "superChatDialog": {
+      "title": "SuperChatを送信",
+      "balance": "利用可能 {{coins}} coins",
+      "tierUnlockHint": "ティア {{tier}} は {{amount}}+ でメッセージ解放",
+      "amount": "金額",
+      "tierMaxChars": "ティア {{tier}} · 最大 {{count}} 文字",
+      "amountAria": "SuperChat 金額",
+      "textPlaceholder": "メッセージを入力...",
+      "upgradeTextPlaceholder": "ティア1以上でメッセージを追加できます",
+      "insufficientCoins": "coins が不足しています",
+      "failed": "SuperChatの送信に失敗しました",
+      "insufficientBalance": "残高不足です（あと {{coins}} 必要）。",
+      "cancel": "キャンセル",
+      "topUp": "チャージ",
+      "sending": "送信中...",
+      "send": "送信"
     }
   },
   "player": {
@@ -272,7 +336,14 @@
       "startLive": "配信開始",
       "noHistory": "視聴履歴はまだありません。",
       "noWatchLater": "保存したライブルームがここに表示されます。",
-      "noLiked": "高評価したルームがここに表示されます。"
+      "noLiked": "高評価したルームがここに表示されます。",
+      "levelProgress": {
+        "title": "Lv.{{level}} ステータス",
+        "maxLevel": "最大レベル",
+        "toNext": "Lv.{{level}}まであと {{coins}} coins",
+        "charged": "累計チャージ {{coins}} coins",
+        "target": "目標 {{coins}} coins"
+      }
     },
     "fanBadges": {
       "signIn": "ログインしてファンバッジを見る。",

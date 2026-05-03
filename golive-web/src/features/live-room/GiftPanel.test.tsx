@@ -25,6 +25,20 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      let value = String(options?.defaultValue ?? key);
+      for (const [name, replacement] of Object.entries(options ?? {})) {
+        if (name === 'defaultValue') continue;
+        value = value.replaceAll(`{{${name}}}`, String(replacement));
+      }
+      return value;
+    },
+    i18n: { language: 'en', resolvedLanguage: 'en' },
+  }),
+}));
+
 vi.mock('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => false,
 }));
@@ -78,13 +92,7 @@ describe('GiftPanel', () => {
     giftApiMock.balance = 100;
     const onOpenChange = vi.fn();
 
-    render(
-      <GiftPanel
-        open
-        onOpenChange={onOpenChange}
-        roomId="room-1"
-      />,
-    );
+    render(<GiftPanel open onOpenChange={onOpenChange} roomId="room-1" />);
 
     fireEvent.click(screen.getByText('Rocket'));
     fireEvent.click(screen.getByRole('button', { name: 'Top up' }));
@@ -99,13 +107,7 @@ describe('GiftPanel', () => {
     giftApiMock.balance = 1000;
     const onOpenChange = vi.fn();
 
-    render(
-      <GiftPanel
-        open
-        onOpenChange={onOpenChange}
-        roomId="room-1"
-      />,
-    );
+    render(<GiftPanel open onOpenChange={onOpenChange} roomId="room-1" />);
 
     fireEvent.click(screen.getByText('Rocket'));
     fireEvent.click(screen.getByRole('button', { name: 'Top up' }));
@@ -130,14 +132,7 @@ describe('GiftPanel', () => {
       });
     });
 
-    render(
-      <GiftPanel
-        open
-        onOpenChange={vi.fn()}
-        roomId="room-1"
-        onSent={onSent}
-      />,
-    );
+    render(<GiftPanel open onOpenChange={vi.fn()} roomId="room-1" onSent={onSent} />);
 
     fireEvent.click(screen.getByText('Rocket'));
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));

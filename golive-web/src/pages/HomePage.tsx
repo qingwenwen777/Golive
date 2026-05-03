@@ -1,11 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bell, CheckCircle2, CloudOff, Inbox, Radio, UserPlus } from 'lucide-react';
+import {
+  Bell,
+  CheckCircle2,
+  CloudOff,
+  Coins,
+  Gift as GiftIcon,
+  Inbox,
+  LockKeyhole,
+  Radio,
+  Sparkles,
+  UserPlus,
+} from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
+import { useGifts } from '@/api/gift';
 import {
   useFollow,
   useRecommendedCreators,
@@ -17,6 +29,8 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import { cn } from '@/lib/cn';
+import { localizedGiftName } from '@/lib/gift';
 import { streamChannelName, type Stream } from '@/types/stream';
 
 export default function HomePage() {
@@ -127,6 +141,7 @@ export default function HomePage() {
 
         <MyAppointmentsSection />
         <HomeRecommendationsSection />
+        <HomeLevelGiftsSection />
       </div>
     </>
   );
@@ -144,13 +159,25 @@ function MyAppointmentsSection() {
         <div className="gl-section-title-row">
           <div>
             <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
-            <span>{t('home.myAppointments.subtitle', { defaultValue: 'Sign in to see your reserved live rooms.' })}</span>
+            <span>
+              {t('home.myAppointments.subtitle', {
+                defaultValue: 'Sign in to see your reserved live rooms.',
+              })}
+            </span>
           </div>
         </div>
         <div className="gl-yt-banner">
           <div>
-            <strong>{t('home.myAppointments.signInTitle', { defaultValue: 'Sign in to track reservations' })}</strong>
-            <span>{t('home.myAppointments.signInSub', { defaultValue: 'Keep an eye on upcoming live rooms from one place.' })}</span>
+            <strong>
+              {t('home.myAppointments.signInTitle', {
+                defaultValue: 'Sign in to track reservations',
+              })}
+            </strong>
+            <span>
+              {t('home.myAppointments.signInSub', {
+                defaultValue: 'Keep an eye on upcoming live rooms from one place.',
+              })}
+            </span>
           </div>
           <button className="gl-secondary-btn" type="button" onClick={() => openLogin()}>
             {t('library.signIn')}
@@ -167,7 +194,11 @@ function MyAppointmentsSection() {
       <div className="gl-section-title-row">
         <div>
           <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
-          <span>{t('home.myAppointments.subtitle', { defaultValue: 'Your reserved live rooms appear here.' })}</span>
+          <span>
+            {t('home.myAppointments.subtitle', {
+              defaultValue: 'Your reserved live rooms appear here.',
+            })}
+          </span>
         </div>
       </div>
       {appointments.isPending ? (
@@ -179,7 +210,12 @@ function MyAppointmentsSection() {
       ) : items.length > 0 ? (
         <div className="gl-home-appointment-grid">
           {items.map((item) => (
-            <AppointmentViewerCard key={item.id} appointment={item} to={`/live/${encodeURIComponent(item.roomId)}`} compact />
+            <AppointmentViewerCard
+              key={item.id}
+              appointment={item}
+              to={`/live/${encodeURIComponent(item.roomId)}`}
+              compact
+            />
           ))}
         </div>
       ) : (
@@ -228,8 +264,102 @@ function HomeRecommendationsSection() {
           ))}
         </div>
       ) : (
+        <div className="gl-creator-empty-soft">{t('home.recommendations.empty')}</div>
+      )}
+    </section>
+  );
+}
+
+function HomeLevelGiftsSection() {
+  const { t, i18n } = useTranslation('pages');
+  const gifts = useGifts();
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const levelGifts = useMemo(
+    () =>
+      (gifts.data ?? [])
+        .filter((gift) => (gift.unlockLevel ?? 1) > 1)
+        .sort(
+          (a, b) =>
+            (a.unlockLevel ?? 1) - (b.unlockLevel ?? 1) ||
+            a.priceCoin - b.priceCoin ||
+            a.id.localeCompare(b.id),
+        )
+        .slice(0, 8),
+    [gifts.data],
+  );
+
+  return (
+    <section
+      className="gl-home-level-gifts"
+      aria-label={t('home.levelGifts.title', { defaultValue: 'Level gift showcase' })}
+    >
+      <div className="gl-section-title-row">
+        <div>
+          <h2>{t('home.levelGifts.title', { defaultValue: 'Level gift showcase' })}</h2>
+          <span>
+            {t('home.levelGifts.subtitle', {
+              defaultValue: 'Charge to level up and unlock premium gifts for live rooms.',
+            })}
+          </span>
+        </div>
+      </div>
+
+      {gifts.isPending ? (
+        <div className="gl-home-level-gift-grid" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div className="gl-home-level-gift-card is-loading" key={index} />
+          ))}
+        </div>
+      ) : levelGifts.length > 0 ? (
+        <div className="gl-home-level-gift-grid">
+          {levelGifts.map((gift) => {
+            const unlockLevel = gift.unlockLevel ?? 1;
+            const giftName = localizedGiftName(gift, locale, t);
+            return (
+              <article
+                className={cn(
+                  'gl-home-level-gift-card',
+                  unlockLevel >= 60 && 'is-elite',
+                  unlockLevel >= 90 && 'is-mythic',
+                )}
+                key={gift.id}
+              >
+                <div className="gl-home-level-gift-top">
+                  <span className="gl-home-level-gift-unlock">
+                    <LockKeyhole size={12} />
+                    {t('home.levelGifts.unlockLevel', {
+                      level: unlockLevel,
+                      defaultValue: 'Unlocks at Lv.{{level}}',
+                    })}
+                  </span>
+                  <span className="gl-home-level-gift-tier">
+                    {unlockLevel >= 60 ? <Sparkles size={12} /> : <GiftIcon size={12} />}
+                    {t('home.levelGifts.tier', {
+                      tier: gift.tier + 1,
+                      defaultValue: 'Tier {{tier}}',
+                    })}
+                  </span>
+                </div>
+                <div className="gl-home-level-gift-icon" aria-hidden>
+                  {gift.icon}
+                </div>
+                <h3 title={giftName}>{giftName}</h3>
+                <div className="gl-home-level-gift-meta">
+                  <Coins size={14} />
+                  <span>
+                    {t('home.levelGifts.price', {
+                      coins: gift.priceCoin.toLocaleString(locale),
+                      defaultValue: '{{coins}} coins',
+                    })}
+                  </span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
         <div className="gl-creator-empty-soft">
-          {t('home.recommendations.empty')}
+          {t('home.levelGifts.empty', { defaultValue: 'No level gifts yet.' })}
         </div>
       )}
     </section>

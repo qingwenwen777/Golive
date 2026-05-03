@@ -157,8 +157,16 @@ export function SubscriptionsPage() {
       <section className="gl-library-section">
         <div className="gl-section-title-row">
           <div>
-            <h2>{t('library.subscriptions.appointments.title', { defaultValue: 'Appointments from subscriptions' })}</h2>
-            <span>{t('library.subscriptions.appointments.subtitle', { defaultValue: 'Browse upcoming live rooms from creators you follow.' })}</span>
+            <h2>
+              {t('library.subscriptions.appointments.title', {
+                defaultValue: 'Appointments from subscriptions',
+              })}
+            </h2>
+            <span>
+              {t('library.subscriptions.appointments.subtitle', {
+                defaultValue: 'Browse upcoming live rooms from creators you follow.',
+              })}
+            </span>
           </div>
         </div>
         {isAuthed && subscriptionAppointments.isPending ? (
@@ -191,8 +199,12 @@ export function SubscriptionsPage() {
         ) : (
           <div className="gl-creator-empty-soft">
             {isAuthed
-              ? t('library.subscriptions.appointments.empty', { defaultValue: 'No upcoming appointments from your subscriptions.' })
-              : t('library.subscriptions.appointments.signIn', { defaultValue: 'Sign in to browse appointment schedules.' })}
+              ? t('library.subscriptions.appointments.empty', {
+                  defaultValue: 'No upcoming appointments from your subscriptions.',
+                })
+              : t('library.subscriptions.appointments.signIn', {
+                  defaultValue: 'Sign in to browse appointment schedules.',
+                })}
           </div>
         )}
       </section>
@@ -200,8 +212,14 @@ export function SubscriptionsPage() {
       <section className="gl-library-section">
         <div className="gl-section-title-row">
           <div>
-            <h2>{t('library.subscriptions.posts.title', { defaultValue: '订阅主播的最新动态' })}</h2>
-            <span>{t('library.subscriptions.posts.subtitle', { defaultValue: '每位已订阅主播最近发布的一条动态会显示在这里。' })}</span>
+            <h2>
+              {t('library.subscriptions.posts.title', { defaultValue: '订阅主播的最新动态' })}
+            </h2>
+            <span>
+              {t('library.subscriptions.posts.subtitle', {
+                defaultValue: '每位已订阅主播最近发布的一条动态会显示在这里。',
+              })}
+            </span>
           </div>
           <FileText size={22} />
         </div>
@@ -220,8 +238,12 @@ export function SubscriptionsPage() {
         ) : (
           <div className="gl-creator-empty-soft">
             {isAuthed
-              ? t('library.subscriptions.posts.empty', { defaultValue: '你订阅的主播暂时还没有发布动态。' })
-              : t('library.subscriptions.posts.signIn', { defaultValue: '登录后查看订阅主播的动态。' })}
+              ? t('library.subscriptions.posts.empty', {
+                  defaultValue: '你订阅的主播暂时还没有发布动态。',
+                })
+              : t('library.subscriptions.posts.signIn', {
+                  defaultValue: '登录后查看订阅主播的动态。',
+                })}
           </div>
         )}
       </section>
@@ -246,7 +268,7 @@ export function SubscriptionsPage() {
 }
 
 export function YouPage() {
-  const { t } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isAuthed = useIsAuthed();
@@ -281,6 +303,7 @@ export function YouPage() {
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
   const levelInfo = normalizeLevelInfo(me.data?.levelInfo ?? user?.levelInfo);
   const levelProgress = levelProgressRatio(levelInfo);
+  const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const handleOpenCoins = () => {
     if (!user) {
@@ -340,19 +363,38 @@ export function YouPage() {
           {isAuthed && (
             <div className="gl-you-level-progress">
               <div className="gl-you-level-progress-top">
-                <span>Lv.{levelInfo.level} 等级身份</span>
+                <span>
+                  {t('library.you.levelProgress.title', {
+                    level: levelInfo.level,
+                    defaultValue: 'Lv.{{level}} identity',
+                  })}
+                </span>
                 <strong>
                   {levelInfo.level >= levelInfo.maxLevel
-                    ? '已满级'
-                    : `距离 Lv.${levelInfo.level + 1} 还需 ${levelInfo.coinsToNextLevel.toLocaleString()} coins`}
+                    ? t('library.you.levelProgress.maxLevel', { defaultValue: 'Max level' })
+                    : t('library.you.levelProgress.toNext', {
+                        level: levelInfo.level + 1,
+                        coins: levelInfo.coinsToNextLevel.toLocaleString(locale),
+                        defaultValue: '{{coins}} coins to Lv.{{level}}',
+                      })}
                 </strong>
               </div>
               <div className="gl-you-level-bar" aria-hidden>
                 <i style={{ width: `${Math.round(levelProgress * 100)}%` }} />
               </div>
               <div className="gl-you-level-progress-bottom">
-                <span>累计充值 {levelInfo.totalTopupCoins.toLocaleString()} coins</span>
-                <span>目标 {levelInfo.nextLevelTargetCoins.toLocaleString()} coins</span>
+                <span>
+                  {t('library.you.levelProgress.charged', {
+                    coins: levelInfo.totalTopupCoins.toLocaleString(locale),
+                    defaultValue: '{{coins}} charged',
+                  })}
+                </span>
+                <span>
+                  {t('library.you.levelProgress.target', {
+                    coins: levelInfo.nextLevelTargetCoins.toLocaleString(locale),
+                    defaultValue: '{{coins}} target',
+                  })}
+                </span>
               </div>
             </div>
           )}
@@ -380,7 +422,11 @@ export function YouPage() {
         />
       </Shelf>
 
-      <Shelf title={t('library.you.history')} actionLabel={t('library.you.viewAll')} actionTo="/history">
+      <Shelf
+        title={t('library.you.history')}
+        actionLabel={t('library.you.viewAll')}
+        actionTo="/history"
+      >
         <HorizontalShelf items={history.slice(0, 8)} emptyText={t('library.you.noHistory')} />
       </Shelf>
 
@@ -402,13 +448,21 @@ export function YouPage() {
 
       <Shelf title={t('library.you.quickActions')}>
         <div className="gl-yt-quick-row">
-          <QuickChip icon={<Radio size={16} />} label={t('library.you.startLive')} onClick={() => navigate('/')} />
+          <QuickChip
+            icon={<Radio size={16} />}
+            label={t('library.you.startLive')}
+            onClick={() => navigate('/')}
+          />
           <QuickChip
             icon={<Clock3 size={16} />}
             label={t('library.you.watchLater')}
             onClick={() => navigate('/watch-later')}
           />
-          <QuickChip icon={<Heart size={16} />} label={t('library.you.liked')} onClick={() => navigate('/liked')} />
+          <QuickChip
+            icon={<Heart size={16} />}
+            label={t('library.you.liked')}
+            onClick={() => navigate('/liked')}
+          />
           <QuickChip
             icon={<Settings size={16} />}
             label={t('library.you.settings')}
@@ -552,9 +606,7 @@ export function SettingsPage() {
   const currentUser = me.data ?? user;
   const displayName = userDisplayName(currentUser);
   const usernameAvailableAt = parseDate(currentUser?.usernameChangeAvailableAt);
-  const usernameLocked = Boolean(
-    usernameAvailableAt && usernameAvailableAt.getTime() > Date.now(),
-  );
+  const usernameLocked = Boolean(usernameAvailableAt && usernameAvailableAt.getTime() > Date.now());
 
   useEffect(() => {
     setProfileUsername(currentUser?.username ?? '');
@@ -651,7 +703,11 @@ export function SettingsPage() {
             <section className="gl-settings-card gl-settings-auth-card">
               <h2>登录后管理账号</h2>
               <p>设置会同步到你的频道、直播预约和个人资料。</p>
-              <button className="gl-settings-button is-primary" type="button" onClick={() => openLogin()}>
+              <button
+                className="gl-settings-button is-primary"
+                type="button"
+                onClick={() => openLogin()}
+              >
                 {t('library.signIn')}
               </button>
             </section>
@@ -716,7 +772,7 @@ function SettingsNavButton({
   return (
     <button
       type="button"
-      className={`gl-settings-nav-item${active ? ' is-active' : ''}`}
+      className={`gl-settings-nav-item${active ? 'is-active' : ''}`}
       onClick={onClick}
     >
       <span className="gl-settings-nav-icon">{icon}</span>
@@ -917,7 +973,9 @@ function SecuritySettings({
           <h2>用户名保护</h2>
           <p>
             用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期
-            {usernameAvailableAt ? `，下一次可修改时间为 ${formatSettingsDate(usernameAvailableAt)}` : '。'}
+            {usernameAvailableAt
+              ? `，下一次可修改时间为 ${formatSettingsDate(usernameAvailableAt)}`
+              : '。'}
           </p>
         </div>
       </section>
@@ -1020,11 +1078,15 @@ function formatSettingsDate(date: Date): string {
 
 function settingsErrorMessage(err: Error): string {
   if (err instanceof AxiosError) {
-    const data = err.response?.data as { message?: string; reason?: string; availableAt?: string } | undefined;
+    const data = err.response?.data as
+      | { message?: string; reason?: string; availableAt?: string }
+      | undefined;
     if (data?.reason === 'username_taken') return '这个用户名已被使用。';
     if (data?.reason === 'username_cooldown') {
       const date = parseDate(data.availableAt);
-      return date ? `用户名冷却中，${formatSettingsDate(date)} 后可再次修改。` : '用户名修改仍在冷却期。';
+      return date
+        ? `用户名冷却中，${formatSettingsDate(date)} 后可再次修改。`
+        : '用户名修改仍在冷却期。';
     }
     if (data?.reason === 'invalid_current_password') return '当前密码不正确。';
     if (data?.message) return data.message;
@@ -1087,9 +1149,7 @@ function LibraryCollectionPage({
           <h1>{title}</h1>
           <p className="gl-muted-line">{subtitle}</p>
           <div className="gl-yt-collection-stats">
-            <span>
-              {t('library.collection.liveRoomCount', { count: items.length })}
-            </span>
+            <span>{t('library.collection.liveRoomCount', { count: items.length })}</span>
           </div>
           <div className="gl-yt-collection-actions">
             <button
@@ -1250,7 +1310,10 @@ function AppointmentPager({
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
   return (
-    <div className="gl-history-pager" aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}>
+    <div
+      className="gl-history-pager"
+      aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}
+    >
       <div className="gl-history-pager-count">
         {t('appointments.pageCount', {
           start,
