@@ -6587,15 +6587,15 @@ button.gl-fan-badge-empty {
 .gl-appointment-card.is-management .gl-appointment-link,
 .gl-appointment-card.is-management .gl-appointment-main {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  min-height: 138px;
+  grid-template-columns: clamp(300px, 28vw, 520px) minmax(0, 1fr);
+  min-height: clamp(210px, 16vw, 280px);
 }
 
 .gl-appointment-card.is-management .gl-appointment-cover,
 .gl-appointment-card.is-management .gl-appointment-cover.is-compact {
   aspect-ratio: auto;
   height: 100%;
-  min-height: 138px;
+  min-height: clamp(210px, 16vw, 280px);
 }
 
 .gl-appointment-card.is-management .gl-appointment-cover-overlay {
@@ -6652,6 +6652,10 @@ button.gl-fan-badge-empty {
 
 .gl-appointments-list-panel {
   width: 100%;
+}
+
+.gl-appointments-list-panel .gl-appointment-list {
+  max-height: none;
 }
 
 .gl-appointment-form-panel {
@@ -7056,6 +7060,12 @@ button.gl-fan-badge-empty {
   .gl-appointment-card.is-management .gl-appointment-link,
   .gl-appointment-card.is-management .gl-appointment-main {
     grid-template-columns: 128px minmax(0, 1fr);
+    min-height: 128px;
+  }
+
+  .gl-appointment-card.is-management .gl-appointment-cover,
+  .gl-appointment-card.is-management .gl-appointment-cover.is-compact {
+    min-height: 128px;
   }
 
   .gl-appointment-card.is-management .gl-appointment-actions {
@@ -7086,6 +7096,7 @@ button.gl-fan-badge-empty {
   .gl-appointment-card.is-management .gl-appointment-link,
   .gl-appointment-card.is-management .gl-appointment-main {
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .gl-appointment-card.is-management .gl-appointment-cover,
