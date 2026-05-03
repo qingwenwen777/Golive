@@ -9,9 +9,12 @@ import {
   Copy,
   CalendarClock,
   Eye,
+  FileText,
   Gift,
+  Globe2,
   ImagePlus,
   ListChecks,
+  LockKeyhole,
   MessageSquare,
   PlayCircle,
   Radio,
@@ -29,10 +32,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
 import { useSubmitCreatorApplication } from '@/api/creator';
+import {
+  useCreatePost,
+  useStudioPosts,
+  useUploadPostImage,
+  type PostCommentMode,
+  type PostVisibility,
+} from '@/api/posts';
 import {
   useAddModerator,
   useModeratorFollowers,
@@ -78,6 +89,7 @@ import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { LoadableImage } from '@/components/LoadableImage';
+import { PostCard } from '@/features/posts/PostCard';
 import type { Message } from '@/types/message';
 import type { Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
@@ -492,6 +504,13 @@ export function CreatorReplayPage() {
 
 const APPOINTMENT_STATS_PAGE_SIZE = 100;
 const APPOINTMENT_LIST_PAGE_SIZE = 4;
+const STUDIO_POST_PAGE_SIZE = 6;
+
+interface PostImageDraft {
+  id: string;
+  file: File;
+  preview: string;
+}
 
 export function CreatorAppointmentsPage() {
   const { t } = useTranslation('pages');
@@ -767,6 +786,262 @@ export function CreatorAppointmentsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+export function CreatorPostsPage() {
+  const { t } = useTranslation('pages');
+  const { user } = useStudioUser();
+  const [page, setPage] = useState(1);
+  const posts = useStudioPosts(Boolean(user), page, STUDIO_POST_PAGE_SIZE);
+  const createPost = useCreatePost();
+  const uploadImage = useUploadPostImage();
+  const [content, setContent] = useState('');
+  const [visibility, setVisibility] = useState<PostVisibility>('public');
+  const [commentsEnabled, setCommentsEnabled] = useState(true);
+  const [commentMode, setCommentMode] = useState<PostCommentMode>('everyone');
+  const [imageDrafts, setImageDrafts] = useState<PostImageDraft[]>([]);
+  const total = posts.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / STUDIO_POST_PAGE_SIZE));
+  const pageItems = posts.data?.items ?? [];
+  const pagePublic = pageItems.filter((item) => item.visibility === 'public').length;
+  const pageFollowers = pageItems.filter((item) => item.visibility === 'followers').length;
+  const pagePrivate = pageItems.filter((item) => item.visibility === 'private').length;
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const addImages = (files: FileList | null) => {
+    if (!files?.length) return;
+    const next = [...imageDrafts];
+    for (const file of Array.from(files)) {
+      if (next.length >= 6) {
+        toast.info(t('posts.editor.maxImages', { defaultValue: '最多上传 6 张图片。' }));
+        break;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error(t('upload.imageTypeError', { defaultValue: 'Please use JPG, PNG, WebP, or GIF images.' }));
+        continue;
+      }
+      if (file.size > 5 << 20) {
+        toast.error(t('posts.editor.imageSize', { defaultValue: '图片需小于等于 5MB。' }));
+        continue;
+      }
+      next.push({
+        id: `${Date.now()}-${file.name}-${Math.random().toString(16).slice(2)}`,
+        file,
+        preview: URL.createObjectURL(file),
+      });
+    }
+    setImageDrafts(next);
+  };
+
+  const removeImage = (id: string) => {
+    setImageDrafts((drafts) => {
+      const target = drafts.find((item) => item.id === id);
+      if (target?.preview.startsWith('blob:')) URL.revokeObjectURL(target.preview);
+      return drafts.filter((item) => item.id !== id);
+    });
+  };
+
+  const clearDraft = () => {
+    imageDrafts.forEach((item) => {
+      if (item.preview.startsWith('blob:')) URL.revokeObjectURL(item.preview);
+    });
+    setImageDrafts([]);
+    setContent('');
+    setVisibility('public');
+    setCommentsEnabled(true);
+    setCommentMode('everyone');
+  };
+
+  const publish = async () => {
+    const normalizedContent = content.trim();
+    if (!normalizedContent && imageDrafts.length === 0) {
+      toast.info(t('posts.editor.empty', { defaultValue: '写点内容或添加图片后再发布。' }));
+      return;
+    }
+    try {
+      const images: string[] = [];
+      for (const draft of imageDrafts) {
+        const uploaded = await uploadImage.mutateAsync(draft.file);
+        images.push(uploaded.url);
+      }
+      await createPost.mutateAsync({
+        content: normalizedContent,
+        images,
+        visibility,
+        commentsEnabled,
+        commentMode: commentsEnabled ? commentMode : 'everyone',
+      });
+      clearDraft();
+      setPage(1);
+      toast.success(t('posts.editor.published', { defaultValue: '帖子已发布。' }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('posts.editor.failed', { defaultValue: '发布失败，请稍后重试。' }));
+    }
+  };
+
+  const publishing = createPost.isPending || uploadImage.isPending;
+  const canPublish = Boolean(content.trim() || imageDrafts.length > 0) && !publishing;
+
+  return (
+    <div className="gl-studio-posts-page">
+      <section className="gl-creator-kpis gl-post-kpis" aria-label={t('posts.editor.kpis', { defaultValue: 'Post summary' })}>
+        <StudioKpi
+          icon={<FileText size={18} />}
+          label={t('posts.editor.total', { defaultValue: '全部帖子' })}
+          value={total.toLocaleString()}
+          sub={t('posts.editor.totalSub', { defaultValue: '已发布' })}
+        />
+        <StudioKpi
+          icon={<Globe2 size={18} />}
+          label={t('posts.visibility.publicTitle', { defaultValue: '所有人可见' })}
+          value={String(pagePublic)}
+          sub={t('posts.editor.currentPage', { defaultValue: '当前页' })}
+        />
+        <StudioKpi
+          icon={<Users size={18} />}
+          label={t('posts.visibility.followersTitle', { defaultValue: '仅粉丝可见' })}
+          value={String(pageFollowers)}
+          sub={t('posts.editor.currentPage', { defaultValue: '当前页' })}
+        />
+        <StudioKpi
+          icon={<LockKeyhole size={18} />}
+          label={t('posts.visibility.privateTitle', { defaultValue: '仅自己可见' })}
+          value={String(pagePrivate)}
+          sub={t('posts.editor.currentPage', { defaultValue: '当前页' })}
+        />
+      </section>
+
+      <section className="gl-studio-post-grid">
+        <div className="gl-creator-panel gl-post-composer-panel">
+          <div className="gl-creator-panel-head">
+            <div>
+              <span>{t('posts.editor.label', { defaultValue: '频道动态' })}</span>
+              <h2>{t('posts.editor.title', { defaultValue: '发布帖子' })}</h2>
+            </div>
+            <FileText size={22} />
+          </div>
+
+          <label className="gl-creator-field gl-post-text-field">
+            <span>{t('posts.editor.content', { defaultValue: '内容' })}</span>
+            <textarea
+              rows={7}
+              maxLength={2000}
+              value={content}
+              placeholder={t('posts.editor.placeholder', { defaultValue: '写下直播预告、幕后花絮或想对粉丝说的话。' })}
+              onChange={(event) => setContent(event.target.value)}
+            />
+          </label>
+
+          {imageDrafts.length > 0 && (
+            <div className="gl-post-draft-images">
+              {imageDrafts.map((item) => (
+                <div className="gl-post-draft-image" key={item.id}>
+                  <img src={item.preview} alt="" />
+                  <button type="button" aria-label={t('posts.editor.removeImage', { defaultValue: '移除图片' })} onClick={() => removeImage(item.id)}>
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="gl-post-editor-controls">
+            <div className="gl-post-segmented" aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}>
+              <button type="button" className={visibility === 'public' ? 'is-active' : undefined} onClick={() => setVisibility('public')}>
+                <Globe2 size={15} />
+                {t('posts.visibility.public', { defaultValue: '公开' })}
+              </button>
+              <button type="button" className={visibility === 'followers' ? 'is-active' : undefined} onClick={() => setVisibility('followers')}>
+                <Users size={15} />
+                {t('posts.visibility.followersTitle', { defaultValue: '仅粉丝可见' })}
+              </button>
+              <button type="button" className={visibility === 'private' ? 'is-active' : undefined} onClick={() => setVisibility('private')}>
+                <LockKeyhole size={15} />
+                {t('posts.visibility.privateTitle', { defaultValue: '仅自己可见' })}
+              </button>
+            </div>
+
+            <div className="gl-post-toggle-row">
+              <label className="gl-post-toggle">
+                <input
+                  type="checkbox"
+                  checked={commentsEnabled}
+                  onChange={(event) => setCommentsEnabled(event.target.checked)}
+                />
+                <span>{t('posts.editor.enableComments', { defaultValue: '开启评论区' })}</span>
+              </label>
+              <label className={cn('gl-post-toggle', !commentsEnabled && 'is-disabled')}>
+                <input
+                  type="checkbox"
+                  checked={commentMode === 'followers'}
+                  disabled={!commentsEnabled}
+                  onChange={(event) => setCommentMode(event.target.checked ? 'followers' : 'everyone')}
+                />
+                <span>{t('posts.editor.followersOnlyComments', { defaultValue: '仅粉丝评论' })}</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="gl-post-editor-actions">
+            <label className={cn('gl-creator-secondary', imageDrafts.length >= 6 && 'is-disabled')}>
+              <ImagePlus size={16} />
+              {t('posts.editor.addImages', { defaultValue: '添加图片' })}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                disabled={imageDrafts.length >= 6}
+                onChange={(event) => {
+                  addImages(event.target.files);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+            <button type="button" className="gl-creator-secondary" disabled={publishing || (!content && imageDrafts.length === 0)} onClick={clearDraft}>
+              {t('studio.appointments.reset', { defaultValue: 'Reset' })}
+            </button>
+            <button type="button" className="gl-creator-primary" disabled={!canPublish} onClick={() => void publish()}>
+              <Send size={16} />
+              {publishing
+                ? t('posts.editor.publishing', { defaultValue: '发布中...' })
+                : t('posts.editor.publish', { defaultValue: '发布帖子' })}
+            </button>
+          </div>
+        </div>
+
+        <div className="gl-creator-panel gl-studio-post-list-panel">
+          <div className="gl-creator-panel-head">
+            <div>
+              <span>{t('posts.editor.listLabel', { defaultValue: '帖子管理' })}</span>
+              <h2>{t('posts.editor.listTitle', { defaultValue: '我的动态' })}</h2>
+            </div>
+            <MessageSquare size={22} />
+          </div>
+          <div className="gl-post-feed-list">
+            {posts.isPending ? (
+              Array.from({ length: 2 }).map((_, index) => <div className="gl-post-card is-loading" key={index} />)
+            ) : pageItems.length ? (
+              pageItems.map((post) => <PostCard key={post.id} post={post} context="studio" />)
+            ) : (
+              <div className="gl-creator-empty-soft">{t('posts.editor.emptyList', { defaultValue: '还没有发布过帖子。' })}</div>
+            )}
+          </div>
+          {total > STUDIO_POST_PAGE_SIZE && (
+            <StudioPostPager
+              page={page}
+              pageCount={pageCount}
+              total={total}
+              pageSize={STUDIO_POST_PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -1261,6 +1536,57 @@ function StudioAppointmentPager({
   );
 }
 
+function StudioPostPager({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  return (
+    <div className="gl-history-pager gl-appointment-pager" aria-label={t('posts.editor.pagination', { defaultValue: 'Post pagination' })}>
+      <div className="gl-history-pager-count">
+        {t('posts.editor.pageCount', {
+          start,
+          end,
+          total,
+          defaultValue: '{{start}}-{{end}} / {{total}}',
+        })}
+      </div>
+      <div className="gl-history-pager-controls">
+        <button
+          type="button"
+          aria-label={t('posts.editor.previous', { defaultValue: 'Previous page' })}
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="gl-appointment-pager-current">
+          {page} / {pageCount}
+        </span>
+        <button
+          type="button"
+          aria-label={t('posts.editor.next', { defaultValue: 'Next page' })}
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function toLocalDateTimeInput(value: Date | string): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return '';
@@ -1532,6 +1858,7 @@ function StudioTabs() {
     <nav className="gl-creator-tabs" aria-label={t('studio.tabs.label', { defaultValue: 'Creator Studio sections' })}>
       <NavLink to="/studio/overview">{t('studio.tabs.overview', { defaultValue: 'Overview' })}</NavLink>
       <NavLink to="/studio/prepare">{t('studio.tabs.prepare', { defaultValue: 'Stream setup' })}</NavLink>
+      <NavLink to="/studio/posts">{t('studio.tabs.posts', { defaultValue: '帖子动态' })}</NavLink>
       <NavLink to="/studio/appointments">{t('studio.tabs.appointments', { defaultValue: 'Live appointments' })}</NavLink>
       <NavLink to="/studio/moderators">{t('studio.tabs.moderators', { defaultValue: '房间房管' })}</NavLink>
       <NavLink to="/studio/replay">{t('studio.tabs.replay', { defaultValue: 'Data replay' })}</NavLink>

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CalendarDays,
   Clock3,
+  FileText,
   ImagePlus,
   Plus,
   Radio,
@@ -30,6 +31,7 @@ import {
   useUnfollow,
   type LiveHistoryItem,
 } from '@/api/room';
+import { useChannelPosts } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
@@ -38,6 +40,7 @@ import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
+import { PostCard } from '@/features/posts/PostCard';
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
@@ -45,6 +48,7 @@ import { streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
 const HISTORY_PAGE_SIZE = 4;
+const POST_PAGE_SIZE = 4;
 
 export default function ChannelPage() {
   const { t } = useTranslation('pages');
@@ -62,6 +66,7 @@ export default function ChannelPage() {
   const [coverOpen, setCoverOpen] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [appointmentPage, setAppointmentPage] = useState(1);
+  const [postPage, setPostPage] = useState(1);
   const activeLiveId = useActiveCreatorLiveId(authUser?.id);
 
   const profile = useMemo(
@@ -91,6 +96,10 @@ export default function ChannelPage() {
   const appointmentTotal = channelAppointments.data?.total ?? 0;
   const appointmentPageSize = channelAppointments.data?.size ?? 4;
   const appointmentPageCount = Math.max(1, Math.ceil(appointmentTotal / appointmentPageSize));
+  const channelPosts = useChannelPosts(channelKey, true, postPage, POST_PAGE_SIZE);
+  const postTotal = channelPosts.data?.total ?? 0;
+  const postPageSize = channelPosts.data?.size ?? POST_PAGE_SIZE;
+  const postPageCount = Math.max(1, Math.ceil(postTotal / postPageSize));
 
   const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
   const primaryCategory = primary?.category ?? 'Just Chatting';
@@ -106,6 +115,10 @@ export default function ChannelPage() {
   }, [channelKey]);
 
   useEffect(() => {
+    setPostPage(1);
+  }, [channelKey]);
+
+  useEffect(() => {
     if (historyPage > historyPageCount) {
       setHistoryPage(historyPageCount);
     }
@@ -116,6 +129,12 @@ export default function ChannelPage() {
       setAppointmentPage(appointmentPageCount);
     }
   }, [appointmentPage, appointmentPageCount]);
+
+  useEffect(() => {
+    if (postPage > postPageCount) {
+      setPostPage(postPageCount);
+    }
+  }, [postPage, postPageCount]);
 
   const handleSubscribe = () => {
     if (!isAuthed) {
@@ -292,6 +311,47 @@ export default function ChannelPage() {
         )}
       </section>
 
+      <section className="gl-library-section" id="posts">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('channel.posts.title', { defaultValue: '帖子动态' })}</h2>
+            <span>{t('channel.posts.subtitle', { defaultValue: '预约直播下方会显示主播最近发布的帖子。' })}</span>
+          </div>
+        </div>
+        {channelPosts.isPending ? (
+          <div className="gl-post-feed-list" aria-busy="true">
+            {Array.from({ length: 2 }).map((_, index) => (
+              <div className="gl-post-card is-loading" key={index} />
+            ))}
+          </div>
+        ) : channelPosts.data?.items.length ? (
+          <>
+            <div className="gl-post-feed-list">
+              {channelPosts.data.items.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))}
+            </div>
+            {postPageCount > 1 && (
+              <ChannelPostPager
+                page={postPage}
+                pageCount={postPageCount}
+                total={postTotal}
+                pageSize={postPageSize}
+                onPageChange={setPostPage}
+              />
+            )}
+          </>
+        ) : (
+          <div className="gl-channel-empty">
+            <FileText size={34} />
+            <div>
+              <strong>{t('channel.posts.empty', { defaultValue: '暂时还没有帖子。' })}</strong>
+              <span>{t('channel.posts.emptySub', { defaultValue: '主播发布后，这里会展示最新动态。' })}</span>
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className="gl-library-section" id="live">
         <div className="gl-section-title-row">
           <h2>{t('channel.liveRooms')}</h2>
@@ -437,6 +497,57 @@ function HistoryPager({
         <button
           type="button"
           aria-label={t('channel.history.nextPage')}
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChannelPostPager({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  return (
+    <div className="gl-history-pager gl-channel-post-pager" aria-label={t('channel.posts.pagination', { defaultValue: 'Post pagination' })}>
+      <div className="gl-history-pager-count">
+        {t('channel.posts.pageCount', {
+          start,
+          end,
+          total,
+          defaultValue: '{{start}}-{{end}} / {{total}}',
+        })}
+      </div>
+      <div className="gl-history-pager-controls">
+        <button
+          type="button"
+          aria-label={t('channel.posts.previous', { defaultValue: 'Previous page' })}
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="gl-appointment-pager-current">
+          {page} / {pageCount}
+        </span>
+        <button
+          type="button"
+          aria-label={t('channel.posts.next', { defaultValue: 'Next page' })}
           disabled={page >= pageCount}
           onClick={() => onPageChange(Math.min(pageCount, page + 1))}
         >

@@ -8,6 +8,7 @@ import {
   House,
   Library,
   PlaySquare,
+  FileText,
   Radio,
   History,
   Clock,
@@ -33,6 +34,7 @@ export interface IconSet {
   Library: LucideIcon;
   Subs: LucideIcon;
   Live: LucideIcon;
+  FileText: LucideIcon;
   History: LucideIcon;
   Clock: LucideIcon;
   CalendarClock: LucideIcon;
@@ -56,6 +58,7 @@ export const Icons: IconSet = {
   Home: House,
   Library,
   Subs: PlaySquare,
+  FileText,
   Live: Radio,
   History,
   Clock,

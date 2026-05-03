@@ -51,6 +51,8 @@ type LiveCfg struct {
 type UploadCfg struct {
 	CoverDir       string `mapstructure:"cover_dir"`
 	CoverPublicURL string `mapstructure:"cover_public_url"`
+	PostImageDir   string `mapstructure:"post_image_dir"`
+	PostPublicURL  string `mapstructure:"post_public_url"`
 }
 
 type UsersCfg struct {

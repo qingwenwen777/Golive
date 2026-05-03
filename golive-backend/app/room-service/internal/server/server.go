@@ -14,12 +14,15 @@ type Deps struct {
 	JWTSecret      string
 	Room           *service.RoomService
 	Social         *service.SocialService
+	Posts          *service.PostService
 	Live           *service.LiveService
 	Appointments   *service.AppointmentService
 	Moderation     *service.ModerationService
 	Permission     service.LivePermissionChecker
 	CoverDir       string
 	CoverPublicURL string
+	PostImageDir   string
+	PostPublicURL  string
 }
 
 func NewRouter(d Deps) *gin.Engine {
@@ -32,6 +35,7 @@ func NewRouter(d Deps) *gin.Engine {
 
 	roomH := handler.NewRoomHandler(d.Room)
 	socialH := handler.NewSocialHandler(d.Social)
+	postH := handler.NewPostHandler(d.Posts, d.Permission, d.PostImageDir, d.PostPublicURL)
 	liveH := handler.NewLiveHandler(d.Live, d.Permission)
 	appointmentH := handler.NewAppointmentHandler(d.Appointments)
 	moderationH := handler.NewModerationHandler(d.Moderation)
@@ -66,8 +70,20 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.GET("/moderation/logs", auth, moderationH.Logs)
 		rooms.GET("/channels/:channel/history", optionalAuth, roomH.ChannelHistory)
 		rooms.GET("/channels/:channel/appointments", optionalAuth, appointmentH.ListChannel)
+		rooms.GET("/channels/:channel/posts", optionalAuth, postH.ListChannel)
 		rooms.GET("/channels/:channel/analytics", auth, roomH.ChannelAnalytics)
 		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
+		rooms.GET("/posts/mine", auth, postH.ListMine)
+		rooms.POST("/posts", auth, postH.Create)
+		rooms.POST("/posts/images", auth, postH.UploadImage)
+		rooms.DELETE("/posts/:postID", auth, postH.Delete)
+		rooms.GET("/posts/:postID/comments", optionalAuth, postH.ListComments)
+		rooms.POST("/posts/:postID/comments", auth, postH.CreateComment)
+		rooms.DELETE("/posts/:postID/comments/:commentID", auth, postH.DeleteComment)
+		rooms.POST("/posts/:postID/like", auth, postH.Like)
+		rooms.DELETE("/posts/:postID/like", auth, postH.Unlike)
+		rooms.POST("/posts/:postID/comments/:commentID/like", auth, postH.LikeComment)
+		rooms.DELETE("/posts/:postID/comments/:commentID/like", auth, postH.UnlikeComment)
 		rooms.GET("/recommended-creators", optionalAuth, socialH.RecommendedCreators)
 		rooms.GET("/:id/moderation/state", optionalAuth, moderationH.RoomState)
 		rooms.GET("/:id/moderation/mutes/:userID", auth, moderationH.MuteState)
@@ -99,6 +115,11 @@ func NewRouter(d Deps) *gin.Engine {
 		uploadDir = "./uploads/covers"
 	}
 	r.Static("/uploads/covers", uploadDir)
+	postUploadDir := d.PostImageDir
+	if postUploadDir == "" {
+		postUploadDir = "./uploads/posts"
+	}
+	r.Static("/uploads/posts", postUploadDir)
 
 	// SRS callbacks — server-to-server, no JWT.
 	srs := r.Group("/srs")

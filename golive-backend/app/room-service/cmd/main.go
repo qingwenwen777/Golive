@@ -64,6 +64,10 @@ func main() {
 	if err := moderationRepo.AutoMigrate(); err != nil {
 		log.Fatal("moderation automigrate", zap.Error(err))
 	}
+	postRepo := repo.NewPostRepo(db)
+	if err := postRepo.AutoMigrate(); err != nil {
+		log.Fatal("post automigrate", zap.Error(err))
+	}
 	if n, err := roomRepo.FixUUIDChannels(context.Background()); err != nil {
 		log.Warn("fix uuid channels", zap.Error(err))
 	} else if n > 0 {
@@ -80,6 +84,7 @@ func main() {
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
 	permission := service.NewUserPermissionClient(cfg.Users.ServiceURL)
+	postSvc := service.NewPostService(postRepo, roomRepo, socialRepo, permission)
 	if activeRooms, err := roomRepo.ActiveRooms(context.Background()); err != nil {
 		log.Warn("load active rooms for moderation cache", zap.Error(err))
 	} else if err := moderationRepo.SyncActiveRooms(context.Background(), activeRooms); err != nil {
@@ -93,12 +98,15 @@ func main() {
 		JWTSecret:      cfg.JWT.Secret,
 		Room:           roomSvc,
 		Social:         socialSvc,
+		Posts:          postSvc,
 		Live:           liveSvc,
 		Appointments:   appointmentSvc,
 		Moderation:     moderationSvc,
 		Permission:     permission,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,
+		PostImageDir:   cfg.Upload.PostImageDir,
+		PostPublicURL:  cfg.Upload.PostPublicURL,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 	schedulerCtx, stopScheduler := context.WithCancel(context.Background())

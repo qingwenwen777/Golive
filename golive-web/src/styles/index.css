@@ -47,6 +47,499 @@
   --gl-sc-body-tint: rgba(255, 255, 255, 0.3);
 }
 
+/* Channel posts */
+.gl-studio-posts-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gl-studio-post-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.gl-post-kpis {
+  margin-bottom: 0;
+}
+
+.gl-post-text-field textarea {
+  min-height: 154px;
+  resize: vertical;
+}
+
+.gl-post-draft-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.gl-post-draft-image {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-hover);
+}
+
+.gl-post-draft-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gl-post-draft-image button,
+.gl-post-icon-button {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+}
+
+.gl-post-draft-image button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.dark .gl-post-draft-image button {
+  background: rgba(17, 24, 39, 0.88);
+}
+
+.gl-post-icon-button.is-danger,
+.gl-post-comment-actions .is-danger {
+  color: #dc2626;
+}
+
+.gl-post-editor-controls,
+.gl-post-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.gl-post-editor-controls {
+  flex-direction: column;
+}
+
+.gl-post-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg);
+}
+
+.gl-post-segmented button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 11px;
+}
+
+.gl-post-segmented button.is-active {
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+
+.gl-post-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gl-post-toggle {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 12px;
+}
+
+.gl-post-toggle input {
+  accent-color: var(--gl-text);
+}
+
+.gl-post-toggle.is-disabled {
+  color: var(--gl-text-3);
+  opacity: 0.64;
+}
+
+.gl-post-editor-actions {
+  justify-content: flex-end;
+}
+
+.gl-post-editor-actions input {
+  display: none;
+}
+
+.gl-creator-secondary.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.gl-post-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gl-post-card {
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+  padding: 16px;
+}
+
+.gl-studio-post-list-panel .gl-post-card {
+  box-shadow: none;
+}
+
+.gl-post-card.is-loading {
+  min-height: 190px;
+  background: var(--gl-bg-hover);
+  box-shadow: none;
+}
+
+.gl-post-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.gl-post-author {
+  min-width: 0;
+}
+
+.gl-post-author strong,
+.gl-post-comment-author strong {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gl-post-author span,
+.gl-post-comment-author span {
+  display: block;
+  margin-top: 2px;
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.gl-post-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.gl-post-badges span {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 9px;
+}
+
+.gl-post-content {
+  margin: 14px 0 0;
+  color: var(--gl-text);
+  font-size: 15px;
+  line-height: 1.68;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.gl-post-images {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.gl-post-images.is-single {
+  grid-template-columns: 1fr;
+}
+
+.gl-post-images.is-collage {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gl-post-image {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 0;
+  border-radius: 10px;
+  background: var(--gl-bg-hover);
+  padding: 0;
+}
+
+.gl-post-images.is-single .gl-post-image {
+  aspect-ratio: 16 / 9;
+}
+
+.gl-post-image .gl-loadable-img,
+.gl-post-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gl-post-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid var(--gl-border);
+  padding-top: 12px;
+}
+
+.gl-post-actions button,
+.gl-post-comment-actions button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 10px;
+}
+
+.gl-post-actions button:hover:not(:disabled),
+.gl-post-actions button.is-active,
+.gl-post-comment-actions button:hover:not(:disabled),
+.gl-post-comment-actions button.is-active {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+
+.gl-post-comments {
+  margin-top: 12px;
+  border-top: 1px solid var(--gl-border);
+  padding-top: 12px;
+}
+
+.gl-post-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-post-comment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+}
+
+.gl-post-comment.is-depth-1 {
+  margin-left: 42px;
+}
+
+.gl-post-comment.is-depth-2 {
+  margin-left: 84px;
+}
+
+.gl-post-comment-bubble {
+  border-radius: 12px;
+  background: var(--gl-bg);
+  padding: 10px 12px;
+}
+
+.gl-post-comment-author {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.gl-post-comment-author span {
+  margin-top: 0;
+}
+
+.gl-post-comment-bubble p {
+  margin: 5px 0 0;
+  color: var(--gl-text);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.gl-post-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 0 4px;
+}
+
+.gl-post-comment-empty {
+  border-radius: 10px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.gl-post-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.gl-post-reply-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 10px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 8px 10px;
+}
+
+.gl-post-reply-target button {
+  border: 0;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.gl-post-comment-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.gl-post-comment-input textarea {
+  width: 100%;
+  min-height: 46px;
+  resize: vertical;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font: inherit;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+
+.gl-post-comment-input button {
+  display: inline-flex;
+  width: 42px;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 12px;
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+
+.gl-post-comment-input button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+@media (max-width: 1100px) {
+  .gl-studio-post-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .gl-post-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .gl-post-badges {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .gl-post-images.is-collage {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gl-post-comment.is-depth-1 {
+    margin-left: 22px;
+  }
+
+  .gl-post-comment.is-depth-2 {
+    margin-left: 42px;
+  }
+}
+
+@media (max-width: 520px) {
+  .gl-post-card {
+    padding: 14px;
+  }
+
+  .gl-post-editor-actions,
+  .gl-post-editor-actions .gl-creator-primary,
+  .gl-post-editor-actions .gl-creator-secondary,
+  .gl-post-segmented button,
+  .gl-post-toggle {
+    width: 100%;
+  }
+
+  .gl-post-images,
+  .gl-post-images.is-collage {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dark {
   /* shadcn semantic tokens — dark theme. */
   --background: 0 0% 6%;

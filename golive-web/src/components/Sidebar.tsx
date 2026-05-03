@@ -63,6 +63,12 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       route: '/studio/prepare',
     },
     {
+      key: 'studio-posts',
+      icon: Icons.FileText,
+      label: t('nav.studioPosts', { defaultValue: 'Posts' }),
+      route: '/studio/posts',
+    },
+    {
       key: 'studio-appointments',
       icon: Icons.CalendarClock,
       label: t('nav.studioAppointments', { defaultValue: '直播预约' }),
@@ -165,6 +171,7 @@ function deriveActiveKey(pathname: string): string {
   if (pathname === '/') return 'home';
   if (pathname === '/studio' || pathname === '/studio/overview') return 'studio-overview';
   if (pathname.startsWith('/studio/appointments')) return 'studio-appointments';
+  if (pathname.startsWith('/studio/posts')) return 'studio-posts';
   if (pathname.startsWith('/studio/moderators')) return 'studio-moderators';
   if (pathname.startsWith('/studio/prepare') || pathname.startsWith('/studio/live')) {
     return 'studio-prepare';

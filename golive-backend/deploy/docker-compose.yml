@@ -97,6 +97,7 @@ services:
     volumes:
       - ..:/app:ro
       - cover_uploads:/tmp/golive/covers
+      - post_uploads:/tmp/golive/posts
       - go_mod_cache:/go/pkg/mod
       - go_build_cache:/root/.cache/go-build
     environment:
@@ -318,6 +319,7 @@ volumes:
   prom_data:
   grafana_data:
   cover_uploads:
+  post_uploads:
   avatar_uploads:
   go_mod_cache:
   go_build_cache:
