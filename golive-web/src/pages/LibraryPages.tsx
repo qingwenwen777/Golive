@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { AxiosError } from 'axios';
 import {
+  AtSign,
   Bell,
   Bookmark,
   Camera,
@@ -12,14 +14,21 @@ import {
   Crown,
   Heart,
   History,
+  KeyRound,
+  Languages,
+  Moon,
+  PencilLine,
   Radio,
+  ShieldCheck,
   Settings,
   Sparkles,
   Trash2,
+  UserRound,
   Video,
   Wallet,
 } from 'lucide-react';
-import { useMe } from '@/api/auth';
+import { toast } from 'sonner';
+import { useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
 import { useFanBadges } from '@/api/gift';
 import { useRooms, useSubscriptions, useSubscriptionAppointments } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -461,144 +470,501 @@ export function LikedPage() {
   );
 }
 
-type SettingsTab = 'account' | 'experience' | 'live';
+type SettingsTab = 'profile' | 'security' | 'preferences';
 
 export function SettingsPage() {
   const { t } = useTranslation('pages');
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeStore();
   const { lang, setLang } = useLangStore();
   const user = useAuthStore((s) => s.user);
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const me = useMe();
-  const [lowLatency, setLowLatency] = useState(true);
-  const [chatAssist, setChatAssist] = useState(true);
-  const [category, setCategory] = useState('Just Chatting');
-  const [tab, setTab] = useState<SettingsTab>('account');
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
+  const [tab, setTab] = useState<SettingsTab>('profile');
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [profileUsername, setProfileUsername] = useState('');
+  const [profileDisplayName, setProfileDisplayName] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const currentUser = me.data ?? user;
+  const displayName = userDisplayName(currentUser);
+  const usernameAvailableAt = parseDate(currentUser?.usernameChangeAvailableAt);
+  const usernameLocked = Boolean(
+    usernameAvailableAt && usernameAvailableAt.getTime() > Date.now(),
+  );
 
-  const tabs: Array<{ id: SettingsTab; label: string }> = [
-    { id: 'account', label: t('library.settings.tabs.account') },
-    { id: 'experience', label: t('library.settings.tabs.experience') },
-    { id: 'live', label: t('library.settings.tabs.live') },
+  useEffect(() => {
+    setProfileUsername(currentUser?.username ?? '');
+    setProfileDisplayName(userDisplayName(currentUser));
+  }, [currentUser]);
+
+  const tabs: Array<{ id: SettingsTab; label: string; sub: string; icon: ReactNode }> = [
+    { id: 'profile', label: '账号资料', sub: '用户名、昵称与头像', icon: <UserRound size={18} /> },
+    { id: 'security', label: '安全', sub: '登录密码与账号保护', icon: <ShieldCheck size={18} /> },
+    { id: 'preferences', label: '偏好', sub: '外观、语言与快捷入口', icon: <Sparkles size={18} /> },
   ];
 
+  const submitProfile = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    const username = profileUsername.trim();
+    const nextDisplayName = profileDisplayName.trim();
+    if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/.test(username)) {
+      toast.error('用户名需为 3-32 位字母、数字、点、横线或下划线。');
+      return;
+    }
+    if (!nextDisplayName) {
+      toast.error('昵称不能为空。');
+      return;
+    }
+    updateProfile.mutate(
+      { username, displayName: nextDisplayName },
+      {
+        onSuccess: () => toast.success('账号资料已更新。'),
+        onError: (err) => toast.error(settingsErrorMessage(err)),
+      },
+    );
+  };
+
+  const submitPassword = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('新密码至少需要 6 位。');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('两次输入的新密码不一致。');
+      return;
+    }
+    changePassword.mutate(
+      { currentPassword, newPassword },
+      {
+        onSuccess: () => {
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          toast.success('密码已更新。');
+        },
+        onError: (err) => toast.error(settingsErrorMessage(err)),
+      },
+    );
+  };
+
   return (
-    <div className="gl-page gl-library-page">
-      <header className="gl-yt-page-head">
-        <div className="gl-yt-page-icon">
+    <div className="gl-page gl-library-page gl-settings-page">
+      <header className="gl-settings-hero">
+        <div className="gl-settings-hero-icon">
           <Settings size={22} />
         </div>
-        <h1>{t('library.settings.title')}</h1>
+        <div>
+          <h1>{t('library.settings.title')}</h1>
+          <p>管理你的资料、安全设置和常用体验。</p>
+        </div>
       </header>
 
-      <div className="gl-yt-settings">
-        <nav className="gl-yt-settings-nav" aria-label={t('library.settings.sections')}>
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`gl-yt-settings-tab${tab === t.id ? 'is-active' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
+      <div className="gl-settings-shell">
+        <nav className="gl-settings-rail" aria-label={t('library.settings.sections')}>
+          {tabs.map((item) => (
+            <SettingsNavButton
+              key={item.id}
+              active={tab === item.id}
+              icon={item.icon}
+              label={item.label}
+              sub={item.sub}
+              onClick={() => setTab(item.id)}
+            />
           ))}
         </nav>
 
-        <div className="gl-yt-settings-panel">
-          {tab === 'account' && (
-            <>
-              <h2>{t('library.settings.tabs.account')}</h2>
-              <div className="gl-account-row">
-                <Avatar name={userDisplayName(currentUser)} src={currentUser?.avatar} size={56} />
-                <div>
-                  <div className="gl-account-name">{userDisplayName(currentUser)}</div>
-                  <div className="gl-muted-line">
-                    {isAuthed ? currentUser?.username : t('library.settings.notSignedIn')}
-                  </div>
-                </div>
-              </div>
-              {isAuthed ? (
-                <button
-                  className="gl-retry-btn gl-account-avatar-btn"
-                  type="button"
-                  onClick={() => setAvatarOpen(true)}
-                >
-                  <Camera size={16} />
-                  {t('library.settings.changeAvatar')}
-                </button>
-              ) : (
-                <button className="gl-retry-btn" type="button" onClick={() => openLogin()}>
-                  {t('library.signIn')}
-                </button>
-              )}
-            </>
-          )}
-
-          {tab === 'experience' && (
-            <>
-              <h2>{t('library.settings.tabs.experience')}</h2>
-              <SettingRow
-                title={t('library.settings.darkTheme')}
-                sub={t('library.settings.currentTheme', {
-                  mode:
-                    theme === 'dark'
-                      ? t('library.settings.dark')
-                      : t('library.settings.light'),
-                })}
-                checked={theme === 'dark'}
-                onChange={toggleTheme}
-              />
-              <label className="gl-setting-field">
-                <span>{t('library.settings.language')}</span>
-                <select
-                  value={lang}
-                  onChange={(e) => setLang(e.target.value as (typeof APP_LANGS)[number])}
-                >
-                  {APP_LANGS.map((option) => (
-                    <option key={option} value={option}>
-                      {t(`library.settings.languageNames.${option}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <SettingRow
-                title={t('library.settings.lowLatency')}
-                sub={t('library.settings.lowLatencySub')}
-                checked={lowLatency}
-                onChange={() => setLowLatency((v) => !v)}
-              />
-            </>
-          )}
-
-          {tab === 'live' && (
-            <>
-              <h2>{t('library.settings.tabs.live')}</h2>
-              <label className="gl-setting-field">
-                <span>{t('library.settings.defaultCategory')}</span>
-                <select value={category} onChange={(e) => setCategory(e.target.value)}>
-                  {SETTINGS_CATEGORY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {t(`library.settings.categories.${categoryKey(option)}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <SettingRow
-                title={t('library.settings.chatAssist')}
-                sub={t('library.settings.chatAssistSub')}
-                checked={chatAssist}
-                onChange={() => setChatAssist((v) => !v)}
-              />
-            </>
+        <div className="gl-settings-content">
+          {!isAuthed ? (
+            <section className="gl-settings-card gl-settings-auth-card">
+              <h2>登录后管理账号</h2>
+              <p>设置会同步到你的频道、直播预约和个人资料。</p>
+              <button className="gl-settings-button is-primary" type="button" onClick={() => openLogin()}>
+                {t('library.signIn')}
+              </button>
+            </section>
+          ) : tab === 'profile' ? (
+            <ProfileSettings
+              displayName={displayName}
+              username={currentUser?.username ?? ''}
+              avatar={currentUser?.avatar}
+              profileUsername={profileUsername}
+              profileDisplayName={profileDisplayName}
+              usernameLocked={usernameLocked}
+              usernameAvailableAt={usernameAvailableAt}
+              pending={updateProfile.isPending}
+              onAvatar={() => setAvatarOpen(true)}
+              onChannel={() => navigate(`/channel/${currentUser?.id ?? ''}`)}
+              onUsernameChange={setProfileUsername}
+              onDisplayNameChange={setProfileDisplayName}
+              onSubmit={submitProfile}
+            />
+          ) : tab === 'security' ? (
+            <SecuritySettings
+              currentPassword={currentPassword}
+              newPassword={newPassword}
+              confirmPassword={confirmPassword}
+              pending={changePassword.isPending}
+              usernameAvailableAt={usernameAvailableAt}
+              onCurrentPasswordChange={setCurrentPassword}
+              onNewPasswordChange={setNewPassword}
+              onConfirmPasswordChange={setConfirmPassword}
+              onSubmit={submitPassword}
+            />
+          ) : (
+            <PreferencesSettings
+              lang={lang}
+              theme={theme}
+              onThemeToggle={toggleTheme}
+              onLangChange={setLang}
+              onCoins={() => navigate('/coins')}
+              onStudio={() => navigate('/studio')}
+            />
           )}
         </div>
       </div>
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={currentUser} />
     </div>
   );
+}
+
+function SettingsNavButton({
+  active,
+  icon,
+  label,
+  sub,
+  onClick,
+}: {
+  active: boolean;
+  icon: ReactNode;
+  label: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`gl-settings-nav-item${active ? ' is-active' : ''}`}
+      onClick={onClick}
+    >
+      <span className="gl-settings-nav-icon">{icon}</span>
+      <span>
+        <strong>{label}</strong>
+        <small>{sub}</small>
+      </span>
+    </button>
+  );
+}
+
+function ProfileSettings({
+  displayName,
+  username,
+  avatar,
+  profileUsername,
+  profileDisplayName,
+  usernameLocked,
+  usernameAvailableAt,
+  pending,
+  onAvatar,
+  onChannel,
+  onUsernameChange,
+  onDisplayNameChange,
+  onSubmit,
+}: {
+  displayName: string;
+  username: string;
+  avatar?: string;
+  profileUsername: string;
+  profileDisplayName: string;
+  usernameLocked: boolean;
+  usernameAvailableAt: Date | null;
+  pending: boolean;
+  onAvatar: () => void;
+  onChannel: () => void;
+  onUsernameChange: (value: string) => void;
+  onDisplayNameChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <>
+      <section className="gl-settings-card gl-settings-profile-card">
+        <Avatar name={displayName} src={avatar} size={74} />
+        <div className="gl-settings-profile-main">
+          <h2>{displayName}</h2>
+          <span>{username ? `@${username}` : '尚未设置用户名'}</span>
+        </div>
+        <div className="gl-settings-profile-actions">
+          <button className="gl-settings-button" type="button" onClick={onAvatar}>
+            <Camera size={15} />
+            更换头像
+          </button>
+          <button className="gl-settings-button" type="button" onClick={onChannel}>
+            查看频道
+          </button>
+        </div>
+      </section>
+
+      <form className="gl-settings-card gl-settings-form" onSubmit={onSubmit}>
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <PencilLine size={18} />
+          </span>
+          <div>
+            <h2>编辑资料</h2>
+            <p>用户名用于唯一识别账号，修改后 7 天内不能再次修改。</p>
+          </div>
+        </div>
+        <div className="gl-settings-form-grid">
+          <label className="gl-settings-field">
+            <span>
+              <AtSign size={14} />
+              用户名
+            </span>
+            <input
+              value={profileUsername}
+              onChange={(event) => onUsernameChange(event.target.value)}
+              disabled={usernameLocked}
+              maxLength={32}
+              autoComplete="username"
+              className="gl-settings-input"
+            />
+            <small>
+              {usernameLocked && usernameAvailableAt
+                ? `${formatSettingsDate(usernameAvailableAt)} 后可再次修改`
+                : '3-32 位，支持字母、数字、点、横线和下划线'}
+            </small>
+          </label>
+          <label className="gl-settings-field">
+            <span>
+              <UserRound size={14} />
+              昵称
+            </span>
+            <input
+              value={profileDisplayName}
+              onChange={(event) => onDisplayNameChange(event.target.value)}
+              maxLength={64}
+              autoComplete="name"
+              className="gl-settings-input"
+            />
+            <small>展示在频道页、直播间和通知里的名字。</small>
+          </label>
+        </div>
+        <div className="gl-settings-actions">
+          <button className="gl-settings-button is-primary" type="submit" disabled={pending}>
+            保存资料
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+function SecuritySettings({
+  currentPassword,
+  newPassword,
+  confirmPassword,
+  pending,
+  usernameAvailableAt,
+  onCurrentPasswordChange,
+  onNewPasswordChange,
+  onConfirmPasswordChange,
+  onSubmit,
+}: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  pending: boolean;
+  usernameAvailableAt: Date | null;
+  onCurrentPasswordChange: (value: string) => void;
+  onNewPasswordChange: (value: string) => void;
+  onConfirmPasswordChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <>
+      <form className="gl-settings-card gl-settings-form" onSubmit={onSubmit}>
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <KeyRound size={18} />
+          </span>
+          <div>
+            <h2>修改密码</h2>
+            <p>需要先输入当前密码，修改成功后下次登录使用新密码。</p>
+          </div>
+        </div>
+        <div className="gl-settings-form-grid">
+          <label className="gl-settings-field">
+            <span>当前密码</span>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(event) => onCurrentPasswordChange(event.target.value)}
+              autoComplete="current-password"
+              className="gl-settings-input"
+            />
+          </label>
+          <label className="gl-settings-field">
+            <span>新密码</span>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(event) => onNewPasswordChange(event.target.value)}
+              autoComplete="new-password"
+              className="gl-settings-input"
+            />
+          </label>
+          <label className="gl-settings-field">
+            <span>确认新密码</span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => onConfirmPasswordChange(event.target.value)}
+              autoComplete="new-password"
+              className="gl-settings-input"
+            />
+          </label>
+        </div>
+        <div className="gl-settings-actions">
+          <button className="gl-settings-button is-primary" type="submit" disabled={pending}>
+            更新密码
+          </button>
+        </div>
+      </form>
+
+      <section className="gl-settings-card gl-settings-note">
+        <span className="gl-settings-card-icon">
+          <ShieldCheck size={18} />
+        </span>
+        <div>
+          <h2>用户名保护</h2>
+          <p>
+            用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期
+            {usernameAvailableAt ? `，下一次可修改时间为 ${formatSettingsDate(usernameAvailableAt)}` : '。'}
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function PreferencesSettings({
+  lang,
+  theme,
+  onThemeToggle,
+  onLangChange,
+  onCoins,
+  onStudio,
+}: {
+  lang: (typeof APP_LANGS)[number];
+  theme: string;
+  onThemeToggle: () => void;
+  onLangChange: (value: (typeof APP_LANGS)[number]) => void;
+  onCoins: () => void;
+  onStudio: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  return (
+    <>
+      <section className="gl-settings-card gl-settings-form">
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <Moon size={18} />
+          </span>
+          <div>
+            <h2>显示偏好</h2>
+            <p>让界面更贴合你的使用习惯。</p>
+          </div>
+        </div>
+        <SettingRow
+          title={t('library.settings.darkTheme')}
+          sub={theme === 'dark' ? '当前为深色模式' : '当前为浅色模式'}
+          checked={theme === 'dark'}
+          onChange={onThemeToggle}
+        />
+        <label className="gl-settings-field">
+          <span>
+            <Languages size={14} />
+            {t('library.settings.language')}
+          </span>
+          <select
+            className="gl-settings-input"
+            value={lang}
+            onChange={(event) => onLangChange(event.target.value as (typeof APP_LANGS)[number])}
+          >
+            {APP_LANGS.map((option) => (
+              <option key={option} value={option}>
+                {t(`library.settings.languageNames.${option}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      <section className="gl-settings-card gl-settings-shortcuts">
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <Wallet size={18} />
+          </span>
+          <div>
+            <h2>常用入口</h2>
+            <p>把高频操作留在设置页，避免来回找菜单。</p>
+          </div>
+        </div>
+        <div className="gl-settings-shortcut-row">
+          <button className="gl-settings-button" type="button" onClick={onCoins}>
+            <Wallet size={15} />
+            金币中心
+          </button>
+          <button className="gl-settings-button" type="button" onClick={onStudio}>
+            <Video size={15} />
+            创作者中心
+          </button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function parseDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatSettingsDate(date: Date): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function settingsErrorMessage(err: Error): string {
+  if (err instanceof AxiosError) {
+    const data = err.response?.data as { message?: string; reason?: string; availableAt?: string } | undefined;
+    if (data?.reason === 'username_taken') return '这个用户名已被使用。';
+    if (data?.reason === 'username_cooldown') {
+      const date = parseDate(data.availableAt);
+      return date ? `用户名冷却中，${formatSettingsDate(date)} 后可再次修改。` : '用户名修改仍在冷却期。';
+    }
+    if (data?.reason === 'invalid_current_password') return '当前密码不正确。';
+    if (data?.message) return data.message;
+  }
+  return err.message || '操作失败，请稍后重试。';
 }
 
 function LibraryCollectionPage({
@@ -858,12 +1224,6 @@ function EmptyState({ icon, title, sub }: { icon: ReactNode; title: string; sub:
   );
 }
 
-const SETTINGS_CATEGORY_OPTIONS = ['Just Chatting', 'Gaming', 'Music', 'VTuber', 'News'] as const;
-
-function categoryKey(category: (typeof SETTINGS_CATEGORY_OPTIONS)[number]): string {
-  return category.toLowerCase().replace(/\s+/g, '');
-}
-
 function QuickChip({
   icon,
   label,
@@ -893,7 +1253,7 @@ function SettingRow({
   onChange: () => void;
 }) {
   return (
-    <div className="gl-setting-row">
+    <div className="gl-settings-toggle-row">
       <span>
         <strong>{title}</strong>
         <small>{sub}</small>

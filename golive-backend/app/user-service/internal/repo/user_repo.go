@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,8 +13,16 @@ import (
 )
 
 var ErrUserNotFound = errors.New("user not found")
+var ErrUsernameTaken = errors.New("username already exists")
+var ErrUsernameCooldown = errors.New("username change cooldown")
 var ErrApplicationNotFound = errors.New("creator application not found")
 var ErrApplicationAlreadyReviewed = errors.New("creator application already reviewed")
+
+type UsernameCooldownError struct {
+	AvailableAt time.Time
+}
+
+func (e *UsernameCooldownError) Error() string { return ErrUsernameCooldown.Error() }
 
 type UserRepo struct {
 	db *gorm.DB
@@ -52,6 +61,67 @@ func (r *UserRepo) FindByID(ctx context.Context, id string) (*model.User, error)
 
 func (r *UserRepo) Create(ctx context.Context, u *model.User) error {
 	return r.db.WithContext(ctx).Create(u).Error
+}
+
+func (r *UserRepo) UpdateProfile(
+	ctx context.Context,
+	id string,
+	username *string,
+	displayName *string,
+	now time.Time,
+	cooldown time.Duration,
+) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+			return err
+		}
+
+		updates := map[string]any{}
+		if displayName != nil {
+			updates["display_name"] = strings.TrimSpace(*displayName)
+		}
+		if username != nil {
+			next := strings.TrimSpace(*username)
+			if next != "" && next != u.Username {
+				if u.UsernameUpdatedAt != nil {
+					availableAt := u.UsernameUpdatedAt.Add(cooldown)
+					if now.Before(availableAt) {
+						return &UsernameCooldownError{AvailableAt: availableAt}
+					}
+				}
+				var existing model.User
+				err := tx.Where("username = ? AND id <> ?", next, id).Take(&existing).Error
+				if err == nil {
+					return ErrUsernameTaken
+				}
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				updates["username"] = next
+				updates["username_updated_at"] = now
+			}
+		}
+		if len(updates) > 0 {
+			if err := tx.Model(&u).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Where("id = ?", id).Take(&u).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) UpdatePasswordHash(ctx context.Context, id, hash string) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ?", id).
+		Update("password_hash", hash).Error
 }
 
 func (r *UserRepo) CreateAdmin(ctx context.Context, u *model.User) error {

@@ -120,6 +120,27 @@ type CreatorRecommendationCandidate struct {
 	PeakViewers int64
 }
 
+type OwnerProfile struct {
+	ID          string
+	Username    string
+	DisplayName string
+	Avatar      string
+	Verified    bool
+}
+
+func (r *RoomRepo) OwnerProfile(ctx context.Context, ownerID string) (OwnerProfile, error) {
+	var row OwnerProfile
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Select("id, username, display_name, avatar, verified").
+		Where("id = ?", ownerID).
+		Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return OwnerProfile{}, ErrRoomNotFound
+	}
+	return row, err
+}
+
 func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit int) ([]CreatorRecommendationCandidate, error) {
 	if limit < 1 {
 		limit = 50

@@ -68,13 +68,18 @@ type AppointmentListResp struct {
 }
 
 type NotificationDTO struct {
-	ID        string `json:"id"`
-	Type      string `json:"type"`
-	Title     string `json:"title"`
-	Body      string `json:"body,omitempty"`
-	Link      string `json:"link,omitempty"`
-	ReadAt    string `json:"readAt,omitempty"`
-	CreatedAt string `json:"createdAt"`
+	ID            string `json:"id"`
+	Type          string `json:"type"`
+	Title         string `json:"title"`
+	Body          string `json:"body,omitempty"`
+	Link          string `json:"link,omitempty"`
+	ActorID       string `json:"actorId,omitempty"`
+	ActorUsername string `json:"actorUsername,omitempty"`
+	ActorName     string `json:"actorName,omitempty"`
+	ActorAvatar   string `json:"actorAvatar,omitempty"`
+	ActorVerified bool   `json:"actorVerified,omitempty"`
+	ReadAt        string `json:"readAt,omitempty"`
+	CreatedAt     string `json:"createdAt"`
 }
 
 type NotificationListResp struct {
@@ -398,12 +403,17 @@ func (s *AppointmentService) Notifications(ctx context.Context, userID string, p
 	out := make([]NotificationDTO, 0, len(items))
 	for _, item := range items {
 		dto := NotificationDTO{
-			ID:        item.ID,
-			Type:      item.Type,
-			Title:     item.Title,
-			Body:      item.Body,
-			Link:      item.Link,
-			CreatedAt: item.CreatedAt.UTC().Format(time.RFC3339),
+			ID:            item.ID,
+			Type:          item.Type,
+			Title:         item.Title,
+			Body:          item.Body,
+			Link:          item.Link,
+			ActorID:       item.ActorID,
+			ActorUsername: item.ActorUsername,
+			ActorName:     item.ActorName,
+			ActorAvatar:   item.ActorAvatar,
+			ActorVerified: item.ActorVerified,
+			CreatedAt:     item.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if item.ReadAt != nil {
 			dto.ReadAt = item.ReadAt.UTC().Format(time.RFC3339)
@@ -574,19 +584,60 @@ func (s *AppointmentService) notifyWatchers(ctx context.Context, appt model.Live
 		title = "预约直播已开播"
 		body = appt.Title
 	}
+	actor := s.notificationActor(ctx, appt)
 	notifications := make([]model.Notification, 0, len(watchers))
 	for _, userID := range watchers {
 		notifications = append(notifications, model.Notification{
-			ID:        notificationID(kind, appt.ID, userID),
-			UserID:    userID,
-			Type:      kind,
-			Title:     title,
-			Body:      body,
-			Link:      "/live/" + appt.RoomID,
-			CreatedAt: now,
+			ID:            notificationID(kind, appt.ID, userID),
+			UserID:        userID,
+			Type:          kind,
+			Title:         title,
+			Body:          body,
+			Link:          "/live/" + appt.RoomID,
+			ActorID:       actor.id,
+			ActorUsername: actor.username,
+			ActorName:     actor.name,
+			ActorAvatar:   actor.avatar,
+			ActorVerified: actor.verified,
+			CreatedAt:     now,
 		})
 	}
 	return s.appointments.CreateNotifications(ctx, notifications)
+}
+
+type notificationActor struct {
+	id       string
+	username string
+	name     string
+	avatar   string
+	verified bool
+}
+
+func (s *AppointmentService) notificationActor(ctx context.Context, appt model.LiveAppointment) notificationActor {
+	actor := notificationActor{id: appt.OwnerID}
+	room, _ := s.rooms.GetByID(ctx, appt.RoomID)
+	if room != nil {
+		actor.name = room.Channel
+		actor.avatar = room.Avatar
+		actor.verified = room.Verified
+	}
+	profile, err := s.rooms.OwnerProfile(ctx, appt.OwnerID)
+	if err == nil {
+		actor.username = profile.Username
+		if strings.TrimSpace(profile.DisplayName) != "" {
+			actor.name = profile.DisplayName
+		} else if actor.name == "" {
+			actor.name = profile.Username
+		}
+		if profile.Avatar != "" {
+			actor.avatar = profile.Avatar
+		}
+		actor.verified = actor.verified || profile.Verified
+	}
+	if actor.name == "" {
+		actor.name = "Creator " + trimRunes(appt.OwnerID, 8)
+	}
+	return actor
 }
 
 func cleanAppointmentPayload(payload AppointmentPayload) (string, string, string, error) {

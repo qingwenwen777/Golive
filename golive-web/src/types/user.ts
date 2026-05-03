@@ -2,6 +2,8 @@ export interface User {
   id: string;
   username: string;
   displayName?: string;
+  usernameUpdatedAt?: string;
+  usernameChangeAvailableAt?: string;
   avatar: string;
   cover?: string;
   coinBalance: number;

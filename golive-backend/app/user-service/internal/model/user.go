@@ -15,19 +15,20 @@ const (
 // User is the GORM table model. JSON tags match the frontend `User` type
 // (camelCase). PasswordHash is intentionally json:"-" so it never leaks.
 type User struct {
-	ID                         string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	Username                   string    `gorm:"uniqueIndex;type:varchar(64);not null" json:"username"`
-	DisplayName                string    `gorm:"type:varchar(64)" json:"displayName,omitempty"`
-	PasswordHash               string    `gorm:"type:varchar(100);not null" json:"-"`
-	Avatar                     string    `gorm:"type:varchar(500)" json:"avatar"`
-	Cover                      string    `gorm:"type:varchar(500)" json:"cover"`
-	CoinBalance                int64     `gorm:"not null;default:0" json:"coinBalance"`
-	Verified                   bool      `gorm:"not null;default:false" json:"verified,omitempty"`
-	Role                       string    `gorm:"type:varchar(16);not null;default:user" json:"role"`
-	LivePermissionStatus       string    `gorm:"type:varchar(16);not null;default:none" json:"livePermissionStatus"`
-	LivePermissionRejectReason string    `gorm:"type:text" json:"livePermissionRejectReason,omitempty"`
-	CreatedAt                  time.Time `json:"-"`
-	UpdatedAt                  time.Time `json:"-"`
+	ID                         string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
+	Username                   string     `gorm:"uniqueIndex;type:varchar(64);not null" json:"username"`
+	DisplayName                string     `gorm:"type:varchar(64)" json:"displayName,omitempty"`
+	PasswordHash               string     `gorm:"type:varchar(100);not null" json:"-"`
+	UsernameUpdatedAt          *time.Time `gorm:"index" json:"-"`
+	Avatar                     string     `gorm:"type:varchar(500)" json:"avatar"`
+	Cover                      string     `gorm:"type:varchar(500)" json:"cover"`
+	CoinBalance                int64      `gorm:"not null;default:0" json:"coinBalance"`
+	Verified                   bool       `gorm:"not null;default:false" json:"verified,omitempty"`
+	Role                       string     `gorm:"type:varchar(16);not null;default:user" json:"role"`
+	LivePermissionStatus       string     `gorm:"type:varchar(16);not null;default:none" json:"livePermissionStatus"`
+	LivePermissionRejectReason string     `gorm:"type:text" json:"livePermissionRejectReason,omitempty"`
+	CreatedAt                  time.Time  `json:"-"`
+	UpdatedAt                  time.Time  `json:"-"`
 }
 
 func (User) TableName() string { return "users" }
@@ -53,6 +54,8 @@ type PublicUser struct {
 	ID                         string `json:"id"`
 	Username                   string `json:"username"`
 	DisplayName                string `json:"displayName,omitempty"`
+	UsernameUpdatedAt          string `json:"usernameUpdatedAt,omitempty"`
+	UsernameChangeAvailableAt  string `json:"usernameChangeAvailableAt,omitempty"`
 	Avatar                     string `json:"avatar"`
 	Cover                      string `json:"cover"`
 	CoinBalance                int64  `json:"coinBalance"`
@@ -71,7 +74,7 @@ func (u *User) Public() PublicUser {
 	if liveStatus == "" {
 		liveStatus = LivePermissionNone
 	}
-	return PublicUser{
+	pu := PublicUser{
 		ID:                         u.ID,
 		Username:                   u.Username,
 		DisplayName:                u.DisplayName,
@@ -83,4 +86,9 @@ func (u *User) Public() PublicUser {
 		LivePermissionStatus:       liveStatus,
 		LivePermissionRejectReason: u.LivePermissionRejectReason,
 	}
+	if u.UsernameUpdatedAt != nil {
+		pu.UsernameUpdatedAt = u.UsernameUpdatedAt.UTC().Format(time.RFC3339)
+		pu.UsernameChangeAvailableAt = u.UsernameUpdatedAt.Add(7 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	}
+	return pu
 }

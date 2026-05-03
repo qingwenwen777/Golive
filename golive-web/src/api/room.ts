@@ -367,6 +367,11 @@ export interface NotificationItem {
   title: string;
   body?: string;
   link?: string;
+  actorId?: string;
+  actorUsername?: string;
+  actorName?: string;
+  actorAvatar?: string;
+  actorVerified?: boolean;
   readAt?: string;
   createdAt: string;
 }

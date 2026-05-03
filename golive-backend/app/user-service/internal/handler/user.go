@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
@@ -18,6 +21,10 @@ import (
 type UserHandler struct {
 	users *repo.UserRepo
 }
+
+const usernameChangeCooldown = 7 * 24 * time.Hour
+
+var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$`)
 
 func NewUserHandler(users *repo.UserRepo) *UserHandler {
 	return &UserHandler{users: users}
@@ -61,6 +68,134 @@ func (h *UserHandler) PublicProfile(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, u.Public())
+}
+
+type updateProfileReq struct {
+	Username    *string `json:"username"`
+	DisplayName *string `json:"displayName"`
+}
+
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req updateProfileReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+
+	username, ok := cleanUsernamePatch(req.Username, c)
+	if !ok {
+		return
+	}
+	displayName, ok := cleanDisplayNamePatch(req.DisplayName, c)
+	if !ok {
+		return
+	}
+	if username == nil && displayName == nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "nothing to update"))
+		return
+	}
+
+	u, err := h.users.UpdateProfile(c.Request.Context(), uid, username, displayName, time.Now().UTC(), usernameChangeCooldown)
+	if err != nil {
+		var cooldown *repo.UsernameCooldownError
+		if errors.As(err, &cooldown) {
+			c.AbortWithStatusJSON(http.StatusConflict, gin.H{
+				"message":     "Username can be changed once every 7 days",
+				"reason":      "username_cooldown",
+				"availableAt": cooldown.AvailableAt.UTC().Format(time.RFC3339),
+			})
+			return
+		}
+		if errors.Is(err, repo.ErrUsernameTaken) {
+			errcode.Respond(c, service.ErrUsernameTaken.WithReason("username_taken"))
+			return
+		}
+		if errors.Is(err, repo.ErrUserNotFound) {
+			errcode.Respond(c, service.ErrUnauthorized)
+			return
+		}
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, u.Public())
+}
+
+type changePasswordReq struct {
+	CurrentPassword string `json:"currentPassword" binding:"required"`
+	NewPassword     string `json:"newPassword" binding:"required"`
+}
+
+func (h *UserHandler) ChangePassword(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req changePasswordReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	if len([]rune(req.NewPassword)) < 6 {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "password must be at least 6 characters").WithReason("invalid_password"))
+		return
+	}
+	u, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+		errcode.Respond(c, service.ErrInvalidCredentials.WithReason("invalid_current_password"))
+		return
+	}
+	hash, err := service.HashPassword(req.NewPassword)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	if err := h.users.UpdatePasswordHash(c.Request.Context(), uid, hash); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func cleanUsernamePatch(raw *string, c *gin.Context) (*string, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	username := strings.TrimSpace(*raw)
+	if !usernamePattern.MatchString(username) {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "username must be 3-32 letters, numbers, dots, hyphens, or underscores").WithReason("invalid_username"))
+		return nil, false
+	}
+	return &username, true
+}
+
+func cleanDisplayNamePatch(raw *string, c *gin.Context) (*string, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	displayName := trimRunes(strings.TrimSpace(*raw), 64)
+	if displayName == "" {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "display name is required").WithReason("invalid_display_name"))
+		return nil, false
+	}
+	return &displayName, true
+}
+
+func trimRunes(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max])
 }
 
 type topupReq struct {

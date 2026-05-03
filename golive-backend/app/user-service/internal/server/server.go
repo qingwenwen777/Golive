@@ -51,6 +51,8 @@ func NewRouter(d Deps) *gin.Engine {
 	{
 		users.GET("/profile/:id", userH.PublicProfile)
 		users.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
+		users.PATCH("/me/profile", handler.AuthRequired(d.Auth), userH.UpdateProfile)
+		users.POST("/me/password", handler.AuthRequired(d.Auth), userH.ChangePassword)
 		users.GET("/me/coins/transactions", handler.AuthRequired(d.Auth), userH.CoinTransactions)
 		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), userH.TopupCoins)
 		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), userH.ClaimDailyCoinTask)

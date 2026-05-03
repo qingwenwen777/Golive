@@ -16,6 +16,16 @@ export interface RegisterPayload {
   displayName: string;
 }
 
+export interface UpdateProfilePayload {
+  username: string;
+  displayName: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export function useLoginMutation() {
   const login = useAuthStore((s) => s.login);
   const qc = useQueryClient();
@@ -93,6 +103,35 @@ export function useTopupCoins() {
       qc.setQueryData(['me'], user);
       useAuthStore.getState().setUser(user);
       void qc.invalidateQueries({ queryKey: coinTransactionsKey });
+    },
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation<User, Error, UpdateProfilePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.patch<User>('/users/me/profile', payload);
+      return data;
+    },
+    onSuccess: (user) => {
+      const prev = useAuthStore.getState().user;
+      qc.setQueryData(['me'], user);
+      useAuthStore.getState().setUser(user);
+      void qc.invalidateQueries({ queryKey: ['public-user', user.id] });
+      void qc.invalidateQueries({ queryKey: ['public-user', user.username] });
+      if (prev?.username && prev.username !== user.username) {
+        void qc.invalidateQueries({ queryKey: ['public-user', prev.username] });
+      }
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation<{ ok: boolean }, Error, ChangePasswordPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<{ ok: boolean }>('/users/me/password', payload);
+      return data;
     },
   });
 }

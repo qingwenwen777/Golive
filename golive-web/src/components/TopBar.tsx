@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Coins, Plus, User as UserIcon } from 'lucide-react';
+import { Bell, CheckCircle2, Coins, Plus, User as UserIcon } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, type NotificationItem } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -272,8 +272,20 @@ function NotificationBell() {
                 onClick={() => openNotification(item)}
               >
                 <span className="gl-notification-dot" aria-hidden="true" />
+                <Avatar
+                  name={notificationActorName(item)}
+                  src={item.actorAvatar}
+                  size={38}
+                  className="gl-notification-avatar"
+                />
                 <span className="gl-notification-copy">
                   <strong>{notificationTitle(item, t)}</strong>
+                  {notificationActorLabel(item) && (
+                    <span className="gl-notification-actor">
+                      {notificationActorLabel(item)}
+                      {item.actorVerified && <CheckCircle2 size={12} />}
+                    </span>
+                  )}
                   {item.body && <small>{item.body}</small>}
                   <time>{formatNotificationTime(item.createdAt, i18n.language)}</time>
                 </span>
@@ -288,6 +300,15 @@ function NotificationBell() {
 
 function notificationTitle(item: NotificationItem, t: ReturnType<typeof useTranslation>['t']): string {
   return t(`notificationTypes.${item.type}.title`, { defaultValue: item.title });
+}
+
+function notificationActorName(item: NotificationItem): string {
+  return item.actorName || item.actorUsername || item.body || 'GoLive';
+}
+
+function notificationActorLabel(item: NotificationItem): string {
+  if (item.actorUsername) return `@${item.actorUsername}`;
+  return item.actorName || '';
 }
 
 function formatNotificationTime(value: string, locale: string): string {
