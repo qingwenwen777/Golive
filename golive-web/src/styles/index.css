@@ -4891,6 +4891,11 @@ button.gl-fan-badge-empty {
   font-size: 13px;
   font-weight: 800;
 }
+
+.gl-channel-post-pager {
+  justify-content: center;
+}
+
 .gl-history-pager-controls {
   display: inline-flex;
   align-items: center;

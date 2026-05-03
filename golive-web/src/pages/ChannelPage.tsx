@@ -99,9 +99,7 @@ export default function ChannelPage() {
   const appointmentPageSize = channelAppointments.data?.size ?? 4;
   const appointmentPageCount = Math.max(1, Math.ceil(appointmentTotal / appointmentPageSize));
   const channelPosts = useChannelPosts(channelKey, true, postPage, POST_PAGE_SIZE);
-  const postTotal = channelPosts.data?.total ?? 0;
-  const postPageSize = channelPosts.data?.size ?? POST_PAGE_SIZE;
-  const postPageCount = Math.max(1, Math.ceil(postTotal / postPageSize));
+  const postPageCount = Math.max(1, Math.ceil((channelPosts.data?.total ?? 0) / (channelPosts.data?.size ?? POST_PAGE_SIZE)));
 
   const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
   const primaryCategory = primary?.category ?? 'Just Chatting';
@@ -351,8 +349,6 @@ export default function ChannelPage() {
               <ChannelPostPager
                 page={postPage}
                 pageCount={postPageCount}
-                total={postTotal}
-                pageSize={postPageSize}
                 onPageChange={setPostPage}
               />
             )}
@@ -524,32 +520,19 @@ function HistoryPager({
 function ChannelPostPager({
   page,
   pageCount,
-  total,
-  pageSize,
   onPageChange,
 }: {
   page: number;
   pageCount: number;
-  total: number;
-  pageSize: number;
   onPageChange: (page: number) => void;
 }) {
   const { t } = useTranslation('pages');
-  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(total, page * pageSize);
+  const pages = visibleHistoryPages(page, pageCount);
   return (
     <div
       className="gl-history-pager gl-channel-post-pager"
       aria-label={t('channel.posts.pagination', { defaultValue: 'Post pagination' })}
     >
-      <div className="gl-history-pager-count">
-        {t('channel.posts.pageCount', {
-          start,
-          end,
-          total,
-          defaultValue: '{{start}}-{{end}} / {{total}}',
-        })}
-      </div>
       <div className="gl-history-pager-controls">
         <button
           type="button"
@@ -559,9 +542,23 @@ function ChannelPostPager({
         >
           <ChevronLeft size={16} />
         </button>
-        <span className="gl-appointment-pager-current">
-          {page} / {pageCount}
-        </span>
+        {pages.map((item, index) =>
+          item === 'gap' ? (
+            <span key={`gap-${index}`} className="gl-history-pager-gap">
+              ...
+            </span>
+          ) : (
+            <button
+              key={item}
+              type="button"
+              className={item === page ? 'is-active' : undefined}
+              aria-current={item === page ? 'page' : undefined}
+              onClick={() => onPageChange(item)}
+            >
+              {item}
+            </button>
+          ),
+        )}
         <button
           type="button"
           aria-label={t('channel.posts.next', { defaultValue: 'Next page' })}
