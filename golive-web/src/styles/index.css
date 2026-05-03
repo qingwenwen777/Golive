@@ -3273,6 +3273,11 @@ button.gl-fan-badge-empty {
   align-items: center;
   padding: 10px 0 2px;
 }
+
+.gl-studio-head > div:last-child {
+  min-width: 0;
+}
+
 .gl-studio-head-icon {
   display: inline-flex;
   align-items: center;
@@ -3294,6 +3299,7 @@ button.gl-fan-badge-empty {
   font-size: 30px;
   font-weight: 900;
   line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 .gl-studio-head a {
   color: var(--gl-text-2);
@@ -3481,6 +3487,11 @@ button.gl-fan-badge-empty {
   padding: 8px;
   border-radius: 10px;
 }
+
+.gl-studio-live-row > div {
+  min-width: 0;
+}
+
 .gl-studio-live-row:hover {
   background: var(--gl-bg-hover);
 }
@@ -3495,6 +3506,7 @@ button.gl-fan-badge-empty {
 .gl-studio-live-row span {
   color: var(--gl-text-2);
   font-size: 13px;
+  min-width: 0;
 }
 .gl-studio-latest {
   display: flex;
@@ -3551,6 +3563,12 @@ button.gl-fan-badge-empty {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.gl-studio-fan-row strong {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .gl-studio-breakdown div {
   position: relative;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3563,6 +3581,150 @@ button.gl-fan-badge-empty {
   height: 6px;
   border-radius: 999px;
   background: #1c62b9;
+}
+
+@media (max-width: 1199px) {
+  .gl-studio-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gl-studio-grid,
+  .gl-studio-live-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-studio-panel-wide {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .gl-studio-page {
+    gap: 14px;
+  }
+
+  .gl-studio-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 12px;
+    padding-top: 0;
+  }
+
+  .gl-studio-head-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .gl-studio-head h1 {
+    font-size: 24px;
+  }
+
+  .gl-studio-kpis,
+  .gl-studio-kpis.compact {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .gl-studio-kpi {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .gl-studio-panel {
+    padding: 14px;
+  }
+
+  .gl-studio-panel,
+  .gl-studio-kpi,
+  .gl-studio-latest {
+    border-radius: 10px;
+  }
+
+  .gl-studio-panel-head {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .gl-studio-panel-head h2 {
+    font-size: 19px;
+    overflow-wrap: anywhere;
+  }
+
+  .gl-studio-bars {
+    height: 210px;
+    gap: 8px;
+    padding-top: 10px;
+  }
+
+  .gl-studio-bar small {
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gl-studio-line {
+    height: 160px;
+  }
+
+  .gl-studio-live-table {
+    gap: 10px;
+  }
+
+  .gl-studio-live-row {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 10px 12px;
+    align-items: start;
+    border: 1px solid var(--gl-border);
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .gl-studio-live-row .gl-history-cover {
+    grid-row: 1 / span 3;
+    width: 112px;
+  }
+
+  .gl-studio-live-row > span {
+    grid-column: 2;
+    font-size: 12px;
+  }
+
+  .gl-studio-latest {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gl-studio-latest .gl-retry-btn {
+    width: 100%;
+  }
+
+  .gl-studio-live-date {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .gl-studio-head {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-studio-head-icon {
+    display: none;
+  }
+
+  .gl-studio-live-row {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-studio-live-row .gl-history-cover {
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .gl-studio-live-row > span {
+    grid-column: 1;
+  }
 }
 
 /* Creator studio */
