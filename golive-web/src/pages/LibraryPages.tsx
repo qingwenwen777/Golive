@@ -98,6 +98,7 @@ export function SubscriptionsPage() {
       ),
     [channels],
   );
+  const hydratedStreams = useReplayHydratedStreams(streams);
 
   useEffect(() => {
     setAppointmentPage(1);
@@ -256,7 +257,7 @@ export function SubscriptionsPage() {
         </div>
         <StreamGrid
           isPending={isAuthed && subscriptions.isPending}
-          streams={streams.slice(0, 12)}
+          streams={hydratedStreams.slice(0, 12)}
           emptyTitle={
             isAuthed
               ? t('library.subscriptions.emptyAuthed')
@@ -286,7 +287,7 @@ export function YouPage() {
         : readLibrary(WATCH_HISTORY_KEY),
     [liveStreams],
   );
-  const hydratedHistory = useReplayHydratedLibraryItems(history);
+  const hydratedHistory = useReplayHydratedStreams(history);
   const saved = useMemo(
     () =>
       liveStreams
@@ -294,7 +295,7 @@ export function YouPage() {
         : readLibrary(WATCH_LATER_KEY),
     [liveStreams],
   );
-  const hydratedSaved = useReplayHydratedLibraryItems(saved);
+  const hydratedSaved = useReplayHydratedStreams(saved);
   const liked = useMemo(
     () =>
       liveStreams
@@ -302,7 +303,7 @@ export function YouPage() {
         : readLibrary(LIKED_STREAMS_KEY),
     [liveStreams],
   );
-  const hydratedLiked = useReplayHydratedLibraryItems(liked);
+  const hydratedLiked = useReplayHydratedStreams(liked);
   const displayName = userDisplayName(user);
   const ownLive = rooms.data?.items.find((stream) => stream.ownerId === user?.id);
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
@@ -1131,7 +1132,7 @@ function LibraryCollectionPage({
     setItems(readLibrary(storageKey));
   }, [rooms.data?.items, storageKey]);
 
-  const hydratedItems = useReplayHydratedLibraryItems(items);
+  const hydratedItems = useReplayHydratedStreams(items);
 
   const handleRemove = (streamId: string) => {
     setItems(removeFromLibrary(storageKey, streamId));
@@ -1225,7 +1226,7 @@ function collectionThemeClass(storageKey: string): string {
   return 'is-default';
 }
 
-function useReplayHydratedLibraryItems(items: LibraryStream[]): LibraryStream[] {
+function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
   const lookupItems = useMemo(
     () =>
       items
@@ -1262,8 +1263,6 @@ function useReplayHydratedLibraryItems(items: LibraryStream[]): LibraryStream[] 
     return {
       ...item,
       ...replayRoom,
-      savedAt: item.savedAt,
-      watchedAt: item.watchedAt,
     };
   });
 }
