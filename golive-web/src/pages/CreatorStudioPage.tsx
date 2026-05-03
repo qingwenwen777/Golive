@@ -299,7 +299,7 @@ export function CreatorPreparePage() {
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [obsChecked, setObsChecked] = useState(false);
   const categories = CATEGORIES_EN.filter((item) => item !== 'All');
   const appointments = useStudioAppointments(Boolean(user), 1, 5);
@@ -361,6 +361,7 @@ export function CreatorPreparePage() {
           done={done1}
           locked={false}
           title={t('studio.prepare.steps.info', { defaultValue: 'Fill live info' })}
+          actionLabel={done1 ? undefined : t('studio.prepare.startWriting', { defaultValue: '开始填写' })}
           onOpen={() => setStep(1)}
         >
           <label className="gl-creator-field">
@@ -1685,6 +1686,7 @@ function StepCard({
   done,
   locked,
   title,
+  actionLabel,
   onOpen,
   children,
 }: {
@@ -1693,6 +1695,7 @@ function StepCard({
   done: boolean;
   locked: boolean;
   title: string;
+  actionLabel?: string;
   onOpen: () => void;
   children: ReactNode;
 }) {
@@ -1701,6 +1704,7 @@ function StepCard({
       <button type="button" className="gl-creator-step-head" disabled={locked} onClick={onOpen}>
         <span>{done ? <CheckCircle2 size={16} /> : number}</span>
         <strong>{title}</strong>
+        {!active && !locked && actionLabel && <em>{actionLabel}</em>}
       </button>
       {active && <div className="gl-creator-step-body">{children}</div>}
     </section>
