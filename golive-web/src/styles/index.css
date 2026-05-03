@@ -6633,10 +6633,25 @@ button.gl-fan-badge-empty {
   white-space: nowrap;
 }
 
+.gl-appointments-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.gl-appointments-create-btn {
+  min-height: 44px;
+  padding-inline: 18px;
+}
+
 .gl-appointments-grid {
   align-items: start;
-  grid-template-columns: minmax(500px, 0.9fr) minmax(540px, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+}
+
+.gl-appointments-list-panel {
+  width: 100%;
 }
 
 .gl-appointment-form-panel {
@@ -6859,6 +6874,26 @@ button.gl-fan-badge-empty {
 .gl-appointment-submit {
   align-self: flex-start;
   min-width: 148px;
+}
+
+.gl-appointment-dialog {
+  width: min(900px, calc(100vw - 32px));
+}
+
+.gl-appointment-dialog-panel .gl-creator-panel-head {
+  margin-bottom: 0;
+  padding-right: 32px;
+}
+
+.gl-appointment-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.gl-appointment-dialog-actions .gl-appointment-submit {
+  align-self: auto;
 }
 
 .gl-appointment-pager {

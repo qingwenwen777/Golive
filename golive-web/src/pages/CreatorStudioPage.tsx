@@ -27,6 +27,7 @@ import {
   Clock3,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
@@ -48,6 +49,7 @@ import {
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { AppointmentCard } from '@/components/AppointmentCard';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Chat } from '@/features/live-room/Chat';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { Player } from '@/features/live-room/Player';
@@ -78,6 +80,10 @@ function categoryKey(category: string): string {
 
 function currentChannelKey(user: User | null | undefined): string {
   return user?.id ?? '';
+}
+
+function defaultAppointmentTime(): string {
+  return toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000));
 }
 
 function isStreamLive(stream: Pick<Stream, 'isLive' | 'status'>): boolean {
@@ -485,9 +491,10 @@ export function CreatorAppointmentsPage() {
   const appointments = useStudioAppointments(Boolean(channelKey), appointmentPage, APPOINTMENT_LIST_PAGE_SIZE);
   const createAppointment = useCreateAppointment();
   const uploadCover = useUploadLiveCover();
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
   const [editing, setEditing] = useState<AppointmentItem | null>(null);
   const updateAppointment = useUpdateAppointment(editing?.id ?? '');
-  const [scheduledAt, setScheduledAt] = useState(() => toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [scheduledAt, setScheduledAt] = useState(() => defaultAppointmentTime());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -499,16 +506,6 @@ export function CreatorAppointmentsPage() {
   }, [channelKey]);
 
   useEffect(() => {
-    if (!editing) return;
-    setTitle(editing.title);
-    setDescription(editing.description ?? '');
-    setScheduledAt(toLocalDateTimeInput(editing.scheduledAt));
-    setCoverPreview(editing.cover ?? '');
-    setCoverFile(null);
-    setError('');
-  }, [editing]);
-
-  useEffect(() => {
     return () => {
       if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
     };
@@ -518,10 +515,44 @@ export function CreatorAppointmentsPage() {
     setEditing(null);
     setTitle('');
     setDescription('');
-    setScheduledAt(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+    setScheduledAt(defaultAppointmentTime());
     setCoverFile(null);
     setCoverPreview('');
     setError('');
+  };
+
+  const resetDraft = () => {
+    if (!editing) {
+      clearDraft();
+      return;
+    }
+    setTitle(editing.title);
+    setDescription(editing.description ?? '');
+    setScheduledAt(toLocalDateTimeInput(editing.scheduledAt));
+    setCoverFile(null);
+    setCoverPreview(editing.cover ?? '');
+    setError('');
+  };
+
+  const openCreateDialog = () => {
+    clearDraft();
+    setAppointmentDialogOpen(true);
+  };
+
+  const openEditDialog = (item: AppointmentItem) => {
+    setEditing(item);
+    setTitle(item.title);
+    setDescription(item.description ?? '');
+    setScheduledAt(toLocalDateTimeInput(item.scheduledAt));
+    setCoverFile(null);
+    setCoverPreview(item.cover ?? '');
+    setError('');
+    setAppointmentDialogOpen(true);
+  };
+
+  const handleAppointmentDialogOpenChange = (open: boolean) => {
+    setAppointmentDialogOpen(open);
+    if (!open) clearDraft();
   };
 
   const saveAppointment = async () => {
@@ -560,6 +591,7 @@ export function CreatorAppointmentsPage() {
         await updateAppointment.mutateAsync(payload);
         toast.success(t('studio.appointments.updated', { defaultValue: 'Appointment updated.' }));
       }
+      setAppointmentDialogOpen(false);
       clearDraft();
       void appointments.refetch();
       void appointmentStats.refetch();
@@ -613,63 +645,15 @@ export function CreatorAppointmentsPage() {
         />
       </section>
 
+      <div className="gl-appointments-toolbar">
+        <button type="button" className="gl-creator-primary gl-appointments-create-btn" onClick={openCreateDialog}>
+          <Plus size={16} />
+          {t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}
+        </button>
+      </div>
+
       <section className="gl-creator-dashboard-grid gl-appointments-grid">
-        <div className="gl-creator-panel gl-appointment-form-panel">
-          <div className="gl-creator-panel-head">
-            <div>
-              <span>{t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}</span>
-              <h2>{editing ? t('studio.appointments.editTitle', { defaultValue: 'Edit appointment' }) : t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}</h2>
-            </div>
-            <button type="button" className="gl-creator-secondary" onClick={clearDraft} disabled={!title && !description && !coverPreview && !editing}>
-              {t('studio.appointments.reset', { defaultValue: 'Reset' })}
-            </button>
-          </div>
-
-          <div className="gl-appointment-form-body">
-            <div className="gl-appointment-form-fields">
-              <div className="gl-appointment-form-row">
-                <div className="gl-creator-field">
-                  <span>{t('studio.appointments.time', { defaultValue: 'Start time' })}</span>
-                  <AppointmentDateTimePicker value={scheduledAt} onChange={setScheduledAt} />
-                </div>
-                <label className="gl-creator-field">
-                  <span>{t('createLive.fields.title')}</span>
-                  <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
-                </label>
-              </div>
-              <label className="gl-creator-field">
-                <span>{t('createLive.fields.description')}</span>
-                <textarea
-                  value={description}
-                  rows={4}
-                  maxLength={2000}
-                  placeholder={t('studio.appointments.descriptionPlaceholder', { defaultValue: 'Tell viewers what this appointment is about.' })}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-            </div>
-            <div className="gl-creator-field gl-appointment-cover-field">
-              <span>{t('createLive.fields.cover')}</span>
-              <CoverPicker
-                preview={coverPreview}
-                onChange={(file) => {
-                  if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
-                  setCoverFile(file);
-                  setCoverPreview(file ? URL.createObjectURL(file) : '');
-                }}
-              />
-            </div>
-          </div>
-          {error && <div className="gl-creator-empty-soft gl-appointment-error">{error}</div>}
-          <button type="button" className="gl-creator-primary gl-appointment-submit" onClick={() => void saveAppointment()} disabled={createAppointment.isPending || updateAppointment.isPending || uploadCover.isPending}>
-            <Save size={16} />
-            {editing
-              ? t('studio.appointments.saveEdit', { defaultValue: 'Save changes' })
-              : t('studio.appointments.publish', { defaultValue: 'Publish appointment' })}
-          </button>
-        </div>
-
-        <div className="gl-creator-panel">
+        <div className="gl-creator-panel gl-appointments-list-panel">
           <div className="gl-creator-panel-head">
             <div>
               <span>{t('studio.appointments.listLabel', { defaultValue: 'My appointments' })}</span>
@@ -688,7 +672,7 @@ export function CreatorAppointmentsPage() {
                   <AppointmentStudioRow
                     key={item.id}
                     item={item}
-                    onEdit={() => setEditing(item)}
+                    onEdit={() => openEditDialog(item)}
                     onUpdated={() => {
                       void appointments.refetch();
                       void appointmentStats.refetch();
@@ -709,6 +693,69 @@ export function CreatorAppointmentsPage() {
           </div>
         </div>
       </section>
+
+      <Dialog open={appointmentDialogOpen} onOpenChange={handleAppointmentDialogOpenChange}>
+        <DialogContent className="gl-appointment-dialog max-h-[calc(100vh-32px)] max-w-4xl overflow-y-auto sm:max-w-4xl">
+          <div className="gl-appointment-form-panel gl-appointment-dialog-panel">
+            <div className="gl-creator-panel-head">
+              <div>
+                <span>{t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}</span>
+                <DialogTitle asChild>
+                  <h2>{editing ? t('studio.appointments.editTitle', { defaultValue: 'Edit appointment' }) : t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}</h2>
+                </DialogTitle>
+              </div>
+            </div>
+
+            <div className="gl-appointment-form-body">
+              <div className="gl-appointment-form-fields">
+                <div className="gl-appointment-form-row">
+                  <div className="gl-creator-field">
+                    <span>{t('studio.appointments.time', { defaultValue: 'Start time' })}</span>
+                    <AppointmentDateTimePicker value={scheduledAt} onChange={setScheduledAt} />
+                  </div>
+                  <label className="gl-creator-field">
+                    <span>{t('createLive.fields.title')}</span>
+                    <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} />
+                  </label>
+                </div>
+                <label className="gl-creator-field">
+                  <span>{t('createLive.fields.description')}</span>
+                  <textarea
+                    value={description}
+                    rows={4}
+                    maxLength={2000}
+                    placeholder={t('studio.appointments.descriptionPlaceholder', { defaultValue: 'Tell viewers what this appointment is about.' })}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="gl-creator-field gl-appointment-cover-field">
+                <span>{t('createLive.fields.cover')}</span>
+                <CoverPicker
+                  preview={coverPreview}
+                  onChange={(file) => {
+                    if (coverPreview.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+                    setCoverFile(file);
+                    setCoverPreview(file ? URL.createObjectURL(file) : '');
+                  }}
+                />
+              </div>
+            </div>
+            {error && <div className="gl-creator-empty-soft gl-appointment-error">{error}</div>}
+            <div className="gl-appointment-dialog-actions">
+              <button type="button" className="gl-creator-secondary" onClick={resetDraft} disabled={!title && !description && !coverPreview && !editing}>
+                {t('studio.appointments.reset', { defaultValue: 'Reset' })}
+              </button>
+              <button type="button" className="gl-creator-primary gl-appointment-submit" onClick={() => void saveAppointment()} disabled={createAppointment.isPending || updateAppointment.isPending || uploadCover.isPending}>
+                <Save size={16} />
+                {editing
+                  ? t('studio.appointments.saveEdit', { defaultValue: 'Save changes' })
+                  : t('studio.appointments.publish', { defaultValue: 'Publish appointment' })}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
