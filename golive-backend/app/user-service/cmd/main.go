@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -15,10 +16,13 @@ import (
 	"github.com/go-redis/redis/v9"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	userv1 "github.com/qingwenwen777/golive/api/gen/go/user/v1"
 	"github.com/qingwenwen777/golive/app/user-service/internal/config"
+	"github.com/qingwenwen777/golive/app/user-service/internal/grpcserver"
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/user-service/internal/server"
@@ -92,6 +96,7 @@ func main() {
 		CoverPublicURL:  cfg.Upload.CoverPublicURL,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	var grpcSrv *grpc.Server
 
 	// pprof on a side port.
 	go func() {
@@ -99,6 +104,20 @@ func main() {
 			log.Warn("pprof exit", zap.Error(err))
 		}
 	}()
+	if cfg.Service.GRPCAddr != "" {
+		lis, err := net.Listen("tcp", cfg.Service.GRPCAddr)
+		if err != nil {
+			log.Fatal("listen grpc", zap.String("addr", cfg.Service.GRPCAddr), zap.Error(err))
+		}
+		grpcSrv = grpc.NewServer()
+		userv1.RegisterUserServiceServer(grpcSrv, grpcserver.NewUserServer(userRepo))
+		go func() {
+			log.Info("user-service grpc listening", zap.String("addr", cfg.Service.GRPCAddr))
+			if err := grpcSrv.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+				log.Fatal("grpc exit", zap.Error(err))
+			}
+		}()
+	}
 
 	go func() {
 		log.Info("user-service listening", zap.String("addr", cfg.Service.HTTPAddr))
@@ -114,6 +133,18 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = httpSrv.Shutdown(ctx)
+	if grpcSrv != nil {
+		done := make(chan struct{})
+		go func() {
+			grpcSrv.GracefulStop()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			grpcSrv.Stop()
+		}
+	}
 }
 
 func openMySQL(c config.MySQLCfg) (*gorm.DB, error) {

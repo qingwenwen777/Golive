@@ -57,6 +57,7 @@ type UploadCfg struct {
 
 type UsersCfg struct {
 	ServiceURL string `mapstructure:"service_url"`
+	GRPCAddr   string `mapstructure:"grpc_addr"`
 }
 
 func Load(path string) (*Config, error) {

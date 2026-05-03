@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package golive.user.v1;
+
+option go_package = "github.com/qingwenwen777/golive/api/gen/go/user/v1;userv1";
+
+service UserService {
+  rpc GetUserPermission(GetUserPermissionRequest) returns (GetUserPermissionResponse);
+}
+
+message GetUserPermissionRequest {
+  string user_id = 1;
+}
+
+message GetUserPermissionResponse {
+  string user_id = 1;
+  string role = 2;
+  string live_permission_status = 3;
+  bool live_permission_approved = 4;
+}

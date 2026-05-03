@@ -1,6 +1,7 @@
 service:
   name: user-service
   http_addr: ":8090"
+  grpc_addr: ":19090"
   pprof_addr: ":6062"
   log_level: info
 

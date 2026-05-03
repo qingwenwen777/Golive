@@ -19,6 +19,7 @@ type Config struct {
 type ServiceCfg struct {
 	Name      string `mapstructure:"name"`
 	HTTPAddr  string `mapstructure:"http_addr"`
+	GRPCAddr  string `mapstructure:"grpc_addr"`
 	PprofAddr string `mapstructure:"pprof_addr"`
 	LogLevel  string `mapstructure:"log_level"`
 }
