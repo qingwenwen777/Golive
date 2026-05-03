@@ -1940,47 +1940,11 @@ input:focus-visible,
   justify-content: space-between;
   gap: 12px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--gl-border) 82%, #f59e0b 18%);
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #fff7ed 48%, var(--gl-bg-card)) 0%,
-    var(--gl-bg-card) 48%,
-    color-mix(in srgb, #ecfeff 42%, var(--gl-bg-card)) 100%
-  );
-  box-shadow: var(--gl-shadow);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   padding: 14px;
-}
-.gl-home-level-gift-card::before {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 4px;
-  background: linear-gradient(90deg, #f59e0b, #14b8a6, #e11d48);
-  content: '';
-}
-.gl-home-level-gift-card.is-elite {
-  border-color: color-mix(in srgb, var(--gl-border) 62%, #d97706 38%);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #fff1c2 52%, var(--gl-bg-card)) 0%,
-    var(--gl-bg-card) 45%,
-    color-mix(in srgb, #fef2f2 45%, var(--gl-bg-card)) 100%
-  );
-}
-.gl-home-level-gift-card.is-elite::before {
-  background: linear-gradient(90deg, #d97706, #facc15, #db2777);
-}
-.gl-home-level-gift-card.is-mythic {
-  border-color: color-mix(in srgb, var(--gl-border) 52%, #0f766e 48%);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #ecfdf5 48%, var(--gl-bg-card)) 0%,
-    var(--gl-bg-card) 45%,
-    color-mix(in srgb, #fff7ed 50%, var(--gl-bg-card)) 100%
-  );
-}
-.gl-home-level-gift-card.is-mythic::before {
-  background: linear-gradient(90deg, #0f766e, #f59e0b, #be123c);
 }
 .gl-home-level-gift-card.is-loading {
   min-height: 188px;
@@ -2022,8 +1986,19 @@ input:focus-visible,
 }
 .gl-home-level-gift-tier {
   flex: 0 0 auto;
-  background: rgba(20, 184, 166, 0.12);
-  color: #0f766e;
+  color: #ffffff;
+}
+.gl-home-level-gift-tier.is-tier-1 {
+  background: #64748b;
+}
+.gl-home-level-gift-tier.is-tier-2 {
+  background: #0ea5e9;
+}
+.gl-home-level-gift-tier.is-tier-3 {
+  background: #7c3aed;
+}
+.gl-home-level-gift-tier.is-tier-4 {
+  background: #d97706;
 }
 .gl-home-level-gift-icon {
   display: grid;
@@ -2033,7 +2008,7 @@ input:focus-visible,
   align-self: center;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 50%;
-  background: color-mix(in srgb, var(--gl-bg-card) 78%, #ffffff 22%);
+  background: #f8fafc;
   box-shadow: inset 0 -10px 22px rgba(15, 23, 42, 0.06);
   font-size: 38px;
   line-height: 1;
@@ -2063,50 +2038,40 @@ input:focus-visible,
 }
 .gl-home-level-gift-meta svg {
   flex: 0 0 auto;
+}
+.gl-home-level-gift-meta.is-tier-1 svg {
+  color: #64748b;
+}
+.gl-home-level-gift-meta.is-tier-2 svg {
+  color: #0ea5e9;
+}
+.gl-home-level-gift-meta.is-tier-3 svg {
+  color: #7c3aed;
+}
+.gl-home-level-gift-meta.is-tier-4 svg {
   color: #d97706;
 }
 .dark .gl-home-level-gift-card {
-  border-color: color-mix(in srgb, var(--gl-border) 70%, #f59e0b 30%);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #451a03 34%, var(--gl-bg-card)) 0%,
-    var(--gl-bg-card) 48%,
-    color-mix(in srgb, #042f2e 30%, var(--gl-bg-card)) 100%
-  );
-}
-.dark .gl-home-level-gift-card.is-elite {
-  border-color: color-mix(in srgb, var(--gl-border) 55%, #facc15 45%);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #713f12 34%, var(--gl-bg-card)) 0%,
-    var(--gl-bg-card) 45%,
-    color-mix(in srgb, #4a044e 24%, var(--gl-bg-card)) 100%
-  );
-}
-.dark .gl-home-level-gift-card.is-mythic {
-  border-color: color-mix(in srgb, var(--gl-border) 50%, #2dd4bf 50%);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, #134e4a 34%, var(--gl-bg-card)) 0%,
-    var(--gl-bg-card) 45%,
-    color-mix(in srgb, #7c2d12 26%, var(--gl-bg-card)) 100%
-  );
+  border-color: #e5e7eb;
+  background: #ffffff;
 }
 .dark .gl-home-level-gift-card.is-loading::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
 .dark .gl-home-level-gift-unlock {
-  background: rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
-}
-.dark .gl-home-level-gift-tier {
-  background: rgba(45, 212, 191, 0.16);
-  color: #99f6e4;
+  background: #f1f5f9;
+  color: #334155;
 }
 .dark .gl-home-level-gift-icon {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: color-mix(in srgb, var(--gl-bg-card) 78%, #0f172a 22%);
-  box-shadow: inset 0 -10px 22px rgba(0, 0, 0, 0.28);
+  border-color: rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
+  box-shadow: inset 0 -10px 22px rgba(15, 23, 42, 0.06);
+}
+.dark .gl-home-level-gift-card h3 {
+  color: #111827;
+}
+.dark .gl-home-level-gift-meta {
+  color: #64748b;
 }
 .gl-retry-btn {
   display: inline-flex;

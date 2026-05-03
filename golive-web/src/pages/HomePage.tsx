@@ -315,15 +315,9 @@ function HomeLevelGiftsSection() {
           {levelGifts.map((gift) => {
             const unlockLevel = gift.unlockLevel ?? 1;
             const giftName = localizedGiftName(gift, locale, t);
+            const tierLevel = gift.tier + 1;
             return (
-              <article
-                className={cn(
-                  'gl-home-level-gift-card',
-                  unlockLevel >= 60 && 'is-elite',
-                  unlockLevel >= 90 && 'is-mythic',
-                )}
-                key={gift.id}
-              >
+              <article className="gl-home-level-gift-card" key={gift.id}>
                 <div className="gl-home-level-gift-top">
                   <span className="gl-home-level-gift-unlock">
                     <LockKeyhole size={12} />
@@ -332,10 +326,10 @@ function HomeLevelGiftsSection() {
                       defaultValue: 'Unlocks at Lv.{{level}}',
                     })}
                   </span>
-                  <span className="gl-home-level-gift-tier">
+                  <span className={cn('gl-home-level-gift-tier', `is-tier-${tierLevel}`)}>
                     {unlockLevel >= 60 ? <Sparkles size={12} /> : <GiftIcon size={12} />}
                     {t('home.levelGifts.tier', {
-                      tier: gift.tier + 1,
+                      tier: tierLevel,
                       defaultValue: 'Tier {{tier}}',
                     })}
                   </span>
@@ -344,7 +338,7 @@ function HomeLevelGiftsSection() {
                   {gift.icon}
                 </div>
                 <h3 title={giftName}>{giftName}</h3>
-                <div className="gl-home-level-gift-meta">
+                <div className={cn('gl-home-level-gift-meta', `is-tier-${tierLevel}`)}>
                   <Coins size={14} />
                   <span>
                     {t('home.levelGifts.price', {
