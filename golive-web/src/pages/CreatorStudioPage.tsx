@@ -802,6 +802,7 @@ export function CreatorPostsPage() {
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [commentMode, setCommentMode] = useState<PostCommentMode>('everyone');
   const [imageDrafts, setImageDrafts] = useState<PostImageDraft[]>([]);
+  const [postDialogOpen, setPostDialogOpen] = useState(false);
   const total = posts.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / STUDIO_POST_PAGE_SIZE));
   const pageItems = posts.data?.items ?? [];
@@ -877,6 +878,7 @@ export function CreatorPostsPage() {
         commentMode: commentsEnabled ? commentMode : 'everyone',
       });
       clearDraft();
+      setPostDialogOpen(false);
       setPage(1);
       toast.success(t('posts.editor.published', { defaultValue: '帖子已发布。' }));
     } catch (err) {
@@ -916,104 +918,14 @@ export function CreatorPostsPage() {
         />
       </section>
 
+      <div className="gl-post-toolbar">
+        <button type="button" className="gl-creator-primary gl-post-create-btn" onClick={() => setPostDialogOpen(true)}>
+          <Plus size={16} />
+          {t('posts.editor.title', { defaultValue: '发布帖子' })}
+        </button>
+      </div>
+
       <section className="gl-studio-post-grid">
-        <div className="gl-creator-panel gl-post-composer-panel">
-          <div className="gl-creator-panel-head">
-            <div>
-              <span>{t('posts.editor.label', { defaultValue: '频道动态' })}</span>
-              <h2>{t('posts.editor.title', { defaultValue: '发布帖子' })}</h2>
-            </div>
-            <FileText size={22} />
-          </div>
-
-          <label className="gl-creator-field gl-post-text-field">
-            <span>{t('posts.editor.content', { defaultValue: '内容' })}</span>
-            <textarea
-              rows={7}
-              maxLength={2000}
-              value={content}
-              placeholder={t('posts.editor.placeholder', { defaultValue: '写下直播预告、幕后花絮或想对粉丝说的话。' })}
-              onChange={(event) => setContent(event.target.value)}
-            />
-          </label>
-
-          {imageDrafts.length > 0 && (
-            <div className="gl-post-draft-images">
-              {imageDrafts.map((item) => (
-                <div className="gl-post-draft-image" key={item.id}>
-                  <img src={item.preview} alt="" />
-                  <button type="button" aria-label={t('posts.editor.removeImage', { defaultValue: '移除图片' })} onClick={() => removeImage(item.id)}>
-                    <X size={15} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="gl-post-editor-controls">
-            <div className="gl-post-segmented" aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}>
-              <button type="button" className={visibility === 'public' ? 'is-active' : undefined} onClick={() => setVisibility('public')}>
-                <Globe2 size={15} />
-                {t('posts.visibility.public', { defaultValue: '公开' })}
-              </button>
-              <button type="button" className={visibility === 'followers' ? 'is-active' : undefined} onClick={() => setVisibility('followers')}>
-                <Users size={15} />
-                {t('posts.visibility.followersTitle', { defaultValue: '仅粉丝可见' })}
-              </button>
-              <button type="button" className={visibility === 'private' ? 'is-active' : undefined} onClick={() => setVisibility('private')}>
-                <LockKeyhole size={15} />
-                {t('posts.visibility.privateTitle', { defaultValue: '仅自己可见' })}
-              </button>
-            </div>
-
-            <div className="gl-post-toggle-row">
-              <label className="gl-post-toggle">
-                <input
-                  type="checkbox"
-                  checked={commentsEnabled}
-                  onChange={(event) => setCommentsEnabled(event.target.checked)}
-                />
-                <span>{t('posts.editor.enableComments', { defaultValue: '开启评论区' })}</span>
-              </label>
-              <label className={cn('gl-post-toggle', !commentsEnabled && 'is-disabled')}>
-                <input
-                  type="checkbox"
-                  checked={commentMode === 'followers'}
-                  disabled={!commentsEnabled}
-                  onChange={(event) => setCommentMode(event.target.checked ? 'followers' : 'everyone')}
-                />
-                <span>{t('posts.editor.followersOnlyComments', { defaultValue: '仅粉丝评论' })}</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="gl-post-editor-actions">
-            <label className={cn('gl-creator-secondary', imageDrafts.length >= 6 && 'is-disabled')}>
-              <ImagePlus size={16} />
-              {t('posts.editor.addImages', { defaultValue: '添加图片' })}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                multiple
-                disabled={imageDrafts.length >= 6}
-                onChange={(event) => {
-                  addImages(event.target.files);
-                  event.target.value = '';
-                }}
-              />
-            </label>
-            <button type="button" className="gl-creator-secondary" disabled={publishing || (!content && imageDrafts.length === 0)} onClick={clearDraft}>
-              {t('studio.appointments.reset', { defaultValue: 'Reset' })}
-            </button>
-            <button type="button" className="gl-creator-primary" disabled={!canPublish} onClick={() => void publish()}>
-              <Send size={16} />
-              {publishing
-                ? t('posts.editor.publishing', { defaultValue: '发布中...' })
-                : t('posts.editor.publish', { defaultValue: '发布帖子' })}
-            </button>
-          </div>
-        </div>
-
         <div className="gl-creator-panel gl-studio-post-list-panel">
           <div className="gl-creator-panel-head">
             <div>
@@ -1042,6 +954,123 @@ export function CreatorPostsPage() {
           )}
         </div>
       </section>
+
+      <Dialog
+        open={postDialogOpen}
+        onOpenChange={(open) => {
+          setPostDialogOpen(open);
+          if (!open) clearDraft();
+        }}
+      >
+        <DialogContent className="gl-post-dialog max-h-[calc(100vh-32px)] max-w-4xl overflow-y-auto sm:max-w-4xl">
+          <div className="gl-appointment-form-panel gl-post-dialog-panel">
+            <div className="gl-creator-panel-head">
+              <div>
+                <span>{t('posts.editor.label', { defaultValue: '频道动态' })}</span>
+                <DialogTitle asChild>
+                  <h2>{t('posts.editor.title', { defaultValue: '发布帖子' })}</h2>
+                </DialogTitle>
+              </div>
+              <FileText size={22} />
+            </div>
+
+            <div className="gl-post-dialog-body">
+              <div className="gl-post-dialog-fields">
+                <label className="gl-creator-field gl-post-text-field">
+                  <span>{t('posts.editor.content', { defaultValue: '内容' })}</span>
+                  <textarea
+                    rows={7}
+                    maxLength={2000}
+                    value={content}
+                    placeholder={t('posts.editor.placeholder', { defaultValue: '写下直播预告、幕后花絮或想对粉丝说的话。' })}
+                    onChange={(event) => setContent(event.target.value)}
+                  />
+                </label>
+
+                <div className="gl-post-editor-controls">
+                  <div className="gl-post-segmented" aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}>
+                    <button type="button" className={visibility === 'public' ? 'is-active' : undefined} onClick={() => setVisibility('public')}>
+                      <Globe2 size={15} />
+                      {t('posts.visibility.public', { defaultValue: '公开' })}
+                    </button>
+                    <button type="button" className={visibility === 'followers' ? 'is-active' : undefined} onClick={() => setVisibility('followers')}>
+                      <Users size={15} />
+                      {t('posts.visibility.followersTitle', { defaultValue: '仅粉丝可见' })}
+                    </button>
+                    <button type="button" className={visibility === 'private' ? 'is-active' : undefined} onClick={() => setVisibility('private')}>
+                      <LockKeyhole size={15} />
+                      {t('posts.visibility.privateTitle', { defaultValue: '仅自己可见' })}
+                    </button>
+                  </div>
+
+                  <div className="gl-post-toggle-row">
+                    <label className="gl-post-toggle">
+                      <input
+                        type="checkbox"
+                        checked={commentsEnabled}
+                        onChange={(event) => setCommentsEnabled(event.target.checked)}
+                      />
+                      <span>{t('posts.editor.enableComments', { defaultValue: '开启评论区' })}</span>
+                    </label>
+                    <label className={cn('gl-post-toggle', !commentsEnabled && 'is-disabled')}>
+                      <input
+                        type="checkbox"
+                        checked={commentMode === 'followers'}
+                        disabled={!commentsEnabled}
+                        onChange={(event) => setCommentMode(event.target.checked ? 'followers' : 'everyone')}
+                      />
+                      <span>{t('posts.editor.followersOnlyComments', { defaultValue: '仅粉丝评论' })}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="gl-creator-field gl-post-image-field">
+                <span>{t('posts.editor.addImages', { defaultValue: '添加图片' })}</span>
+                <label className={cn('gl-post-image-picker', imageDrafts.length >= 6 && 'is-disabled')}>
+                  <ImagePlus size={22} />
+                  <strong>{t('posts.editor.addImages', { defaultValue: '添加图片' })}</strong>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    disabled={imageDrafts.length >= 6}
+                    onChange={(event) => {
+                      addImages(event.target.files);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+
+                {imageDrafts.length > 0 && (
+                  <div className="gl-post-draft-images">
+                    {imageDrafts.map((item) => (
+                      <div className="gl-post-draft-image" key={item.id}>
+                        <img src={item.preview} alt="" />
+                        <button type="button" aria-label={t('posts.editor.removeImage', { defaultValue: '移除图片' })} onClick={() => removeImage(item.id)}>
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="gl-appointment-dialog-actions">
+              <button type="button" className="gl-creator-secondary" disabled={publishing || (!content && imageDrafts.length === 0)} onClick={clearDraft}>
+                {t('studio.appointments.reset', { defaultValue: 'Reset' })}
+              </button>
+              <button type="button" className="gl-creator-primary gl-post-submit" disabled={!canPublish} onClick={() => void publish()}>
+                <Send size={16} />
+                {publishing
+                  ? t('posts.editor.publishing', { defaultValue: '发布中...' })
+                  : t('posts.editor.publish', { defaultValue: '发布帖子' })}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

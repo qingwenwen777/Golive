@@ -41,6 +41,7 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
   const toggleLike = useTogglePostLike(post.id);
   const meta = visibilityMeta(post, t);
   const CommentMetaIcon = post.commentsEnabled && post.commentMode === 'followers' ? Users : MessageCircle;
+  const hasPostBody = Boolean(post.content.trim() || post.images.length > 0);
 
   const submitComment = (event: FormEvent) => {
     event.preventDefault();
@@ -135,15 +136,19 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
         )}
       </header>
 
-      {post.content.trim() && <p className="gl-post-content">{post.content}</p>}
+      {hasPostBody && (
+        <div className="gl-post-body">
+          {post.content.trim() && <p className="gl-post-content">{post.content}</p>}
 
-      {post.images.length > 0 && (
-        <div className={cn('gl-post-images', post.images.length === 1 && 'is-single', post.images.length > 2 && 'is-collage')}>
-          {post.images.map((image) => (
-            <button type="button" className="gl-post-image" key={image} onClick={() => window.open(image, '_blank', 'noopener,noreferrer')}>
-              <LoadableImage src={image} alt="" />
-            </button>
-          ))}
+          {post.images.length > 0 && (
+            <div className={cn('gl-post-images', post.images.length === 1 && 'is-single', post.images.length > 2 && 'is-collage')}>
+              {post.images.map((image) => (
+                <button type="button" className="gl-post-image" key={image} onClick={() => window.open(image, '_blank', 'noopener,noreferrer')}>
+                  <LoadableImage src={image} alt="" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -191,7 +196,7 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
                 )}
                 <div className="gl-post-comment-input">
                   <textarea
-                    rows={2}
+                    rows={1}
                     maxLength={500}
                     value={commentText}
                     placeholder={t('posts.comments.placeholder', { defaultValue: '写一条评论...' })}
