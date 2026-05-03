@@ -651,8 +651,11 @@
       "visibilityLabel": "公開範囲",
       "visibility": {
         "private": "自分のみ",
+        "privateShort": "自分のみ",
         "followers": "フォロワーのみ",
-        "public": "全員に公開"
+        "followersShort": "フォロワー",
+        "public": "全員に公開",
+        "publicShort": "公開"
       },
       "status": {
         "pending": "アップロード待ち",

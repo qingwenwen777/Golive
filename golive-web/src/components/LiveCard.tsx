@@ -48,6 +48,8 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
   const channelName = streamChannelName(stream);
   const isLive = stream.isLive === true || stream.status === 'live';
+  const hasReplay = stream.status === 'ended' && Boolean(stream.replay?.canWatch);
+  const canOpen = isLive || hasReplay;
   const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
 
   useEffect(() => {
@@ -55,9 +57,9 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   }, [stream.id]);
 
   const handleOpen = () => {
-    if (!isLive) return;
+    if (!canOpen) return;
     if (onClick) onClick(stream);
-    else navigate(`/live/${stream.id}`);
+    else navigate(`/live/${encodeURIComponent(stream.id)}`);
   };
 
   const toggleWatchLater = () => {
@@ -93,13 +95,13 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
 
   return (
     <div
-      className={`gl-card${isLive ? '' : ' is-ended'}`}
-      tabIndex={isLive ? 0 : -1}
-      role={isLive ? 'link' : 'article'}
-      aria-disabled={!isLive}
+      className={`gl-card${canOpen ? '' : ' is-ended'}${hasReplay ? ' is-replay' : ''}`}
+      tabIndex={canOpen ? 0 : -1}
+      role={canOpen ? 'link' : 'article'}
+      aria-disabled={!canOpen}
       onClick={handleOpen}
       onKeyDown={(e) => {
-        if (isLive && e.key === 'Enter') handleOpen();
+        if (canOpen && e.key === 'Enter') handleOpen();
       }}
     >
       <div className={`gl-card-cover relative overflow-hidden rounded-card${stream.cover ? ' has-image' : ''}`}>
@@ -125,7 +127,15 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         ) : null}
         <div className="gl-card-gloss" />
         <div className="gl-card-top">
-          {isLive ? <LiveBadge /> : <span className="gl-dur-pill">Offline</span>}
+          {isLive ? (
+            <LiveBadge />
+          ) : (
+            <span className="gl-dur-pill">
+              {hasReplay
+                ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
+                : t('library.status.offline', { defaultValue: 'Offline' })}
+            </span>
+          )}
         </div>
         <div className="gl-card-bottom">
           <span className="gl-view-pill">
@@ -150,7 +160,9 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             <span>
               {isLive
                 ? t('home.watching', { count: stream.viewers, defaultValue: '{{count}} watching' })
-                : 'Not live now'}
+                : hasReplay
+                  ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
+                  : t('library.status.offline', { defaultValue: 'Offline' })}
             </span>
             <span>·</span>
             <span className="truncate">{category}</span>

@@ -652,8 +652,11 @@
       "visibilityLabel": "可见范围",
       "visibility": {
         "private": "仅自己可见",
+        "privateShort": "仅自己",
         "followers": "仅粉丝可见",
-        "public": "所有人可见"
+        "followersShort": "粉丝",
+        "public": "所有人可见",
+        "publicShort": "公开"
       },
       "status": {
         "pending": "等待上传",

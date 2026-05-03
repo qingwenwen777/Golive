@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
+import { useQueries } from '@tanstack/react-query';
 import {
   AtSign,
   Bell,
@@ -41,6 +42,7 @@ import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { PostCard } from '@/features/posts/PostCard';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
+import { http } from '@/lib/axios';
 import { levelProgressRatio, normalizeLevelInfo } from '@/lib/userLevel';
 import {
   LIKED_STREAMS_KEY,
@@ -284,6 +286,7 @@ export function YouPage() {
         : readLibrary(WATCH_HISTORY_KEY),
     [liveStreams],
   );
+  const hydratedHistory = useReplayHydratedLibraryItems(history);
   const saved = useMemo(
     () =>
       liveStreams
@@ -291,6 +294,7 @@ export function YouPage() {
         : readLibrary(WATCH_LATER_KEY),
     [liveStreams],
   );
+  const hydratedSaved = useReplayHydratedLibraryItems(saved);
   const liked = useMemo(
     () =>
       liveStreams
@@ -298,6 +302,7 @@ export function YouPage() {
         : readLibrary(LIKED_STREAMS_KEY),
     [liveStreams],
   );
+  const hydratedLiked = useReplayHydratedLibraryItems(liked);
   const displayName = userDisplayName(user);
   const ownLive = rooms.data?.items.find((stream) => stream.ownerId === user?.id);
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
@@ -348,13 +353,13 @@ export function YouPage() {
               <span className="gl-yt-coin-chip-add">{t('library.you.recharge')}</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
-              <Bookmark size={14} /> {t('library.you.watchLaterCount', { count: saved.length })}
+              <Bookmark size={14} /> {t('library.you.watchLaterCount', { count: hydratedSaved.length })}
             </Link>
             <Link className="gl-yt-chip" to="/liked">
-              <Heart size={14} /> {t('library.you.likedCount', { count: liked.length })}
+              <Heart size={14} /> {t('library.you.likedCount', { count: hydratedLiked.length })}
             </Link>
             <Link className="gl-yt-chip" to="/history">
-              <History size={14} /> {t('library.you.historyCount', { count: history.length })}
+              <History size={14} /> {t('library.you.historyCount', { count: hydratedHistory.length })}
             </Link>
             <Link className="gl-yt-chip" to="/settings">
               <Settings size={14} /> {t('library.you.settings')}
@@ -427,7 +432,7 @@ export function YouPage() {
         actionLabel={t('library.you.viewAll')}
         actionTo="/history"
       >
-        <HorizontalShelf items={history.slice(0, 8)} emptyText={t('library.you.noHistory')} />
+        <HorizontalShelf items={hydratedHistory.slice(0, 8)} emptyText={t('library.you.noHistory')} />
       </Shelf>
 
       <Shelf
@@ -435,7 +440,7 @@ export function YouPage() {
         actionLabel={t('library.you.seeAll')}
         actionTo="/watch-later"
       >
-        <HorizontalShelf items={saved.slice(0, 8)} emptyText={t('library.you.noWatchLater')} />
+        <HorizontalShelf items={hydratedSaved.slice(0, 8)} emptyText={t('library.you.noWatchLater')} />
       </Shelf>
 
       <Shelf
@@ -443,7 +448,7 @@ export function YouPage() {
         actionLabel={t('library.you.seeAll')}
         actionTo="/liked"
       >
-        <HorizontalShelf items={liked.slice(0, 8)} emptyText={t('library.you.noLiked')} />
+        <HorizontalShelf items={hydratedLiked.slice(0, 8)} emptyText={t('library.you.noLiked')} />
       </Shelf>
 
       <Shelf title={t('library.you.quickActions')}>
@@ -1126,6 +1131,8 @@ function LibraryCollectionPage({
     setItems(readLibrary(storageKey));
   }, [rooms.data?.items, storageKey]);
 
+  const hydratedItems = useReplayHydratedLibraryItems(items);
+
   const handleRemove = (streamId: string) => {
     setItems(removeFromLibrary(storageKey, streamId));
   };
@@ -1136,7 +1143,7 @@ function LibraryCollectionPage({
   };
 
   const handleOpenFirstRoom = () => {
-    if (items.length > 0) navigate(`/live/${items[0].id}`);
+    if (hydratedItems.length > 0) navigate(`/live/${encodeURIComponent(hydratedItems[0].id)}`);
   };
 
   return (
@@ -1149,14 +1156,14 @@ function LibraryCollectionPage({
           <h1>{title}</h1>
           <p className="gl-muted-line">{subtitle}</p>
           <div className="gl-yt-collection-stats">
-            <span>{t('library.collection.liveRoomCount', { count: items.length })}</span>
+            <span>{t('library.collection.liveRoomCount', { count: hydratedItems.length })}</span>
           </div>
           <div className="gl-yt-collection-actions">
             <button
               type="button"
               className="gl-yt-open-room"
               onClick={handleOpenFirstRoom}
-              disabled={items.length === 0}
+              disabled={hydratedItems.length === 0}
             >
               <Radio size={16} /> {primaryActionLabel}
             </button>
@@ -1169,11 +1176,11 @@ function LibraryCollectionPage({
         </aside>
 
         <div className="gl-yt-collection-main">
-          {items.length === 0 ? (
+          {hydratedItems.length === 0 ? (
             <EmptyState icon={<Sparkles size={36} />} title={emptyTitle} sub={emptySub} />
           ) : (
             <ol className="gl-yt-vlist">
-              {items.map((stream, i) => (
+              {hydratedItems.map((stream, i) => (
                 <li className="gl-yt-vrow" key={stream.id}>
                   <span className="gl-yt-vrow-index">{i + 1}</span>
                   <div className="gl-yt-vrow-card">
@@ -1216,6 +1223,49 @@ function collectionThemeClass(storageKey: string): string {
   if (storageKey === WATCH_LATER_KEY) return 'is-watch-later';
   if (storageKey === LIKED_STREAMS_KEY) return 'is-liked';
   return 'is-default';
+}
+
+function useReplayHydratedLibraryItems(items: LibraryStream[]): LibraryStream[] {
+  const lookupItems = useMemo(
+    () =>
+      items
+        .filter((item) => item.status === 'ended' && !item.replay?.canWatch)
+        .slice(0, 60),
+    [items],
+  );
+  const lookups = useQueries({
+    queries: lookupItems.map((item) => ({
+      queryKey: ['room', item.id],
+      queryFn: async ({ signal }): Promise<Stream> => {
+        const { data } = await http.get<Stream>(`/rooms/${encodeURIComponent(item.id)}`, {
+          signal,
+        });
+        return data;
+      },
+      enabled: Boolean(item.id),
+      staleTime: 30_000,
+      retry: false,
+    })),
+  });
+
+  const replayRooms = new Map<string, Stream>();
+  lookups.forEach((query, index) => {
+    if (query.data?.replay?.canWatch) {
+      replayRooms.set(lookupItems[index].id, query.data);
+    }
+  });
+
+  if (replayRooms.size === 0) return items;
+  return items.map((item) => {
+    const replayRoom = replayRooms.get(item.id);
+    if (!replayRoom) return item;
+    return {
+      ...item,
+      ...replayRoom,
+      savedAt: item.savedAt,
+      watchedAt: item.watchedAt,
+    };
+  });
 }
 
 function Shelf({

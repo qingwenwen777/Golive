@@ -52,7 +52,13 @@ import {
 import { copyText } from '@/lib/clipboard';
 import { addDailyCoinWatchSeconds, markDailyCoinRoomWatched } from '@/lib/coinActivity';
 import { localizedGiftName } from '@/lib/gift';
-import { WATCH_HISTORY_KEY, markStreamEndedInLibraries, saveToLibrary } from '@/lib/liveLibrary';
+import {
+  LIKED_STREAMS_KEY,
+  WATCH_HISTORY_KEY,
+  markStreamEndedInLibraries,
+  removeFromLibrary,
+  saveToLibrary,
+} from '@/lib/liveLibrary';
 import {
   clearPublisherSession,
   loadPublisherSession,
@@ -298,9 +304,9 @@ export default function LiveRoomPage() {
   }, [currentUser?.id, stream]);
 
   useEffect(() => {
-    if (!stream || !roomIsLive) return;
+    if (!stream || (!roomIsLive && !roomIsReplay)) return;
     saveToLibrary(WATCH_HISTORY_KEY, stream, 'watchedAt');
-  }, [roomIsLive, stream]);
+  }, [roomIsLive, roomIsReplay, stream]);
 
   useEffect(() => {
     if (!roomIsLive || !roomId || !currentUser?.id) return;
@@ -1298,9 +1304,19 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
     : '';
 
   const toggleLike = () => {
+    const nextLiked = !liked;
     if (!isAuthed) {
-      openLogin(() => like.mutate('like'));
+      openLogin(() => {
+        saveToLibrary(LIKED_STREAMS_KEY, stream);
+        like.mutate('like');
+      });
       return;
+    }
+    if (nextLiked) {
+      saveToLibrary(LIKED_STREAMS_KEY, stream);
+      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+    } else {
+      removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
     }
     like.mutate(liked ? 'unlike' : 'like');
   };

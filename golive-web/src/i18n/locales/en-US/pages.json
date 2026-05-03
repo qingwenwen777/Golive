@@ -651,8 +651,11 @@
       "visibilityLabel": "Visibility",
       "visibility": {
         "private": "Only me",
+        "privateShort": "Only me",
         "followers": "Followers only",
-        "public": "Public"
+        "followersShort": "Followers",
+        "public": "Public",
+        "publicShort": "Public"
       },
       "status": {
         "pending": "Pending upload",

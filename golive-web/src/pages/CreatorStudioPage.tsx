@@ -782,22 +782,52 @@ function VisibilitySelect({
   onChange: (value: ReplayVisibility) => void;
 }) {
   const { t } = useTranslation('pages');
+  const options = replayVisibilityOptions(t);
   return (
-    <label className="gl-replay-visibility-select">
+    <div className="gl-replay-visibility-control">
       <span>{t('studio.replay.visibilityLabel', { defaultValue: 'Visibility' })}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="private">
-          {t('studio.replay.visibility.private', { defaultValue: 'Only me' })}
-        </option>
-        <option value="followers">
-          {t('studio.replay.visibility.followers', { defaultValue: 'Followers only' })}
-        </option>
-        <option value="public">
-          {t('studio.replay.visibility.public', { defaultValue: 'Public' })}
-        </option>
-      </select>
-    </label>
+      <div
+        className="gl-post-visibility-edit gl-replay-visibility-edit"
+        aria-label={t('studio.replay.visibilityLabel', { defaultValue: 'Visibility' })}
+      >
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={value === option.value ? 'is-active' : undefined}
+            onClick={() => onChange(option.value)}
+          >
+            <option.Icon size={14} />
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
+}
+
+function replayVisibilityOptions(t: TFunction): Array<{
+  value: ReplayVisibility;
+  label: string;
+  Icon: typeof Globe2;
+}> {
+  return [
+    {
+      value: 'public',
+      label: t('studio.replay.visibility.publicShort', { defaultValue: 'Public' }),
+      Icon: Globe2,
+    },
+    {
+      value: 'followers',
+      label: t('studio.replay.visibility.followersShort', { defaultValue: 'Followers' }),
+      Icon: Users,
+    },
+    {
+      value: 'private',
+      label: t('studio.replay.visibility.privateShort', { defaultValue: 'Only me' }),
+      Icon: LockKeyhole,
+    },
+  ];
 }
 
 function replayStatusLabel(status: string, t: TFunction): string {

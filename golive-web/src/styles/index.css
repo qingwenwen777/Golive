@@ -167,7 +167,7 @@
   justify-content: flex-end;
 }
 
-.gl-replay-visibility-select {
+.gl-replay-visibility-control {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -176,14 +176,13 @@
   font-weight: 700;
 }
 
-.gl-replay-visibility-select select {
-  min-height: 36px;
-  border: 1px solid var(--gl-border);
-  border-radius: 8px;
+.gl-replay-visibility-control > span {
+  color: var(--gl-text-3);
+  font-weight: 850;
+}
+
+.gl-replay-visibility-edit {
   background: var(--gl-bg-card);
-  color: var(--gl-text);
-  padding: 0 10px;
-  font-size: 13px;
 }
 
 .gl-live-replay-settings {
