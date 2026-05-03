@@ -130,6 +130,14 @@
       "disconnected": "已断开",
       "liveEnded": "直播已结束。"
     },
+    "replay": {
+      "loadingChat": "正在加载回放聊天...",
+      "chatReadOnly": "回放聊天只读，评论和 SuperChat 会跟随播放进度显示。",
+      "badge": "回放",
+      "endedAt": "结束于 {{time}}",
+      "ended": "已结束的直播回放",
+      "playerLoadFailed": "无法加载回放播放器。"
+    },
     "chatPanel": {
       "chatTab": "聊天",
       "viewersTab": "房间观众",
@@ -285,7 +293,8 @@
       "revenue": "收入 {{amount}}",
       "topFan": "{{name}} 贡献最高",
       "noFan": "暂无粉丝贡献",
-      "liveAnalysis": "直播分析"
+      "liveAnalysis": "直播分析",
+      "watchReplay": "观看回放"
     },
     "appointments": {
       "title": "直播预约",
@@ -504,7 +513,9 @@
       "label": "主播工作台栏目",
       "overview": "概览",
       "prepare": "开播准备",
+      "posts": "帖子动态",
       "replay": "数据复盘",
+      "liveReplays": "直播回放",
       "appointments": "直播预约",
       "moderators": "房间房管"
     },
@@ -623,6 +634,45 @@
         "peakViewers": "峰值 {{amount}} 人",
         "danmuCount": "{{formattedCount}} 条弹幕"
       }
+    },
+    "replay": {
+      "label": "直播回放",
+      "title": "管理已结束直播的回放",
+      "pageCount": "{{page}} / {{pageCount}} · 共 {{total}} 条回放",
+      "empty": "还没有上传任何回放。开播后在直播控制台开启结束后上传，结束直播后会自动进入这里。",
+      "visibilitySaved": "回放可见范围已更新。",
+      "visibilityFailed": "无法更新回放。",
+      "deleteConfirm": "确定删除这个回放吗？",
+      "deleted": "回放已删除。",
+      "deleteFailed": "无法删除回放。",
+      "saveVisibility": "保存",
+      "open": "打开",
+      "delete": "删除",
+      "peakViewers": "峰值 {{amount}} 人",
+      "visibilityLabel": "可见范围",
+      "visibility": {
+        "private": "仅自己可见",
+        "followers": "仅粉丝可见",
+        "public": "所有人可见"
+      },
+      "status": {
+        "pending": "等待上传",
+        "uploading": "上传中",
+        "processing": "处理中",
+        "ready": "已就绪",
+        "failed": "上传失败",
+        "deleted": "已删除",
+        "none": "未上传"
+      },
+      "liveSaved": "回放上传设置已保存。",
+      "liveSaveFailed": "无法保存回放设置。",
+      "liveLabel": "回放上传",
+      "liveTitle": "这场直播结束后",
+      "uploadOn": "结束直播后上传回放",
+      "uploadOff": "不上传回放",
+      "uploadStatus": "当前状态：{{status}}",
+      "saving": "保存中...",
+      "saveLive": "保存回放设置"
     },
     "prepare": {
       "created": "直播间已创建。请打开 OBS 开始推流。",

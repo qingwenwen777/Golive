@@ -1243,15 +1243,21 @@ function BunnyReplayPlayer({
           if (Number.isFinite(value)) onTimeChange(Math.max(0, value));
         });
       })
-      .catch((err) => {
-        if (!cancelled) setPlayerError(err instanceof Error ? err.message : 'Player failed');
+      .catch(() => {
+        if (!cancelled) {
+          setPlayerError(
+            t('liveRoom.replay.playerLoadFailed', {
+              defaultValue: 'Could not load replay player.',
+            }),
+          );
+        }
       });
 
     return () => {
       cancelled = true;
       if (timer) window.clearInterval(timer);
     };
-  }, [onTimeChange, src]);
+  }, [onTimeChange, src, t]);
 
   return (
     <section className="gl-replay-player">
@@ -1333,7 +1339,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
         <div className="gl-desc">
           <div className="gl-desc-meta">
             <span>{stream.duration}</span>
-            <span>路</span>
+            <span>·</span>
             <span className="gl-desc-tag">#{stream.category.replace(/\s+/g, '')}</span>
           </div>
           <div className="gl-desc-body">{stream.description}</div>

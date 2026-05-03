@@ -582,6 +582,13 @@ export function CreatorPreparePage() {
 }
 
 export function CreatorReplayPage() {
+  const { user } = useStudioUser();
+  const channelKey = currentChannelKey(user);
+  if (!channelKey) return null;
+  return <Navigate to={`/studio/analytics/${encodeURIComponent(channelKey)}`} replace />;
+}
+
+export function CreatorLiveReplaysPage() {
   const { t, i18n } = useTranslation('pages');
   const { user } = useStudioUser();
   const [page, setPage] = useState(1);
@@ -678,6 +685,7 @@ function ReplayManageRow({ stream, locale }: { stream: Stream; locale: string })
         minute: '2-digit',
       }).format(new Date(replay.uploadedAt))
     : '';
+  const peakViewers = stream.peakViewers ?? stream.viewers;
   const saveVisibility = () => {
     updateReplay.mutate(
       { visibility },
@@ -725,7 +733,10 @@ function ReplayManageRow({ stream, locale }: { stream: Stream; locale: string })
         <div className="gl-replay-manage-meta">
           <span>{uploadedAt || stream.category}</span>
           <span>
-            {stream.peakViewers?.toLocaleString() ?? stream.viewers.toLocaleString()} peak
+            {t('studio.replay.peakViewers', {
+              amount: peakViewers.toLocaleString(locale),
+              defaultValue: '{{amount}} peak',
+            })}
           </span>
           {replay?.error && <span className="is-error">{replay.error}</span>}
         </div>
@@ -773,7 +784,7 @@ function VisibilitySelect({
   const { t } = useTranslation('pages');
   return (
     <label className="gl-replay-visibility-select">
-      <span>{t('studio.replay.visibility', { defaultValue: 'Visibility' })}</span>
+      <span>{t('studio.replay.visibilityLabel', { defaultValue: 'Visibility' })}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="private">
           {t('studio.replay.visibility.private', { defaultValue: 'Only me' })}
@@ -2530,7 +2541,12 @@ function StudioTabs() {
       <NavLink to="/studio/moderators">
         {t('studio.tabs.moderators', { defaultValue: '房间房管' })}
       </NavLink>
-      <NavLink to="/studio/replay">{t('studio.tabs.replay', { defaultValue: '直播回放' })}</NavLink>
+      <NavLink to="/studio/replay">
+        {t('studio.tabs.replay', { defaultValue: 'Data replay' })}
+      </NavLink>
+      <NavLink to="/studio/live-replays">
+        {t('studio.tabs.liveReplays', { defaultValue: 'Live replays' })}
+      </NavLink>
     </nav>
   );
 }

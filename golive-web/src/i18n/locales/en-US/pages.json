@@ -130,6 +130,14 @@
       "disconnected": "Disconnected",
       "liveEnded": "Live has ended."
     },
+    "replay": {
+      "loadingChat": "Loading replay chat...",
+      "chatReadOnly": "Replay chat is read-only. Comments and SuperChat follow playback.",
+      "badge": "Replay",
+      "endedAt": "Ended {{time}}",
+      "ended": "Ended live replay",
+      "playerLoadFailed": "Could not load replay player."
+    },
     "chatPanel": {
       "chatTab": "Chat",
       "viewersTab": "Room viewers",
@@ -284,7 +292,8 @@
       "revenue": "{{amount}} revenue",
       "topFan": "{{name}} top fan",
       "noFan": "No fan contribution yet",
-      "liveAnalysis": "Live analysis"
+      "liveAnalysis": "Live analysis",
+      "watchReplay": "Watch replay"
     },
     "appointments": {
       "title": "Live appointments",
@@ -503,7 +512,9 @@
       "label": "Creator Studio sections",
       "overview": "Overview",
       "prepare": "Stream setup",
+      "posts": "Posts",
       "replay": "Data replay",
+      "liveReplays": "Live replays",
       "appointments": "Live appointments",
       "moderators": "Room moderators"
     },
@@ -622,6 +633,45 @@
         "peakViewers": "{{amount}} peak",
         "danmuCount": "{{formattedCount}} danmu"
       }
+    },
+    "replay": {
+      "label": "Live replay",
+      "title": "Manage completed live replays",
+      "pageCount": "{{page}} / {{pageCount}} · {{total}} replays",
+      "empty": "No replay has been uploaded yet. Enable replay upload in a live console before ending the live.",
+      "visibilitySaved": "Replay visibility updated.",
+      "visibilityFailed": "Could not update replay.",
+      "deleteConfirm": "Delete this replay?",
+      "deleted": "Replay deleted.",
+      "deleteFailed": "Could not delete replay.",
+      "saveVisibility": "Save",
+      "open": "Open",
+      "delete": "Delete",
+      "peakViewers": "{{amount}} peak",
+      "visibilityLabel": "Visibility",
+      "visibility": {
+        "private": "Only me",
+        "followers": "Followers only",
+        "public": "Public"
+      },
+      "status": {
+        "pending": "Pending upload",
+        "uploading": "Uploading",
+        "processing": "Processing",
+        "ready": "Ready",
+        "failed": "Failed",
+        "deleted": "Deleted",
+        "none": "Not uploaded"
+      },
+      "liveSaved": "Replay upload preference saved.",
+      "liveSaveFailed": "Could not save replay preference.",
+      "liveLabel": "Replay upload",
+      "liveTitle": "After this live ends",
+      "uploadOn": "Upload replay after ending",
+      "uploadOff": "Do not upload replay",
+      "uploadStatus": "Current status: {{status}}",
+      "saving": "Saving...",
+      "saveLive": "Save replay settings"
     },
     "prepare": {
       "created": "Live room created. Open OBS and begin publishing.",

@@ -130,6 +130,14 @@
       "disconnected": "切断されました",
       "liveEnded": "配信は終了しました。"
     },
+    "replay": {
+      "loadingChat": "リプレイのチャットを読み込み中...",
+      "chatReadOnly": "リプレイのチャットは閲覧のみです。コメントと SuperChat は再生に合わせて表示されます。",
+      "badge": "リプレイ",
+      "endedAt": "{{time}} に終了",
+      "ended": "終了したライブのリプレイ",
+      "playerLoadFailed": "リプレイプレイヤーを読み込めませんでした。"
+    },
     "chatPanel": {
       "chatTab": "チャット",
       "viewersTab": "ルーム視聴者",
@@ -284,7 +292,8 @@
       "revenue": "収益 {{amount}}",
       "topFan": "{{name}} がトップファン",
       "noFan": "ファン貢献はまだありません",
-      "liveAnalysis": "ライブ分析"
+      "liveAnalysis": "ライブ分析",
+      "watchReplay": "リプレイを見る"
     },
     "appointments": {
       "title": "ライブ予約",
@@ -503,7 +512,9 @@
       "label": "配信者ワークスペースのセクション",
       "overview": "概要",
       "prepare": "配信準備",
+      "posts": "投稿",
       "replay": "データ振り返り",
+      "liveReplays": "ライブアーカイブ",
       "appointments": "ライブ予約",
       "moderators": "ルームモデレーター"
     },
@@ -622,6 +633,45 @@
         "peakViewers": "ピーク {{amount}} 人",
         "danmuCount": "{{formattedCount}} 件の弾幕"
       }
+    },
+    "replay": {
+      "label": "ライブアーカイブ",
+      "title": "終了したライブのアーカイブを管理",
+      "pageCount": "{{page}} / {{pageCount}} · 全 {{total}} 件",
+      "empty": "まだアップロードされたアーカイブはありません。ライブ終了前にコントロール画面で終了後アップロードを有効にしてください。",
+      "visibilitySaved": "アーカイブの公開範囲を更新しました。",
+      "visibilityFailed": "アーカイブを更新できませんでした。",
+      "deleteConfirm": "このアーカイブを削除しますか？",
+      "deleted": "アーカイブを削除しました。",
+      "deleteFailed": "アーカイブを削除できませんでした。",
+      "saveVisibility": "保存",
+      "open": "開く",
+      "delete": "削除",
+      "peakViewers": "ピーク {{amount}} 人",
+      "visibilityLabel": "公開範囲",
+      "visibility": {
+        "private": "自分のみ",
+        "followers": "フォロワーのみ",
+        "public": "全員に公開"
+      },
+      "status": {
+        "pending": "アップロード待ち",
+        "uploading": "アップロード中",
+        "processing": "処理中",
+        "ready": "準備完了",
+        "failed": "失敗",
+        "deleted": "削除済み",
+        "none": "未アップロード"
+      },
+      "liveSaved": "アーカイブのアップロード設定を保存しました。",
+      "liveSaveFailed": "アーカイブ設定を保存できませんでした。",
+      "liveLabel": "アーカイブアップロード",
+      "liveTitle": "このライブの終了後",
+      "uploadOn": "終了後にアーカイブをアップロード",
+      "uploadOff": "アーカイブをアップロードしない",
+      "uploadStatus": "現在の状態: {{status}}",
+      "saving": "保存中...",
+      "saveLive": "アーカイブ設定を保存"
     },
     "prepare": {
       "created": "ライブルームを作成しました。OBS を開いて配信を開始してください。",

@@ -86,6 +86,12 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       label: t('nav.studioReplay', { defaultValue: 'Data replay' }),
       route: '/studio/replay',
     },
+    {
+      key: 'studio-live-replays',
+      icon: Icons.Live,
+      label: t('nav.studioLiveReplays', { defaultValue: 'Live replays' }),
+      route: '/studio/live-replays',
+    },
   ];
 
   const youItems: NavItem[] = [
@@ -173,7 +179,8 @@ function deriveActiveKey(pathname: string): string {
   if (pathname.startsWith('/studio/appointments')) return 'studio-appointments';
   if (pathname.startsWith('/studio/posts')) return 'studio-posts';
   if (pathname.startsWith('/studio/moderators')) return 'studio-moderators';
-  if (pathname.startsWith('/studio/prepare') || pathname.startsWith('/studio/live')) {
+  if (pathname.startsWith('/studio/live-replays')) return 'studio-live-replays';
+  if (pathname.startsWith('/studio/prepare') || pathname.startsWith('/studio/live/')) {
     return 'studio-prepare';
   }
   if (pathname.startsWith('/studio/replay') || pathname.startsWith('/studio/analytics')) {

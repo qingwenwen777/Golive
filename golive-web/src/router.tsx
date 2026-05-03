@@ -59,6 +59,11 @@ const CreatorReplayPage = lazy(() =>
     default: module.CreatorReplayPage,
   })),
 );
+const CreatorLiveReplaysPage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorLiveReplaysPage,
+  })),
+);
 const CreatorLiveConsolePage = lazy(() =>
   import('@/pages/CreatorStudioPage').then((module) => ({
     default: module.CreatorLiveConsolePage,
@@ -115,6 +120,7 @@ export const router = createBrowserRouter([
           { path: 'appointments', element: <CreatorAppointmentsPage /> },
           { path: 'moderators', element: <CreatorRoomModeratorsPage /> },
           { path: 'replay', element: <CreatorReplayPage /> },
+          { path: 'live-replays', element: <CreatorLiveReplaysPage /> },
         ],
       },
       { path: 'studio/live/:id', element: <CreatorLiveConsolePage /> },
