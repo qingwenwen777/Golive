@@ -32,9 +32,10 @@ type FanBadgePayload struct {
 }
 
 type ViewerProfile struct {
-	UserID string `json:"userId,omitempty"`
-	User   string `json:"user"`
-	Avatar string `json:"avatar,omitempty"`
+	UserID  string `json:"userId,omitempty"`
+	User    string `json:"user"`
+	Avatar  string `json:"avatar,omitempty"`
+	IsOwner bool   `json:"-"`
 }
 
 type ViewerListItem struct {

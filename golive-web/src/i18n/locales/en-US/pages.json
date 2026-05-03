@@ -535,6 +535,7 @@
           "peakOnlineSub": "highest",
           "newSubscribers": "New subscribers",
           "newSubscribersSub": "during live",
+          "danmu": "Danmu count",
           "topFan": "Top fan"
         }
       },
@@ -547,7 +548,8 @@
         "hourAmount": "{{amount}}h",
         "streamCount": "{{formattedCount}} streams",
         "fanCount": "{{formattedCount}} fans",
-        "peakViewers": "{{amount}} peak"
+        "peakViewers": "{{amount}} peak",
+        "danmuCount": "{{formattedCount}} danmu"
       }
     },
     "prepare": {
@@ -790,6 +792,7 @@
       "liveIncome": "Live income"
     },
     "dailyTasks": "Daily tasks",
+    "dailyResetHint": "Resets at 00:00 Beijing time",
     "tasks": {
       "dailyLogin": {
         "title": "Daily login lottery",

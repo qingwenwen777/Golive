@@ -214,7 +214,11 @@ export default function LiveRoomPage() {
   }, [id, queryClient, stream, t]);
 
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
-    useRoomRealtime(roomId, roomCanWatch, { onLiveEnded: handleLiveEnded, activeFanBadge });
+    useRoomRealtime(roomId, roomCanWatch, {
+      onLiveEnded: handleLiveEnded,
+      activeFanBadge,
+      ownerId: stream?.ownerId,
+    });
 
   const guardedSendChat = useCallback(
     (text: string) => {

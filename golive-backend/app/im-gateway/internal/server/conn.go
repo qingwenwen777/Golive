@@ -27,6 +27,7 @@ import (
 type Conn struct {
 	id       string
 	roomID   string
+	ownerID  string
 	identity auth.Identity
 
 	ws     *websocket.Conn
@@ -50,10 +51,11 @@ type WSConfig struct {
 	MaxMessageRate  float64
 }
 
-func newConn(ws *websocket.Conn, roomID string, identity auth.Identity, h *hub.Hub, p producer.Producer, m moderation.Checker, cfg WSConfig) *Conn {
+func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, h *hub.Hub, p producer.Producer, m moderation.Checker, cfg WSConfig) *Conn {
 	c := &Conn{
 		id:         uuid.NewString(),
 		roomID:     roomID,
+		ownerID:    ownerID,
 		identity:   identity,
 		ws:         ws,
 		send:       make(chan []byte, cfg.SendBuffer),
@@ -185,10 +187,27 @@ func (c *Conn) handleViewerProfile(username, avatar string) {
 		}
 	}
 	c.hub.UpdateViewer(c.roomID, c.id, hub.ViewerProfile{
-		UserID: c.identity.UserID,
-		User:   username,
-		Avatar: avatar,
+		UserID:  c.identity.UserID,
+		User:    username,
+		Avatar:  avatar,
+		IsOwner: c.isOwner(),
 	})
+}
+
+func (c *Conn) initialViewerProfile() hub.ViewerProfile {
+	user := "Guest"
+	if c.identity.UserID != "" {
+		user = c.identity.UserID
+	}
+	return hub.ViewerProfile{
+		UserID:  c.identity.UserID,
+		User:    user,
+		IsOwner: c.isOwner(),
+	}
+}
+
+func (c *Conn) isOwner() bool {
+	return c.ownerID != "" && c.identity.UserID != "" && c.ownerID == c.identity.UserID
 }
 
 func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string, fanBadge *hub.FanBadgePayload) {

@@ -131,6 +131,14 @@ func (f *fakeSink) snapshot() [][]byte {
 	return out
 }
 
+func joinRoom(h *hub.Hub, roomID string, s *fakeSink, profiles ...hub.ViewerProfile) (*hub.Room, error) {
+	profile := hub.ViewerProfile{User: "Guest"}
+	if len(profiles) > 0 {
+		profile = profiles[0]
+	}
+	return h.Join(roomID, s, profile)
+}
+
 // helpers
 
 func waitFor(t *testing.T, cond func() bool) {
@@ -154,11 +162,11 @@ func TestHub_LazySubscribeFirstJoinOnly(t *testing.T) {
 	a := newFakeSink("a")
 	b := newFakeSink("b")
 
-	_, err := h.Join("R1", a)
+	_, err := joinRoom(h, "R1", a)
 	require.NoError(t, err)
 	require.Equal(t, 1, br.subscribes)
 
-	_, err = h.Join("R1", b)
+	_, err = joinRoom(h, "R1", b)
 	require.NoError(t, err)
 	require.Equal(t, 1, br.subscribes, "second join must reuse the existing room")
 
@@ -171,8 +179,8 @@ func TestHub_LastLeaveTearsDownSubscription(t *testing.T) {
 
 	a := newFakeSink("a")
 	b := newFakeSink("b")
-	_, _ = h.Join("R1", a)
-	_, _ = h.Join("R1", b)
+	_, _ = joinRoom(h, "R1", a)
+	_, _ = joinRoom(h, "R1", b)
 
 	h.Leave("R1", "a")
 	require.Equal(t, 0, br.unsubscribes, "still has b")
@@ -187,9 +195,9 @@ func TestHub_BroadcastFansOutToAllSinks(t *testing.T) {
 	h := hub.New(context.Background(), br, 0)
 
 	a, b, c := newFakeSink("a"), newFakeSink("b"), newFakeSink("c")
-	_, _ = h.Join("R1", a)
-	_, _ = h.Join("R1", b)
-	_, _ = h.Join("R1", c)
+	_, _ = joinRoom(h, "R1", a)
+	_, _ = joinRoom(h, "R1", b)
+	_, _ = joinRoom(h, "R1", c)
 
 	require.NoError(t, h.Broadcast(context.Background(), "R1",
 		[]byte(`{"type":"chat","text":"hi"}`)))
@@ -205,8 +213,8 @@ func TestHub_BroadcastIsolatesPerRoom(t *testing.T) {
 
 	a := newFakeSink("a")
 	b := newFakeSink("b")
-	_, _ = h.Join("R1", a)
-	_, _ = h.Join("R2", b)
+	_, _ = joinRoom(h, "R1", a)
+	_, _ = joinRoom(h, "R2", b)
 
 	_ = h.Broadcast(context.Background(), "R1", []byte(`hello-r1`))
 	waitFor(t, func() bool { return len(a.snapshot()) >= 1 })
@@ -223,8 +231,8 @@ func TestHub_EvictsSlowConsumer(t *testing.T) {
 	slow := newFakeSink("slow")
 	slow.full = true // every Send returns false
 
-	_, _ = h.Join("R1", good)
-	_, _ = h.Join("R1", slow)
+	_, _ = joinRoom(h, "R1", good)
+	_, _ = joinRoom(h, "R1", slow)
 
 	_ = h.Broadcast(context.Background(), "R1", []byte(`x`))
 	waitFor(t, func() bool {
@@ -240,7 +248,7 @@ func TestHub_ViewerCountPushedPeriodically(t *testing.T) {
 	h := hub.New(context.Background(), br, 50*time.Millisecond)
 
 	a := newFakeSink("a")
-	_, _ = h.Join("R1", a)
+	_, _ = joinRoom(h, "R1", a)
 
 	waitFor(t, func() bool {
 		for _, payload := range a.snapshot() {
@@ -256,6 +264,68 @@ func TestHub_ViewerCountPushedPeriodically(t *testing.T) {
 	})
 }
 
+func TestHub_DeduplicatesAuthenticatedViewerConnections(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+
+	a := newFakeSink("a")
+	b := newFakeSink("b")
+	_, _ = joinRoom(h, "R1", a, hub.ViewerProfile{UserID: "u-1", User: "Luna"})
+	_, _ = joinRoom(h, "R1", b, hub.ViewerProfile{UserID: "u-1", User: "Luna"})
+
+	require.EqualValues(t, 1, h.Snapshot(1)[0].Size)
+
+	var list struct {
+		Type    string `json:"type"`
+		Total   int    `json:"total"`
+		Viewers []struct {
+			UserID string `json:"userId"`
+			User   string `json:"user"`
+		} `json:"viewers"`
+	}
+	waitFor(t, func() bool {
+		for _, payload := range b.snapshot() {
+			if json.Unmarshal(payload, &list) == nil && list.Type == "viewer_list" && list.Total == 1 {
+				return true
+			}
+		}
+		return false
+	})
+	require.Len(t, list.Viewers, 1)
+	require.Equal(t, "u-1", list.Viewers[0].UserID)
+}
+
+func TestHub_ExcludesOwnerFromViewerMetrics(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0)
+
+	owner := newFakeSink("owner")
+	viewer := newFakeSink("viewer")
+	_, _ = joinRoom(h, "R1", owner, hub.ViewerProfile{UserID: "owner-1", User: "Host", IsOwner: true})
+	_, _ = joinRoom(h, "R1", viewer, hub.ViewerProfile{UserID: "viewer-1", User: "Fan"})
+
+	require.EqualValues(t, 1, h.Snapshot(1)[0].Size)
+
+	var list struct {
+		Type    string `json:"type"`
+		Total   int    `json:"total"`
+		Viewers []struct {
+			UserID string `json:"userId"`
+			User   string `json:"user"`
+		} `json:"viewers"`
+	}
+	waitFor(t, func() bool {
+		for _, payload := range viewer.snapshot() {
+			if json.Unmarshal(payload, &list) == nil && list.Type == "viewer_list" && list.Total == 1 {
+				return true
+			}
+		}
+		return false
+	})
+	require.Len(t, list.Viewers, 1)
+	require.Equal(t, "viewer-1", list.Viewers[0].UserID)
+}
+
 func TestHub_SnapshotTopN(t *testing.T) {
 	br := newFakeBroker()
 	h := hub.New(context.Background(), br, 0)
@@ -265,7 +335,7 @@ func TestHub_SnapshotTopN(t *testing.T) {
 	}{{"a", 3}, {"b", 1}, {"c", 5}} {
 		for i := 0; i < room.n; i++ {
 			id := room.id + string(rune('0'+i))
-			_, _ = h.Join(room.id, newFakeSink(id))
+			_, _ = joinRoom(h, room.id, newFakeSink(id))
 		}
 	}
 	stats := h.Snapshot(2)

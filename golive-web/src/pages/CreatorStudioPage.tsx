@@ -50,6 +50,10 @@ import {
   useModeratorLogs,
   useRemoveModerator,
   useRoomModerators,
+  useRoomMuteState,
+  useMuteRoomUser,
+  useUnmuteRoomUser,
+  type MuteUserPayload,
   type ModerationLog,
   type ModerationUser,
 } from '@/api/moderation';
@@ -71,7 +75,7 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Chat } from '@/features/live-room/Chat';
+import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { Player } from '@/features/live-room/Player';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
@@ -1708,9 +1712,18 @@ export function CreatorLiveConsolePage() {
   const streamEnded = Boolean(stream && !roomIsLive && stream.status === 'ended');
   const ownsStream = Boolean(stream?.ownerId && currentUser?.id && stream.ownerId === currentUser.id);
   const [ended, setEnded] = useState(false);
+  const [moderationTarget, setModerationTarget] = useState<ChatModerationTarget | null>(null);
   const realtime = useRoomRealtime(id, Boolean(id && stream), {
     onLiveEnded: () => setEnded(true),
+    ownerId: stream?.ownerId,
   });
+  const muteUser = useMuteRoomUser(id);
+  const unmuteUser = useUnmuteRoomUser(id);
+  const targetMuteState = useRoomMuteState(
+    id,
+    moderationTarget?.userId ?? '',
+    Boolean(id && moderationTarget),
+  );
   const elapsed = useElapsed(stream?.startedAt, roomIsLive && !ended);
   const viewerCount = realtime.viewerCount > 0 ? realtime.viewerCount : (stream?.viewers ?? 0);
   const session = useMemo(() => {
@@ -1791,6 +1804,53 @@ export function CreatorLiveConsolePage() {
       onError: () => toast.error(t('studio.console.endFailed', { defaultValue: 'Could not end the live.' })),
     });
   };
+  const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
+    if (!moderationTarget) return;
+    muteUser.mutate(
+      {
+        targetUserId: moderationTarget.userId,
+        targetName: moderationTarget.user,
+        targetAvatar: moderationTarget.avatar,
+        durationMinutes,
+      },
+      {
+        onSuccess: (resp) => {
+          toast.success(
+            t('liveRoom.moderation.muted', {
+              user: resp.targetName,
+              minutes: resp.durationMinutes,
+              defaultValue: `${resp.targetName} muted for ${resp.durationMinutes} minutes.`,
+            }),
+          );
+          setModerationTarget(null);
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('liveRoom.moderation.muteFailed', { defaultValue: 'Could not mute this user.' }),
+          ),
+      },
+    );
+  };
+  const submitUnmute = () => {
+    if (!moderationTarget) return;
+    unmuteUser.mutate(moderationTarget.userId, {
+      onSuccess: () => {
+        toast.success(
+          t('liveRoom.moderation.unmuted', {
+            user: moderationTarget.user,
+            defaultValue: `${moderationTarget.user} was unmuted.`,
+          }),
+        );
+        setModerationTarget(null);
+      },
+      onError: (err) =>
+        toast.error(
+          err.message ||
+            t('liveRoom.moderation.unmuteFailed', { defaultValue: 'Could not unmute this user.' }),
+        ),
+    });
+  };
 
   return (
     <div className="gl-page gl-live-console">
@@ -1860,10 +1920,24 @@ export function CreatorLiveConsolePage() {
           bulletsCount={realtime.bullets.length}
           onClearBullets={() => realtime.bullets.forEach((bullet) => realtime.clearBullet(bullet.id))}
           onSendChat={realtime.sendChat}
+          canModerate
+          onOpenModeration={setModerationTarget}
           reconnecting={realtime.readyState !== 'open'}
           reconnectingLabel={realtime.readyState === 'reconnecting' ? t('studio.console.reconnecting', { count: realtime.retryCount, defaultValue: 'Reconnecting #{{count}}' }) : t('studio.console.disconnected', { defaultValue: 'Disconnected' })}
         />
       </div>
+      <ConsoleMuteUserDialog
+        target={moderationTarget}
+        currentUserId={currentUser?.id}
+        muted={Boolean(targetMuteState.data?.muted)}
+        statePending={targetMuteState.isFetching}
+        pending={muteUser.isPending || unmuteUser.isPending}
+        onOpenChange={(open) => {
+          if (!open) setModerationTarget(null);
+        }}
+        onMute={submitMute}
+        onUnmute={submitUnmute}
+      />
     </div>
   );
 }
@@ -2400,6 +2474,8 @@ function StudioInteractionRail({
   bulletsCount,
   onClearBullets,
   onSendChat,
+  canModerate,
+  onOpenModeration,
   reconnecting,
   reconnectingLabel,
 }: {
@@ -2410,6 +2486,8 @@ function StudioInteractionRail({
   bulletsCount: number;
   onClearBullets: () => void;
   onSendChat: (text: string) => boolean;
+  canModerate?: boolean;
+  onOpenModeration?: (target: ChatModerationTarget) => void;
   reconnecting: boolean;
   reconnectingLabel: string;
 }) {
@@ -2440,6 +2518,8 @@ function StudioInteractionRail({
           ownerId={stream.ownerId}
           ownerName={stream.channel}
           onSendChat={onSendChat}
+          canModerate={canModerate}
+          onOpenModeration={onOpenModeration}
           reconnecting={reconnecting}
           reconnectingLabel={reconnectingLabel}
         />
@@ -2456,9 +2536,12 @@ function StudioInteractionRail({
         <div className="gl-live-console-gifts">
           {gifts.items.length > 0 ? (
             gifts.items.map((item) => (
-              <div className="gl-live-console-gift-row" key={item.name}>
+              <div className="gl-live-console-gift-row" key={item.key}>
                 <span>{item.icon || item.name}</span>
-                <strong>{item.name}</strong>
+                <div className="gl-live-console-gift-main">
+                  <strong>{item.user}</strong>
+                  <small>{item.name}</small>
+                </div>
                 <small>x{item.count}</small>
               </div>
             ))
@@ -2494,6 +2577,87 @@ function StudioInteractionRail({
   );
 }
 
+function ConsoleMuteUserDialog({
+  target,
+  currentUserId,
+  muted,
+  statePending,
+  pending,
+  onOpenChange,
+  onMute,
+  onUnmute,
+}: {
+  target: ChatModerationTarget | null;
+  currentUserId?: string;
+  muted: boolean;
+  statePending: boolean;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMute: (duration: MuteUserPayload['durationMinutes']) => void;
+  onUnmute: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  const targetRole = target?.role ?? 'viewer';
+  const blocked =
+    !target ||
+    target.userId === currentUserId ||
+    targetRole === 'owner' ||
+    targetRole === 'moderator';
+  const durations: MuteUserPayload['durationMinutes'][] = [5, 10, 30, 60];
+  const statusText = blocked
+    ? t('liveRoom.moderation.blocked', {
+        defaultValue: 'Creators, moderators, and yourself cannot be muted.',
+      })
+    : statePending
+      ? t('liveRoom.moderation.checkingMute', { defaultValue: 'Checking mute status...' })
+      : muted
+        ? t('liveRoom.moderation.alreadyMuted', {
+            defaultValue: 'This user is currently muted. You can unmute them.',
+          })
+        : t('liveRoom.moderation.pickDuration', { defaultValue: 'Choose mute duration' });
+
+  return (
+    <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
+      <DialogContent className="gl-mute-dialog">
+        <DialogTitle>{t('liveRoom.moderation.title', { defaultValue: 'Mute user' })}</DialogTitle>
+        <div className="gl-mute-target">
+          <ShieldCheck size={22} />
+          <div>
+            <strong>{target?.user ?? ''}</strong>
+            <span>{statusText}</span>
+          </div>
+        </div>
+        {muted && !blocked ? (
+          <button
+            type="button"
+            className="gl-mute-unmute-btn"
+            disabled={pending || statePending}
+            onClick={onUnmute}
+          >
+            {t('liveRoom.moderation.unmuteAction', { defaultValue: 'Unmute' })}
+          </button>
+        ) : (
+          <div className="gl-mute-duration-grid">
+            {durations.map((duration) => (
+              <button
+                key={duration}
+                type="button"
+                disabled={blocked || pending || statePending}
+                onClick={() => onMute(duration)}
+              >
+                {t('liveRoom.moderation.minutes', {
+                  count: duration,
+                  defaultValue: '{{count}} minutes',
+                })}
+              </button>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function StatusMetric({ label, value }: { label: string; value: string }) {
   return (
     <span className="gl-live-console-metric">
@@ -2519,10 +2683,17 @@ function useElapsed(startedAt: string | undefined, enabled: boolean): string {
 }
 
 function summarizeGifts(messages: Message[]) {
-  const map = new Map<string, { name: string; icon?: string; count: number; totalCoin: number }>();
+  const map = new Map<
+    string,
+    { key: string; user: string; name: string; icon?: string; count: number; totalCoin: number }
+  >();
+  let totalCoin = 0;
   for (const item of messages) {
     if (item.kind !== 'gift') continue;
-    const current = map.get(item.giftName) ?? {
+    const key = `${item.userId || item.user}:${item.giftName}`;
+    const current = map.get(key) ?? {
+      key,
+      user: item.user,
       name: item.giftName,
       icon: item.giftIcon,
       count: 0,
@@ -2530,11 +2701,13 @@ function summarizeGifts(messages: Message[]) {
     };
     current.count += item.count ?? 1;
     current.totalCoin += item.totalCoin ?? 0;
+    totalCoin += item.totalCoin ?? 0;
+    if (item.user) current.user = item.user;
     if (item.giftIcon) current.icon = item.giftIcon;
-    map.set(item.giftName, current);
+    map.set(key, current);
   }
   const items = Array.from(map.values()).sort((a, b) => b.totalCoin - a.totalCoin).slice(0, 5);
-  return { items, totalCoin: items.reduce((sum, item) => sum + item.totalCoin, 0) };
+  return { items, totalCoin };
 }
 
 function matchingStoredSession(streamId: string): PublisherSession | null {

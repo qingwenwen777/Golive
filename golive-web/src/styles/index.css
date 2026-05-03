@@ -4432,7 +4432,7 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-live-row {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) auto auto;
+  grid-template-columns: 128px minmax(0, 1fr) auto auto auto;
   gap: 14px;
   align-items: center;
   padding: 8px;
@@ -4631,7 +4631,7 @@ button.gl-fan-badge-empty {
   }
 
   .gl-studio-live-row .gl-history-cover {
-    grid-row: 1 / span 3;
+    grid-row: 1 / span 4;
     width: 112px;
   }
 
@@ -5779,6 +5779,9 @@ button.gl-fan-badge-empty {
 .gl-live-console-gift-row span {
   text-align: center;
 }
+.gl-live-console-gift-main {
+  min-width: 0;
+}
 .gl-live-console-gift-row strong,
 .gl-live-console-superchats strong {
   overflow: hidden;
@@ -5793,6 +5796,12 @@ button.gl-fan-badge-empty {
   color: var(--gl-text-2);
   font-size: 12px;
   font-weight: 850;
+}
+.gl-live-console-gift-main small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .gl-live-console-superchats div {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -6880,6 +6889,17 @@ button.gl-fan-badge-empty {
   color: var(--gl-text-2);
   font-size: 12px;
   line-height: 1.4;
+}
+.gl-coin-panel .gl-section-title-row > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.gl-coin-panel .gl-section-title-row span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.35;
 }
 .gl-coin-task-grid {
   display: grid;

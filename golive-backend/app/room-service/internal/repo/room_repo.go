@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -435,6 +436,39 @@ LEFT JOIN users u ON u.id = s.user_id
 WHERE s.status = 'success' AND r.owner_id = ? AND s.created_at >= ?
 `, ownerID, since, ownerID, since).Scan(&rows).Error
 	return rows, err
+}
+
+const danmuShardCount = 8
+
+func (r *RoomRepo) DanmuCountsByRooms(ctx context.Context, roomIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(roomIDs))
+	if len(roomIDs) == 0 {
+		return out, nil
+	}
+	type row struct {
+		RoomID string
+		Count  int64
+	}
+	for i := 0; i < danmuShardCount; i++ {
+		table := fmt.Sprintf("danmus_%d", i)
+		var rows []row
+		err := r.db.WithContext(ctx).
+			Table(table).
+			Select("room_id, COUNT(*) AS count").
+			Where("room_id IN ?", roomIDs).
+			Group("room_id").
+			Scan(&rows).Error
+		if err != nil {
+			if isMissingTable(err) {
+				continue
+			}
+			return nil, err
+		}
+		for _, item := range rows {
+			out[item.RoomID] += item.Count
+		}
+	}
+	return out, nil
 }
 
 const uuidPattern = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"

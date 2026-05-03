@@ -536,6 +536,7 @@
           "peakOnlineSub": "最高值",
           "newSubscribers": "新增订阅者",
           "newSubscribersSub": "直播期间",
+          "danmu": "弹幕数量",
           "topFan": "头号粉丝"
         }
       },
@@ -548,7 +549,8 @@
         "hourAmount": "{{amount}} 小时",
         "streamCount": "{{formattedCount}} 场直播",
         "fanCount": "{{formattedCount}} 位粉丝",
-        "peakViewers": "峰值 {{amount}} 人"
+        "peakViewers": "峰值 {{amount}} 人",
+        "danmuCount": "{{formattedCount}} 条弹幕"
       }
     },
     "prepare": {
@@ -791,6 +793,7 @@
       "liveIncome": "直播收入"
     },
     "dailyTasks": "每日任务",
+    "dailyResetHint": "北京时间 0 点刷新",
     "tasks": {
       "dailyLogin": {
         "title": "每日登录抽奖",

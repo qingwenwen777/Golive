@@ -400,7 +400,17 @@ function formatContribution(value: number, locale: string): string {
   return Math.max(0, Math.floor(value)).toLocaleString(locale);
 }
 
-function ViewerRankList({ viewers, total }: { viewers: RoomViewer[]; total: number }) {
+function ViewerRankList({
+  viewers,
+  total,
+  canModerate,
+  onOpenModeration,
+}: {
+  viewers: RoomViewer[];
+  total: number;
+  canModerate?: boolean;
+  onOpenModeration?: (target: ChatModerationTarget) => void;
+}) {
   const { t, i18n } = useTranslation('pages');
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const sorted = viewers
@@ -436,7 +446,26 @@ function ViewerRankList({ viewers, total }: { viewers: RoomViewer[]; total: numb
                 <span className={cn('gl-viewer-rank', rank <= 3 && `top-${rank}`)}>
                   {rank <= 3 ? t('liveRoom.chatPanel.rankTop', { rank }) : rank}
                 </span>
-                <Avatar name={viewer.user} src={viewer.avatar} size={34} />
+                <button
+                  type="button"
+                  className="gl-viewer-avatar-btn"
+                  disabled={!canModerate || !viewer.userId}
+                  onClick={() => {
+                    if (!viewer.userId) return;
+                    onOpenModeration?.({
+                      userId: viewer.userId,
+                      user: viewer.user,
+                      avatar: viewer.avatar,
+                      role: 'viewer',
+                    });
+                  }}
+                  aria-label={t('liveRoom.chatPanel.moderateUser', {
+                    user: viewer.user,
+                    defaultValue: `Moderate ${viewer.user}`,
+                  })}
+                >
+                  <Avatar name={viewer.user} src={viewer.avatar} size={34} />
+                </button>
                 <div className="gl-viewer-main">
                   <span className="gl-viewer-name">{viewer.user}</span>
                   <span className="gl-viewer-sub">{t('liveRoom.chatPanel.online')}</span>
@@ -703,7 +732,12 @@ export function Chat({
           })}
         </div>
       ) : (
-        <ViewerRankList viewers={viewers} total={viewerTotal ?? viewers.length} />
+        <ViewerRankList
+          viewers={viewers}
+          total={viewerTotal ?? viewers.length}
+          canModerate={canModerate}
+          onOpenModeration={onOpenModeration}
+        />
       )}
 
       {activeTab === 'chat' && newMessageCount > 0 && (

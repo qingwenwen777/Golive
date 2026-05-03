@@ -321,7 +321,10 @@ export default function CoinPage() {
         <div className="gl-coin-main">
           <section className="gl-coin-panel">
             <div className="gl-section-title-row">
-              <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
+              <div>
+                <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
+                <span>{t('coin.dailyResetHint', { defaultValue: '北京时间 0 点刷新' })}</span>
+              </div>
             </div>
             <div className="gl-coin-task-grid">
               {DAILY_TASKS.map((task) => {

@@ -131,7 +131,7 @@ export interface UseRoomRealtimeReturn {
 export function useRoomRealtime(
   roomId: string,
   enabled = true,
-  opts: { onLiveEnded?: () => void; activeFanBadge?: ChatFanBadge | null } = {},
+  opts: { onLiveEnded?: () => void; activeFanBadge?: ChatFanBadge | null; ownerId?: string } = {},
 ): UseRoomRealtimeReturn {
   const ensureRoom = useRealtimeStore((s) => s.ensureRoom);
   const appendMessage = useRealtimeStore((s) => s.appendMessage);
@@ -179,8 +179,10 @@ export function useRoomRealtime(
     const base = raw.startsWith('/')
       ? `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${raw}`
       : raw;
-    return `${base}?roomId=${encodeURIComponent(roomId)}`;
-  }, [enabled, roomId]);
+    const params = new URLSearchParams({ roomId });
+    if (opts.ownerId) params.set('ownerId', opts.ownerId);
+    return `${base}?${params.toString()}`;
+  }, [enabled, opts.ownerId, roomId]);
 
   // Subscribe to auth token so a login/logout transition reconnects the WS
   // with the latest credentials. Without this, an anonymous handshake would

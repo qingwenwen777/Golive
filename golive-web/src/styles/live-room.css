@@ -585,6 +585,29 @@
 .gl-viewer-row:hover {
   background: var(--gl-bg-hover);
 }
+.gl-viewer-avatar-btn {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.gl-viewer-avatar-btn:not(:disabled) {
+  cursor: pointer;
+}
+.gl-viewer-avatar-btn:not(:disabled):hover,
+.gl-viewer-avatar-btn:not(:disabled):focus-visible {
+  outline: 2px solid color-mix(in srgb, #1c62b9 58%, transparent);
+  outline-offset: 2px;
+}
+.gl-viewer-avatar-btn:disabled {
+  cursor: default;
+}
 .gl-viewer-rank {
   display: inline-flex;
   align-items: center;

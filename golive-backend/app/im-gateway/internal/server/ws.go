@@ -56,6 +56,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing roomId", http.StatusBadRequest)
 		return
 	}
+	ownerID := strings.TrimSpace(r.URL.Query().Get("ownerId"))
 	identity, err := h.verifier.Verify(r.URL.Query().Get("token"))
 	if err != nil {
 		metrics.HandshakeFailures.WithLabelValues("invalid_token").Inc()
@@ -69,8 +70,8 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := newConn(ws, roomID, identity, h.hub, h.producer, h.moderation, h.cfg)
-	room, err := h.hub.Join(roomID, c)
+	c := newConn(ws, roomID, ownerID, identity, h.hub, h.producer, h.moderation, h.cfg)
+	room, err := h.hub.Join(roomID, c, c.initialViewerProfile())
 	if err != nil {
 		logger.L().Error("hub join", zap.Error(err))
 		_ = ws.Close()

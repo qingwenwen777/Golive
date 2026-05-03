@@ -37,13 +37,13 @@ func New(ctx context.Context, broker pubsub.Broker, viewerPushInterval time.Dura
 		ctx:                ctx,
 		broker:             broker,
 		viewerPushInterval: viewerPushInterval,
-		rooms: make(map[string]*Room),
+		rooms:              make(map[string]*Room),
 	}
 }
 
 // Join attaches sink to roomID, creating the room (and its Redis subscription)
 // if this is the first member. Returns the live Room so callers can inspect it.
-func (h *Hub) Join(roomID string, c Sink) (*Room, error) {
+func (h *Hub) Join(roomID string, c Sink, profile ViewerProfile) (*Room, error) {
 	h.mu.Lock()
 	r, ok := h.rooms[roomID]
 	if !ok {
@@ -57,7 +57,7 @@ func (h *Hub) Join(roomID string, c Sink) (*Room, error) {
 	}
 	h.mu.Unlock()
 
-	r.add(c)
+	r.add(c, profile)
 	metrics.ConnectionsActive.Inc()
 	metrics.ConnectionsTotal.Inc()
 	return r, nil

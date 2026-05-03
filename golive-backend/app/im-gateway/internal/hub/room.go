@@ -65,15 +65,19 @@ func newRoom(parent context.Context, h *Hub, id string) (*Room, error) {
 
 // add returns true if this is the first connection (caller already locked
 // the hub-level rooms mutex via Hub.Join, so the room itself is reachable).
-func (r *Room) add(c Sink) {
+func (r *Room) add(c Sink, profile ViewerProfile) {
 	r.mu.Lock()
 	r.conns[c.ID()] = c
 	r.resetContributionIfNeededLocked()
-	r.viewerProfiles[c.ID()] = ViewerProfile{User: "Guest"}
-	n := int64(len(r.conns))
+	if profile.User == "" {
+		profile.User = "Guest"
+	}
+	r.viewerProfiles[c.ID()] = profile
+	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
 	r.viewers.Store(n)
 	r.persistViewerCount(n)
+	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
 }
 
@@ -86,12 +90,14 @@ func (r *Room) remove(connID string) bool {
 	}
 	delete(r.conns, connID)
 	delete(r.viewerProfiles, connID)
-	n := int64(len(r.conns))
+	n := r.uniqueViewerCountLocked()
+	empty := len(r.conns) == 0
 	r.mu.Unlock()
 	r.viewers.Store(n)
 	r.persistViewerCount(n)
+	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
-	return n == 0
+	return empty
 }
 
 // size is used for /debug/rooms top-N.
@@ -154,7 +160,11 @@ func (r *Room) updateViewer(connID string, profile ViewerProfile) {
 		profile.User = "Guest"
 	}
 	r.viewerProfiles[connID] = profile
+	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
+	r.viewers.Store(n)
+	r.persistViewerCount(n)
+	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
 }
 
@@ -227,20 +237,42 @@ func (r *Room) persistViewerCount(count int64) {
 func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 	r.mu.Lock()
 	r.resetContributionIfNeededLocked()
-	total := len(r.viewerProfiles)
-	items := make([]ViewerListItem, 0, total)
-	for _, profile := range r.viewerProfiles {
+	byViewer := make(map[string]ViewerListItem, len(r.viewerProfiles))
+	for connID, profile := range r.viewerProfiles {
+		key := viewerIdentityKey(connID, profile)
+		if key == "" {
+			continue
+		}
 		user := profile.User
 		if user == "" {
 			user = "Guest"
 		}
-		items = append(items, ViewerListItem{
-			UserID:       profile.UserID,
-			User:         user,
-			Avatar:       profile.Avatar,
-			Contribution: r.contributions[contributionKey(profile)],
-		})
+		item := byViewer[key]
+		if item.User == "" {
+			item = ViewerListItem{
+				UserID: profile.UserID,
+				User:   user,
+				Avatar: profile.Avatar,
+			}
+		} else {
+			if item.UserID == "" && profile.UserID != "" {
+				item.UserID = profile.UserID
+			}
+			if item.User == "Guest" && user != "" {
+				item.User = user
+			}
+			if item.Avatar == "" && profile.Avatar != "" {
+				item.Avatar = profile.Avatar
+			}
+		}
+		item.Contribution = r.contributions[contributionKey(profile)]
+		byViewer[key] = item
 	}
+	items := make([]ViewerListItem, 0, len(byViewer))
+	for _, item := range byViewer {
+		items = append(items, item)
+	}
+	total := len(items)
 	r.mu.Unlock()
 
 	sort.SliceStable(items, func(i, j int) bool {
@@ -253,6 +285,31 @@ func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 		items = items[:limit]
 	}
 	return total, items
+}
+
+func (r *Room) uniqueViewerCountLocked() int64 {
+	seen := make(map[string]struct{}, len(r.viewerProfiles))
+	for connID, profile := range r.viewerProfiles {
+		key := viewerIdentityKey(connID, profile)
+		if key == "" {
+			continue
+		}
+		seen[key] = struct{}{}
+	}
+	return int64(len(seen))
+}
+
+func viewerIdentityKey(connID string, profile ViewerProfile) string {
+	if profile.IsOwner {
+		return ""
+	}
+	if profile.UserID != "" {
+		return "id:" + profile.UserID
+	}
+	if connID != "" {
+		return "conn:" + connID
+	}
+	return ""
 }
 
 func (r *Room) resetContributionIfNeededLocked() {

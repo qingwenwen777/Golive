@@ -9,6 +9,7 @@ import {
   Crown,
   Coins,
   Eye,
+  MessageSquare,
   Radio,
   TrendingUp,
   UserPlus,
@@ -239,6 +240,15 @@ export function LiveAnalysisPage() {
                   trend={t('studio.analytics.live.cards.newSubscribersSub')}
                 />
                 <StudioKpi
+                  icon={<MessageSquare size={18} />}
+                  label={t('studio.analytics.live.cards.danmu')}
+                  value={(record.danmuCount ?? 0).toLocaleString(locale)}
+                  trend={t('studio.analytics.units.danmuCount', {
+                    count: record.danmuCount ?? 0,
+                    formattedCount: (record.danmuCount ?? 0).toLocaleString(locale),
+                  })}
+                />
+                <StudioKpi
                   icon={<Crown size={18} />}
                   label={t('studio.analytics.live.cards.topFan')}
                   value={record.topFan?.name ?? '-'}
@@ -373,6 +383,12 @@ function LiveHistoryStudioRow({
       <span>
         {t('studio.analytics.units.peakViewers', {
           amount: record.peakViewers.toLocaleString(locale),
+        })}
+      </span>
+      <span>
+        {t('studio.analytics.units.danmuCount', {
+          count: record.danmuCount ?? 0,
+          formattedCount: (record.danmuCount ?? 0).toLocaleString(locale),
         })}
       </span>
     </Link>

@@ -33,6 +33,7 @@ type LiveHistoryItem struct {
 	Duration        string           `json:"duration"`
 	DurationSeconds int64            `json:"durationSeconds"`
 	PeakViewers     int64            `json:"peakViewers"`
+	DanmuCount      int64            `json:"danmuCount"`
 	RevenueCoin     int64            `json:"revenueCoin"`
 	NewSubscribers  int64            `json:"newSubscribers"`
 	TopFan          *FanContribution `json:"topFan,omitempty"`
@@ -147,7 +148,11 @@ func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, view
 	if err != nil {
 		return nil, err
 	}
-	item := s.historyItem(*room, rows)
+	danmuCounts, err := s.rooms.DanmuCountsByRooms(ctx, []string{room.ID})
+	if err != nil {
+		return nil, err
+	}
+	item := s.historyItem(*room, rows, danmuCounts[room.ID])
 	item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(*room))
 	topFans := topFans(rows, 8)
 	giftRevenue, scRevenue := int64(0), int64(0)
@@ -183,17 +188,21 @@ func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID string, 
 	for _, row := range rows {
 		rowsByRoom[row.RoomID] = append(rowsByRoom[row.RoomID], row)
 	}
+	danmuCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
+	if err != nil {
+		return nil, nil, 0, err
+	}
 
 	items := make([]LiveHistoryItem, 0, len(rooms))
 	for _, room := range rooms {
-		item := s.historyItem(room, rowsByRoom[room.ID])
+		item := s.historyItem(room, rowsByRoom[room.ID], danmuCounts[room.ID])
 		item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
 		items = append(items, item)
 	}
 	return items, rooms, total, nil
 }
 
-func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow) LiveHistoryItem {
+func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow, danmuCount int64) LiveHistoryItem {
 	endedAt := endedAtOf(room)
 	duration := endedAt.Sub(room.StartedAt)
 	if duration < 0 {
@@ -226,6 +235,7 @@ func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow) LiveH
 		Duration:        model.FormatDuration(duration),
 		DurationSeconds: int64(duration.Seconds()),
 		PeakViewers:     peak,
+		DanmuCount:      danmuCount,
 		RevenueCoin:     revenue,
 		TopFan:          topFan,
 	}

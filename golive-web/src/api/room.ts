@@ -295,6 +295,7 @@ export interface LiveHistoryItem {
   duration: string;
   durationSeconds: number;
   peakViewers: number;
+  danmuCount: number;
   revenueCoin: number;
   newSubscribers: number;
   topFan?: FanContribution;

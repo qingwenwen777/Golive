@@ -535,6 +535,7 @@
           "peakOnlineSub": "最高値",
           "newSubscribers": "新規登録者",
           "newSubscribersSub": "配信中",
+          "danmu": "弾幕数",
           "topFan": "トップファン"
         }
       },
@@ -547,7 +548,8 @@
         "hourAmount": "{{amount}}時間",
         "streamCount": "{{formattedCount}} 件の配信",
         "fanCount": "{{formattedCount}} 人のファン",
-        "peakViewers": "ピーク {{amount}} 人"
+        "peakViewers": "ピーク {{amount}} 人",
+        "danmuCount": "{{formattedCount}} 件の弾幕"
       }
     },
     "prepare": {
@@ -790,6 +792,7 @@
       "liveIncome": "ライブ収益"
     },
     "dailyTasks": "デイリータスク",
+    "dailyResetHint": "北京時間 0:00 に更新",
     "tasks": {
       "dailyLogin": {
         "title": "毎日ログイン抽選",

@@ -1,4 +1,5 @@
 export const COIN_ACTIVITY_KEY_PREFIX = 'golive-coin-activity';
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 export interface DailyCoinActivity {
   date: string;
@@ -7,9 +8,10 @@ export interface DailyCoinActivity {
 }
 
 export function coinTodayKey(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const beijingDate = new Date(date.getTime() + BEIJING_OFFSET_MS);
+  const year = beijingDate.getUTCFullYear();
+  const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijingDate.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 

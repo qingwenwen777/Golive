@@ -294,6 +294,10 @@ var dailyCoinTasks = map[string]dailyCoinTask{
 	},
 }
 
+func beijingDailyTaskDate(now time.Time) string {
+	return now.UTC().Add(8 * time.Hour).Format("2006-01-02")
+}
+
 func (h *UserHandler) ClaimDailyCoinTask(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {
@@ -310,7 +314,7 @@ func (h *UserHandler) ClaimDailyCoinTask(c *gin.Context) {
 	if task.RewardMax > task.RewardMin {
 		reward += time.Now().UnixNano() % (task.RewardMax - task.RewardMin + 1)
 	}
-	today := time.Now().Local().Format("2006-01-02")
+	today := beijingDailyTaskDate(time.Now())
 	sourceID := fmt.Sprintf("%s:%s", task.ID, today)
 	u, tx, created, err := h.users.ClaimDailyCoinReward(
 		c.Request.Context(),
