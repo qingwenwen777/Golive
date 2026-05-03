@@ -57,8 +57,8 @@
 .gl-post-toolbar {
   display: flex;
   justify-content: flex-start;
-  width: min(100%, 860px);
-  margin-inline: auto;
+  width: min(100%, 980px);
+  margin-inline: 0 auto;
 }
 
 .gl-post-create-btn,
@@ -222,12 +222,13 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: min(100%, 860px);
-  margin-inline: auto;
+  width: min(100%, 920px);
+  margin-inline: 0 auto;
 }
 
 .gl-post-card {
   display: flex;
+  width: 100%;
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
@@ -240,6 +241,15 @@
 
 .gl-studio-post-list-panel .gl-post-card {
   box-shadow: none;
+}
+
+.gl-studio-post-list-panel {
+  width: min(100%, 980px);
+}
+
+.gl-studio-post-list-panel .gl-post-feed-list {
+  width: min(100%, 920px);
+  margin-inline: 0 auto;
 }
 
 .gl-post-card.is-loading {
@@ -257,8 +267,8 @@
 }
 
 .gl-post-body {
-  width: min(100%, 720px);
-  margin: 14px auto 0;
+  width: min(100%, 780px);
+  margin: 14px 0 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -324,13 +334,13 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   width: 100%;
-  max-width: 620px;
+  max-width: 680px;
   margin-top: 0;
 }
 
 .gl-post-images.is-single {
   grid-template-columns: 1fr;
-  max-width: 520px;
+  max-width: 620px;
 }
 
 .gl-post-images.is-collage {
@@ -367,8 +377,8 @@
 .gl-post-actions {
   display: flex;
   gap: 8px;
-  width: min(100%, 720px);
-  margin: 14px auto 0;
+  width: min(100%, 780px);
+  margin: 14px 0 0;
   border-top: 1px solid var(--gl-border);
   padding-top: 12px;
 }
@@ -398,8 +408,8 @@
 }
 
 .gl-post-comments {
-  width: min(100%, 720px);
-  margin: 12px auto 0;
+  width: min(100%, 780px);
+  margin: 12px 0 0;
   border-top: 1px solid var(--gl-border);
   padding-top: 12px;
 }
