@@ -1,7 +1,18 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Bell, CalendarClock, CheckCircle2, Clock3, Pencil, PlayCircle, Trash2, UserPlus, X } from 'lucide-react';
+import {
+  Bell,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  Pencil,
+  PlayCircle,
+  Tag,
+  Trash2,
+  UserPlus,
+  X,
+} from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
 import { cn } from '@/lib/cn';
@@ -47,6 +58,13 @@ export function AppointmentCard({
       }).format(new Date(appointment.scheduledAt)),
     [appointment.scheduledAt, i18n.language],
   );
+  const category =
+    appointment.category && appointment.category !== 'Scheduled'
+      ? appointment.category
+      : 'Just Chatting';
+  const categoryLabel = t(`createLive.categories.${categoryKey(category)}`, {
+    defaultValue: category,
+  });
 
   const main = (
     <>
@@ -74,18 +92,25 @@ export function AppointmentCard({
           </div>
         )}
         {appointment.description && <p>{appointment.description}</p>}
-      <div className="gl-appointment-meta">
-        <span>
-          <Bell size={13} />
-          {t('appointments.reservationCount', { count: appointment.reservationCount, defaultValue: '{{count}} reserved' })}
-        </span>
-        <span>
-          <CalendarClock size={13} />
-          {appointment.canStart
-            ? t('appointments.startWindow', { defaultValue: 'Start available now' })
-            : t('appointments.waitingWindow', { defaultValue: 'Waiting to start' })}
-        </span>
-      </div>
+        <div className="gl-appointment-meta">
+          <span>
+            <Tag size={13} />
+            {categoryLabel}
+          </span>
+          <span>
+            <Bell size={13} />
+            {t('appointments.reservationCount', {
+              count: appointment.reservationCount,
+              defaultValue: '{{count}} reserved',
+            })}
+          </span>
+          <span>
+            <CalendarClock size={13} />
+            {appointment.canStart
+              ? t('appointments.startWindow', { defaultValue: 'Start available now' })
+              : t('appointments.waitingWindow', { defaultValue: 'Waiting to start' })}
+          </span>
+        </div>
       </div>
     </>
   );
@@ -99,12 +124,23 @@ export function AppointmentCard({
   );
 
   return (
-    <article className={cn('gl-appointment-card', compact && 'is-compact', managementMode && 'is-management')}>
+    <article
+      className={cn(
+        'gl-appointment-card',
+        compact && 'is-compact',
+        managementMode && 'is-management',
+      )}
+    >
       {content}
       <div className="gl-appointment-actions">
         {viewerMode ? (
           appointment.reserved ? (
-            <button type="button" className="gl-secondary-btn" disabled={pending} onClick={onUnreserve}>
+            <button
+              type="button"
+              className="gl-secondary-btn"
+              disabled={pending}
+              onClick={onUnreserve}
+            >
               <X size={15} />
               {t('appointments.cancelReserve', { defaultValue: 'Cancel' })}
             </button>
@@ -126,7 +162,12 @@ export function AppointmentCard({
               <Pencil size={15} />
               {t('appointments.edit', { defaultValue: 'Edit' })}
             </button>
-            <button type="button" className="gl-secondary-btn" disabled={pending} onClick={onDelete}>
+            <button
+              type="button"
+              className="gl-secondary-btn"
+              disabled={pending}
+              onClick={onDelete}
+            >
               <Trash2 size={15} />
               {t('appointments.delete', { defaultValue: 'Delete' })}
             </button>
@@ -152,4 +193,8 @@ function statusLabel(status: string, t: ReturnType<typeof useTranslation>['t']):
     default:
       return status;
   }
+}
+
+function categoryKey(category: string): string {
+  return category.toLowerCase().replace(/\s+/g, '');
 }

@@ -76,6 +76,7 @@ func (r *AppointmentRepo) UpdateScheduled(ctx context.Context, appt *model.LiveA
 			Updates(map[string]any{
 				"title":       room.Title,
 				"description": room.Description,
+				"category":    room.Category,
 				"cover":       room.Cover,
 				"started_at":  room.StartedAt,
 			}).Error

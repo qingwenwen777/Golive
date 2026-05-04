@@ -377,16 +377,23 @@ func TestRoomGetDoesNotExposePublishingOrEndedToViewers(t *testing.T) {
 
 func TestRoomGetExposesStartingAppointmentToViewers(t *testing.T) {
 	ctx := context.Background()
-	liveSvc, rooms, _ := newLiveServiceTestDeps(t)
+	_, rooms, _ := newLiveServiceTestDeps(t)
 	roomSvc := NewRoomService(rooms, "http://srs/live")
-	st := startTestLive(t, liveSvc, "owner-appt-starting")
-	room, err := rooms.GetByID(ctx, st.ID)
-	require.NoError(t, err)
-	room.Category = "Scheduled"
-	room.Status = model.StatusPublishing
+	room := &model.Room{
+		ID:          "appt-owner-appt-starting-test",
+		OwnerID:     "owner-appt-starting",
+		ChannelID:   "ch-owner-appt-starting",
+		Channel:     "Appointment Creator",
+		Title:       "Starting appointment",
+		Description: "Appointment room entering the start window",
+		Category:    "Gaming",
+		Cover:       "/uploads/appointment.jpg",
+		StartedAt:   time.Now(),
+		Status:      model.StatusPublishing,
+	}
 	require.NoError(t, rooms.Upsert(ctx, room))
 
-	viewerView, err := roomSvc.Get(ctx, st.ID, "viewer-appt-starting")
+	viewerView, err := roomSvc.Get(ctx, room.ID, "viewer-appt-starting")
 	require.NoError(t, err)
 	require.False(t, viewerView.IsLive)
 	require.Equal(t, model.StatusPublishing, viewerView.Status)

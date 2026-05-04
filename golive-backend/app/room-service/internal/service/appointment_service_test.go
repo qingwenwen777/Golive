@@ -36,6 +36,39 @@ CREATE TABLE users (
 	return NewAppointmentService(appointments, rooms, nil, nil), db
 }
 
+func TestAppointmentCreateAndUpdatePersistCategory(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newAppointmentServiceTestDeps(t)
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	payload := AppointmentPayload{
+		ScheduledAt: now.Add(2 * time.Hour),
+		Title:       "Category appointment",
+		Description: "A scheduled live with a category",
+		Category:    "Gaming",
+		Cover:       "/uploads/gaming.jpg",
+		ChannelName: "Creator Channel",
+	}
+	created, err := svc.Create(ctx, "owner-category", payload)
+	require.NoError(t, err)
+	require.Equal(t, "Gaming", created.Category)
+
+	room, err := svc.rooms.GetByID(ctx, created.RoomID)
+	require.NoError(t, err)
+	require.Equal(t, "Gaming", room.Category)
+
+	payload.Category = "Music"
+	payload.Title = "Music appointment"
+	updated, err := svc.Update(ctx, "owner-category", created.ID, payload)
+	require.NoError(t, err)
+	require.Equal(t, "Music", updated.Category)
+
+	room, err = svc.rooms.GetByID(ctx, created.RoomID)
+	require.NoError(t, err)
+	require.Equal(t, "Music", room.Category)
+}
+
 func TestNotificationsBackfillActorFromLiveLinkAndProfile(t *testing.T) {
 	ctx := context.Background()
 	svc, db := newAppointmentServiceTestDeps(t)

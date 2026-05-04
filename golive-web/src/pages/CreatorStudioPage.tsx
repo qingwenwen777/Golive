@@ -104,9 +104,16 @@ import type { ReplayVisibility, Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
 
 const DEFAULT_CATEGORY = 'Just Chatting';
+const LEGACY_APPOINTMENT_CATEGORY = 'Scheduled';
 
 function categoryKey(category: string): string {
   return category.toLowerCase().replace(/\s+/g, '');
+}
+
+function appointmentCategoryDraft(category?: string): string {
+  const normalized = category?.trim();
+  if (!normalized || normalized === LEGACY_APPOINTMENT_CATEGORY) return DEFAULT_CATEGORY;
+  return normalized;
 }
 
 function currentChannelKey(user: User | null | undefined): string {
@@ -927,9 +934,11 @@ export function CreatorAppointmentsPage() {
   const [scheduledAt, setScheduledAt] = useState(() => defaultAppointmentTime());
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [error, setError] = useState('');
+  const categories = CATEGORIES_EN.filter((item) => item !== 'All');
 
   useEffect(() => {
     setAppointmentPage(1);
@@ -945,6 +954,7 @@ export function CreatorAppointmentsPage() {
     setEditing(null);
     setTitle('');
     setDescription('');
+    setCategory(DEFAULT_CATEGORY);
     setScheduledAt(defaultAppointmentTime());
     setCoverFile(null);
     setCoverPreview('');
@@ -958,6 +968,7 @@ export function CreatorAppointmentsPage() {
     }
     setTitle(editing.title);
     setDescription(editing.description ?? '');
+    setCategory(appointmentCategoryDraft(editing.category));
     setScheduledAt(toLocalDateTimeInput(editing.scheduledAt));
     setCoverFile(null);
     setCoverPreview(editing.cover ?? '');
@@ -973,6 +984,7 @@ export function CreatorAppointmentsPage() {
     setEditing(item);
     setTitle(item.title);
     setDescription(item.description ?? '');
+    setCategory(appointmentCategoryDraft(item.category));
     setScheduledAt(toLocalDateTimeInput(item.scheduledAt));
     setCoverFile(null);
     setCoverPreview(item.cover ?? '');
@@ -1002,10 +1014,10 @@ export function CreatorAppointmentsPage() {
       );
       return;
     }
-    if (!normalizedTitle || !normalizedDescription || !coverPreview.trim()) {
+    if (!normalizedTitle || !normalizedDescription || !category || !coverPreview.trim()) {
       setError(
         t('studio.appointments.formIncomplete', {
-          defaultValue: 'Start time, title, cover, and description are required.',
+          defaultValue: 'Start time, title, category, cover, and description are required.',
         }),
       );
       return;
@@ -1017,6 +1029,7 @@ export function CreatorAppointmentsPage() {
         scheduledAt: scheduled.toISOString(),
         title: normalizedTitle,
         description: normalizedDescription,
+        category,
         cover,
         channelName: userDisplayName(user),
         avatar: user.avatar,
@@ -1155,7 +1168,7 @@ export function CreatorAppointmentsPage() {
       </section>
 
       <Dialog open={appointmentDialogOpen} onOpenChange={handleAppointmentDialogOpenChange}>
-        <DialogContent className="gl-appointment-dialog max-h-[calc(100vh-32px)] max-w-4xl overflow-y-auto sm:max-w-4xl">
+        <DialogContent className="gl-appointment-dialog max-w-none overflow-visible p-0 sm:max-w-none">
           <div className="gl-appointment-form-panel gl-appointment-dialog-panel">
             <div className="gl-creator-panel-head">
               <div>
@@ -1188,6 +1201,23 @@ export function CreatorAppointmentsPage() {
                       maxLength={120}
                       onChange={(event) => setTitle(event.target.value)}
                     />
+                  </label>
+                  <label className="gl-creator-field">
+                    <span>{t('createLive.fields.category')}</span>
+                    <select
+                      className="gl-appointment-category-select"
+                      value={category}
+                      onChange={(event) => setCategory(event.target.value)}
+                      required
+                    >
+                      {categories.map((item) => (
+                        <option key={item} value={item}>
+                          {t(`createLive.categories.${categoryKey(item)}`, {
+                            defaultValue: item,
+                          })}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
                 <label className="gl-creator-field">
@@ -2003,7 +2033,7 @@ function AppointmentDateTimePicker({
   };
 
   return (
-    <div className="gl-appointment-datetime">
+    <div className={cn('gl-appointment-datetime', open && 'is-open')}>
       <button
         type="button"
         className="gl-appointment-datetime-trigger"
@@ -2015,93 +2045,99 @@ function AppointmentDateTimePicker({
       </button>
       {open && (
         <div className="gl-appointment-datetime-popover">
-          <div className="gl-appointment-calendar-head">
-            <button
-              type="button"
-              aria-label={t('studio.appointments.previousMonth', {
-                defaultValue: 'Previous month',
-              })}
-              onClick={() => setViewMonth(addMonths(viewMonth, -1))}
-            >
-              <ChevronLeft size={17} />
-            </button>
-            <strong>{formatMonthLabel(viewMonth, i18n.language)}</strong>
-            <button
-              type="button"
-              aria-label={t('studio.appointments.nextMonth', { defaultValue: 'Next month' })}
-              onClick={() => setViewMonth(addMonths(viewMonth, 1))}
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
-          <div className="gl-appointment-calendar-weekdays">
-            {weekdays.map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="gl-appointment-calendar-grid">
-            {monthDays.map((day) => {
-              const sameMonth = day.getMonth() === viewMonth.getMonth();
-              const selectedDay = isSameDate(day, selected);
-              return (
-                <button
-                  type="button"
-                  key={day.toISOString()}
-                  className={cn(!sameMonth && 'is-muted', selectedDay && 'is-selected')}
-                  aria-pressed={selectedDay}
-                  onClick={() => pickDate(day)}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
-          <div className="gl-appointment-time-row">
-            <label>
-              <span>{t('studio.appointments.hour', { defaultValue: 'Hour' })}</span>
-              <select
-                value={selectedHour}
-                onChange={(event) =>
-                  onChange(replaceTimePart(value, event.target.value, selectedMinute))
-                }
-              >
-                {Array.from({ length: 24 }).map((_, index) => {
-                  const hour = pad2(index);
-                  return (
-                    <option key={hour} value={hour}>
-                      {hour}
-                    </option>
-                  );
+          <div className="gl-appointment-calendar-panel">
+            <div className="gl-appointment-calendar-head">
+              <button
+                type="button"
+                aria-label={t('studio.appointments.previousMonth', {
+                  defaultValue: 'Previous month',
                 })}
-              </select>
-            </label>
-            <label>
-              <span>{t('studio.appointments.minute', { defaultValue: 'Minute' })}</span>
-              <select
-                value={selectedMinute}
-                onChange={(event) =>
-                  onChange(replaceTimePart(value, selectedHour, event.target.value))
+                onClick={() => setViewMonth(addMonths(viewMonth, -1))}
+              >
+                <ChevronLeft size={17} />
+              </button>
+              <strong>{formatMonthLabel(viewMonth, i18n.language)}</strong>
+              <button
+                type="button"
+                aria-label={t('studio.appointments.nextMonth', { defaultValue: 'Next month' })}
+                onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+            <div className="gl-appointment-calendar-weekdays">
+              {weekdays.map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="gl-appointment-calendar-grid">
+              {monthDays.map((day) => {
+                const sameMonth = day.getMonth() === viewMonth.getMonth();
+                const selectedDay = isSameDate(day, selected);
+                return (
+                  <button
+                    type="button"
+                    key={day.toISOString()}
+                    className={cn(!sameMonth && 'is-muted', selectedDay && 'is-selected')}
+                    aria-pressed={selectedDay}
+                    onClick={() => pickDate(day)}
+                  >
+                    {day.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="gl-appointment-time-panel">
+            <div className="gl-appointment-time-row">
+              <label>
+                <span>{t('studio.appointments.hour', { defaultValue: 'Hour' })}</span>
+                <select
+                  value={selectedHour}
+                  onChange={(event) =>
+                    onChange(replaceTimePart(value, event.target.value, selectedMinute))
+                  }
+                >
+                  {Array.from({ length: 24 }).map((_, index) => {
+                    const hour = pad2(index);
+                    return (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label>
+                <span>{t('studio.appointments.minute', { defaultValue: 'Minute' })}</span>
+                <select
+                  value={selectedMinute}
+                  onChange={(event) =>
+                    onChange(replaceTimePart(value, selectedHour, event.target.value))
+                  }
+                >
+                  {minuteOptions(selectedMinute).map((minute) => (
+                    <option key={minute} value={minute}>
+                      {minute}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="gl-appointment-datetime-actions">
+              <button
+                type="button"
+                className="gl-creator-secondary"
+                onClick={() =>
+                  onChange(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)))
                 }
               >
-                {minuteOptions(selectedMinute).map((minute) => (
-                  <option key={minute} value={minute}>
-                    {minute}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="gl-appointment-datetime-actions">
-            <button
-              type="button"
-              className="gl-creator-secondary"
-              onClick={() => onChange(toLocalDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)))}
-            >
-              {t('studio.appointments.oneHourLater', { defaultValue: '1 hour later' })}
-            </button>
-            <button type="button" className="gl-creator-primary" onClick={() => setOpen(false)}>
-              {t('studio.appointments.done', { defaultValue: 'Done' })}
-            </button>
+                {t('studio.appointments.oneHourLater', { defaultValue: '1 hour later' })}
+              </button>
+              <button type="button" className="gl-creator-primary" onClick={() => setOpen(false)}>
+                {t('studio.appointments.done', { defaultValue: 'Done' })}
+              </button>
+            </div>
           </div>
         </div>
       )}

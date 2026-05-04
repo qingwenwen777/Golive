@@ -9641,7 +9641,7 @@ button.gl-fan-badge-empty {
 .gl-appointment-form-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .gl-appointment-form-panel .gl-creator-panel-head {
@@ -9650,35 +9650,55 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-form-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 210px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
   align-items: start;
-  gap: 16px;
+  gap: 24px;
 }
 
 .gl-appointment-form-fields {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .gl-appointment-form-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 12px;
+  grid-template-columns: minmax(220px, 0.95fr) minmax(250px, 1.2fr) minmax(190px, 0.75fr);
+  align-items: end;
+  gap: 14px;
+}
+
+.gl-appointment-form-row .gl-creator-field {
+  min-width: 0;
 }
 
 .gl-appointment-form-panel .gl-creator-field textarea {
-  min-height: 104px;
+  min-height: 132px;
+}
+
+.gl-appointment-cover-field {
+  align-self: stretch;
 }
 
 .gl-appointment-cover-field .gl-creator-cover-picker {
   width: 100%;
+  border-radius: 8px;
   min-height: 0;
+}
+
+.gl-appointment-cover-field .gl-creator-cover-picker > span {
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
 }
 
 .gl-appointment-datetime {
   position: relative;
+}
+
+.gl-appointment-datetime.is-open {
+  z-index: 60;
 }
 
 .gl-appointment-datetime-trigger {
@@ -9717,15 +9737,33 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-datetime-popover {
   position: absolute;
-  z-index: 30;
+  z-index: 70;
   top: calc(100% + 8px);
   left: 0;
-  width: min(360px, calc(100vw - 48px));
+  display: grid;
+  width: min(560px, calc(100vw - 48px));
+  grid-template-columns: minmax(0, 1fr) 150px;
+  align-items: stretch;
+  gap: 16px;
   border: 1px solid var(--gl-border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--gl-bg-card);
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
-  padding: 14px;
+  padding: 16px;
+}
+
+.gl-appointment-calendar-panel {
+  min-width: 0;
+}
+
+.gl-appointment-time-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  border-left: 1px solid var(--gl-border);
+  padding-left: 16px;
 }
 
 .gl-appointment-calendar-head {
@@ -9785,9 +9823,9 @@ button.gl-fan-badge-empty {
 }
 
 .gl-appointment-calendar-grid button {
-  aspect-ratio: 1;
+  height: 34px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 850;
 }
 
@@ -9807,9 +9845,9 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-time-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .gl-appointment-time-row label {
@@ -9844,13 +9882,15 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-datetime-actions {
   display: flex;
+  flex-direction: column;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .gl-appointment-datetime-actions .gl-creator-primary,
 .gl-appointment-datetime-actions .gl-creator-secondary {
+  width: 100%;
   min-height: 34px;
   padding-inline: 12px;
 }
@@ -9861,7 +9901,15 @@ button.gl-fan-badge-empty {
 }
 
 .gl-appointment-dialog {
-  width: min(900px, calc(100vw - 32px));
+  width: min(1120px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: visible;
+  border-radius: 8px;
+  background: var(--gl-bg-card);
+}
+
+.gl-appointment-dialog-panel {
+  padding: clamp(22px, 2.4vw, 30px);
 }
 
 .gl-appointment-dialog-panel .gl-creator-panel-head {
@@ -10023,6 +10071,30 @@ button.gl-fan-badge-empty {
   .gl-appointment-grid,
   .gl-home-appointment-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gl-appointment-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+  }
+
+  .gl-appointment-dialog-panel {
+    padding: 20px;
+  }
+
+  .gl-appointment-datetime-popover {
+    position: static;
+    width: 100%;
+    grid-template-columns: 1fr;
+    margin-top: 8px;
+  }
+
+  .gl-appointment-time-panel {
+    border-top: 1px solid var(--gl-border);
+    border-left: 0;
+    padding-top: 14px;
+    padding-left: 0;
   }
 
   .gl-appointment-card {

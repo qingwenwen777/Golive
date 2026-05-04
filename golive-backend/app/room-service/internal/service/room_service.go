@@ -98,7 +98,7 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 	}
 	isOwner := viewerID != "" && viewerID == r.OwnerID
 	isPublicScheduled := r.Status == model.StatusScheduled && !s.now().After(r.StartedAt.Add(30*time.Minute))
-	isPublicAppointmentStarting := r.Status == model.StatusPublishing && r.Category == "Scheduled" && s.now().Before(r.StartedAt.Add(30*time.Minute))
+	isPublicAppointmentStarting := r.Status == model.StatusPublishing && strings.HasPrefix(r.ID, "appt-") && s.now().Before(r.StartedAt.Add(30*time.Minute))
 	var replay *model.Replay
 	var replayVisible bool
 	if s.replay != nil && (r.Status == model.StatusEnded || isOwner) {

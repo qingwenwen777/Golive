@@ -409,6 +409,8 @@ export interface AppointmentItem {
   verified: boolean;
   title: string;
   description?: string;
+  category: string;
+  categoryJa?: string;
   cover: string;
   scheduledAt: string;
   status: 'scheduled' | 'live' | 'completed' | 'expired' | 'canceled' | string;
@@ -660,6 +662,7 @@ export interface AppointmentPayload {
   scheduledAt: string;
   title: string;
   description?: string;
+  category: string;
   cover?: string;
   channelName?: string;
   avatar?: string;

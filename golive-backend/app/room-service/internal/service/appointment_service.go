@@ -18,10 +18,12 @@ import (
 )
 
 const (
-	maxActiveAppointments = 5
-	startLead             = 30 * time.Minute
-	startGrace            = 30 * time.Minute
-	upcomingWindow        = 72 * time.Hour
+	maxActiveAppointments      = 5
+	startLead                  = 30 * time.Minute
+	startGrace                 = 30 * time.Minute
+	upcomingWindow             = 72 * time.Hour
+	defaultAppointmentCategory = "Just Chatting"
+	legacyAppointmentCategory  = "Scheduled"
 )
 
 type AppointmentService struct {
@@ -36,6 +38,7 @@ type AppointmentPayload struct {
 	ScheduledAt time.Time
 	Title       string
 	Description string
+	Category    string
 	Cover       string
 	ChannelName string
 	Avatar      string
@@ -51,6 +54,8 @@ type AppointmentDTO struct {
 	Verified         bool   `json:"verified"`
 	Title            string `json:"title"`
 	Description      string `json:"description,omitempty"`
+	Category         string `json:"category"`
+	CategoryJa       string `json:"categoryJa,omitempty"`
 	Cover            string `json:"cover"`
 	ScheduledAt      string `json:"scheduledAt"`
 	Status           string `json:"status"`
@@ -106,7 +111,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 		return nil, err
 	}
 	now := s.now()
-	title, description, cover, err := cleanAppointmentPayload(payload)
+	title, description, category, cover, err := cleanAppointmentPayload(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +140,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 		ID:          roomID,
 		Title:       title,
 		Description: description,
-		Category:    "Scheduled",
+		Category:    category,
 		Cover:       cover,
 		Channel:     channelName,
 		ChannelID:   channelID,
@@ -178,7 +183,7 @@ func (s *AppointmentService) Update(ctx context.Context, ownerID, id string, pay
 	if appt.Status != model.AppointmentScheduled {
 		return nil, errcode.New(409, "only scheduled appointments can be updated")
 	}
-	title, description, cover, err := cleanAppointmentPayload(payload)
+	title, description, category, cover, err := cleanAppointmentPayload(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +205,7 @@ func (s *AppointmentService) Update(ctx context.Context, ownerID, id string, pay
 		ID:          appt.RoomID,
 		Title:       title,
 		Description: description,
+		Category:    category,
 		Cover:       cover,
 		StartedAt:   payload.ScheduledAt,
 	}
@@ -601,9 +607,14 @@ func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Roo
 		dto.Channel = room.Channel
 		dto.Avatar = room.Avatar
 		dto.Verified = room.Verified
+		dto.Category = publicAppointmentCategory(room.Category)
+		dto.CategoryJa = room.CategoryJa
 		if dto.Cover == "" {
 			dto.Cover = room.Cover
 		}
+	}
+	if dto.Category == "" {
+		dto.Category = defaultAppointmentCategory
 	}
 	return dto
 }
@@ -719,20 +730,33 @@ func (s *AppointmentService) notificationActor(ctx context.Context, appt model.L
 	return actor
 }
 
-func cleanAppointmentPayload(payload AppointmentPayload) (string, string, string, error) {
+func cleanAppointmentPayload(payload AppointmentPayload) (string, string, string, string, error) {
 	title := trimRunes(strings.TrimSpace(payload.Title), 120)
 	if title == "" {
-		return "", "", "", errcode.New(400, "title is required")
+		return "", "", "", "", errcode.New(400, "title is required")
 	}
 	description := cleanDescription(payload.Description)
 	if description == "" {
-		return "", "", "", errcode.New(400, "description is required")
+		return "", "", "", "", errcode.New(400, "description is required")
 	}
+	category := cleanAppointmentCategory(payload.Category)
 	cover := trimRunes(strings.TrimSpace(payload.Cover), 500)
 	if cover == "" {
-		return "", "", "", errcode.New(400, "cover is required")
+		return "", "", "", "", errcode.New(400, "cover is required")
 	}
-	return title, description, cover, nil
+	return title, description, category, cover, nil
+}
+
+func cleanAppointmentCategory(raw string) string {
+	category := trimRunes(strings.TrimSpace(raw), 64)
+	if category == "" || strings.EqualFold(category, legacyAppointmentCategory) {
+		return defaultAppointmentCategory
+	}
+	return category
+}
+
+func publicAppointmentCategory(raw string) string {
+	return cleanAppointmentCategory(raw)
 }
 
 func notificationID(kind, appointmentID, userID string) string {

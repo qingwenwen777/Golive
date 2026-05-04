@@ -23,6 +23,7 @@ type appointmentReq struct {
 	ScheduledAt string `json:"scheduledAt" binding:"required"`
 	Title       string `json:"title" binding:"required"`
 	Description string `json:"description"`
+	Category    string `json:"category"`
 	Cover       string `json:"cover"`
 	ChannelName string `json:"channelName"`
 	Avatar      string `json:"avatar"`
@@ -229,6 +230,7 @@ func bindAppointmentPayload(c *gin.Context) (service.AppointmentPayload, bool) {
 		ScheduledAt: scheduledAt.UTC(),
 		Title:       req.Title,
 		Description: req.Description,
+		Category:    req.Category,
 		Cover:       req.Cover,
 		ChannelName: req.ChannelName,
 		Avatar:      req.Avatar,
