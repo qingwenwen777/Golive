@@ -76,6 +76,18 @@ func (h *AppointmentHandler) Cancel(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *AppointmentHandler) DeleteRecord(c *gin.Context) {
+	uid, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteRecord(c.Request.Context(), uid, c.Param("id")); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func (h *AppointmentHandler) Start(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {

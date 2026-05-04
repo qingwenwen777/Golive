@@ -69,6 +69,31 @@ func TestAppointmentCreateAndUpdatePersistCategory(t *testing.T) {
 	require.Equal(t, "Music", room.Category)
 }
 
+func TestAppointmentDeleteRecordRemovesOwnerRecordAndScheduledRoom(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newAppointmentServiceTestDeps(t)
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	created, err := svc.Create(ctx, "owner-delete-record", AppointmentPayload{
+		ScheduledAt: now.Add(2 * time.Hour),
+		Title:       "Delete me",
+		Description: "Remove this scheduled appointment from the studio list",
+		Category:    "Music",
+		Cover:       "/uploads/delete.jpg",
+		ChannelName: "Creator Channel",
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, svc.DeleteRecord(ctx, "owner-delete-record", created.ID))
+
+	resp, err := svc.ListOwner(ctx, "owner-delete-record", 1, 10)
+	require.NoError(t, err)
+	require.Zero(t, resp.Total)
+	_, err = svc.rooms.GetByID(ctx, created.RoomID)
+	require.Error(t, err)
+}
+
 func TestNotificationsBackfillActorFromLiveLinkAndProfile(t *testing.T) {
 	ctx := context.Background()
 	svc, db := newAppointmentServiceTestDeps(t)

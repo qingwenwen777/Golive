@@ -28,6 +28,7 @@ export interface AppointmentCardProps {
   onStart?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onDeleteRecord?: () => void;
   pending?: boolean;
   showChannel?: boolean;
   managementMode?: boolean;
@@ -43,6 +44,7 @@ export function AppointmentCard({
   onStart,
   onEdit,
   onDelete,
+  onDeleteRecord,
   pending = false,
   showChannel = true,
   managementMode = false,
@@ -162,14 +164,25 @@ export function AppointmentCard({
               <Pencil size={15} />
               {t('appointments.edit', { defaultValue: 'Edit' })}
             </button>
+            {appointment.status === 'scheduled' && (
+              <button
+                type="button"
+                className="gl-secondary-btn"
+                disabled={pending}
+                onClick={onDelete}
+              >
+                <X size={15} />
+                {t('appointments.cancelAppointment', { defaultValue: '取消预约' })}
+              </button>
+            )}
             <button
               type="button"
-              className="gl-secondary-btn"
-              disabled={pending}
-              onClick={onDelete}
+              className="gl-secondary-btn is-danger"
+              disabled={pending || appointment.status === 'live'}
+              onClick={onDeleteRecord}
             >
               <Trash2 size={15} />
-              {t('appointments.delete', { defaultValue: 'Delete' })}
+              {t('appointments.deleteRecord', { defaultValue: '彻底删除' })}
             </button>
           </>
         )}

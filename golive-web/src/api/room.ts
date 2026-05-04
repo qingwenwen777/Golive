@@ -709,6 +709,13 @@ export function useCancelAppointment(id: string) {
   );
 }
 
+export function useDeleteAppointmentRecord(id: string) {
+  return useAppointmentMutation<{ ok: boolean }>(
+    'delete',
+    `/rooms/appointments/${encodeURIComponent(id)}/record`,
+  );
+}
+
 export function useStartAppointment(id: string) {
   const qc = useQueryClient();
   return useMutation<Stream, Error, void>({

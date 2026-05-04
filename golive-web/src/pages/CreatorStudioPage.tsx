@@ -62,6 +62,7 @@ import {
   useCancelAppointment,
   useCreateAppointment,
   useCreatorAnalytics,
+  useDeleteAppointmentRecord,
   useGoLive,
   useRoom,
   useRooms,
@@ -1935,8 +1936,10 @@ function AppointmentStudioRow({
   const navigate = useNavigate();
   const startAppointment = useStartAppointment(item.id);
   const cancelAppointment = useCancelAppointment(item.id);
+  const deleteAppointmentRecord = useDeleteAppointmentRecord(item.id);
   const mutable = item.status === 'scheduled';
-  const pending = startAppointment.isPending || cancelAppointment.isPending;
+  const pending =
+    startAppointment.isPending || cancelAppointment.isPending || deleteAppointmentRecord.isPending;
 
   return (
     <AppointmentCard
@@ -1986,7 +1989,7 @@ function AppointmentStudioRow({
         cancelAppointment.mutate(undefined, {
           onSuccess: () => {
             toast.success(
-              t('studio.appointments.deleted', { defaultValue: 'Appointment deleted.' }),
+              t('studio.appointments.canceled', { defaultValue: 'Appointment canceled.' }),
             );
             onUpdated();
           },
@@ -1995,6 +1998,31 @@ function AppointmentStudioRow({
               err.message ||
                 t('studio.appointments.deleteFailed', {
                   defaultValue: 'Could not delete the appointment.',
+                }),
+            ),
+        });
+      }}
+      onDeleteRecord={() => {
+        const confirmed = window.confirm(
+          t('studio.appointments.deleteRecordConfirm', {
+            defaultValue: '确定要彻底删除这条预约记录吗？删除后它不会再出现在主播预约列表中。',
+          }),
+        );
+        if (!confirmed) return;
+        deleteAppointmentRecord.mutate(undefined, {
+          onSuccess: () => {
+            toast.success(
+              t('studio.appointments.recordDeleted', {
+                defaultValue: '预约记录已彻底删除。',
+              }),
+            );
+            onUpdated();
+          },
+          onError: (err) =>
+            toast.error(
+              err.message ||
+                t('studio.appointments.deleteRecordFailed', {
+                  defaultValue: '无法彻底删除这条预约记录。',
                 }),
             ),
         });

@@ -13,6 +13,7 @@ import (
 
 var ErrAppointmentNotFound = errors.New("appointment not found")
 var ErrAppointmentNotCancelable = errors.New("appointment cannot be cancelled")
+var ErrAppointmentNotDeletable = errors.New("appointment cannot be permanently deleted")
 
 const appointmentWindow = time.Hour
 
@@ -298,6 +299,37 @@ func (r *AppointmentRepo) Cancel(ctx context.Context, ownerID, appointmentID str
 	}
 	appt.Status = model.AppointmentCanceled
 	appt.EndedAt = &canceledAt
+	return &appt, nil
+}
+
+func (r *AppointmentRepo) DeleteRecord(ctx context.Context, ownerID, appointmentID string) (*model.LiveAppointment, error) {
+	var appt model.LiveAppointment
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("owner_id = ? AND id = ?", ownerID, appointmentID).Take(&appt).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrAppointmentNotFound
+			}
+			return err
+		}
+		if appt.Status == model.AppointmentLive {
+			return ErrAppointmentNotDeletable
+		}
+		if err := tx.Where("appointment_id = ?", appointmentID).Delete(&model.AppointmentReservation{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ? AND owner_id = ?", appointmentID, ownerID).Delete(&model.LiveAppointment{}).Error; err != nil {
+			return err
+		}
+		if appt.Status != model.AppointmentCompleted {
+			if err := tx.Where("id = ?", appt.RoomID).Delete(&model.Room{}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &appt, nil
 }
 

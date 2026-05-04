@@ -69,6 +69,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.GET("/appointments", auth, appointmentH.ListOwner)
 		rooms.POST("/appointments", auth, appointmentH.Create)
 		rooms.PATCH("/appointments/:id", auth, appointmentH.Update)
+		rooms.DELETE("/appointments/:id/record", auth, appointmentH.DeleteRecord)
 		rooms.DELETE("/appointments/:id", auth, appointmentH.Cancel)
 		rooms.POST("/appointments/:id/start", auth, appointmentH.Start)
 		rooms.POST("/appointments/:id/reservations", auth, appointmentH.Reserve)

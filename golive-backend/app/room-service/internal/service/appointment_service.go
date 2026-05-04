@@ -233,6 +233,23 @@ func (s *AppointmentService) Cancel(ctx context.Context, ownerID, id string) (*A
 	return s.dto(ctx, *appt, room, ownerID)
 }
 
+func (s *AppointmentService) DeleteRecord(ctx context.Context, ownerID, id string) error {
+	appt, err := s.appointments.DeleteRecord(ctx, ownerID, id)
+	if err != nil {
+		if errors.Is(err, repo.ErrAppointmentNotFound) {
+			return errcode.New(404, "appointment not found")
+		}
+		if errors.Is(err, repo.ErrAppointmentNotDeletable) {
+			return errcode.New(409, "live appointments cannot be permanently deleted")
+		}
+		return err
+	}
+	if s.live != nil {
+		_ = s.live.broadcastEnded(ctx, appt.RoomID, s.now())
+	}
+	return nil
+}
+
 func (s *AppointmentService) ListOwner(ctx context.Context, ownerID string, page, size int) (*AppointmentListResp, error) {
 	if err := s.cleanupExpired(ctx); err != nil {
 		return nil, err
