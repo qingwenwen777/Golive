@@ -88,12 +88,6 @@
   object-fit: contain;
   display: block;
 }
-
-.gl-cloudflare-frame {
-  border: 0;
-  background: #000;
-}
-
 .gl-player:fullscreen {
   width: 100vw;
   height: 100vh;

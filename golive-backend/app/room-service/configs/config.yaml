@@ -22,15 +22,7 @@ live:
   # HMAC key for stream key generation. Different from JWT secret.
   stream_key_secret: "dev-stream-key-secret-change-me"
   stream_key_ttl: 4h
-  rtmp_base: "rtmp://localhost/live"
   flv_base: "http://localhost:8082/live"
-
-cloudflare:
-  account_id: ""
-  stream_token: ""
-  api_base: "https://api.cloudflare.com/client/v4"
-  recording_mode: "off"
-  http_timeout: 15s
 
 replay:
   record_dir: "./records"

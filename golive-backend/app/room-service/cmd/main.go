@@ -75,18 +75,10 @@ func main() {
 	}
 	socialRepo := repo.NewSocialRepo(rdb)
 	liveRepo := repo.NewLiveRepo(rdb)
-	cloudflareStream := service.NewCloudflareStreamClient(service.CloudflareStreamConfig{
-		AccountID:     cfg.Cloudflare.AccountID,
-		StreamToken:   cfg.Cloudflare.StreamToken,
-		APIBase:       cfg.Cloudflare.APIBase,
-		RecordingMode: cfg.Cloudflare.RecordingMode,
-		HTTPTimeout:   cfg.Cloudflare.HTTPTimeout,
-	})
 
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase, socialRepo)
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
-	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase, cloudflareStream)
-	liveSvc.SetRTMPBase(cfg.Live.RTMPBase)
+	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 	replaySvc := service.NewReplayService(roomRepo, socialRepo, service.ReplayConfig{
 		RecordDir:       cfg.Replay.RecordDir,
 		BunnyLibraryID:  cfg.Replay.BunnyLibraryID,

@@ -1,5 +1,0 @@
-# Local secrets and machine-specific environment files.
-**/.env
-**/.env.local
-**/.env.*.local
-!**/.env.example

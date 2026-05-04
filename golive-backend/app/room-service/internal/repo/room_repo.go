@@ -210,7 +210,6 @@ func (r *RoomRepo) Upsert(ctx context.Context, room *model.Room) error {
 			"title", "title_ja", "description", "category", "category_ja", "cover",
 			"viewers", "peak_viewers", "started_at", "status", "ended_at", "updated_at",
 			"stream_key", "owner_id", "channel", "channel_id", "avatar",
-			"stream_provider", "stream_input_id", "stream_rtmp_server", "stream_playback_url",
 			"replay_upload_enabled", "replay_status", "replay_visibility",
 			"replay_bunny_video_id", "replay_bunny_library_id", "replay_error",
 			"replay_uploaded_at", "replay_deleted_at",

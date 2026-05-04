@@ -118,21 +118,6 @@ function buildFlvUrl(stream: Stream): string {
   return '';
 }
 
-function cloudflareEmbedUrl(stream: Stream): string {
-  const source = stream.playbackUrl || '';
-  if (!source.includes('cloudflarestream.com') && !source.includes('videodelivery.net')) return '';
-  try {
-    const url = new URL(source, window.location.origin);
-    if (url.hostname === 'iframe.videodelivery.net') return url.href;
-    if (/\/iframe(?:[?#].*)?$/i.test(url.pathname)) return url.href;
-    const id = url.pathname.split('/').filter(Boolean)[0];
-    if (!id) return '';
-    return `${url.origin}/${id}/iframe`;
-  } catch {
-    return '';
-  }
-}
-
 export function Player({
   stream,
   videoSrc,
@@ -165,9 +150,7 @@ export function Player({
   const setDanmuFontSize = useDanmuStore((s) => s.setFontSize);
 
   const flvUrl = buildFlvUrl(stream);
-  const cloudflareUrl = cloudflareEmbedUrl(stream);
-  const isCloudflarePlayer = !!cloudflareUrl && stream.isLive !== false;
-  const isLiveFlv = !!flvUrl && !isCloudflarePlayer && stream.isLive !== false;
+  const isLiveFlv = !!flvUrl && stream.isLive !== false;
   const fallbackSrc = videoSrc ?? DEFAULT_VIDEO_SRC;
 
   const [flvError, setFlvError] = useState<string | null>(null);
@@ -685,27 +668,17 @@ export function Player({
       onTouchStart={showControlsTemporarily}
       onFocusCapture={showControlsTemporarily}
     >
-      {isCloudflarePlayer ? (
-        <iframe
-          className="gl-video gl-cloudflare-frame"
-          src={cloudflareUrl}
-          allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-          title={stream.title}
-        />
-      ) : (
-        <video
-          ref={videoRef}
-          className="gl-video"
-          src={isLiveFlv ? undefined : fallbackSrc}
-          autoPlay
-          muted={muted}
-          playsInline
-          preload="auto"
-          loop={!isLiveFlv}
-          controls={false}
-        />
-      )}
+      <video
+        ref={videoRef}
+        className="gl-video"
+        src={isLiveFlv ? undefined : fallbackSrc}
+        autoPlay
+        muted={muted}
+        playsInline
+        preload="auto"
+        loop={!isLiveFlv}
+        controls={false}
+      />
 
       <div className="gl-player-top">
         <span className="gl-player-title">{stream.title}</span>
@@ -763,113 +736,111 @@ export function Player({
         </div>
       )}
 
-      {!isCloudflarePlayer && (
-        <div
-          className={cn('gl-player-ctl', controlsVisible && 'is-on')}
-          onPointerDown={showControlsTemporarily}
-        >
-          <div className="gl-progress" aria-label={t('player.liveProgress')}>
-            <div className="gl-progress-fill" style={{ width: '100%' }} />
-          </div>
-          <div className="gl-ctl-row">
+      <div
+        className={cn('gl-player-ctl', controlsVisible && 'is-on')}
+        onPointerDown={showControlsTemporarily}
+      >
+        <div className="gl-progress" aria-label={t('player.liveProgress')}>
+          <div className="gl-progress-fill" style={{ width: '100%' }} />
+        </div>
+        <div className="gl-ctl-row">
+          <button
+            className="gl-pbtn"
+            onClick={togglePlay}
+            aria-label={playing ? t('player.pause') : t('player.play')}
+          >
+            {playing ? <Pause size={20} /> : <Play size={20} />}
+          </button>
+          <div className="gl-vol-wrap">
             <button
               className="gl-pbtn"
-              onClick={togglePlay}
-              aria-label={playing ? t('player.pause') : t('player.play')}
+              onClick={toggleMute}
+              aria-label={muted ? t('player.unmute') : t('player.mute')}
+              aria-pressed={muted}
             >
-              {playing ? <Pause size={20} /> : <Play size={20} />}
+              {muted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
             </button>
-            <div className="gl-vol-wrap">
+            <div className="gl-vol">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={muted ? 0 : volume}
+                onChange={(e) => changeVolume(Number(e.target.value))}
+                aria-label={t('player.volume')}
+              />
+            </div>
+          </div>
+          <button className="gl-ctl-live" onClick={jumpToLive} aria-label={t('player.jumpLive')}>
+            <span className="gl-live-dot-red" aria-hidden="true" />
+            <span className="gl-live-word">{t('player.live')}</span>
+          </button>
+          <div className="gl-ctl-spacer" />
+          <button
+            className="gl-pbtn"
+            onClick={toggleDanmu}
+            aria-label={t('player.toggleDanmu')}
+            aria-pressed={danmuOn}
+            title={danmuOn ? t('player.danmuOn') : t('player.danmuOff')}
+          >
+            {danmuOn ? <MessagesSquare size={20} /> : <MessageSquareOff size={20} />}
+          </button>
+          <DropdownMenu
+            onOpenChange={(open) => {
+              if (open) showControlsTemporarily();
+            }}
+          >
+            <DropdownMenuTrigger asChild>
               <button
                 className="gl-pbtn"
-                onClick={toggleMute}
-                aria-label={muted ? t('player.unmute') : t('player.mute')}
-                aria-pressed={muted}
+                aria-label={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+                title={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
               >
-                {muted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                <Type size={20} />
               </button>
-              <div className="gl-vol">
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={muted ? 0 : volume}
-                  onChange={(e) => changeVolume(Number(e.target.value))}
-                  aria-label={t('player.volume')}
-                />
-              </div>
-            </div>
-            <button className="gl-ctl-live" onClick={jumpToLive} aria-label={t('player.jumpLive')}>
-              <span className="gl-live-dot-red" aria-hidden="true" />
-              <span className="gl-live-word">{t('player.live')}</span>
-            </button>
-            <div className="gl-ctl-spacer" />
-            <button
-              className="gl-pbtn"
-              onClick={toggleDanmu}
-              aria-label={t('player.toggleDanmu')}
-              aria-pressed={danmuOn}
-              title={danmuOn ? t('player.danmuOn') : t('player.danmuOff')}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              side="top"
+              className="w-36"
+              container={menuPortalContainer}
             >
-              {danmuOn ? <MessagesSquare size={20} /> : <MessageSquareOff size={20} />}
-            </button>
-            <DropdownMenu
-              onOpenChange={(open) => {
-                if (open) showControlsTemporarily();
-              }}
-            >
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="gl-pbtn"
-                  aria-label={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
-                  title={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
-                >
-                  <Type size={20} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                side="top"
-                className="w-36"
-                container={menuPortalContainer}
+              <DropdownMenuLabel>
+                {t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={danmuFontSize}
+                onValueChange={(value) => setDanmuFontSize(value as DanmuFontSize)}
               >
-                <DropdownMenuLabel>
-                  {t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
-                </DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={danmuFontSize}
-                  onValueChange={(value) => setDanmuFontSize(value as DanmuFontSize)}
-                >
-                  {DANMU_FONT_OPTIONS.map((option) => (
-                    <DropdownMenuRadioItem key={option.value} value={option.value}>
-                      {t(`player.danmuFontSize.${option.value}`, {
-                        defaultValue: option.label,
-                      })}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <button
-              className="gl-pbtn"
-              onClick={togglePip}
-              aria-label={t('player.pip')}
-              aria-pressed={pip}
-            >
-              <PictureInPicture size={20} />
-            </button>
-            <button
-              className="gl-pbtn"
-              onClick={toggleFullscreen}
-              aria-label={fullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
-              aria-pressed={fullscreen}
-            >
-              {fullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-            </button>
-          </div>
+                {DANMU_FONT_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem key={option.value} value={option.value}>
+                    {t(`player.danmuFontSize.${option.value}`, {
+                      defaultValue: option.label,
+                    })}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button
+            className="gl-pbtn"
+            onClick={togglePip}
+            aria-label={t('player.pip')}
+            aria-pressed={pip}
+          >
+            <PictureInPicture size={20} />
+          </button>
+          <button
+            className="gl-pbtn"
+            onClick={toggleFullscreen}
+            aria-label={fullscreen ? t('player.exitFullscreen') : t('player.fullscreen')}
+            aria-pressed={fullscreen}
+          >
+            {fullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

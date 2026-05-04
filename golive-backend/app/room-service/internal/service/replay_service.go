@@ -93,9 +93,6 @@ func (s *ReplayService) UpdateActiveSettings(ctx context.Context, ownerID string
 	if err != nil {
 		return nil, err
 	}
-	if room.StreamProvider == model.StreamProviderCloudflare && req.UploadAfterEnd {
-		return nil, errcode.New(http.StatusConflict, "Bunny replay upload is not available for Cloudflare live sessions yet").WithReason("cloudflare_live_replay_unavailable")
-	}
 	visibility := normalizeReplayVisibility(req.Visibility)
 	status := room.ReplayStatus
 	if status == "" || status == model.ReplayStatusDeleted {

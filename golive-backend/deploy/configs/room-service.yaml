@@ -20,15 +20,7 @@ jwt:
 live:
   stream_key_secret: "golive-1718011198-stream-key-0e49b7c2a65d4391bd8f"
   stream_key_ttl: 4h
-  rtmp_base: "rtmp://154.36.185.85/live"
   flv_base: "https://golive.us.ci/live"
-
-cloudflare:
-  account_id: ""
-  stream_token: ""
-  api_base: "https://api.cloudflare.com/client/v4"
-  recording_mode: "off"
-  http_timeout: 15s
 
 replay:
   record_dir: "/tmp/golive/records"

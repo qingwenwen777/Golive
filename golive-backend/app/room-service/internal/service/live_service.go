@@ -27,10 +27,8 @@ type LiveService struct {
 	appointments   *repo.AppointmentRepo
 	moderation     *repo.ModerationRepo
 	replay         *ReplayService
-	cloudflare     *CloudflareStreamClient
 	keySecret      []byte
 	keyTTL         time.Duration
-	rtmpBase       string
 	flvBase        string
 	unpublishGrace time.Duration
 	now            func() time.Time
@@ -51,31 +49,18 @@ type liveMetadataMsg struct {
 	Ts          int64  `json:"ts"`
 }
 
-func NewLiveService(rooms *repo.RoomRepo, live *repo.LiveRepo, secret string, ttl time.Duration, flvBase string, cloudflare ...*CloudflareStreamClient) *LiveService {
+func NewLiveService(rooms *repo.RoomRepo, live *repo.LiveRepo, secret string, ttl time.Duration, flvBase string) *LiveService {
 	if flvBase == "" {
 		flvBase = "http://localhost:8082/live"
-	}
-	var cf *CloudflareStreamClient
-	if len(cloudflare) > 0 && cloudflare[0] != nil && cloudflare[0].Enabled() {
-		cf = cloudflare[0]
 	}
 	return &LiveService{
 		rooms:          rooms,
 		live:           live,
-		cloudflare:     cf,
 		keySecret:      []byte(secret),
 		keyTTL:         ttl,
-		rtmpBase:       "rtmp://localhost/live",
 		flvBase:        strings.TrimRight(flvBase, "/"),
 		unpublishGrace: 20 * time.Second,
 		now:            time.Now,
-	}
-}
-
-func (s *LiveService) SetRTMPBase(rtmpBase string) {
-	rtmpBase = strings.TrimSpace(rtmpBase)
-	if rtmpBase != "" {
-		s.rtmpBase = strings.TrimRight(rtmpBase, "/")
 	}
 }
 
@@ -89,15 +74,6 @@ func (s *LiveService) SetModerationRepo(moderation *repo.ModerationRepo) {
 
 func (s *LiveService) SetReplayService(replay *ReplayService) {
 	s.replay = replay
-}
-
-type provisionedStreamInput struct {
-	provider      string
-	initialStatus string
-	inputID       string
-	rtmpServer    string
-	streamKey     string
-	playbackURL   string
 }
 
 // GoLiveReq is the body of POST /rooms/live.
@@ -136,7 +112,6 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 			_ = s.live.Delete(ctx, active.StreamKey)
 			_ = s.live.DeletePublishSession(ctx, active.StreamKey)
 		}
-		_ = s.releaseStreamInput(ctx, active)
 		_ = s.broadcastEnded(ctx, active.ID, now)
 	} else if !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
@@ -146,10 +121,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	channelID := "ch-" + ownerID
 	ownerName := cleanDisplayName(req.ChannelName, ownerID)
 
-	streamInput, err := s.provisionStreamInput(ctx, roomID, ownerID, ownerName, strings.TrimSpace(req.Title), now)
-	if err != nil {
-		return nil, err
-	}
+	streamKey := s.generateKey(roomID, ownerID, now)
 
 	room := &model.Room{
 		ID:                  roomID,
@@ -164,13 +136,9 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		Viewers:             0,
 		PeakViewers:         0,
 		StartedAt:           now,
-		Status:              streamInput.initialStatus,
+		Status:              model.StatusPublishing,
 		OwnerID:             ownerID,
-		StreamKey:           streamInput.streamKey,
-		StreamProvider:      streamInput.provider,
-		StreamInputID:       streamInput.inputID,
-		StreamRTMPServer:    streamInput.rtmpServer,
-		StreamPlaybackURL:   streamInput.playbackURL,
+		StreamKey:           streamKey,
 		ReplayUploadEnabled: false,
 		ReplayStatus:        model.ReplayStatusNone,
 		ReplayVisibility:    model.PostVisibilityPublic,
@@ -178,10 +146,8 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	if err := s.rooms.Upsert(ctx, room); err != nil {
 		return nil, err
 	}
-	if streamInput.provider == model.StreamProviderSRS && streamInput.streamKey != "" {
-		if err := s.live.Save(ctx, streamInput.streamKey, roomID, s.keyTTL); err != nil {
-			return nil, err
-		}
+	if err := s.live.Save(ctx, streamKey, roomID, s.keyTTL); err != nil {
+		return nil, err
 	}
 	if s.moderation != nil {
 		if err := s.moderation.SyncRoomModerators(ctx, room.ID, ownerID); err != nil {
@@ -190,53 +156,15 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	}
 
 	st := room.ToStream(now)
-	st.PlaybackURL = s.playbackURL(room)
-	st.StreamKey = streamInput.streamKey
-	st.RTMPServer = streamInput.rtmpServer
+	st.StreamKey = streamKey
 	return &st, nil
 }
 
 func (s *LiveService) playbackURL(r *model.Room) string {
-	if r != nil && r.StreamPlaybackURL != "" && (r.Status == model.StatusLive || r.Status == model.StatusPublishing) {
-		return r.StreamPlaybackURL
-	}
 	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
 		return ""
 	}
 	return s.flvBase + "/" + r.StreamKey + ".flv"
-}
-
-func (s *LiveService) provisionStreamInput(ctx context.Context, roomID, ownerID, channelName, title string, now time.Time) (provisionedStreamInput, error) {
-	if s.cloudflare != nil && s.cloudflare.Enabled() {
-		input, err := s.cloudflare.CreateLiveInput(ctx, fmt.Sprintf("%s - %s", channelName, title))
-		if err != nil {
-			return provisionedStreamInput{}, errcode.New(502, "Cloudflare Stream live input creation failed")
-		}
-		return provisionedStreamInput{
-			provider:      model.StreamProviderCloudflare,
-			initialStatus: model.StatusLive,
-			inputID:       input.UID,
-			rtmpServer:    input.RTMPServer,
-			streamKey:     input.StreamKey,
-			playbackURL:   input.PlaybackURL,
-		}, nil
-	}
-	return provisionedStreamInput{
-		provider:      model.StreamProviderSRS,
-		initialStatus: model.StatusPublishing,
-		rtmpServer:    s.rtmpBase,
-		streamKey:     s.generateKey(roomID, ownerID, now),
-	}, nil
-}
-
-func (s *LiveService) releaseStreamInput(ctx context.Context, room *model.Room) error {
-	if room == nil || room.StreamProvider != model.StreamProviderCloudflare || room.StreamInputID == "" {
-		return nil
-	}
-	if s.cloudflare == nil || !s.cloudflare.Enabled() {
-		return nil
-	}
-	return s.cloudflare.DeleteLiveInput(ctx, room.StreamInputID)
 }
 
 // UpdateLiveMetadata changes the active live room's public metadata without
@@ -267,7 +195,6 @@ func (s *LiveService) UpdateLiveMetadata(ctx context.Context, ownerID string, re
 	st := room.ToStream(now)
 	st.PlaybackURL = s.playbackURL(room)
 	st.StreamKey = room.StreamKey
-	st.RTMPServer = room.StreamRTMPServer
 	_ = s.broadcastRoomUpdated(ctx, room, now)
 	return &st, nil
 }
@@ -333,7 +260,7 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 		if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
 			return err
 		}
-		if s.replay != nil && room.StreamProvider != model.StreamProviderCloudflare {
+		if s.replay != nil {
 			s.replay.EnqueueUpload(ctx, room)
 		}
 		if room.StreamKey != "" {
@@ -344,7 +271,6 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 				return err
 			}
 		}
-		_ = s.releaseStreamInput(ctx, &room)
 	}
 	return nil
 }
@@ -511,17 +437,13 @@ func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID, 
 	if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
 		return err
 	}
-	if s.replay != nil && room.StreamProvider != model.StreamProviderCloudflare {
+	if s.replay != nil {
 		s.replay.EnqueueUpload(ctx, *room)
 	}
 	if err := s.live.DeletePublishSession(ctx, streamKey); err != nil {
 		return err
 	}
-	if err := s.live.Delete(ctx, streamKey); err != nil {
-		return err
-	}
-	_ = s.releaseStreamInput(ctx, room)
-	return nil
+	return s.live.Delete(ctx, streamKey)
 }
 
 func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt time.Time) error {
@@ -547,7 +469,7 @@ func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt tim
 			return err
 		}
 	}
-	if s.replay != nil && room.StreamProvider != model.StreamProviderCloudflare && room.ReplayUploadEnabled && normalizeReplayStatus(room.ReplayStatus) == model.ReplayStatusNone {
+	if s.replay != nil && room.ReplayUploadEnabled && normalizeReplayStatus(room.ReplayStatus) == model.ReplayStatusNone {
 		if err := s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, ""); err != nil {
 			return err
 		}
