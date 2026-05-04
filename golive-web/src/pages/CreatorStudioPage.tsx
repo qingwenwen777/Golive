@@ -132,6 +132,8 @@ function mergeStreamSnapshot(
     ...directoryStream,
     ownerId: roomStream.ownerId ?? directoryStream.ownerId,
     streamKey: roomStream.streamKey ?? directoryStream.streamKey,
+    rtmpServer: roomStream.rtmpServer ?? directoryStream.rtmpServer,
+    provider: roomStream.provider ?? directoryStream.provider,
     playbackUrl: directoryStream.playbackUrl ?? roomStream.playbackUrl,
     isLive: true,
     status: directoryStream.status ?? 'live',

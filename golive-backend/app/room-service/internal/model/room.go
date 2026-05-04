@@ -16,6 +16,12 @@ const (
 	StatusCanceled   = "canceled"
 )
 
+// Stream provider values for Room.StreamProvider.
+const (
+	StreamProviderSRS        = "srs"
+	StreamProviderCloudflare = "cloudflare"
+)
+
 // Replay status values for Room.ReplayStatus.
 const (
 	ReplayStatusNone       = "none"
@@ -47,6 +53,10 @@ type Room struct {
 	Status               string    `gorm:"type:varchar(16);not null;default:'live';index"`
 	OwnerID              string    `gorm:"type:varchar(36);index"`
 	StreamKey            string    `gorm:"type:varchar(128);index"`
+	StreamProvider       string    `gorm:"type:varchar(24);not null;default:'srs';index"`
+	StreamInputID        string    `gorm:"type:varchar(128);index"`
+	StreamRTMPServer     string    `gorm:"type:varchar(500)"`
+	StreamPlaybackURL    string    `gorm:"type:varchar(500)"`
 	ReplayUploadEnabled  bool      `gorm:"not null;default:false"`
 	ReplayStatus         string    `gorm:"type:varchar(20);not null;default:'none';index"`
 	ReplayVisibility     string    `gorm:"type:varchar(16);not null;default:'public';index"`
@@ -86,6 +96,8 @@ type Stream struct {
 	OwnerID         string  `json:"ownerId,omitempty"`
 	PlaybackURL     string  `json:"playbackUrl,omitempty"`
 	StreamKey       string  `json:"streamKey,omitempty"`
+	RTMPServer      string  `json:"rtmpServer,omitempty"`
+	Provider        string  `json:"provider,omitempty"`
 	Status          string  `json:"status,omitempty"`
 	SubscriberCount int64   `json:"subscriberCount"`
 	Replay          *Replay `json:"replay,omitempty"`
@@ -136,6 +148,7 @@ func (r *Room) ToStream(now time.Time) Stream {
 		EndedAt:     endedAt,
 		IsLive:      r.Status == StatusLive,
 		OwnerID:     r.OwnerID,
+		Provider:    r.StreamProvider,
 		Status:      r.Status,
 	}
 	return st

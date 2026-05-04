@@ -21,6 +21,8 @@ export interface Stream {
   ownerId?: string;
   playbackUrl?: string;
   streamKey?: string;
+  rtmpServer?: string;
+  provider?: string;
   status?:
     | 'scheduled'
     | 'publishing'

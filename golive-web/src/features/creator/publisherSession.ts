@@ -8,18 +8,24 @@ export interface PublisherSession {
   ownerId?: string;
   playbackUrl?: string;
   rtmpServer: string;
+  provider?: string;
   createdAt: string;
 }
 
 export function publisherSessionFromStream(stream: Stream): PublisherSession | null {
   if (!stream.streamKey) return null;
-  const rtmpServer = (import.meta.env.VITE_RTMP_BASE || 'rtmp://localhost/live').replace(/\/$/, '');
+  const rtmpServer = (
+    stream.rtmpServer ||
+    import.meta.env.VITE_RTMP_BASE ||
+    'rtmp://localhost/live'
+  ).replace(/\/$/, '');
   return {
     streamId: stream.id,
     streamKey: stream.streamKey,
     ownerId: stream.ownerId,
     playbackUrl: stream.playbackUrl,
     rtmpServer,
+    provider: stream.provider,
     createdAt: new Date().toISOString(),
   };
 }

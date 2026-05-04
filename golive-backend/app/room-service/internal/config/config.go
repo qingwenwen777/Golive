@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	Service ServiceCfg `mapstructure:"service"`
-	MySQL   MySQLCfg   `mapstructure:"mysql"`
-	Redis   RedisCfg   `mapstructure:"redis"`
-	JWT     JWTCfg     `mapstructure:"jwt"`
-	Live    LiveCfg    `mapstructure:"live"`
-	Replay  ReplayCfg  `mapstructure:"replay"`
-	Upload  UploadCfg  `mapstructure:"upload"`
-	Users   UsersCfg   `mapstructure:"users"`
+	Service    ServiceCfg    `mapstructure:"service"`
+	MySQL      MySQLCfg      `mapstructure:"mysql"`
+	Redis      RedisCfg      `mapstructure:"redis"`
+	JWT        JWTCfg        `mapstructure:"jwt"`
+	Live       LiveCfg       `mapstructure:"live"`
+	Cloudflare CloudflareCfg `mapstructure:"cloudflare"`
+	Replay     ReplayCfg     `mapstructure:"replay"`
+	Upload     UploadCfg     `mapstructure:"upload"`
+	Users      UsersCfg      `mapstructure:"users"`
 }
 
 type ServiceCfg struct {
@@ -45,9 +46,20 @@ type JWTCfg struct {
 type LiveCfg struct {
 	StreamKeySecret string        `mapstructure:"stream_key_secret"`
 	StreamKeyTTL    time.Duration `mapstructure:"stream_key_ttl"`
+	// RTMPBase is the public SRS publish URL prefix for OBS, for example
+	// "rtmp://154.36.185.85/live".
+	RTMPBase string `mapstructure:"rtmp_base"`
 	// FlvBase is the public HTTP-FLV URL prefix (e.g.
 	// "http://localhost:8082/live"). Stream IDs/keys are appended with ".flv".
 	FlvBase string `mapstructure:"flv_base"`
+}
+
+type CloudflareCfg struct {
+	AccountID     string        `mapstructure:"account_id"`
+	StreamToken   string        `mapstructure:"stream_token"`
+	APIBase       string        `mapstructure:"api_base"`
+	RecordingMode string        `mapstructure:"recording_mode"`
+	HTTPTimeout   time.Duration `mapstructure:"http_timeout"`
 }
 
 type ReplayCfg struct {
@@ -86,6 +98,8 @@ func Load(path string) (*Config, error) {
 	v.AutomaticEnv()
 	_ = v.BindEnv("replay.bunny_library_id")
 	_ = v.BindEnv("replay.bunny_api_key")
+	_ = v.BindEnv("cloudflare.account_id")
+	_ = v.BindEnv("cloudflare.stream_token")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

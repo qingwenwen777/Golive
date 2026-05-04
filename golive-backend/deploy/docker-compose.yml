@@ -106,6 +106,8 @@ services:
       GOPROXY: https://goproxy.cn,direct
       ROOMSVC_REPLAY_BUNNY_LIBRARY_ID: ${BUNNY_STREAM_LIBRARY_ID:-}
       ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
+      ROOMSVC_CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      ROOMSVC_CLOUDFLARE_STREAM_TOKEN: ${CLOUDFLARE_STREAM_TOKEN:-}
     depends_on:
       mysql:
         condition: service_healthy

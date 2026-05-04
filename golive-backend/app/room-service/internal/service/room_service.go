@@ -39,6 +39,9 @@ func (s *RoomService) SetReplayService(replay *ReplayService) {
 // playbackURL builds the public HTTP-FLV URL for a live room. Viewers receive
 // this; the raw streamKey stays server-side.
 func (s *RoomService) playbackURL(r *model.Room) string {
+	if r != nil && r.StreamPlaybackURL != "" && (r.Status == model.StatusLive || r.Status == model.StatusPublishing) {
+		return r.StreamPlaybackURL
+	}
 	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
 		return ""
 	}
@@ -122,6 +125,7 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 	}
 	if isOwner {
 		st.StreamKey = r.StreamKey
+		st.RTMPServer = r.StreamRTMPServer
 	}
 	return &st, nil
 }

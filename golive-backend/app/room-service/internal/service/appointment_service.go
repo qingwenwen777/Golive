@@ -373,24 +373,35 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 			_ = s.live.live.Delete(ctx, active.StreamKey)
 			_ = s.live.live.DeletePublishSession(ctx, active.StreamKey)
 		}
+		_ = s.live.releaseStreamInput(ctx, active)
 		_ = s.live.broadcastEnded(ctx, active.ID, now)
 	} else if err != nil && !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
 	}
 
-	streamKey := s.live.generateKey(room.ID, ownerID, now)
+	ownerName := cleanDisplayName(room.Channel, ownerID)
+	streamInput, err := s.live.provisionStreamInput(ctx, room.ID, ownerID, ownerName, appt.Title, now)
+	if err != nil {
+		return nil, err
+	}
 	room.Title = appt.Title
 	room.Description = appt.Description
 	room.Cover = appt.Cover
 	room.StartedAt = now
-	room.Status = model.StatusPublishing
-	room.StreamKey = streamKey
+	room.Status = streamInput.initialStatus
+	room.StreamKey = streamInput.streamKey
+	room.StreamProvider = streamInput.provider
+	room.StreamInputID = streamInput.inputID
+	room.StreamRTMPServer = streamInput.rtmpServer
+	room.StreamPlaybackURL = streamInput.playbackURL
 	room.EndedAt = nil
 	if err := s.rooms.Upsert(ctx, room); err != nil {
 		return nil, err
 	}
-	if err := s.live.live.Save(ctx, streamKey, room.ID, s.live.keyTTL); err != nil {
-		return nil, err
+	if streamInput.provider == model.StreamProviderSRS && streamInput.streamKey != "" {
+		if err := s.live.live.Save(ctx, streamInput.streamKey, room.ID, s.live.keyTTL); err != nil {
+			return nil, err
+		}
 	}
 	if s.live.moderation != nil {
 		if err := s.live.moderation.SyncRoomModerators(ctx, room.ID, ownerID); err != nil {
@@ -404,7 +415,9 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 		logger.L().Warn("notify appointment start", zap.Error(err), zap.String("appointment", appt.ID))
 	}
 	st := room.ToStream(now)
-	st.StreamKey = streamKey
+	st.PlaybackURL = s.live.playbackURL(room)
+	st.StreamKey = streamInput.streamKey
+	st.RTMPServer = streamInput.rtmpServer
 	return &st, nil
 }
 
