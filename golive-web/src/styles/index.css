@@ -1992,7 +1992,8 @@ input:focus-visible,
   z-index: 1;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center center;
 }
 .gl-history-thumb .gl-loadable-img,
 .gl-history-cover .gl-loadable-img,
@@ -2499,7 +2500,8 @@ input:focus-visible,
 .gl-home-replay-cover .gl-loadable-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center center;
 }
 .gl-home-replay-cover > span {
   color: var(--gl-text-2);
@@ -9685,7 +9687,8 @@ button.gl-fan-badge-empty {
 .gl-appointment-cover img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center center;
 }
 
 .gl-appointment-cover > span {

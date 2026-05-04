@@ -137,7 +137,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             alt=""
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
-            className="absolute inset-0 h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : null}
         <div className="gl-card-gloss" />
