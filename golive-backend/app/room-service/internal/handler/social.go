@@ -54,7 +54,7 @@ func (h *SocialHandler) ListSubscriptions(c *gin.Context) {
 
 func (h *SocialHandler) RecommendedCreators(c *gin.Context) {
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "8"))
-	resp, err := h.svc.RecommendedCreators(c.Request.Context(), UserIDFromCtx(c), size)
+	resp, err := h.svc.RecommendedCreators(c.Request.Context(), UserIDFromCtx(c), size, c.Query("category"))
 	if err != nil {
 		errcode.Respond(c, err)
 		return

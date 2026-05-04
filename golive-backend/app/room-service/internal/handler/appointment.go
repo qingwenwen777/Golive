@@ -141,7 +141,7 @@ func (h *AppointmentHandler) ListSubscriptionAppointments(c *gin.Context) {
 
 func (h *AppointmentHandler) ListUpcoming(c *gin.Context) {
 	page, size := pageSize(c, 1, 100)
-	resp, err := h.svc.ListUpcoming(c.Request.Context(), UserIDFromCtx(c), page, size)
+	resp, err := h.svc.ListUpcoming(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

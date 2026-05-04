@@ -122,7 +122,7 @@ func TestHotReplaysRanksWatchableRecentReplays(t *testing.T) {
 	require.NoError(t, social.SeedLikeCount(ctx, "replay-private", 100))
 	require.NoError(t, seedHotReplayMetrics(db))
 
-	resp, err := svc.HotReplays(ctx, "", 3, 3)
+	resp, err := svc.HotReplays(ctx, "", "", 3, 3)
 	require.NoError(t, err)
 	require.Equal(t, int64(4), resp.Total)
 	require.Len(t, resp.Items, 3)

@@ -32,7 +32,7 @@ import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
-import { useLike, useLikeState, useRoom, useStopLive } from '@/api/room';
+import { useLike, useLikeState, useRecordRoomWatch, useRoom, useStopLive } from '@/api/room';
 import { useReplayMessages } from '@/api/chat';
 import { useLatestBet } from '@/api/bet';
 import {
@@ -111,6 +111,7 @@ export default function LiveRoomPage() {
   const stopLive = useStopLive();
   const liveEndedRef = useRef(false);
   const endTransitionTimerRef = useRef<number | null>(null);
+  const recordedWatchKeyRef = useRef('');
   const [endTransition, setEndTransition] = useState<{
     stream: Stream;
     startedAt: number;
@@ -135,6 +136,7 @@ export default function LiveRoomPage() {
   );
   const roomId = stream?.id ?? id;
   const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
+  const recordRoomWatch = useRecordRoomWatch(roomId);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
   const roomIsStarting = Boolean(stream?.status === 'publishing' && !roomIsLive);
   const roomIsReplay = Boolean(
@@ -351,6 +353,18 @@ export default function LiveRoomPage() {
     if (!stream || (!roomIsLive && !roomIsReplay)) return;
     saveToLibrary(WATCH_HISTORY_KEY, stream, 'watchedAt');
   }, [roomIsLive, roomIsReplay, stream]);
+
+  useEffect(() => {
+    if (!isAuthed || !currentUser?.id || !stream || (!roomIsLive && !roomIsReplay)) return;
+    const key = `${currentUser.id}:${stream.id}`;
+    if (recordedWatchKeyRef.current === key) return;
+    recordedWatchKeyRef.current = key;
+    recordRoomWatch.mutate(undefined, {
+      onError: () => {
+        recordedWatchKeyRef.current = '';
+      },
+    });
+  }, [currentUser?.id, isAuthed, recordRoomWatch, roomIsLive, roomIsReplay, stream]);
 
   useEffect(() => {
     if (!roomIsLive || !roomId || !currentUser?.id) return;

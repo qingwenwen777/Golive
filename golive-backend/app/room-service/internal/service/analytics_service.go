@@ -121,7 +121,7 @@ func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID
 	return &LiveHistoryResp{Items: items, Total: total, Page: page, Size: size}, nil
 }
 
-func (s *RoomService) HotReplays(ctx context.Context, viewerID string, days, size int) (*HotReplayResp, error) {
+func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory string, days, size int) (*HotReplayResp, error) {
 	if days < 1 {
 		days = 3
 	}
@@ -139,7 +139,7 @@ func (s *RoomService) HotReplays(ctx context.Context, viewerID string, days, siz
 	}
 
 	since := s.now().AddDate(0, 0, -days)
-	rooms, err := s.rooms.HotReplayCandidates(ctx, since, 100)
+	rooms, err := s.rooms.HotReplayCandidates(ctx, since, 100, NormalizeCategory(rawCategory))
 	if err != nil {
 		return nil, err
 	}

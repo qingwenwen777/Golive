@@ -62,6 +62,21 @@ type Room struct {
 
 func (Room) TableName() string { return "rooms" }
 
+type RoomWatchEvent struct {
+	ID            string    `gorm:"primaryKey;type:varchar(64)"`
+	UserID        string    `gorm:"type:varchar(36);not null;index:idx_watch_user_time,priority:1;uniqueIndex:idx_watch_user_room,priority:1"`
+	RoomID        string    `gorm:"type:varchar(64);not null;index;uniqueIndex:idx_watch_user_room,priority:2"`
+	ChannelID     string    `gorm:"type:varchar(64);index"`
+	OwnerID       string    `gorm:"type:varchar(36);index"`
+	Category      string    `gorm:"type:varchar(64);index"`
+	WatchCount    int64     `gorm:"not null;default:1"`
+	LastWatchedAt time.Time `gorm:"not null;index:idx_watch_user_time,priority:2"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (RoomWatchEvent) TableName() string { return "room_watch_events" }
+
 // Stream is the DTO returned to the frontend. Field names + omitempty match
 // src/types/stream.ts. StreamKey is set ONLY for the publishing owner.
 // PlaybackURL is the public HTTP-FLV URL exposed to all viewers when live.

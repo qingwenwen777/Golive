@@ -29,6 +29,24 @@ func (h *RoomHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *RoomHandler) Recommended(c *gin.Context) {
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "12"))
+	resp, err := h.svc.RecommendedLive(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) RecordWatch(c *gin.Context) {
+	if err := h.svc.RecordWatch(c.Request.Context(), UserIDFromCtx(c), c.Param("id")); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func (h *RoomHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	st, err := h.svc.Get(c.Request.Context(), id, UserIDFromCtx(c))
@@ -60,7 +78,7 @@ func (h *RoomHandler) ChannelHistory(c *gin.Context) {
 func (h *RoomHandler) HotReplays(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "3"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "4"))
-	resp, err := h.svc.HotReplays(c.Request.Context(), UserIDFromCtx(c), days, size)
+	resp, err := h.svc.HotReplays(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), days, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

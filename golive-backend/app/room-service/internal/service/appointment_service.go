@@ -301,12 +301,12 @@ func (s *AppointmentService) ListSubscriptionAppointments(ctx context.Context, v
 	return s.listResp(ctx, items, viewerID, page, size, total)
 }
 
-func (s *AppointmentService) ListUpcoming(ctx context.Context, viewerID string, page, size int) (*AppointmentListResp, error) {
+func (s *AppointmentService) ListUpcoming(ctx context.Context, viewerID, rawCategory string, page, size int) (*AppointmentListResp, error) {
 	if err := s.cleanupExpired(ctx); err != nil {
 		return nil, err
 	}
 	now := s.now()
-	items, total, err := s.appointments.ListPublicUpcoming(ctx, now, now.Add(upcomingWindow), page, size)
+	items, total, err := s.appointments.ListPublicUpcoming(ctx, now, now.Add(upcomingWindow), page, size, NormalizeCategory(rawCategory))
 	if err != nil {
 		return nil, err
 	}

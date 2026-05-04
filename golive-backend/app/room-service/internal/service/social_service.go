@@ -201,7 +201,7 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 	return &SubscriptionsResp{Items: items}, nil
 }
 
-func (s *SocialService) RecommendedCreators(ctx context.Context, uid string, limit int) (*CreatorRecommendationsResp, error) {
+func (s *SocialService) RecommendedCreators(ctx context.Context, uid string, limit int, rawCategory ...string) (*CreatorRecommendationsResp, error) {
 	if limit < 1 {
 		limit = 8
 	}
@@ -211,8 +211,12 @@ func (s *SocialService) RecommendedCreators(ctx context.Context, uid string, lim
 	if s.rooms == nil {
 		return &CreatorRecommendationsResp{Items: []CreatorRecommendation{}}, nil
 	}
+	category := ""
+	if len(rawCategory) > 0 {
+		category = NormalizeCategory(rawCategory[0])
+	}
 
-	candidates, err := s.rooms.CreatorRecommendationCandidates(ctx, limit*4)
+	candidates, err := s.rooms.CreatorRecommendationCandidates(ctx, limit*4, category)
 	if err != nil {
 		return nil, err
 	}

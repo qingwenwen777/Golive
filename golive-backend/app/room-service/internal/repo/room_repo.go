@@ -25,7 +25,7 @@ type RoomRepo struct {
 func NewRoomRepo(db *gorm.DB) *RoomRepo { return &RoomRepo{db: db} }
 
 func (r *RoomRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.Room{})
+	return r.db.AutoMigrate(&model.Room{}, &model.RoomWatchEvent{})
 }
 
 // ListQuery is what the service layer hands to the repo. Empty Category means
@@ -145,15 +145,28 @@ func (r *RoomRepo) OwnerProfile(ctx context.Context, ownerID string) (OwnerProfi
 	return row, err
 }
 
-func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit int) ([]CreatorRecommendationCandidate, error) {
+func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit int, category string) ([]CreatorRecommendationCandidate, error) {
 	if limit < 1 {
 		limit = 50
 	}
 	actualLiveStatuses := []string{model.StatusLive, model.StatusEnded}
-	var rows []CreatorRecommendationCandidate
-	err := r.db.WithContext(ctx).
-		Table("users AS u").
-		Select(`
+	category = strings.TrimSpace(category)
+	lowerCategory := strings.ToLower(category)
+	categoryClause := ""
+	if category != "" {
+		categoryClause = " AND (LOWER(r.category) = ? OR r.category_ja = ?)"
+	}
+	selectArgs := make([]any, 0, 18)
+	addSubqueryArgs := func() {
+		selectArgs = append(selectArgs, actualLiveStatuses)
+		if category != "" {
+			selectArgs = append(selectArgs, lowerCategory, category)
+		}
+	}
+	for i := 0; i < 6; i++ {
+		addSubqueryArgs()
+	}
+	selectSQL := fmt.Sprintf(`
 			u.id,
 			u.username,
 			u.display_name,
@@ -162,40 +175,47 @@ func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit in
 			u.updated_at,
 			COALESCE((
 				SELECT r.channel_id FROM rooms r
-				WHERE r.owner_id = u.id AND r.status IN ?
+				WHERE r.owner_id = u.id AND r.status IN ?%s
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			), '') AS channel_id,
 			COALESCE((
 				SELECT r.channel FROM rooms r
-				WHERE r.owner_id = u.id AND r.status IN ?
+				WHERE r.owner_id = u.id AND r.status IN ?%s
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			), '') AS channel,
 			(
 				SELECT r.started_at FROM rooms r
-				WHERE r.owner_id = u.id AND r.status IN ?
+				WHERE r.owner_id = u.id AND r.status IN ?%s
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			) AS last_live_at,
 			COALESCE((
 				SELECT r.title FROM rooms r
-				WHERE r.owner_id = u.id AND r.status IN ?
+				WHERE r.owner_id = u.id AND r.status IN ?%s
 				ORDER BY r.started_at DESC, r.created_at DESC
 				LIMIT 1
 			), '') AS last_title,
-			(SELECT COUNT(*) FROM rooms r WHERE r.owner_id = u.id AND r.status IN ?) AS stream_count,
-			COALESCE((SELECT MAX(r.peak_viewers) FROM rooms r WHERE r.owner_id = u.id AND r.status IN ?), 0) AS peak_viewers
-		`,
-			actualLiveStatuses,
-			actualLiveStatuses,
-			actualLiveStatuses,
-			actualLiveStatuses,
-			actualLiveStatuses,
-			actualLiveStatuses,
-		).
-		Where("u.live_permission_status = ?", "approved").
-		Order("u.updated_at DESC").
+			(SELECT COUNT(*) FROM rooms r WHERE r.owner_id = u.id AND r.status IN ?%s) AS stream_count,
+			COALESCE((SELECT MAX(r.peak_viewers) FROM rooms r WHERE r.owner_id = u.id AND r.status IN ?%s), 0) AS peak_viewers
+		`, categoryClause, categoryClause, categoryClause, categoryClause, categoryClause, categoryClause)
+	var rows []CreatorRecommendationCandidate
+	tx := r.db.WithContext(ctx).
+		Table("users AS u").
+		Select(selectSQL, selectArgs...).
+		Where("u.live_permission_status = ?", "approved")
+	if category != "" {
+		tx = tx.Where(`
+			EXISTS (
+				SELECT 1 FROM rooms r
+				WHERE r.owner_id = u.id
+					AND r.status IN ?
+					AND (LOWER(r.category) = ? OR r.category_ja = ?)
+			)
+		`, actualLiveStatuses, lowerCategory, category)
+	}
+	err := tx.Order("u.updated_at DESC").
 		Limit(limit).
 		Scan(&rows).Error
 	return rows, err
@@ -383,19 +403,92 @@ func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID stri
 	return rooms, err
 }
 
-func (r *RoomRepo) HotReplayCandidates(ctx context.Context, since time.Time, limit int) ([]model.Room, error) {
+func (r *RoomRepo) HotReplayCandidates(ctx context.Context, since time.Time, limit int, category string) ([]model.Room, error) {
 	if limit < 1 {
 		limit = 100
 	}
-	var rooms []model.Room
-	err := r.db.WithContext(ctx).Model(&model.Room{}).
+	tx := r.db.WithContext(ctx).Model(&model.Room{}).
 		Where("status = ? AND replay_status = ? AND replay_bunny_video_id <> ?", model.StatusEnded, model.ReplayStatusReady, "").
 		Where("replay_visibility IN ?", []string{model.PostVisibilityPublic, model.PostVisibilityFollowers}).
-		Where("COALESCE(ended_at, updated_at) >= ?", since).
+		Where("COALESCE(ended_at, updated_at) >= ?", since)
+	if category = strings.TrimSpace(category); category != "" {
+		tx = tx.Where("LOWER(category) = ? OR category_ja = ?", strings.ToLower(category), category)
+	}
+	var rooms []model.Room
+	err := tx.
 		Order("COALESCE(ended_at, updated_at) DESC").
 		Limit(limit).
 		Find(&rooms).Error
 	return rooms, err
+}
+
+type WatchCategoryRow struct {
+	Category string
+	Count    int64
+}
+
+type UserRevenuePreferenceRow struct {
+	RoomID    string
+	OwnerID   string
+	ChannelID string
+	Category  string
+	Amount    int64
+}
+
+func (r *RoomRepo) RecordWatchEvent(ctx context.Context, event *model.RoomWatchEvent) error {
+	if event == nil || event.ID == "" || event.UserID == "" || event.RoomID == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"channel_id":      event.ChannelID,
+			"owner_id":        event.OwnerID,
+			"category":        event.Category,
+			"last_watched_at": event.LastWatchedAt,
+			"watch_count":     gorm.Expr("watch_count + 1"),
+			"updated_at":      event.UpdatedAt,
+		}),
+	}).Create(event).Error
+}
+
+func (r *RoomRepo) WatchCategoryRows(ctx context.Context, userID string, since time.Time) ([]WatchCategoryRow, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	var rows []WatchCategoryRow
+	err := r.db.WithContext(ctx).
+		Model(&model.RoomWatchEvent{}).
+		Select("category, COALESCE(SUM(watch_count), 0) AS count").
+		Where("user_id = ? AND last_watched_at >= ? AND category <> ?", userID, since, "").
+		Group("category").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *RoomRepo) UserRevenuePreferenceRows(ctx context.Context, userID string, since time.Time) ([]UserRevenuePreferenceRow, error) {
+	if userID == "" {
+		return nil, nil
+	}
+	var rows []UserRevenuePreferenceRow
+	err := r.db.WithContext(ctx).Raw(`
+SELECT
+  r.id AS room_id,
+  r.owner_id,
+  r.channel_id,
+  r.category,
+  COALESCE(SUM(x.amount), 0) AS amount
+FROM (
+  SELECT room_id, total_coin AS amount, created_at FROM gift_orders
+  WHERE status = 'success' AND user_id = ? AND created_at >= ?
+  UNION ALL
+  SELECT room_id, amount AS amount, created_at FROM super_chat_orders
+  WHERE status = 'success' AND user_id = ? AND created_at >= ?
+) x
+JOIN rooms r ON r.id = x.room_id
+GROUP BY r.id, r.owner_id, r.channel_id, r.category
+`, userID, since, userID, since).Scan(&rows).Error
+	return rows, err
 }
 
 func (r *RoomRepo) EndedRoomByOwner(ctx context.Context, ownerID, roomID string) (*model.Room, error) {

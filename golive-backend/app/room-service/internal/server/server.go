@@ -66,6 +66,7 @@ func NewRouter(d Deps) *gin.Engine {
 	rooms := r.Group("/rooms")
 	{
 		rooms.GET("", roomH.List)
+		rooms.GET("/recommended", optionalAuth, roomH.Recommended)
 		rooms.GET("/appointments", auth, appointmentH.ListOwner)
 		rooms.POST("/appointments", auth, appointmentH.Create)
 		rooms.PATCH("/appointments/:id", auth, appointmentH.Update)
@@ -112,6 +113,7 @@ func NewRouter(d Deps) *gin.Engine {
 		authed.DELETE("/:id/follow", socialH.Unfollow)
 
 		authed.GET("/:id/like", socialH.GetLike)
+		authed.POST("/:id/watch", roomH.RecordWatch)
 		authed.POST("/:id/like", socialH.Like)
 		authed.DELETE("/:id/like", socialH.Unlike)
 

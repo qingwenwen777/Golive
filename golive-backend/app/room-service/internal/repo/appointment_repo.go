@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -162,9 +163,13 @@ func (r *AppointmentRepo) ListPublicByOwners(ctx context.Context, ownerIDs []str
 	return items, total, err
 }
 
-func (r *AppointmentRepo) ListPublicUpcoming(ctx context.Context, now, until time.Time, page, size int) ([]model.LiveAppointment, int64, error) {
+func (r *AppointmentRepo) ListPublicUpcoming(ctx context.Context, now, until time.Time, page, size int, category string) ([]model.LiveAppointment, int64, error) {
 	page, size = normalizePageSize(page, size)
 	tx := publicAppointmentQuery(r.db.WithContext(ctx), now).Where("scheduled_at < ?", until)
+	if category = strings.TrimSpace(category); category != "" {
+		tx = tx.Joins("JOIN rooms r ON r.id = live_appointments.room_id").
+			Where("LOWER(r.category) = ? OR r.category_ja = ?", strings.ToLower(category), category)
+	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -455,7 +460,7 @@ func (r *AppointmentRepo) MarkAllNotificationsRead(ctx context.Context, userID s
 
 func publicAppointmentQuery(db *gorm.DB, now time.Time) *gorm.DB {
 	return db.Model(&model.LiveAppointment{}).
-		Where("status = ? AND scheduled_at >= ?", model.AppointmentScheduled, now.Add(-30*time.Minute))
+		Where("live_appointments.status = ? AND live_appointments.scheduled_at >= ?", model.AppointmentScheduled, now.Add(-30*time.Minute))
 }
 
 func normalizePageSize(page, size int) (int, int) {

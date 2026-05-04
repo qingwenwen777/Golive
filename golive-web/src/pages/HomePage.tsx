@@ -1,30 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  Bell,
-  CheckCircle2,
-  CloudOff,
-  Coins,
-  Gift as GiftIcon,
-  Inbox,
-  LockKeyhole,
-  Radio,
-  RefreshCw,
-  Sparkles,
-  UserPlus,
-} from 'lucide-react';
+import { Bell, CheckCircle2, CloudOff, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
-import { useGifts } from '@/api/gift';
 import {
   useFollow,
   useHotReplays,
+  useInfiniteRooms,
   useRecommendedCreators,
-  useRooms,
+  useRecommendedRooms,
   useUnfollow,
   useUpcomingAppointments,
   type HotReplayItem,
@@ -32,13 +20,14 @@ import {
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
-import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import { useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
-import { localizedGiftName } from '@/lib/gift';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { streamChannelName, type Stream } from '@/types/stream';
 
 const UPCOMING_APPOINTMENT_LIMIT = 3;
+const RECOMMENDED_LIVE_LIMIT = 12;
+const LIVE_PAGE_SIZE = 12;
 
 export default function HomePage() {
   const { t } = useTranslation('pages');
@@ -47,49 +36,14 @@ export default function HomePage() {
   const searchQuery = searchParams.get('q')?.trim() ?? '';
 
   const categoryParam = activeCat === 'All' ? undefined : activeCat;
-  const { data, isPending, isError, isFetching, refetch } = useRooms({
+  const recommended = useRecommendedRooms({
     category: categoryParam,
-    size: 100,
+    size: RECOMMENDED_LIVE_LIMIT,
   });
-  const userId = useAuthStore((s) => s.user?.id);
-
-  // Pin the current user's own active stream to the front, then sort by
-  // startedAt DESC. Backend already orders by started_at DESC but we re-sort
-  // defensively (e.g. stale cache slices).
-  const sortedItems = useMemo<Stream[]>(() => {
-    const items = data?.items ?? [];
-    const own: Stream[] = [];
-    const rest: Stream[] = [];
-    for (const s of items) {
-      if (userId && (s.ownerId === userId || s.id === `live-${userId}`)) own.push(s);
-      else rest.push(s);
-    }
-    rest.sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0));
-    return [...own, ...rest];
-  }, [data?.items, userId]);
-
-  const visibleItems = useMemo<Stream[]>(() => {
-    const q = searchQuery.toLowerCase();
-    if (!q) return sortedItems;
-
-    return sortedItems.filter((stream) => {
-      const haystack = [
-        stream.title,
-        stream.titleJa,
-        stream.description,
-        stream.category,
-        stream.categoryJa,
-        stream.channel,
-        stream.channelId,
-        streamChannelName(stream),
-        stream.id,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [searchQuery, sortedItems]);
+  const recommendedItems = useMemo(
+    () => filterStreamsBySearch(recommended.data?.items ?? [], searchQuery),
+    [recommended.data?.items, searchQuery],
+  );
 
   return (
     <>
@@ -104,28 +58,28 @@ export default function HomePage() {
                   query: searchQuery,
                   defaultValue: `Search results for "${searchQuery}"`,
                 })
-              : t('home.liveNow')}
+              : t('home.recommendedLive', { defaultValue: '推荐直播' })}
           </div>
         </div>
 
-        {isPending ? (
+        {recommended.isPending ? (
           <div className="gl-grid" aria-busy="true">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: RECOMMENDED_LIVE_LIMIT }).map((_, i) => (
               <LiveCardSkeleton key={i} />
             ))}
           </div>
-        ) : isError ? (
+        ) : recommended.isError ? (
           <div className="gl-error" role="alert">
             <CloudOff size={64} strokeWidth={1.5} />
             <div className="gl-empty-title">{t('home.errorTitle')}</div>
             <div className="gl-empty-sub">{t('home.errorSub')}</div>
-            <button className="gl-retry-btn" onClick={() => refetch()}>
+            <button className="gl-retry-btn" onClick={() => recommended.refetch()}>
               {t('home.retry')}
             </button>
           </div>
-        ) : data && data.items.length === 0 ? (
+        ) : recommended.data && recommended.data.items.length === 0 ? (
           <HomeNoLiveEmpty />
-        ) : visibleItems.length === 0 ? (
+        ) : recommendedItems.length === 0 ? (
           <div className="gl-empty">
             <Inbox size={64} strokeWidth={1.5} />
             <div className="gl-empty-title">
@@ -138,28 +92,28 @@ export default function HomePage() {
         ) : (
           <div
             className="gl-grid"
-            style={{ opacity: isFetching ? 0.7 : 1, transition: 'opacity .15s' }}
+            style={{ opacity: recommended.isFetching ? 0.7 : 1, transition: 'opacity .15s' }}
           >
-            {visibleItems.map((s, i) => (
+            {recommendedItems.map((s, i) => (
               <LiveCard key={s.id} stream={s} priority={i < 4} />
             ))}
           </div>
         )}
 
-        <UpcomingAppointmentsSection />
-        <HomeRecommendationsSection />
-        <HomeHotReplaysSection />
-        <HomeLevelGiftsSection />
+        <UpcomingAppointmentsSection category={categoryParam} />
+        <HomeRecommendationsSection category={categoryParam} />
+        <HomeHotReplaysSection category={categoryParam} />
+        <HomeAllLiveSection category={categoryParam} searchQuery={searchQuery} />
       </div>
     </>
   );
 }
 
-function UpcomingAppointmentsSection() {
+function UpcomingAppointmentsSection({ category }: { category?: string }) {
   const { t } = useTranslation('pages');
   const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
-  const appointments = useUpcomingAppointments(1, 100);
-  const items = appointments.data?.items ?? [];
+  const appointments = useUpcomingAppointments(1, 100, category);
+  const items = useMemo(() => appointments.data?.items ?? [], [appointments.data?.items]);
   const visibleItems = useMemo(
     () =>
       items
@@ -242,9 +196,9 @@ function HomeNoLiveEmpty() {
   );
 }
 
-function HomeRecommendationsSection() {
+function HomeRecommendationsSection({ category }: { category?: string }) {
   const { t } = useTranslation('pages');
-  const recommendations = useRecommendedCreators(8);
+  const recommendations = useRecommendedCreators(8, true, category);
 
   return (
     <section className="gl-home-recs" aria-label={t('home.recommendations.title')}>
@@ -273,9 +227,9 @@ function HomeRecommendationsSection() {
   );
 }
 
-function HomeHotReplaysSection() {
+function HomeHotReplaysSection({ category }: { category?: string }) {
   const { t } = useTranslation('pages');
-  const hotReplays = useHotReplays(3, 3);
+  const hotReplays = useHotReplays(3, 3, category);
   const items = hotReplays.data?.items ?? [];
 
   return (
@@ -356,90 +310,91 @@ function HotReplayCard({ replay }: { replay: HotReplayItem }) {
   );
 }
 
-function HomeLevelGiftsSection() {
-  const { t, i18n } = useTranslation('pages');
-  const gifts = useGifts();
-  const locale = i18n.resolvedLanguage ?? i18n.language;
-  const levelGifts = useMemo(
-    () =>
-      (gifts.data ?? [])
-        .filter((gift) => (gift.unlockLevel ?? 1) > 1)
-        .sort(
-          (a, b) =>
-            (a.unlockLevel ?? 1) - (b.unlockLevel ?? 1) ||
-            a.priceCoin - b.priceCoin ||
-            a.id.localeCompare(b.id),
-        )
-        .slice(0, 8),
-    [gifts.data],
+function HomeAllLiveSection({ category, searchQuery }: { category?: string; searchQuery: string }) {
+  const { t } = useTranslation('pages');
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const rooms = useInfiniteRooms({ category, size: LIVE_PAGE_SIZE });
+  const { data, fetchNextPage, hasNextPage, isError, isFetchingNextPage, isPending, refetch } =
+    rooms;
+  const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data?.pages]);
+  const visibleItems = useMemo(
+    () => filterStreamsBySearch(items, searchQuery),
+    [items, searchQuery],
   );
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: '640px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  useEffect(() => {
+    if (!searchQuery || visibleItems.length > 0 || !hasNextPage || isFetchingNextPage) {
+      return;
+    }
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, searchQuery, visibleItems.length]);
 
   return (
     <section
-      className="gl-home-level-gifts"
-      aria-label={t('home.levelGifts.title', { defaultValue: 'Level gift showcase' })}
+      className="gl-home-live-all"
+      aria-label={t('home.allLive.title', { defaultValue: '正在直播' })}
     >
       <div className="gl-section-title-row">
         <div>
-          <h2>{t('home.levelGifts.title', { defaultValue: 'Level gift showcase' })}</h2>
-          <span>
-            {t('home.levelGifts.subtitle', {
-              defaultValue: 'Charge to level up and unlock premium gifts for live rooms.',
-            })}
-          </span>
+          <h2>{t('home.allLive.title', { defaultValue: '正在直播' })}</h2>
         </div>
       </div>
 
-      {gifts.isPending ? (
-        <div className="gl-home-level-gift-grid" aria-busy="true">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div className="gl-home-level-gift-card is-loading" key={index} />
+      {isPending ? (
+        <div className="gl-grid" aria-busy="true">
+          {Array.from({ length: LIVE_PAGE_SIZE }).map((_, index) => (
+            <LiveCardSkeleton key={index} />
           ))}
         </div>
-      ) : levelGifts.length > 0 ? (
-        <div className="gl-home-level-gift-grid">
-          {levelGifts.map((gift) => {
-            const unlockLevel = gift.unlockLevel ?? 1;
-            const giftName = localizedGiftName(gift, locale, t);
-            const tierLevel = gift.tier + 1;
-            return (
-              <article className="gl-home-level-gift-card" key={gift.id}>
-                <div className="gl-home-level-gift-top">
-                  <span className="gl-home-level-gift-unlock">
-                    <LockKeyhole size={12} />
-                    {t('home.levelGifts.unlockLevel', {
-                      level: unlockLevel,
-                      defaultValue: 'Unlocks at Lv.{{level}}',
-                    })}
-                  </span>
-                  <span className={cn('gl-home-level-gift-tier', `is-tier-${tierLevel}`)}>
-                    {unlockLevel >= 60 ? <Sparkles size={12} /> : <GiftIcon size={12} />}
-                    {t('home.levelGifts.tier', {
-                      tier: tierLevel,
-                      defaultValue: 'Tier {{tier}}',
-                    })}
-                  </span>
-                </div>
-                <div className="gl-home-level-gift-icon" aria-hidden>
-                  {gift.icon}
-                </div>
-                <h3 title={giftName}>{giftName}</h3>
-                <div className={cn('gl-home-level-gift-meta', `is-tier-${tierLevel}`)}>
-                  <Coins size={14} />
-                  <span>
-                    {t('home.levelGifts.price', {
-                      coins: gift.priceCoin.toLocaleString(locale),
-                      defaultValue: '{{coins}} coins',
-                    })}
-                  </span>
-                </div>
-              </article>
-            );
-          })}
+      ) : isError ? (
+        <div className="gl-error" role="alert">
+          <CloudOff size={56} strokeWidth={1.5} />
+          <div className="gl-empty-title">{t('home.errorTitle')}</div>
+          <button className="gl-retry-btn" onClick={() => refetch()}>
+            {t('home.retry')}
+          </button>
         </div>
+      ) : visibleItems.length > 0 ? (
+        <>
+          <div className="gl-grid">
+            {visibleItems.map((stream, index) => (
+              <LiveCard key={stream.id} stream={stream} priority={index < 3} />
+            ))}
+          </div>
+          <div ref={sentinelRef} className="gl-home-live-sentinel" aria-hidden />
+          {hasNextPage && (
+            <button
+              type="button"
+              className="gl-home-live-more"
+              disabled={isFetchingNextPage}
+              onClick={() => fetchNextPage()}
+            >
+              {isFetchingNextPage
+                ? t('home.allLive.loading', { defaultValue: '加载中...' })
+                : t('home.allLive.loadMore', { defaultValue: '加载更多' })}
+            </button>
+          )}
+        </>
       ) : (
         <div className="gl-creator-empty-soft">
-          {t('home.levelGifts.empty', { defaultValue: 'No level gifts yet.' })}
+          {searchQuery
+            ? t('home.searchEmpty', { defaultValue: 'No matching live rooms' })
+            : t('home.empty', { defaultValue: 'No live streams right now' })}
         </div>
       )}
     </section>
@@ -513,6 +468,29 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
       {creator.lastTitle && <p>{creator.lastTitle}</p>}
     </article>
   );
+}
+
+function filterStreamsBySearch(items: Stream[], searchQuery: string): Stream[] {
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return items;
+
+  return items.filter((stream) => {
+    const haystack = [
+      stream.title,
+      stream.titleJa,
+      stream.description,
+      stream.category,
+      stream.categoryJa,
+      stream.channel,
+      stream.channelId,
+      streamChannelName(stream),
+      stream.id,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(q);
+  });
 }
 
 function formatRecommendationTime(value: string, locale: string): string {

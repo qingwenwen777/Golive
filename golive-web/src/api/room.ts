@@ -1,6 +1,12 @@
-﻿import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+﻿import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import { http } from '@/lib/axios';
-import type { QueryKey } from '@tanstack/react-query';
+import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import type {
   PaginatedRooms,
   ReplayInfo,
@@ -12,6 +18,13 @@ import type {
 function normalizeCategory(cat?: string): string {
   if (!cat || cat.toLowerCase() === 'all' || cat === 'すべて') return 'all';
   return cat;
+}
+
+function invalidateLiveDirectoryQueries(qc: QueryClient) {
+  void qc.invalidateQueries({ queryKey: ['rooms'] });
+  void qc.invalidateQueries({ queryKey: ['rooms-infinite'] });
+  void qc.invalidateQueries({ queryKey: ['recommended-rooms'] });
+  void qc.invalidateQueries({ queryKey: ['recommended-creators'] });
 }
 
 export function useRooms(params: RoomsQuery = {}) {
@@ -33,6 +46,50 @@ export function useRooms(params: RoomsQuery = {}) {
   });
 }
 
+export function useInfiniteRooms(params: RoomsQuery = {}) {
+  const category = normalizeCategory(params.category);
+  const size = params.size ?? 12;
+
+  return useInfiniteQuery<PaginatedRooms, Error>({
+    queryKey: ['rooms-infinite', { category, size }],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam, signal }) => {
+      const page = typeof pageParam === 'number' ? pageParam : 1;
+      const search: Record<string, string | number> = { page, size };
+      if (category !== 'all') search.category = category;
+      const { data } = await http.get<PaginatedRooms>('/rooms', { params: search, signal });
+      return data;
+    },
+    getNextPageParam: (lastPage) => {
+      const nextPage = lastPage.page + 1;
+      return lastPage.page * lastPage.size < lastPage.total ? nextPage : undefined;
+    },
+    staleTime: 30_000,
+    retry: 1,
+  });
+}
+
+export function useRecommendedRooms(params: RoomsQuery = {}) {
+  const category = normalizeCategory(params.category);
+  const size = params.size ?? 12;
+
+  return useQuery<PaginatedRooms, Error>({
+    queryKey: ['recommended-rooms', { category, size }],
+    queryFn: async ({ signal }) => {
+      const search: Record<string, string | number> = { size };
+      if (category !== 'all') search.category = category;
+      const { data } = await http.get<PaginatedRooms>('/rooms/recommended', {
+        params: search,
+        signal,
+      });
+      return data;
+    },
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
 export function useRoom(id: string, enabled = true) {
   return useQuery<Stream, Error>({
     queryKey: ['room', id],
@@ -43,6 +100,21 @@ export function useRoom(id: string, enabled = true) {
     enabled: enabled && !!id,
     staleTime: 30_000,
     retry: 1,
+  });
+}
+
+export function useRecordRoomWatch(roomId: string) {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.post<{ ok: boolean }>(
+        `/rooms/${encodeURIComponent(roomId)}/watch`,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['recommended-rooms'] });
+    },
   });
 }
 
@@ -64,7 +136,7 @@ export function useGoLive() {
     },
     onSuccess: (stream) => {
       qc.setQueryData(['room', stream.id], stream);
-      void qc.invalidateQueries({ queryKey: ['rooms'] });
+      invalidateLiveDirectoryQueries(qc);
     },
   });
 }
@@ -84,7 +156,7 @@ export function useUpdateLiveMetadata() {
     },
     onSuccess: (stream) => {
       qc.setQueryData(['room', stream.id], stream);
-      void qc.invalidateQueries({ queryKey: ['rooms'] });
+      invalidateLiveDirectoryQueries(qc);
     },
   });
 }
@@ -97,7 +169,7 @@ export function useStopLive() {
       return data;
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['rooms'] });
+      invalidateLiveDirectoryQueries(qc);
     },
   });
 }
@@ -209,12 +281,15 @@ export function useSubscriptions(enabled: boolean) {
   });
 }
 
-export function useRecommendedCreators(size = 8, enabled = true) {
+export function useRecommendedCreators(size = 8, enabled = true, category?: string) {
+  const normalized = normalizeCategory(category);
   return useQuery<RecommendedCreatorsResp, Error>({
-    queryKey: ['recommended-creators', size],
+    queryKey: ['recommended-creators', size, normalized],
     queryFn: async ({ signal }) => {
+      const params: Record<string, string | number> = { size };
+      if (normalized !== 'all') params.category = normalized;
       const { data } = await http.get<RecommendedCreatorsResp>('/rooms/recommended-creators', {
-        params: { size },
+        params,
         signal,
       });
       return data;
@@ -524,12 +599,15 @@ export function useStudioReplays(enabled = true, page = 1, size = 12) {
   });
 }
 
-export function useHotReplays(size = 4, days = 3) {
+export function useHotReplays(size = 4, days = 3, category?: string) {
+  const normalized = normalizeCategory(category);
   return useQuery<HotReplayListResp, Error>({
-    queryKey: ['hot-replays', size, days],
+    queryKey: ['hot-replays', size, days, normalized],
     queryFn: async ({ signal }) => {
+      const params: Record<string, string | number> = { size, days };
+      if (normalized !== 'all') params.category = normalized;
       const { data } = await http.get<HotReplayListResp>('/rooms/replays/hot', {
-        params: { size, days },
+        params,
         signal,
       });
       return data;
@@ -625,12 +703,15 @@ export function useReservedAppointments(enabled = true, page = 1, size = 8) {
   });
 }
 
-export function useUpcomingAppointments(page = 1, size = 100) {
+export function useUpcomingAppointments(page = 1, size = 100, category?: string) {
+  const normalized = normalizeCategory(category);
   return useQuery<AppointmentListResp, Error>({
-    queryKey: ['upcoming-appointments', page, size],
+    queryKey: ['upcoming-appointments', page, size, normalized],
     queryFn: async ({ signal }) => {
+      const params: Record<string, string | number> = { page, size };
+      if (normalized !== 'all') params.category = normalized;
       const { data } = await http.get<AppointmentListResp>('/appointments/upcoming', {
-        params: { page, size },
+        params,
         signal,
       });
       return data;
@@ -733,7 +814,7 @@ export function useStartAppointment(id: string) {
       void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
       void qc.invalidateQueries({ queryKey: ['upcoming-appointments'] });
       void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
-      void qc.invalidateQueries({ queryKey: ['rooms'] });
+      invalidateLiveDirectoryQueries(qc);
     },
   });
 }

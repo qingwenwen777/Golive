@@ -2211,6 +2211,37 @@ input:focus-visible,
   gap: 14px;
   margin-top: 26px;
 }
+.gl-home-live-all {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 30px;
+  padding-bottom: 18px;
+}
+.gl-home-live-sentinel {
+  height: 1px;
+}
+.gl-home-live-more {
+  display: inline-flex;
+  min-height: 38px;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 18px;
+}
+.gl-home-live-more:hover:not(:disabled) {
+  background: var(--gl-bg-hover);
+}
+.gl-home-live-more:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
 .gl-home-replay-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

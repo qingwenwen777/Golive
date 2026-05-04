@@ -268,6 +268,11 @@ CREATE TABLE users (
 	require.Equal(t, "creator-c", resp.Items[2].ID)
 	require.Empty(t, resp.Items[2].LastLiveAt)
 	require.Empty(t, resp.Items[2].LastTitle)
+
+	musicResp, err := svc.RecommendedCreators(ctx, "viewer-1", 4, "Music")
+	require.NoError(t, err)
+	require.Len(t, musicResp.Items, 1)
+	require.Equal(t, "creator-a", musicResp.Items[0].ID)
 }
 
 // The big one: like / dislike state machine. We replay the same sequence the
