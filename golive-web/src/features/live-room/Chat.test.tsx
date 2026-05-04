@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ChatMessage } from '@/types/message';
+import type { ChatMessage, SuperChatMessage } from '@/types/message';
 import { Chat } from './Chat';
 
 const authMock = vi.hoisted(() => ({
@@ -72,6 +72,20 @@ function chatMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
     user: 'Viewer',
     text: 'hello',
     ts: 1,
+    ...overrides,
+  };
+}
+
+function superChatMessage(overrides: Partial<SuperChatMessage> = {}): SuperChatMessage {
+  return {
+    id: 'sc-1',
+    kind: 'super_chat',
+    userId: 'viewer-sc',
+    user: 'Alice',
+    text: 'Pinned hello',
+    amount: '1000',
+    tier: 2,
+    ts: Date.now(),
     ...overrides,
   };
 }
@@ -211,5 +225,34 @@ describe('Chat', () => {
     expect(button.disabled).toBe(true);
     fireEvent.click(button);
     expect(onOpenModeration).not.toHaveBeenCalled();
+  });
+
+  it('keeps pinned SuperChats as compact capsules and reveals details in a popover', () => {
+    render(
+      <Chat
+        messages={[
+          superChatMessage(),
+          superChatMessage({
+            id: 'sc-2',
+            user: 'Bob',
+            text: 'Second pinned message',
+            amount: '2000',
+            tier: 3,
+          }),
+        ]}
+      />,
+    );
+
+    const pinned = screen.getByLabelText('liveRoom.chatPanel.pinnedSuperChats');
+    expect(pinned.querySelector('.gl-sc-pin-row')).toBeTruthy();
+    expect(within(pinned).getByRole('button', { name: 'Open SuperChat from Alice' })).toBeTruthy();
+    expect(within(pinned).getByRole('button', { name: 'Open SuperChat from Bob' })).toBeTruthy();
+    expect(within(pinned).queryByText('\u00a51,000')).toBeNull();
+    expect(within(pinned).queryByText('Pinned hello')).toBeNull();
+
+    fireEvent.click(within(pinned).getByRole('button', { name: 'Open SuperChat from Alice' }));
+
+    expect(within(pinned).getByText('1,000 coins')).toBeTruthy();
+    expect(within(pinned).getByText('Pinned hello')).toBeTruthy();
   });
 });

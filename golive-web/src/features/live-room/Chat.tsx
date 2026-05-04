@@ -155,11 +155,9 @@ function superChatPinDurationMs(m: SuperChatMessage): number {
   return 60_000;
 }
 
-function formatRemaining(ms: number): string {
-  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}s`;
+function formatCoinAmount(amount: string, locale: string): string {
+  const n = parseAmountValue(amount);
+  return `${n.toLocaleString(locale)} coins`;
 }
 
 const GIFT_META: Record<string, { icon: string; tier: 0 | 1 | 2 | 3 }> = {
@@ -308,64 +306,79 @@ function SuperChatCard({ m }: { m: SuperChatMessage }) {
   );
 }
 
-function PinnedSuperChatCard({
+function PinnedSuperChatPill({
   m,
   remainingMs,
   durationMs,
-  expanded,
+  active,
   onToggle,
+  buttonRef,
 }: {
   m: SuperChatMessage;
   remainingMs: number;
   durationMs: number;
-  expanded: boolean;
+  active: boolean;
   onToggle: () => void;
+  buttonRef: (node: HTMLButtonElement | null) => void;
 }) {
   const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
   const progress = Math.max(0, Math.min(100, (remainingMs / durationMs) * 100));
   const style = {
-    background: spec.bg,
+    '--sc-bg': spec.bg,
     '--sc-soft': spec.soft,
     '--sc-progress': `${progress}%`,
-  } as CSSProperties & { '--sc-soft': string; '--sc-progress': string };
+  } as CSSProperties & { '--sc-bg': string; '--sc-soft': string; '--sc-progress': string };
 
   return (
     <button
+      ref={buttonRef}
       type="button"
-      className={cn('gl-sc-pin', expanded && 'is-expanded', m.pending && 'opacity-60')}
+      className={cn('gl-sc-pin', active && 'is-expanded', m.pending && 'opacity-60')}
       style={style}
       onClick={onToggle}
-      aria-expanded={expanded}
-      aria-label={t('liveRoom.chatPanel.openSuperChat', { user: m.user })}
+      aria-expanded={active}
+      aria-label={t('liveRoom.chatPanel.openSuperChat', {
+        user: m.user,
+        defaultValue: 'Open SuperChat from {{user}}',
+      })}
     >
-      <div className="gl-sc-pin-main">
-        <Avatar name={m.user} src={m.avatar} size={24} />
-        <div className="gl-sc-pin-copy">
-          <div className="gl-sc-pin-meta">
-            <span className="gl-sc-pin-user">{m.user}</span>
-            <span className="gl-sc-pin-amount">{formatYenAmount(m.amount)}</span>
-          </div>
-          <div className="gl-sc-pin-hint">
-            <span>{formatRemaining(remainingMs)}</span>
-            <span>
-              {m.text ? t('liveRoom.chatPanel.tapToRead') : t('liveRoom.chatPanel.noMessage')}
-            </span>
-          </div>
-        </div>
-        <ChevronDown className="gl-sc-pin-chevron" size={18} />
-      </div>
+      <Avatar name={m.user} src={m.avatar} size={26} ring="rgba(255, 255, 255, 0.76)" />
+      <span className="gl-sc-pin-user">{m.user}</span>
       <span className="gl-sc-pin-progress" aria-hidden="true" />
-      {expanded && (
-        <div className="gl-sc-pin-body" role="tooltip">
-          <div className="gl-sc-pin-body-head">
-            <strong>{m.user}</strong>
-            <span>{formatYenAmount(m.amount)}</span>
-          </div>
-          <p>{m.text || t('liveRoom.chatPanel.noSuperChatMessage')}</p>
-        </div>
-      )}
     </button>
+  );
+}
+
+function PinnedSuperChatBubble({
+  m,
+  locale,
+  position,
+}: {
+  m: SuperChatMessage;
+  locale: string;
+  position: { left: number; arrowLeft: number };
+}) {
+  const { t } = useTranslation('pages');
+  const spec = tierSpec(m.tier);
+  const style = {
+    left: position.left,
+    '--sc-bg': spec.bg,
+    '--sc-soft': spec.soft,
+    '--sc-arrow-left': `${position.arrowLeft}px`,
+  } as CSSProperties & { '--sc-bg': string; '--sc-soft': string; '--sc-arrow-left': string };
+
+  return (
+    <div className="gl-sc-pin-popover" role="dialog" style={style}>
+      <div className="gl-sc-pin-popover-head">
+        <Avatar name={m.user} src={m.avatar} size={28} ring="rgba(255, 255, 255, 0.8)" />
+        <div>
+          <strong>{m.user}</strong>
+          <span>{formatCoinAmount(m.amount, locale)}</span>
+        </div>
+      </div>
+      <p>{m.text || t('liveRoom.chatPanel.noSuperChatMessage')}</p>
+    </div>
   );
 }
 
@@ -521,6 +534,8 @@ export function Chat({
   const listRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const emojiWrapRef = useRef<HTMLDivElement | null>(null);
+  const pinStackRef = useRef<HTMLDivElement | null>(null);
+  const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const inputValueRef = useRef('');
   const lastMessageCountRef = useRef(messages.length);
   const stickToBottomRef = useRef(true);
@@ -531,6 +546,7 @@ export function Chat({
   const [now, setNow] = useState(() => Date.now());
   const [activeTab, setActiveTab] = useState<ChatPanelTab>('chat');
   const [expandedPinnedId, setExpandedPinnedId] = useState<string | null>(null);
+  const [pinBubblePosition, setPinBubblePosition] = useState({ left: 10, arrowLeft: 28 });
   const [newMessageCount, setNewMessageCount] = useState(0);
   // Track IME composition so Enter during candidate selection (CJK input
   // methods) does not submit a half-finished message.
@@ -614,6 +630,26 @@ export function Chat({
     if (nearBottom) setNewMessageCount(0);
   };
 
+  const updatePinnedBubblePosition = useCallback((id: string) => {
+    const stack = pinStackRef.current;
+    const button = pinButtonRefs.current.get(id);
+    if (!stack || !button) return;
+
+    const stackRect = stack.getBoundingClientRect();
+    const buttonRect = button.getBoundingClientRect();
+    const bubbleWidth = Math.min(320, Math.max(0, stackRect.width - 20));
+    const buttonCenter = buttonRect.left - stackRect.left + buttonRect.width / 2;
+    const maxLeft = Math.max(10, stackRect.width - bubbleWidth - 10);
+    const left = Math.max(10, Math.min(maxLeft, buttonCenter - bubbleWidth / 2));
+    const arrowLeft = Math.max(22, Math.min(bubbleWidth - 22, buttonCenter - left));
+
+    setPinBubblePosition({ left, arrowLeft });
+  }, []);
+
+  const handlePinnedRowScroll = () => {
+    if (expandedPinnedId) updatePinnedBubblePosition(expandedPinnedId);
+  };
+
   useLayoutEffect(() => {
     const previousCount = lastMessageCountRef.current;
     const nextCount = messages.length;
@@ -690,6 +726,33 @@ export function Chat({
     setExpandedPinnedId(null);
   }, [expandedPinnedId, pinnedSuperChats]);
 
+  useLayoutEffect(() => {
+    if (!expandedPinnedId) return;
+    updatePinnedBubblePosition(expandedPinnedId);
+  }, [expandedPinnedId, pinnedSuperChats.length, updatePinnedBubblePosition]);
+
+  useEffect(() => {
+    if (!expandedPinnedId) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && pinStackRef.current?.contains(target)) return;
+      setExpandedPinnedId(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpandedPinnedId(null);
+    };
+    const handleResize = () => updatePinnedBubblePosition(expandedPinnedId);
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [expandedPinnedId, updatePinnedBubblePosition]);
+
   return (
     <aside
       className={cn('gl-chat', sheetMode && 'is-sheet', readOnly && 'is-readonly')}
@@ -730,19 +793,46 @@ export function Chat({
         )}
       </div>
       {effectiveTab === 'chat' && pinnedSuperChats.length > 0 && (
-        <div className="gl-sc-pin-stack" aria-label={t('liveRoom.chatPanel.pinnedSuperChats')}>
-          {pinnedSuperChats.map(({ message, remainingMs, durationMs }) => (
-            <PinnedSuperChatCard
-              key={message.id}
-              m={message}
-              remainingMs={remainingMs}
-              durationMs={durationMs}
-              expanded={expandedPinnedId === message.id}
-              onToggle={() =>
-                setExpandedPinnedId((current) => (current === message.id ? null : message.id))
+        <div
+          className="gl-sc-pin-stack"
+          ref={pinStackRef}
+          aria-label={t('liveRoom.chatPanel.pinnedSuperChats')}
+        >
+          <div className="gl-sc-pin-row" onScroll={handlePinnedRowScroll}>
+            {pinnedSuperChats.map(({ message, remainingMs, durationMs }) => (
+              <PinnedSuperChatPill
+                key={message.id}
+                m={message}
+                remainingMs={remainingMs}
+                durationMs={durationMs}
+                active={expandedPinnedId === message.id}
+                buttonRef={(node) => {
+                  if (node) {
+                    pinButtonRefs.current.set(message.id, node);
+                  } else {
+                    pinButtonRefs.current.delete(message.id);
+                  }
+                }}
+                onToggle={() => {
+                  setExpandedPinnedId((current) => {
+                    const next = current === message.id ? null : message.id;
+                    if (next) window.requestAnimationFrame(() => updatePinnedBubblePosition(next));
+                    return next;
+                  });
+                }}
+              />
+            ))}
+          </div>
+          {expandedPinnedId && (
+            <PinnedSuperChatBubble
+              m={
+                pinnedSuperChats.find((item) => item.message.id === expandedPinnedId)?.message ??
+                pinnedSuperChats[0].message
               }
+              locale={locale}
+              position={pinBubblePosition}
             />
-          ))}
+          )}
         </div>
       )}
       {effectiveTab === 'chat' ? (
