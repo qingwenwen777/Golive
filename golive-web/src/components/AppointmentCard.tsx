@@ -5,6 +5,7 @@ import { CheckCircle2, Clock3, Pencil, PlayCircle, Trash2, X } from 'lucide-reac
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
 import { cn } from '@/lib/cn';
+import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import type { AppointmentItem } from '@/api/room';
 
 export interface AppointmentCardProps {
@@ -50,6 +51,10 @@ export function AppointmentCard({
   });
   const channelName = appointment.channel || `Creator ${appointment.ownerId.slice(0, 8)}`;
   const appointmentLabel = t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' });
+  const hoverStyle = useCoverHoverStyle(
+    appointment.cover,
+    channelName || appointment.title || appointment.id,
+  );
 
   const main = (
     <>
@@ -89,7 +94,14 @@ export function AppointmentCard({
   );
 
   return (
-    <article className={cn('gl-appointment-card', managementMode && 'is-management')}>
+    <article
+      className={cn(
+        'gl-appointment-card',
+        !managementMode && 'gl-video-hover-card',
+        managementMode && 'is-management',
+      )}
+      style={managementMode ? undefined : hoverStyle}
+    >
       {content}
       {managementMode && (
         <div className="gl-appointment-actions">

@@ -14,7 +14,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { copyText } from '@/lib/clipboard';
+import { cn } from '@/lib/cn';
 import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
+import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useLangStore } from '@/stores/useLangStore';
 import { streamChannelName, type Stream } from '@/types/stream';
 
@@ -51,6 +53,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const hasReplay = stream.status === 'ended' && Boolean(stream.replay?.canWatch);
   const canOpen = isLive || hasReplay;
   const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
+  const hoverStyle = useCoverHoverStyle(stream.cover, channelName || title || stream.id);
 
   useEffect(() => {
     setSaved(isInLibrary(WATCH_LATER_KEY, stream.id));
@@ -77,9 +80,14 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const copyLink = async () => {
     const href = `${window.location.origin}/live/${stream.id}`;
     try {
-      const method = await copyText(href, t('liveRoom.copyTarget', { defaultValue: 'live room link' }));
+      const method = await copyText(
+        href,
+        t('liveRoom.copyTarget', { defaultValue: 'live room link' }),
+      );
       if (method === 'manual') {
-        toast.info(t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }));
+        toast.info(
+          t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }),
+        );
       } else {
         toast.success(t('liveRoom.copySuccess', { defaultValue: 'Live room link copied.' }));
       }
@@ -95,7 +103,12 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
 
   return (
     <div
-      className={`gl-card${canOpen ? '' : ' is-ended'}${hasReplay ? ' is-replay' : ''}`}
+      className={cn(
+        'gl-card gl-video-hover-card',
+        !canOpen && 'is-ended',
+        hasReplay && 'is-replay',
+      )}
+      style={hoverStyle}
       tabIndex={canOpen ? 0 : -1}
       role={canOpen ? 'link' : 'article'}
       aria-disabled={!canOpen}
@@ -104,7 +117,9 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         if (canOpen && e.key === 'Enter') handleOpen();
       }}
     >
-      <div className={`gl-card-cover relative overflow-hidden rounded-card${stream.cover ? ' has-image' : ''}`}>
+      <div
+        className={`gl-card-cover relative overflow-hidden rounded-card${stream.cover ? 'has-image' : ''}`}
+      >
         <div
           aria-hidden
           className="absolute inset-0 flex items-center justify-center"
@@ -122,7 +137,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             alt=""
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-contain"
           />
         ) : null}
         <div className="gl-card-gloss" />
@@ -144,12 +159,13 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
           </span>
           <span className="gl-dur-pill">{stream.duration}</span>
         </div>
-        <div className="gl-card-hover-outline" />
       </div>
       <div className="gl-card-meta">
-        <Avatar name={channelName} src={stream.avatar} size={36} />
+        <Avatar name={channelName} src={stream.avatar} size={44} />
         <div className="gl-card-text">
-          <div className="gl-card-title">{title}</div>
+          <div className="gl-card-title" title={title}>
+            {title}
+          </div>
           <div className="gl-card-chan">
             <span className="truncate">{channelName}</span>
             {stream.verified && (
@@ -178,11 +194,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
               <Icons.More size={18} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-48"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem onSelect={toggleWatchLater}>
               {saved ? 'Remove from Watch later' : 'Save to Watch later'}
             </DropdownMenuItem>

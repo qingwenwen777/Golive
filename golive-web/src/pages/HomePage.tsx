@@ -35,6 +35,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
 import { localizedGiftName } from '@/lib/gift';
+import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { streamChannelName, type Stream } from '@/types/stream';
 
 const UPCOMING_APPOINTMENT_LIMIT = 3;
@@ -320,9 +321,14 @@ function HotReplayCard({ replay }: { replay: HotReplayItem }) {
   const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
   const category =
     i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;
+  const hoverStyle = useCoverHoverStyle(replay.cover, channelName || title || replay.id);
 
   return (
-    <Link className="gl-home-replay-card" to={`/live/${encodeURIComponent(replay.id)}`}>
+    <Link
+      className="gl-home-replay-card gl-video-hover-card"
+      style={hoverStyle}
+      to={`/live/${encodeURIComponent(replay.id)}`}
+    >
       <div className={cn('gl-home-replay-cover', replay.cover && 'has-image')}>
         {replay.cover ? (
           <LoadableImage src={replay.cover} alt="" loading="lazy" />

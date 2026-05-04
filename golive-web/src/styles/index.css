@@ -1034,6 +1034,7 @@ button:focus-visible,
 input:focus-visible,
 .gl-card:focus-visible,
 .gl-appointment-link:focus-visible,
+.gl-home-replay-card:focus-visible,
 .gl-chip:focus-visible,
 .gl-side-item:focus-visible,
 .gl-logo:focus-visible {
@@ -1777,7 +1778,14 @@ input:focus-visible,
   );
   background-size: 220% 100%;
 }
-.gl-card-cover .gl-loadable-img,
+.gl-card-cover .gl-loadable-img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .gl-history-thumb .gl-loadable-img,
 .gl-history-cover .gl-loadable-img,
 .gl-creator-latest-cover .gl-loadable-img {
@@ -1810,13 +1818,13 @@ input:focus-visible,
 
 .gl-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-top: 8px;
 }
 @media (max-width: 1439px) {
   .gl-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .gl-home-rec-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1843,7 +1851,21 @@ input:focus-visible,
   }
 }
 
+.gl-video-hover-card {
+  border-radius: 16px;
+  background-color: transparent;
+  color: inherit;
+  margin: -6px;
+  padding: 6px;
+  transition: background-color 0.16s ease;
+}
+.gl-video-hover-card:hover,
+.gl-video-hover-card:focus-within {
+  background-color: var(--gl-card-hover-bg, rgba(242, 242, 242, 0.88));
+  color: inherit;
+}
 .gl-card {
+  display: block;
   cursor: pointer;
   min-width: 0;
 }
@@ -1857,19 +1879,9 @@ input:focus-visible,
   border-radius: 12px;
   overflow: hidden;
   background: var(--gl-bg-hover);
-  transition: transform 0.15s ease;
 }
-.gl-card:hover .gl-card-cover {
-  transform: translateY(-4px);
-}
-.gl-card.is-ended:hover .gl-card-cover {
-  transform: none;
-}
-.gl-card:hover .gl-card-hover-outline {
-  opacity: 1;
-}
-.gl-card.is-ended:hover .gl-card-hover-outline {
-  opacity: 0;
+.gl-card-cover.has-image {
+  background: #111111;
 }
 .gl-card-gloss {
   position: absolute;
@@ -1905,29 +1917,20 @@ input:focus-visible,
   font-weight: 500;
   line-height: 1.2;
 }
-.gl-card-hover-outline {
-  position: absolute;
-  inset: 4px;
-  z-index: 3;
-  border: 2px dashed rgba(255, 255, 255, 0.6);
-  border-radius: 8px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-}
 .gl-card-meta {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
-  padding: 12px 0 0;
+  padding: 12px 2px 0;
 }
 .gl-card-text {
   flex: 1;
   min-width: 0;
 }
 .gl-card-title {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
   color: var(--gl-text);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1938,16 +1941,22 @@ input:focus-visible,
 .gl-card-chan,
 .gl-card-sub {
   color: var(--gl-text-2);
-  font-size: 12px;
+  font-size: 14px;
+  line-height: 1.35;
   display: flex;
   align-items: center;
   gap: 4px;
   margin-top: 4px;
   min-width: 0;
 }
+.gl-card-sub {
+  margin-top: 2px;
+}
 .gl-card-more {
-  width: 24px;
-  height: 24px;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  margin-top: -4px;
 }
 
 /* ── Skeletons ──────────────────────────────────────────────────────── */
@@ -1965,8 +1974,8 @@ input:focus-visible,
   padding: 12px 0 0;
 }
 .gl-skel-avatar {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--gl-bg-hover);
   position: relative;
@@ -2244,13 +2253,6 @@ input:focus-visible,
   border-radius: 12px;
   background: var(--gl-bg-hover);
   color: var(--gl-text);
-  transition:
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
-}
-.gl-home-replay-card:hover .gl-home-replay-cover {
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
-  transform: translateY(-2px);
 }
 .gl-home-replay-cover.has-image {
   background: #111111;
@@ -2326,9 +2328,6 @@ input:focus-visible,
   margin-top: 2px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.dark .gl-home-replay-card:hover .gl-home-replay-cover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
 }
 .gl-home-level-gifts {
   display: flex;
@@ -7596,6 +7595,10 @@ button.gl-fan-badge-empty {
 .gl-yt-vrow-card {
   min-width: 0;
 }
+.gl-yt-vrow-card .gl-video-hover-card {
+  margin: 0;
+  padding: 0;
+}
 .gl-yt-vrow-card .gl-card {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
@@ -9433,18 +9436,6 @@ button.gl-fan-badge-empty {
   border-radius: 12px;
   background: var(--gl-bg-hover);
   color: var(--gl-text);
-  transition:
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
-}
-
-.gl-appointment-card:hover .gl-appointment-cover {
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
-  transform: translateY(-2px);
-}
-
-.dark .gl-appointment-card:hover .gl-appointment-cover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
 }
 
 .gl-appointment-cover.has-image {
@@ -9588,11 +9579,6 @@ button.gl-fan-badge-empty {
   height: 100%;
   min-height: clamp(170px, 12vw, 220px);
   border-radius: 10px 0 0 10px;
-}
-
-.gl-appointment-card.is-management:hover .gl-appointment-cover {
-  box-shadow: none;
-  transform: none;
 }
 
 .gl-appointment-card.is-management .gl-appointment-body {
