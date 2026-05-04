@@ -9,21 +9,28 @@ import {
   Gift as GiftIcon,
   Inbox,
   LockKeyhole,
+  MessageCircle,
   Radio,
   Sparkles,
+  ThumbsUp,
+  TrendingUp,
+  UsersRound,
   UserPlus,
 } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
+import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { useGifts } from '@/api/gift';
 import {
   useFollow,
+  useHotReplays,
   useRecommendedCreators,
   useRooms,
   useUnfollow,
   useUpcomingAppointments,
+  type HotReplayItem,
   type RecommendedCreator,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -141,6 +148,7 @@ export default function HomePage() {
 
         <UpcomingAppointmentsSection />
         <HomeRecommendationsSection />
+        <HomeHotReplaysSection />
         <HomeLevelGiftsSection />
       </div>
     </>
@@ -224,6 +232,128 @@ function HomeRecommendationsSection() {
         <div className="gl-creator-empty-soft">{t('home.recommendations.empty')}</div>
       )}
     </section>
+  );
+}
+
+function HomeHotReplaysSection() {
+  const { t } = useTranslation('pages');
+  const hotReplays = useHotReplays(4, 3);
+  const items = hotReplays.data?.items ?? [];
+
+  return (
+    <section
+      className="gl-home-hot-replays"
+      aria-label={t('home.hotReplays.title', { defaultValue: 'Hot live replays' })}
+    >
+      <div className="gl-section-title-row">
+        <div>
+          <h2>{t('home.hotReplays.title', { defaultValue: 'Hot live replays' })}</h2>
+          <span>
+            {t('home.hotReplays.subtitle', {
+              defaultValue:
+                'Top replays from the last three days by likes, comments, coins, and peak viewers.',
+            })}
+          </span>
+        </div>
+      </div>
+      {hotReplays.isPending ? (
+        <div className="gl-home-replay-grid" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div className="gl-home-replay-card is-loading" key={index} />
+          ))}
+        </div>
+      ) : items.length > 0 ? (
+        <div className="gl-home-replay-grid">
+          {items.map((replay, index) => (
+            <HotReplayCard key={replay.id} replay={replay} rank={index + 1} />
+          ))}
+        </div>
+      ) : (
+        <div className="gl-creator-empty-soft">
+          {t('home.hotReplays.empty', { defaultValue: 'No hot replays in the last three days.' })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HotReplayCard({ replay, rank }: { replay: HotReplayItem; rank: number }) {
+  const { t, i18n } = useTranslation('pages');
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const channelName = streamChannelName(replay);
+  const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
+  const category =
+    i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;
+
+  return (
+    <Link className="gl-home-replay-card" to={`/live/${encodeURIComponent(replay.id)}`}>
+      <div className={cn('gl-home-replay-cover', replay.cover && 'has-image')}>
+        {replay.cover ? (
+          <LoadableImage src={replay.cover} alt="" loading={rank === 1 ? 'eager' : 'lazy'} />
+        ) : (
+          <span>{channelName.slice(0, 1).toUpperCase()}</span>
+        )}
+        <div className="gl-home-replay-rank">
+          <TrendingUp size={12} />
+          {t('home.hotReplays.rank', { rank, defaultValue: '#{{rank}}' })}
+        </div>
+        <div className="gl-home-replay-duration">{replay.duration}</div>
+      </div>
+      <div className="gl-home-replay-body">
+        <div className="gl-home-replay-title" title={title}>
+          {title}
+        </div>
+        <div className="gl-home-replay-channel">
+          <Avatar name={channelName} src={replay.avatar} size={22} />
+          <span>{channelName}</span>
+        </div>
+        <div
+          className="gl-home-replay-stats"
+          aria-label={t('home.hotReplays.metrics', { defaultValue: 'Replay metrics' })}
+        >
+          <span
+            title={t('home.hotReplays.likes', {
+              count: replay.likes,
+              defaultValue: '{{count}} likes',
+            })}
+          >
+            <ThumbsUp size={12} />
+            {formatCompactNumber(replay.likes, locale)}
+          </span>
+          <span
+            title={t('home.hotReplays.comments', {
+              count: replay.commentCount,
+              defaultValue: '{{count}} comments',
+            })}
+          >
+            <MessageCircle size={12} />
+            {formatCompactNumber(replay.commentCount, locale)}
+          </span>
+          <span
+            title={t('home.hotReplays.revenue', {
+              count: replay.revenueCoin,
+              defaultValue: '{{count}} coins',
+            })}
+          >
+            <Coins size={12} />
+            {formatCompactNumber(replay.revenueCoin, locale)}
+          </span>
+          <span
+            title={t('home.hotReplays.peakViewers', {
+              count: replay.peakViewers ?? 0,
+              defaultValue: '{{count}} peak viewers',
+            })}
+          >
+            <UsersRound size={12} />
+            {formatCompactNumber(replay.peakViewers ?? 0, locale)}
+          </span>
+        </div>
+        <div className="gl-home-replay-foot">
+          <span>{category}</span>
+          <strong>{t('liveRoom.replay.badge', { defaultValue: 'Replay' })}</strong>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -384,4 +514,11 @@ function formatRecommendationTime(value: string, locale: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function formatCompactNumber(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
 }

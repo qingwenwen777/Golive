@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,6 +19,21 @@ type LiveHistoryResp struct {
 	Total int64             `json:"total"`
 	Page  int               `json:"page"`
 	Size  int               `json:"size"`
+}
+
+type HotReplayResp struct {
+	Items []HotReplayItem `json:"items"`
+	Total int64           `json:"total"`
+	Days  int             `json:"days"`
+	Size  int             `json:"size"`
+}
+
+type HotReplayItem struct {
+	model.Stream
+	Likes        int64   `json:"likes"`
+	CommentCount int64   `json:"commentCount"`
+	RevenueCoin  int64   `json:"revenueCoin"`
+	HotScore     float64 `json:"hotScore"`
 }
 
 type LiveHistoryItem struct {
@@ -103,6 +119,111 @@ func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID
 		return nil, err
 	}
 	return &LiveHistoryResp{Items: items, Total: total, Page: page, Size: size}, nil
+}
+
+func (s *RoomService) HotReplays(ctx context.Context, viewerID string, days, size int) (*HotReplayResp, error) {
+	if days < 1 {
+		days = 3
+	}
+	if days > 30 {
+		days = 30
+	}
+	if size < 1 {
+		size = 4
+	}
+	if size > 12 {
+		size = 12
+	}
+	if s.replay == nil {
+		return &HotReplayResp{Items: []HotReplayItem{}, Total: 0, Days: days, Size: size}, nil
+	}
+
+	since := s.now().AddDate(0, 0, -days)
+	rooms, err := s.rooms.HotReplayCandidates(ctx, since, 100)
+	if err != nil {
+		return nil, err
+	}
+	visibleRooms := make([]model.Room, 0, len(rooms))
+	replaysByRoom := make(map[string]*model.Replay, len(rooms))
+	for _, room := range rooms {
+		replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if replay == nil || !replay.CanWatch {
+			continue
+		}
+		visibleRooms = append(visibleRooms, room)
+		replaysByRoom[room.ID] = replay
+	}
+	if len(visibleRooms) == 0 {
+		return &HotReplayResp{Items: []HotReplayItem{}, Total: 0, Days: days, Size: size}, nil
+	}
+
+	roomIDs := make([]string, 0, len(visibleRooms))
+	for _, room := range visibleRooms {
+		roomIDs = append(roomIDs, room.ID)
+	}
+	rows, err := s.revenueRows(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	revenueByRoom := make(map[string]int64, len(roomIDs))
+	for _, row := range rows {
+		revenueByRoom[row.RoomID] += row.Amount
+	}
+	commentCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	likeCounts := make(map[string]int64, len(roomIDs))
+	if s.social != nil {
+		likeCounts, err = s.social.LikeCounts(ctx, roomIDs)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var maxLikes, maxComments, maxRevenue, maxPeak int64
+	for _, room := range visibleRooms {
+		maxLikes = maxInt64(maxLikes, likeCounts[room.ID])
+		maxComments = maxInt64(maxComments, commentCounts[room.ID])
+		maxRevenue = maxInt64(maxRevenue, revenueByRoom[room.ID])
+		maxPeak = maxInt64(maxPeak, maxInt64(room.PeakViewers, room.Viewers))
+	}
+
+	now := s.now()
+	items := make([]HotReplayItem, 0, len(visibleRooms))
+	for _, room := range visibleRooms {
+		st := room.ToStream(now)
+		st.Replay = replaysByRoom[room.ID]
+		if err := s.addSubscriberCount(ctx, &st); err != nil {
+			return nil, err
+		}
+		likes := likeCounts[room.ID]
+		comments := commentCounts[room.ID]
+		revenue := revenueByRoom[room.ID]
+		peak := maxInt64(room.PeakViewers, room.Viewers)
+		st.PeakViewers = peak
+		items = append(items, HotReplayItem{
+			Stream:       st,
+			Likes:        likes,
+			CommentCount: comments,
+			RevenueCoin:  revenue,
+			HotScore:     hotReplayScore(likes, comments, revenue, peak, maxLikes, maxComments, maxRevenue, maxPeak),
+		})
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].HotScore == items[j].HotScore {
+			return items[i].EndedAt > items[j].EndedAt
+		}
+		return items[i].HotScore > items[j].HotScore
+	})
+	total := int64(len(items))
+	if len(items) > size {
+		items = items[:size]
+	}
+	return &HotReplayResp{Items: items, Total: total, Days: days, Size: size}, nil
 }
 
 func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID string) (*CreatorAnalyticsResp, error) {
@@ -490,4 +611,25 @@ func isMissingAnalyticsTable(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
+}
+
+func hotReplayScore(likes, comments, revenue, peak, maxLikes, maxComments, maxRevenue, maxPeak int64) float64 {
+	return normalized(likes, maxLikes)*0.35 +
+		normalized(comments, maxComments)*0.25 +
+		normalized(revenue, maxRevenue)*0.25 +
+		normalized(peak, maxPeak)*0.15
+}
+
+func normalized(value, maxValue int64) float64 {
+	if value <= 0 || maxValue <= 0 {
+		return 0
+	}
+	return float64(value) / float64(maxValue)
+}
+
+func maxInt64(a, b int64) int64 {
+	if b > a {
+		return b
+	}
+	return a
 }

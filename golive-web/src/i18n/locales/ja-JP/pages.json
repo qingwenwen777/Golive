@@ -24,6 +24,17 @@
       "subscribed": "登録済み",
       "empty": "おすすめできるクリエイターはまだありません。"
     },
+    "hotReplays": {
+      "title": "人気ライブリプレイ",
+      "subtitle": "直近3日間の高評価、コメント、coins、ピーク視聴者数でランキングします。",
+      "rank": "#{{rank}}",
+      "metrics": "リプレイ指標",
+      "likes": "高評価 {{count}}",
+      "comments": "コメント {{count}}",
+      "revenue": "{{count}} coins",
+      "peakViewers": "ピーク {{count}} 人",
+      "empty": "直近3日間の人気リプレイはありません。"
+    },
     "myAppointments": {
       "title": "予約中のライブ",
       "subtitle": "予約したライブルームがここに表示されます。",

@@ -24,6 +24,17 @@
       "subscribed": "Subscribed",
       "empty": "No creator recommendations yet."
     },
+    "hotReplays": {
+      "title": "Hot live replays",
+      "subtitle": "Ranked from the last three days by likes, comments, coins, and peak viewers.",
+      "rank": "#{{rank}}",
+      "metrics": "Replay heat metrics",
+      "likes": "{{count}} likes",
+      "comments": "{{count}} comments",
+      "revenue": "{{count}} coins",
+      "peakViewers": "{{count}} peak viewers",
+      "empty": "No hot replays in the last three days."
+    },
     "myAppointments": {
       "title": "My appointments",
       "subtitle": "Your reserved live rooms appear here.",

@@ -78,6 +78,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.GET("/channels/:channel/analytics", auth, roomH.ChannelAnalytics)
 		rooms.GET("/channels/:channel/history/:recordID/analytics", auth, roomH.LiveAnalysis)
 		rooms.GET("/posts/mine", auth, postH.ListMine)
+		rooms.GET("/replays/hot", optionalAuth, roomH.HotReplays)
 		rooms.GET("/replays/mine", auth, replayH.ListMine)
 		rooms.POST("/posts", auth, postH.Create)
 		rooms.POST("/posts/images", auth, postH.UploadImage)

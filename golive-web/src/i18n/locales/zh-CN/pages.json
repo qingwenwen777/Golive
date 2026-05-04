@@ -24,6 +24,17 @@
       "subscribed": "已订阅",
       "empty": "暂无可推荐的主播。"
     },
+    "hotReplays": {
+      "title": "热门直播回放",
+      "subtitle": "近三天按点赞、评论、coins 收益和峰值人数综合排序。",
+      "rank": "#{{rank}}",
+      "metrics": "回放热度指标",
+      "likes": "{{count}} 个赞",
+      "comments": "{{count}} 条评论",
+      "revenue": "{{count}} coins",
+      "peakViewers": "峰值 {{count}} 人",
+      "empty": "近三天暂无热门直播回放。"
+    },
     "myAppointments": {
       "title": "我的预约",
       "subtitle": "你预约的直播会显示在这里。",

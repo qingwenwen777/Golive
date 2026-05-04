@@ -57,6 +57,17 @@ func (h *RoomHandler) ChannelHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *RoomHandler) HotReplays(c *gin.Context) {
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "3"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "4"))
+	resp, err := h.svc.HotReplays(c.Request.Context(), UserIDFromCtx(c), days, size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *RoomHandler) ChannelAnalytics(c *gin.Context) {
 	resp, err := h.svc.CreatorAnalytics(c.Request.Context(), c.Param("channel"), UserIDFromCtx(c))
 	if err != nil {

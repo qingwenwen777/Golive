@@ -134,6 +134,25 @@ func (s *SocialRepo) GetLike(ctx context.Context, sid, uid string) (*LikeState, 
 	}, nil
 }
 
+func (s *SocialRepo) LikeCounts(ctx context.Context, sids []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(sids))
+	if s == nil || s.rdb == nil || len(sids) == 0 {
+		return out, nil
+	}
+	keys := make([]string, 0, len(sids))
+	for _, sid := range sids {
+		keys = append(keys, likeCountKey(sid))
+	}
+	values, err := s.rdb.MGet(ctx, keys...).Result()
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+	for i, value := range values {
+		out[sids[i]] = toInt64(value)
+	}
+	return out, nil
+}
+
 // Lua scripts. KEYS[1]=stateHash, KEYS[2]=countKey. Each returns {liked, disliked, count}.
 
 var luaLike = redis.NewScript(`

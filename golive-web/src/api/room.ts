@@ -343,6 +343,20 @@ export interface ReplayListResp {
   size: number;
 }
 
+export interface HotReplayItem extends Stream {
+  likes: number;
+  commentCount: number;
+  revenueCoin: number;
+  hotScore: number;
+}
+
+export interface HotReplayListResp {
+  items: HotReplayItem[];
+  total: number;
+  days: number;
+  size: number;
+}
+
 export interface UpdateReplayPayload {
   visibility: ReplayVisibility;
 }
@@ -504,6 +518,21 @@ export function useStudioReplays(enabled = true, page = 1, size = 12) {
     enabled,
     staleTime: 20_000,
     placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useHotReplays(size = 4, days = 3) {
+  return useQuery<HotReplayListResp, Error>({
+    queryKey: ['hot-replays', size, days],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<HotReplayListResp>('/rooms/replays/hot', {
+        params: { size, days },
+        signal,
+      });
+      return data;
+    },
+    staleTime: 60_000,
     retry: 1,
   });
 }
