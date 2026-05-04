@@ -14,12 +14,11 @@ export interface PublisherSession {
 
 export function publisherSessionFromStream(stream: Stream): PublisherSession | null {
   if (!stream.streamKey) return null;
-  const rtmpServer =
+  const rtmpServer = (
     stream.rtmpServer ||
-    ((import.meta.env.VITE_RTMP_BASE as string | undefined) || 'rtmp://localhost/live').replace(
-      /\/$/,
-      '',
-    );
+    import.meta.env.VITE_RTMP_BASE ||
+    'rtmp://localhost/live'
+  ).replace(/\/$/, '');
   return {
     streamId: stream.id,
     streamKey: stream.streamKey,

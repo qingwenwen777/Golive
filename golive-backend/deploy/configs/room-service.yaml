@@ -27,7 +27,7 @@ cloudflare:
   account_id: ""
   stream_token: ""
   api_base: "https://api.cloudflare.com/client/v4"
-  recording_mode: "automatic"
+  recording_mode: "off"
   http_timeout: 15s
 
 replay:
