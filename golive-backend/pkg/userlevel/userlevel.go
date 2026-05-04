@@ -2,7 +2,7 @@ package userlevel
 
 const (
 	MaxLevel     = 99
-	MaxTopupCoin = int64(1_000_000_000)
+	MaxTopupCoin = int64(10_000_000)
 )
 
 type Snapshot struct {

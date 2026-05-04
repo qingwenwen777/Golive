@@ -1068,7 +1068,7 @@
     "authTitle": "ログインして coins を管理",
     "authSub": "利用履歴、チャージ、デイリータスク、出金プレビューを確認できます。",
     "guest": "ゲスト",
-    "heroSub": "{{name}} の coin アカウント。チャージ比率は 1,000 coins = 1 人民元です。",
+    "heroSub": "{{name}} の coin アカウント。チャージ比率は 10 coins = ¥1 です。",
     "goTopup": "チャージ",
     "watchHistory": "視聴履歴",
     "stats": {
@@ -1112,7 +1112,7 @@
     "emptySub": "チャージ、ギフト、SC、予想の履歴がここに表示されます。",
     "topup": {
       "title": "チャージ",
-      "sub": "1,000 coins からチャージできます。上限はありません。",
+      "sub": "10 coins からチャージできます。上限はありません。",
       "amount": "チャージ数量",
       "amountAria": "チャージする coins 数量",
       "pay": "支払い",
@@ -1148,7 +1148,7 @@
     "next": "次へ",
     "progressMinutes": "{{current}} / {{total}} 分",
     "toast": {
-      "minTopup": "チャージは 1,000 coins 以上です。",
+      "minTopup": "チャージは 10 coins 以上です。",
       "topupSuccess": "チャージ成功。現在の残高は {{balance}} coins です。",
       "topupFailed": "チャージに失敗しました。",
       "taskIncomplete": "タスク完了後に受け取れます。",

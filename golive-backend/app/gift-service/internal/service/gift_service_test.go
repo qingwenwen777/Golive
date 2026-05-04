@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
@@ -290,6 +291,46 @@ func TestAmountToTier(t *testing.T) {
 	for amount, want := range cases {
 		require.Equalf(t, want, service.AmountToTier(amount), "amount=%d", amount)
 	}
+}
+
+func TestFanBadgeLevelThresholds(t *testing.T) {
+	cases := map[int64]int{
+		0: 1, 9: 1, 10: 2, 29: 2, 30: 3, 59: 3, 60: 4,
+	}
+	for contribution, want := range cases {
+		require.Equalf(t, want, repo.FanBadgeLevel(contribution), "contribution=%d", contribution)
+	}
+}
+
+func TestListFanBadgesRecomputesLevels(t *testing.T) {
+	db := newTestDB(t, 0)
+	now := time.Now()
+	require.NoError(t, db.Create(&[]model.FanBadge{
+		{
+			UserID:            "u-demo",
+			CreatorID:         "creator-low",
+			CreatorName:       "Low",
+			TotalContribution: 9,
+			Level:             99,
+			UpdatedAt:         now.Add(time.Minute),
+		},
+		{
+			UserID:            "u-demo",
+			CreatorID:         "creator-high",
+			CreatorName:       "High",
+			TotalContribution: 30,
+			Level:             1,
+			UpdatedAt:         now,
+		},
+	}).Error)
+
+	badges, err := repo.NewOrderRepo(db).ListFanBadges(context.Background(), "u-demo")
+	require.NoError(t, err)
+	require.Len(t, badges, 2)
+	require.Equal(t, "creator-high", badges[0].CreatorID)
+	require.Equal(t, 3, badges[0].Level)
+	require.Equal(t, "creator-low", badges[1].CreatorID)
+	require.Equal(t, 1, badges[1].Level)
 }
 
 // 7) SC tier 0 rejected.

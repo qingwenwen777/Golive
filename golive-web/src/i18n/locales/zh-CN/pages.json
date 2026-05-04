@@ -1069,7 +1069,7 @@
     "authTitle": "登录后管理 coins",
     "authSub": "查看消费记录、充值、每日任务和提现预留信息。",
     "guest": "游客",
-    "heroSub": "{{name}} 的 coin 账户，充值比例为 1,000 coins = 1 人民币。",
+    "heroSub": "{{name}} 的 coin 账户，充值比例为 10 coins = ¥1。",
     "goTopup": "去充值",
     "watchHistory": "观看记录",
     "stats": {
@@ -1113,7 +1113,7 @@
     "emptySub": "开始充值、送礼物、发 SC 或参与竞猜后会出现在这里。",
     "topup": {
       "title": "充值",
-      "sub": "1,000 coins 起充，上不封顶。",
+      "sub": "10 coins 起充，上不封顶。",
       "amount": "充值数量",
       "amountAria": "充值 coins 数量",
       "pay": "需支付",
@@ -1149,7 +1149,7 @@
     "next": "下一页",
     "progressMinutes": "{{current}} / {{total}} 分钟",
     "toast": {
-      "minTopup": "充值至少 1,000 coins。",
+      "minTopup": "充值至少 10 coins。",
       "topupSuccess": "充值成功，当前余额 {{balance}} coins。",
       "topupFailed": "充值失败。",
       "taskIncomplete": "任务还没完成，完成后就能领取。",

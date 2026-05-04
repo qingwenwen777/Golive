@@ -3,6 +3,9 @@ package userlevel
 import "testing"
 
 func TestRequiredCoinsForLevelBounds(t *testing.T) {
+	if MaxTopupCoin != 10_000_000 {
+		t.Fatalf("max topup coin = %d, want 10000000", MaxTopupCoin)
+	}
 	if got := RequiredCoinsForLevel(1); got != 0 {
 		t.Fatalf("level 1 threshold = %d, want 0", got)
 	}

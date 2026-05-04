@@ -153,6 +153,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
           'gl-side-item',
           isNavItemActive(it.key, active) && 'is-active',
           it.key === 'studio' && studioSubnavOpen && canShowStudioSubnav && 'is-sub-open',
+          it.key === 'coins' && 'is-coins',
           collapsed && 'is-col',
         )}
         onClick={() => handleNav(it.key, it.route)}

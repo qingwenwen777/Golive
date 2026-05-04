@@ -216,8 +216,8 @@ func (h *UserHandler) TopupCoins(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid amount"})
 		return
 	}
-	if req.Amount < 1000 {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 1,000 coins"})
+	if req.Amount < 10 {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 10 coins"})
 		return
 	}
 	u, _, err := h.users.IncrementCoinsWithTransaction(

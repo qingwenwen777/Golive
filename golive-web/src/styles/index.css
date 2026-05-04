@@ -245,6 +245,14 @@
   transform: translateX(20px);
 }
 
+.gl-live-replay-save {
+  justify-self: end;
+  width: fit-content;
+  min-width: 0;
+  min-height: 38px;
+  padding-inline: 18px;
+}
+
 .gl-creator-secondary.is-danger {
   color: #b42318;
 }
@@ -1824,6 +1832,12 @@ input:focus-visible,
 .gl-side-item.is-active {
   background: var(--gl-bg-hover);
   font-weight: 850;
+}
+.gl-side-item.is-coins {
+  font-weight: 900;
+}
+.gl-side-item.is-coins svg {
+  stroke-width: 2.5;
 }
 .gl-side-label {
   flex: 1;

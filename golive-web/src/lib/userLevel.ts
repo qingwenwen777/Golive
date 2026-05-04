@@ -1,7 +1,7 @@
 import type { UserLevelInfo } from '@/types/user';
 
 export const USER_MAX_LEVEL = 99;
-export const USER_MAX_TOPUP_COINS = 1_000_000_000;
+export const USER_MAX_TOPUP_COINS = 10_000_000;
 
 export function requiredCoinsForLevel(level: number): number {
   if (level <= 1) return 0;

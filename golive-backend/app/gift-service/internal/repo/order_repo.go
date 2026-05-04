@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -140,10 +141,10 @@ func FanBadgeLevel(totalContribution int64) int {
 		return 1
 	}
 	level := 1
-	threshold := int64(1000)
+	threshold := int64(10)
 	for level < 99 && totalContribution >= threshold {
 		level++
-		threshold += int64(level) * 1000
+		threshold += int64(level) * 10
 	}
 	return level
 }
@@ -154,7 +155,22 @@ func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.F
 		Where("user_id = ?", userID).
 		Order("level DESC, total_contribution DESC, updated_at DESC").
 		Find(&badges).Error
-	return badges, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range badges {
+		badges[i].Level = FanBadgeLevel(badges[i].TotalContribution)
+	}
+	sort.SliceStable(badges, func(i, j int) bool {
+		if badges[i].Level != badges[j].Level {
+			return badges[i].Level > badges[j].Level
+		}
+		if badges[i].TotalContribution != badges[j].TotalContribution {
+			return badges[i].TotalContribution > badges[j].TotalContribution
+		}
+		return badges[i].UpdatedAt.After(badges[j].UpdatedAt)
+	})
+	return badges, nil
 }
 
 func (r *OrderRepo) UserLevel(ctx context.Context, userID string) (int, error) {

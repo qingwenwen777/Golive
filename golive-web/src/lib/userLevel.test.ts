@@ -8,8 +8,9 @@ import {
 } from './userLevel';
 
 describe('userLevel', () => {
-  it('keeps level 99 capped at one billion topup coins', () => {
+  it('keeps level 99 capped at ten million topup coins', () => {
     expect(USER_MAX_LEVEL).toBe(99);
+    expect(USER_MAX_TOPUP_COINS).toBe(10_000_000);
     expect(requiredCoinsForLevel(1)).toBe(0);
     expect(requiredCoinsForLevel(USER_MAX_LEVEL)).toBe(USER_MAX_TOPUP_COINS);
     expect(createLevelInfo(USER_MAX_TOPUP_COINS)).toMatchObject({

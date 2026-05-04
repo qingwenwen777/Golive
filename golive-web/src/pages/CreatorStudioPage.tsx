@@ -3353,7 +3353,7 @@ function LiveReplaySettingsPanel({ stream }: { stream: Stream }) {
         <VisibilitySelect value={visibility} onChange={setVisibility} />
         <button
           type="button"
-          className="gl-creator-primary"
+          className="gl-creator-primary gl-live-replay-save"
           disabled={!dirty || updateReplay.isPending}
           onClick={save}
         >

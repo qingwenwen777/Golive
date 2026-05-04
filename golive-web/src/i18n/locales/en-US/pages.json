@@ -1068,7 +1068,7 @@
     "authTitle": "Sign in to manage coins",
     "authSub": "View spending records, top up, daily tasks, and withdrawal previews.",
     "guest": "Guest",
-    "heroSub": "{{name}} coin account. Top-up rate: 1,000 coins = 1 RMB.",
+    "heroSub": "{{name}} coin account. Top-up rate: 10 coins = ¥1.",
     "goTopup": "Top up",
     "watchHistory": "Watch history",
     "stats": {
@@ -1112,7 +1112,7 @@
     "emptySub": "Top-ups, gifts, Super Chats, and betting activity will appear here.",
     "topup": {
       "title": "Top up",
-      "sub": "Minimum 1,000 coins. No upper limit.",
+      "sub": "Minimum 10 coins. No upper limit.",
       "amount": "Top-up amount",
       "amountAria": "Top-up coin amount",
       "pay": "Pay",
@@ -1148,7 +1148,7 @@
     "next": "Next",
     "progressMinutes": "{{current}} / {{total}} min",
     "toast": {
-      "minTopup": "Top-up must be at least 1,000 coins.",
+      "minTopup": "Top-up must be at least 10 coins.",
       "topupSuccess": "Top-up complete. Current balance: {{balance}} coins.",
       "topupFailed": "Top-up failed.",
       "taskIncomplete": "Finish the task before claiming.",

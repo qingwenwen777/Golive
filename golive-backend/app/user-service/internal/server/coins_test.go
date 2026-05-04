@@ -54,7 +54,7 @@ func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
 	login, err := auth.Register(ctx, "demo", "demo", "Demo")
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/topup", bytes.NewBufferString(`{"amount":1000}`))
+	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/topup", bytes.NewBufferString(`{"amount":10}`))
 	req.Header.Set("Authorization", "Bearer "+login.Token)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -63,14 +63,14 @@ func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	var got model.PublicUser
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
-	require.Equal(t, int64(2200), got.CoinBalance)
+	require.Equal(t, int64(1210), got.CoinBalance)
 	require.Equal(t, 1, got.LevelInfo.Level)
-	require.Equal(t, int64(1000), got.LevelInfo.TotalTopupCoins)
+	require.Equal(t, int64(10), got.LevelInfo.TotalTopupCoins)
 	require.Greater(t, got.LevelInfo.CoinsToNextLevel, int64(0))
 
 	persisted, err := users.FindByID(ctx, login.User.ID)
 	require.NoError(t, err)
-	require.Equal(t, int64(2200), persisted.CoinBalance)
+	require.Equal(t, int64(1210), persisted.CoinBalance)
 
 	txReq := httptest.NewRequest(http.MethodGet, "/users/me/coins/transactions", nil)
 	txReq.Header.Set("Authorization", "Bearer "+login.Token)
@@ -84,8 +84,8 @@ func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
 	require.NoError(t, json.Unmarshal(txRec.Body.Bytes(), &ledger))
 	require.Len(t, ledger.Items, 1)
 	require.Equal(t, model.CoinTxTopup, ledger.Items[0].Type)
-	require.Equal(t, int64(1000), ledger.Items[0].Amount)
-	require.Equal(t, int64(2200), ledger.Items[0].BalanceAfter)
+	require.Equal(t, int64(10), ledger.Items[0].Amount)
+	require.Equal(t, int64(1210), ledger.Items[0].BalanceAfter)
 }
 
 func TestTopupCoinsRejectsInvalidAmount(t *testing.T) {
@@ -93,7 +93,7 @@ func TestTopupCoinsRejectsInvalidAmount(t *testing.T) {
 	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/topup", bytes.NewBufferString(`{"amount":0}`))
+	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/topup", bytes.NewBufferString(`{"amount":9}`))
 	req.Header.Set("Authorization", "Bearer "+login.Token)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()

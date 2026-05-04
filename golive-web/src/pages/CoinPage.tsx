@@ -40,7 +40,9 @@ type RecordFilter =
   | 'task'
   | 'creator';
 
-const QUICK_TOPUPS = [1000, 5000, 10000, 50000] as const;
+const COINS_PER_RMB = 10;
+const MIN_TOPUP_COINS = 10;
+const QUICK_TOPUPS = [10, 50, 100, 500] as const;
 const WITHDRAW_FEE_RATE = 0.35;
 const RECORD_PAGE_SIZE = 8;
 
@@ -109,7 +111,7 @@ export default function CoinPage() {
   const topup = useTopupCoins();
   const claimTask = useClaimDailyCoinTask();
 
-  const [topupText, setTopupText] = useState('1000');
+  const [topupText, setTopupText] = useState(String(MIN_TOPUP_COINS));
   const [withdrawText, setWithdrawText] = useState('10000');
   const [filter, setFilter] = useState<RecordFilter>('all');
   const [recordPage, setRecordPage] = useState(1);
@@ -177,8 +179,8 @@ export default function CoinPage() {
       openLogin();
       return;
     }
-    if (topupAmount < 1000) {
-      toast.error(t('coin.toast.minTopup', { defaultValue: 'Top-up must be at least 1,000 coins.' }));
+    if (topupAmount < MIN_TOPUP_COINS) {
+      toast.error(t('coin.toast.minTopup', { defaultValue: 'Top-up must be at least 10 coins.' }));
       return;
     }
     topup.mutate(
@@ -274,7 +276,7 @@ export default function CoinPage() {
               name: currentUser
                 ? userDisplayName(currentUser)
                 : t('coin.guest', { defaultValue: 'Guest' }),
-              defaultValue: '{{name}} coin account. Top-up rate: 1,000 coins = 1 RMB.',
+              defaultValue: '{{name}} coin account. Top-up rate: 10 coins = ¥1.',
             })}
           </p>
         </div>
@@ -407,7 +409,7 @@ export default function CoinPage() {
             <div className="gl-coin-panel-head">
               <div>
                 <h2>{t('coin.topup.title', { defaultValue: 'Top up' })}</h2>
-                <p>{t('coin.topup.sub', { defaultValue: 'Minimum 1,000 coins. No upper limit.' })}</p>
+                <p>{t('coin.topup.sub', { defaultValue: 'Minimum 10 coins. No upper limit.' })}</p>
               </div>
               <CreditCard size={20} />
             </div>
@@ -419,7 +421,7 @@ export default function CoinPage() {
                   value={topupText}
                   onChange={(event) => setTopupText(cleanCoinText(event.target.value))}
                   onBlur={() => {
-                    if (topupAmount < 1000) setTopupText('1000');
+                    if (topupAmount < MIN_TOPUP_COINS) setTopupText(String(MIN_TOPUP_COINS));
                   }}
                   aria-label={t('coin.topup.amountAria', { defaultValue: 'Top-up coin amount' })}
                 />
@@ -721,7 +723,7 @@ function formatCoins(value: number): string {
 }
 
 function formatRmb(coins: number, locale: string): string {
-  const rmb = Math.max(0, coins) / 1000;
+  const rmb = Math.max(0, coins) / COINS_PER_RMB;
   return `¥${rmb.toLocaleString(locale, { maximumFractionDigits: 2 })}`;
 }
 
