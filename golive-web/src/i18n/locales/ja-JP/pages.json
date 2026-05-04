@@ -263,6 +263,9 @@
     "share": "共有",
     "sections": "チャンネルセクション",
     "tabs": {
+      "home": "ホーム",
+      "posts": "投稿",
+      "liveHistory": "ライブ履歴",
       "live": "ライブ",
       "history": "履歴"
     },
@@ -300,6 +303,38 @@
       "subtitle": "このチャンネルの今後のライブを予約できます。",
       "empty": "今後のライブ予約はありません。",
       "emptySub": "後でもう一度確認するか、他のクリエイターを探してみましょう。"
+    },
+    "posts": {
+      "title": "投稿",
+      "subtitle": "このクリエイターの最新投稿を確認できます。",
+      "empty": "投稿はまだありません。",
+      "emptySub": "クリエイターが投稿すると、ここに最新情報が表示されます。",
+      "pagination": "投稿ページ",
+      "previous": "前の投稿ページ",
+      "next": "次の投稿ページ"
+    },
+    "fanClub": {
+      "label": "{{channelName}} ファンクラブ",
+      "title": "ファンクラブ",
+      "subtitle": "ファンバッジを点灯してくれた視聴者に感謝します。",
+      "members": "ファンバッジメンバー",
+      "emptyMembers": "最初のファンを待っています",
+      "join": "ファンクラブに参加",
+      "lit": "点灯済み",
+      "alreadyLit": "ファンバッジは点灯済みです。"
+    },
+    "fanBadge": {
+      "title": "{{channelName}} ファンクラブに参加",
+      "description": "{{amount}} coins でファンバッジを購入します。",
+      "name": "ファンバッジ",
+      "price": "{{amount}} coins",
+      "noRoom": "現在このチャンネルにはファンバッジを購入できるライブルームがありません。",
+      "cancel": "キャンセル",
+      "confirm": "購入を確認",
+      "pending": "購入中...",
+      "success": "ファンバッジを点灯しました。",
+      "insufficient": "coins が不足しているため、ファンバッジを購入できません。",
+      "failed": "ファンバッジを購入できませんでした。"
     }
   },
   "library": {

@@ -131,26 +131,26 @@ func uploadProxy(userProxy, roomProxy http.Handler) gin.HandlerFunc {
 			return
 		}
 		if strings.HasPrefix(action, "/covers/") {
-			serveCoverUpload(c, userProxy, roomProxy)
+			serveCoverUpload(c, roomProxy, userProxy)
 			return
 		}
 		roomProxy.ServeHTTP(c.Writer, c.Request)
 	}
 }
 
-func serveCoverUpload(c *gin.Context, userProxy, roomProxy http.Handler) {
+func serveCoverUpload(c *gin.Context, roomProxy, userProxy http.Handler) {
 	if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
 		userProxy.ServeHTTP(c.Writer, c.Request)
 		return
 	}
 
 	rec := newCaptureWriter()
-	userProxy.ServeHTTP(rec, c.Request)
+	roomProxy.ServeHTTP(rec, c.Request)
 	if rec.status != http.StatusNotFound {
 		rec.replay(c.Writer, c.Request.Method == http.MethodHead)
 		return
 	}
-	roomProxy.ServeHTTP(c.Writer, c.Request)
+	userProxy.ServeHTTP(c.Writer, c.Request)
 }
 
 type captureWriter struct {

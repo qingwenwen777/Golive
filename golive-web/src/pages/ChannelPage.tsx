@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  BadgeCheck,
   Bell,
   BarChart3,
   Camera,
@@ -10,6 +11,7 @@ import {
   ChevronRight,
   CalendarDays,
   Clock3,
+  Coins,
   FileText,
   ImagePlus,
   PlayCircle,
@@ -32,6 +34,7 @@ import {
   useUnfollow,
   type LiveHistoryItem,
 } from '@/api/room';
+import { useFanBadges, useSendGift } from '@/api/gift';
 import { useChannelPosts } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
@@ -39,6 +42,7 @@ import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
@@ -51,6 +55,15 @@ import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
 const HISTORY_PAGE_SIZE = 4;
 const POST_PAGE_SIZE = 4;
+const FAN_BADGE_PRICE = 1000;
+
+type ChannelTab = 'home' | 'posts' | 'history';
+
+const CHANNEL_TABS: Array<{ id: ChannelTab; labelKey: string; defaultValue: string }> = [
+  { id: 'home', labelKey: 'channel.tabs.home', defaultValue: '主页' },
+  { id: 'posts', labelKey: 'channel.tabs.posts', defaultValue: '帖子动态' },
+  { id: 'history', labelKey: 'channel.tabs.liveHistory', defaultValue: '直播历史' },
+];
 
 export default function ChannelPage() {
   const { t } = useTranslation('pages');
@@ -69,6 +82,8 @@ export default function ChannelPage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [appointmentPage, setAppointmentPage] = useState(1);
   const [postPage, setPostPage] = useState(1);
+  const [activeTab, setActiveTab] = useState<ChannelTab>('home');
+  const [fanBadgeDialogOpen, setFanBadgeDialogOpen] = useState(false);
   const activeLiveId = useActiveCreatorLiveId(authUser?.id);
 
   const profile = useMemo(
@@ -99,12 +114,34 @@ export default function ChannelPage() {
   const appointmentPageSize = channelAppointments.data?.size ?? 4;
   const appointmentPageCount = Math.max(1, Math.ceil(appointmentTotal / appointmentPageSize));
   const channelPosts = useChannelPosts(channelKey, true, postPage, POST_PAGE_SIZE);
-  const postPageCount = Math.max(1, Math.ceil((channelPosts.data?.total ?? 0) / (channelPosts.data?.size ?? POST_PAGE_SIZE)));
+  const postPageCount = Math.max(
+    1,
+    Math.ceil((channelPosts.data?.total ?? 0) / (channelPosts.data?.size ?? POST_PAGE_SIZE)),
+  );
 
-  const totalViewers = channelStreams.reduce((sum, stream) => sum + stream.viewers, 0);
-  const primaryCategory = primary?.category ?? 'Just Chatting';
   const subscriberCount = followState.data?.subscriberCount ?? primary?.subscriberCount ?? 0;
   const isUnknown = !profile && !primary && !publicUser.isPending && !rooms.isPending;
+  const sendGift = useSendGift();
+  const fanBadges = useFanBadges(isAuthed, authUser?.id);
+  const creatorId = profile?.id || primary?.ownerId || normalizeCreatorId(channelId);
+  const currentFanBadge =
+    fanBadges.data?.find((badge) => creatorId && badge.creatorId === creatorId) ?? null;
+  const fanBadgeRoomId =
+    channelStreams.find((stream) => stream.isLive || stream.status === 'live')?.id ??
+    channelStreams[0]?.id ??
+    channelAppointments.data?.items.find(
+      (item) => item.status !== 'canceled' && item.status !== 'expired',
+    )?.roomId ??
+    '';
+  const fanPreviewItems = useMemo(
+    () =>
+      buildFanPreviewItems({
+        history: liveHistory.data?.items ?? [],
+        currentFanBadge,
+        currentUser: authUser,
+      }),
+    [authUser, currentFanBadge, liveHistory.data?.items],
+  );
 
   useEffect(() => {
     setHistoryPage(1);
@@ -116,6 +153,10 @@ export default function ChannelPage() {
 
   useEffect(() => {
     setPostPage(1);
+  }, [channelKey]);
+
+  useEffect(() => {
+    setActiveTab('home');
   }, [channelKey]);
 
   useEffect(() => {
@@ -161,6 +202,58 @@ export default function ChannelPage() {
     navigate(activeLiveId ? `/studio/live/${encodeURIComponent(activeLiveId)}` : '/studio/prepare');
   };
 
+  const handleJoinFanClub = () => {
+    if (isOwner || currentFanBadge) return;
+    setFanBadgeDialogOpen(true);
+  };
+
+  const handleConfirmFanBadge = () => {
+    if (currentFanBadge) {
+      toast.info(t('channel.fanClub.alreadyLit', { defaultValue: '粉丝灯牌已点亮。' }));
+      setFanBadgeDialogOpen(false);
+      return;
+    }
+    if (!isAuthed) {
+      setFanBadgeDialogOpen(false);
+      openLogin(() => setFanBadgeDialogOpen(true));
+      return;
+    }
+    if (!fanBadgeRoomId) {
+      toast.info(
+        t('channel.fanBadge.noRoom', {
+          defaultValue: '当前频道暂时没有可购买粉丝灯牌的直播间。',
+        }),
+      );
+      return;
+    }
+    sendGift.mutate(
+      {
+        roomId: fanBadgeRoomId,
+        giftId: 'fan_light',
+        count: 1,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t('channel.fanBadge.success', { defaultValue: '粉丝灯牌已点亮。' }));
+          setFanBadgeDialogOpen(false);
+        },
+        onError: (err) => {
+          if (err.reason === 'insufficient_coin') {
+            toast.error(
+              t('channel.fanBadge.insufficient', {
+                defaultValue: 'coins 不足，无法购买粉丝灯牌。',
+              }),
+            );
+            return;
+          }
+          toast.error(
+            err.message || t('channel.fanBadge.failed', { defaultValue: '粉丝灯牌购买失败。' }),
+          );
+        },
+      },
+    );
+  };
+
   const ownerLiveLabel = activeLiveId
     ? tc('nav.liveNow', { defaultValue: t('home.liveNow') })
     : tc('goLive', { defaultValue: t('channel.startLive') });
@@ -176,10 +269,6 @@ export default function ChannelPage() {
           {channelCover && (
             <LoadableImage className="gl-channel-cover-img" src={channelCover} alt="" />
           )}
-          <div className="gl-channel-cover-mark">
-            <Radio size={26} />
-            <span>GoLive</span>
-          </div>
           {isOwner && (
             <button
               className="gl-channel-cover-action"
@@ -193,11 +282,8 @@ export default function ChannelPage() {
         </div>
 
         <div className="gl-channel-profile-v2">
-          <Avatar name={channelName} src={channelAvatar} size={112} className="gl-channel-avatar" />
+          <Avatar name={channelName} src={channelAvatar} size={128} className="gl-channel-avatar" />
           <div className="gl-channel-profile-main">
-            <div className="gl-channel-kicker">
-              {isOwner ? t('channel.yourChannel') : t('channel.liveChannel')}
-            </div>
             <h1>
               <span>{channelName}</span>
               {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
@@ -210,7 +296,6 @@ export default function ChannelPage() {
                 <span>{formatChannelKey(channelKey, t)}</span>
               )}
               <span>{t('channel.subscribers', { count: subscriberCount })}</span>
-              <span>{t('channel.activeRooms', { count: channelStreams.length })}</span>
             </div>
 
             <div className="gl-channel-actions">
@@ -255,201 +340,235 @@ export default function ChannelPage() {
             </div>
           </div>
         </div>
-
-        <div className="gl-channel-stats">
-          <ChannelStat label={t('channel.stats.liveRooms')} value={String(channelStreams.length)} />
-          <ChannelStat
-            label={t('channel.stats.watchingNow')}
-            value={totalViewers.toLocaleString()}
-          />
-          <ChannelStat label={t('channel.stats.mainCategory')} value={primaryCategory} />
-        </div>
       </section>
 
-      <section className="gl-library-section" id="appointments">
-        <div className="gl-section-title-row">
-          <div>
-            <h2>{t('channel.appointments.title', { defaultValue: 'Live appointments' })}</h2>
-            <span>
-              {t('channel.appointments.subtitle', {
-                defaultValue: 'Reserve or follow upcoming live rooms from this channel.',
-              })}
-            </span>
-          </div>
-        </div>
-        {channelAppointments.isPending ? (
-          <div className="gl-grid" aria-busy="true">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <LiveCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : channelAppointments.data?.items.length ? (
-          <>
-            <div className="gl-appointment-grid">
-              {channelAppointments.data.items.map((item) => (
-                <AppointmentViewerCard
-                  key={item.id}
-                  appointment={item}
-                  to={`/live/${encodeURIComponent(item.roomId)}`}
-                />
-              ))}
+      <nav className="gl-channel-tabs" role="tablist" aria-label={t('channel.sections')}>
+        {CHANNEL_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={activeTab === tab.id ? 'is-active' : undefined}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {t(tab.labelKey, { defaultValue: tab.defaultValue })}
+          </button>
+        ))}
+      </nav>
+
+      {activeTab === 'home' && (
+        <div className="gl-channel-tab-panel">
+          <FanClubBanner
+            channelName={channelName}
+            fanPreviewItems={fanPreviewItems}
+            hasFanBadge={Boolean(currentFanBadge)}
+            isOwner={isOwner}
+            onJoin={handleJoinFanClub}
+          />
+
+          <section className="gl-library-section" id="live">
+            <div className="gl-section-title-row">
+              <h2>{t('channel.liveRooms')}</h2>
             </div>
-            {appointmentPageCount > 1 && (
-              <HistoryPager
-                page={appointmentPage}
-                pageCount={appointmentPageCount}
-                pageSize={appointmentPageSize}
-                total={appointmentTotal}
-                onPageChange={setAppointmentPage}
-              />
+            {rooms.isPending ? (
+              <div className="gl-grid" aria-busy="true">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <LiveCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : channelStreams.length > 0 ? (
+              <div className="gl-grid">
+                {channelStreams.map((stream, i) => (
+                  <LiveCard key={stream.id} stream={stream} priority={i < 2} />
+                ))}
+              </div>
+            ) : (
+              <div className="gl-channel-empty">
+                <Video size={34} />
+                <div>
+                  <strong>{isUnknown ? t('channel.notFound') : t('channel.noLiveRooms')}</strong>
+                  <span>
+                    {isUnknown
+                      ? t('channel.notFoundSub')
+                      : isOwner
+                        ? t('channel.noLiveOwnerSub')
+                        : t('channel.noLiveViewerSub')}
+                  </span>
+                </div>
+                {isOwner && (
+                  <button className="gl-retry-btn" type="button" onClick={handleOwnerLiveAction}>
+                    {activeLiveId ? <Radio size={16} /> : <Plus size={16} />}
+                    {ownerLiveLabel}
+                  </button>
+                )}
+              </div>
             )}
-          </>
-        ) : (
-          <div className="gl-channel-empty">
-            <CalendarDays size={34} />
+          </section>
+
+          <section className="gl-library-section" id="appointments">
+            <div className="gl-section-title-row">
+              <div>
+                <h2>{t('channel.appointments.title', { defaultValue: '直播预约' })}</h2>
+                <span>
+                  {t('channel.appointments.subtitle', {
+                    defaultValue: '查看并预约这个频道即将开始的直播。',
+                  })}
+                </span>
+              </div>
+            </div>
+            {channelAppointments.isPending ? (
+              <div className="gl-grid" aria-busy="true">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <LiveCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : channelAppointments.data?.items.length ? (
+              <>
+                <div className="gl-appointment-grid">
+                  {channelAppointments.data.items.map((item) => (
+                    <AppointmentViewerCard
+                      key={item.id}
+                      appointment={item}
+                      to={`/live/${encodeURIComponent(item.roomId)}`}
+                    />
+                  ))}
+                </div>
+                {appointmentPageCount > 1 && (
+                  <HistoryPager
+                    page={appointmentPage}
+                    pageCount={appointmentPageCount}
+                    pageSize={appointmentPageSize}
+                    total={appointmentTotal}
+                    onPageChange={setAppointmentPage}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="gl-channel-empty">
+                <CalendarDays size={34} />
+                <div>
+                  <strong>
+                    {t('channel.appointments.empty', { defaultValue: '暂无直播预约。' })}
+                  </strong>
+                  <span>
+                    {t('channel.appointments.emptySub', {
+                      defaultValue: '稍后回来看看，或去浏览其他主播。',
+                    })}
+                  </span>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'posts' && (
+        <section className="gl-library-section gl-channel-tab-panel" id="posts">
+          <div className="gl-section-title-row">
             <div>
-              <strong>
-                {t('channel.appointments.empty', { defaultValue: 'No upcoming appointments.' })}
-              </strong>
+              <h2>{t('channel.posts.title', { defaultValue: '帖子动态' })}</h2>
               <span>
-                {t('channel.appointments.emptySub', {
-                  defaultValue: 'Check back later or browse other creators.',
+                {t('channel.posts.subtitle', {
+                  defaultValue: '查看主播最近发布的帖子动态。',
                 })}
               </span>
             </div>
           </div>
-        )}
-      </section>
-
-      <section className="gl-library-section" id="posts">
-        <div className="gl-section-title-row">
-          <div>
-            <h2>{t('channel.posts.title', { defaultValue: '帖子动态' })}</h2>
-            <span>
-              {t('channel.posts.subtitle', {
-                defaultValue: '预约直播下方会显示主播最近发布的帖子。',
-              })}
-            </span>
-          </div>
-        </div>
-        {channelPosts.isPending ? (
-          <div className="gl-post-feed-list" aria-busy="true">
-            {Array.from({ length: 2 }).map((_, index) => (
-              <div className="gl-post-card is-loading" key={index} />
-            ))}
-          </div>
-        ) : channelPosts.data?.items.length ? (
-          <>
-            <div className="gl-post-feed-list">
-              {channelPosts.data.items.map((post) => (
-                <PostCard key={post.id} post={post} />
+          {channelPosts.isPending ? (
+            <div className="gl-post-feed-list" aria-busy="true">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <div className="gl-post-card is-loading" key={index} />
               ))}
             </div>
-            {postPageCount > 1 && (
-              <ChannelPostPager
-                page={postPage}
-                pageCount={postPageCount}
-                onPageChange={setPostPage}
-              />
-            )}
-          </>
-        ) : (
-          <div className="gl-channel-empty">
-            <FileText size={34} />
-            <div>
-              <strong>{t('channel.posts.empty', { defaultValue: '暂时还没有帖子。' })}</strong>
-              <span>
-                {t('channel.posts.emptySub', { defaultValue: '主播发布后，这里会展示最新动态。' })}
-              </span>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="gl-library-section" id="live">
-        <div className="gl-section-title-row">
-          <h2>{t('channel.liveRooms')}</h2>
-        </div>
-        {rooms.isPending ? (
-          <div className="gl-grid" aria-busy="true">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <LiveCardSkeleton key={i} />
-            ))}
-          </div>
-        ) : channelStreams.length > 0 ? (
-          <div className="gl-grid">
-            {channelStreams.map((stream, i) => (
-              <LiveCard key={stream.id} stream={stream} priority={i < 2} />
-            ))}
-          </div>
-        ) : (
-          <div className="gl-channel-empty">
-            <Video size={34} />
-            <div>
-              <strong>{isUnknown ? t('channel.notFound') : t('channel.noLiveRooms')}</strong>
-              <span>
-                {isUnknown
-                  ? t('channel.notFoundSub')
-                  : isOwner
-                    ? t('channel.noLiveOwnerSub')
-                    : t('channel.noLiveViewerSub')}
-              </span>
-            </div>
-            {isOwner && (
-              <button className="gl-retry-btn" type="button" onClick={handleOwnerLiveAction}>
-                {activeLiveId ? <Radio size={16} /> : <Plus size={16} />}
-                {ownerLiveLabel}
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section className="gl-library-section" id="history">
-        <div className="gl-section-title-row">
-          <h2>{t('channel.liveHistory')}</h2>
-        </div>
-        {liveHistory.isPending ? (
-          <div className="gl-history-list" aria-busy="true">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div className="gl-history-row is-loading" key={i} />
-            ))}
-          </div>
-        ) : liveHistory.data?.items.length ? (
-          <>
-            <div className="gl-history-list">
-              {liveHistory.data.items.map((record) => (
-                <ChannelHistoryRow
-                  key={record.id}
-                  record={record}
-                  channelKey={channelKey}
-                  isOwner={isOwner}
+          ) : channelPosts.data?.items.length ? (
+            <>
+              <div className="gl-post-feed-list">
+                {channelPosts.data.items.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              </div>
+              {postPageCount > 1 && (
+                <ChannelPostPager
+                  page={postPage}
+                  pageCount={postPageCount}
+                  onPageChange={setPostPage}
                 />
+              )}
+            </>
+          ) : (
+            <div className="gl-channel-empty">
+              <FileText size={34} />
+              <div>
+                <strong>
+                  {t('channel.posts.empty', { defaultValue: '暂时还没有帖子动态。' })}
+                </strong>
+                <span>
+                  {t('channel.posts.emptySub', {
+                    defaultValue: '主播发布后，这里会展示最新动态。',
+                  })}
+                </span>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'history' && (
+        <section className="gl-library-section gl-channel-tab-panel" id="history">
+          <div className="gl-section-title-row">
+            <h2>{t('channel.liveHistory')}</h2>
+          </div>
+          {liveHistory.isPending ? (
+            <div className="gl-history-list" aria-busy="true">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div className="gl-history-row is-loading" key={i} />
               ))}
             </div>
-            {historyPageCount > 1 && (
-              <HistoryPager
-                page={historyPage}
-                pageCount={historyPageCount}
-                pageSize={historyPageSize}
-                total={historyTotal}
-                onPageChange={setHistoryPage}
-              />
-            )}
-          </>
-        ) : (
-          <div className="gl-channel-empty">
-            <Clock3 size={34} />
-            <div>
-              <strong>{t('channel.noHistory')}</strong>
-              <span>
-                {isOwner ? t('channel.noHistoryOwnerSub') : t('channel.noHistoryViewerSub')}
-              </span>
+          ) : liveHistory.data?.items.length ? (
+            <>
+              <div className="gl-history-list">
+                {liveHistory.data.items.map((record) => (
+                  <ChannelHistoryRow
+                    key={record.id}
+                    record={record}
+                    channelKey={channelKey}
+                    isOwner={isOwner}
+                  />
+                ))}
+              </div>
+              {historyPageCount > 1 && (
+                <HistoryPager
+                  page={historyPage}
+                  pageCount={historyPageCount}
+                  pageSize={historyPageSize}
+                  total={historyTotal}
+                  onPageChange={setHistoryPage}
+                />
+              )}
+            </>
+          ) : (
+            <div className="gl-channel-empty">
+              <Clock3 size={34} />
+              <div>
+                <strong>{t('channel.noHistory')}</strong>
+                <span>
+                  {isOwner ? t('channel.noHistoryOwnerSub') : t('channel.noHistoryViewerSub')}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
+      <FanBadgeConfirmDialog
+        open={fanBadgeDialogOpen}
+        channelName={channelName}
+        canPurchase={Boolean(fanBadgeRoomId)}
+        pending={sendGift.isPending}
+        onOpenChange={setFanBadgeDialogOpen}
+        onConfirm={handleConfirmFanBadge}
+      />
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={authUser} />
       <ChannelCoverUploadDialog open={coverOpen} onOpenChange={setCoverOpen} user={authUser} />
     </div>
@@ -664,13 +783,194 @@ function HistoryThumb({ record }: { record: LiveHistoryItem }) {
   );
 }
 
-function ChannelStat({ label, value }: { label: string; value: string }) {
+interface FanPreviewItem {
+  id: string;
+  name: string;
+  avatar?: string;
+  level?: number;
+}
+
+function FanClubBanner({
+  channelName,
+  fanPreviewItems,
+  hasFanBadge,
+  isOwner,
+  onJoin,
+}: {
+  channelName: string;
+  fanPreviewItems: FanPreviewItem[];
+  hasFanBadge: boolean;
+  isOwner: boolean;
+  onJoin: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  const preview = fanPreviewItems.slice(0, 7);
   return (
-    <div className="gl-channel-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
+    <section
+      className="gl-fan-club-banner"
+      aria-label={t('channel.fanClub.label', {
+        channelName,
+        defaultValue: `${channelName} 粉丝团`,
+      })}
+    >
+      <div className="gl-fan-club-copy">
+        <h2>{t('channel.fanClub.title', { defaultValue: '粉丝团' })}</h2>
+        <p>
+          {t('channel.fanClub.subtitle', {
+            defaultValue: '感谢每一位点亮粉丝灯牌的观众。',
+          })}
+        </p>
+      </div>
+      <div className="gl-fan-club-side">
+        <div
+          className="gl-fan-club-avatars"
+          aria-label={t('channel.fanClub.members', { defaultValue: '粉丝灯牌成员' })}
+        >
+          {preview.length ? (
+            preview.map((fan) => (
+              <div className="gl-fan-club-avatar-wrap" key={fan.id} title={fan.name}>
+                <Avatar name={fan.name} src={fan.avatar ?? ''} size={42} />
+                {fan.level && <span>Lv.{fan.level}</span>}
+              </div>
+            ))
+          ) : (
+            <span className="gl-fan-club-empty-avatars">
+              {t('channel.fanClub.emptyMembers', { defaultValue: '等待首位粉丝' })}
+            </span>
+          )}
+        </div>
+        {!isOwner && (
+          <button
+            className={['gl-fan-club-join', hasFanBadge ? 'is-lit' : ''].filter(Boolean).join(' ')}
+            type="button"
+            disabled={hasFanBadge}
+            onClick={onJoin}
+          >
+            <BadgeCheck size={17} />
+            {hasFanBadge
+              ? t('channel.fanClub.lit', { defaultValue: '已点亮' })
+              : t('channel.fanClub.join', { defaultValue: '加入粉丝团' })}
+          </button>
+        )}
+      </div>
+    </section>
   );
+}
+
+function FanBadgeConfirmDialog({
+  open,
+  channelName,
+  canPurchase,
+  pending,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  channelName: string;
+  canPurchase: boolean;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  const amount = FAN_BADGE_PRICE.toLocaleString();
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="gl-fan-badge-dialog p-0 sm:max-w-[460px]">
+        <div className="gl-fan-badge-dialog-body">
+          <div className="gl-fan-badge-dialog-icon">
+            <Coins size={24} />
+          </div>
+          <DialogTitle>
+            {t('channel.fanBadge.title', {
+              channelName,
+              defaultValue: '加入 {{channelName}} 粉丝团',
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {t('channel.fanBadge.description', {
+              amount,
+              defaultValue: '确认花费 {{amount}} coins 购买粉丝灯牌。',
+            })}
+          </DialogDescription>
+          <div className="gl-fan-badge-dialog-cost">
+            <span>{t('channel.fanBadge.name', { defaultValue: '粉丝灯牌' })}</span>
+            <strong>
+              {t('channel.fanBadge.price', { amount, defaultValue: '{{amount}} coins' })}
+            </strong>
+          </div>
+          {!canPurchase && (
+            <p className="gl-fan-badge-dialog-note">
+              {t('channel.fanBadge.noRoom', {
+                defaultValue: '当前频道暂时没有可购买粉丝灯牌的直播间。',
+              })}
+            </p>
+          )}
+          <div className="gl-fan-badge-dialog-actions">
+            <button
+              className="gl-fan-badge-cancel"
+              type="button"
+              onClick={() => onOpenChange(false)}
+            >
+              {t('channel.fanBadge.cancel', { defaultValue: '取消' })}
+            </button>
+            <button
+              className="gl-fan-badge-confirm"
+              type="button"
+              disabled={!canPurchase || pending}
+              onClick={onConfirm}
+            >
+              {pending
+                ? t('channel.fanBadge.pending', { defaultValue: '购买中...' })
+                : t('channel.fanBadge.confirm', { defaultValue: '确认购买' })}
+            </button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function buildFanPreviewItems({
+  history,
+  currentFanBadge,
+  currentUser,
+}: {
+  history: LiveHistoryItem[];
+  currentFanBadge: { creatorName: string; creatorAvatar?: string; level: number } | null;
+  currentUser: User | null;
+}): FanPreviewItem[] {
+  const items: FanPreviewItem[] = [];
+  const seen = new Set<string>();
+
+  if (currentFanBadge && currentUser) {
+    const key = currentUser.id || currentFanBadge.creatorName;
+    if (!seen.has(key)) {
+      seen.add(key);
+      items.push({
+        id: key,
+        name: currentUser.displayName || currentUser.username || currentFanBadge.creatorName,
+        avatar: currentUser.avatar || currentFanBadge.creatorAvatar || '',
+        level: currentFanBadge.level,
+      });
+    }
+  }
+
+  for (const record of history) {
+    const fan = record.topFan;
+    if (!fan) continue;
+    const key = fan.userId || fan.name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({
+      id: key,
+      name: fan.name,
+      avatar: fan.avatar || '',
+    });
+    if (items.length >= 7) break;
+  }
+
+  return items;
 }
 
 function resolveProfile(
@@ -721,6 +1021,11 @@ function normalizeChannelId(key: string): string {
   if (!key) return '';
   if (key.startsWith('ch-')) return key;
   return `ch-${key}`;
+}
+
+function normalizeCreatorId(id: string): string {
+  if (!id) return '';
+  return id.startsWith('ch-') ? id.slice(3) : id;
 }
 
 function formatChannelKey(key: string, t: ReturnType<typeof useTranslation>['t']): string {

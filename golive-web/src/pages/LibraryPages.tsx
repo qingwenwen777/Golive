@@ -9,7 +9,6 @@ import {
   Bell,
   Bookmark,
   Camera,
-  CheckCircle2,
   ChevronRight,
   Clock3,
   Crown,
@@ -26,14 +25,20 @@ import {
   Sparkles,
   Trash2,
   UserRound,
+  UsersRound,
   Video,
   Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
 import { useFanBadges } from '@/api/gift';
-import { useSubscriptionPosts } from '@/api/posts';
-import { useRooms, useSubscriptions, useSubscriptionAppointments } from '@/api/room';
+import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
+import {
+  useChannelAppointments,
+  useRooms,
+  useSubscriptions,
+  useSubscriptionAppointments,
+} from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
@@ -67,12 +72,27 @@ export function SubscriptionsPage() {
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [appointmentPage, setAppointmentPage] = useState(1);
+  const [selectedChannelId, setSelectedChannelId] = useState<'all' | string>('all');
   const subscriptions = useSubscriptions(isAuthed);
   const subscriptionAppointments = useSubscriptionAppointments(isAuthed, appointmentPage, 8);
   const subscriptionPosts = useSubscriptionPosts(isAuthed, 8);
   const channels = subscriptions.data?.items ?? [];
-  const appointmentTotal = subscriptionAppointments.data?.total ?? 0;
-  const appointmentPageSize = subscriptionAppointments.data?.size ?? 8;
+  const selectedChannel = useMemo(
+    () => channels.find((channel) => channel.channelId === selectedChannelId),
+    [channels, selectedChannelId],
+  );
+  const allSelected = selectedChannelId === 'all' || !selectedChannel;
+  const channelAppointments = useChannelAppointments(
+    selectedChannel?.key ?? '',
+    isAuthed && !allSelected,
+    appointmentPage,
+    8,
+  );
+  const channelPosts = useChannelPosts(selectedChannel?.key ?? '', isAuthed && !allSelected, 1, 8);
+  const visibleAppointments = allSelected ? subscriptionAppointments : channelAppointments;
+  const visiblePosts = allSelected ? subscriptionPosts : channelPosts;
+  const appointmentTotal = visibleAppointments.data?.total ?? 0;
+  const appointmentPageSize = visibleAppointments.data?.size ?? 8;
   const appointmentPageCount = Math.max(1, Math.ceil(appointmentTotal / appointmentPageSize));
   const streams = useMemo(
     () =>
@@ -102,13 +122,30 @@ export function SubscriptionsPage() {
 
   useEffect(() => {
     setAppointmentPage(1);
-  }, [isAuthed]);
+  }, [isAuthed, selectedChannelId]);
+
+  useEffect(() => {
+    if (selectedChannelId !== 'all' && !selectedChannel && !subscriptions.isPending) {
+      setSelectedChannelId('all');
+    }
+  }, [selectedChannel, selectedChannelId, subscriptions.isPending]);
 
   useEffect(() => {
     if (appointmentPage > appointmentPageCount) {
       setAppointmentPage(appointmentPageCount);
     }
   }, [appointmentPage, appointmentPageCount]);
+
+  const visibleStreams = useMemo(() => {
+    if (allSelected) return hydratedStreams.slice(0, 12);
+    return hydratedStreams
+      .filter((stream) => stream.channelId === selectedChannel?.channelId)
+      .slice(0, 1);
+  }, [allSelected, hydratedStreams, selectedChannel?.channelId]);
+  const selectedChannelName = selectedChannel?.name ?? '';
+  const selectedChannelUrl = selectedChannel
+    ? `/channel/${encodeURIComponent(selectedChannel.key)}`
+    : '';
 
   return (
     <div className="gl-page gl-library-page">
@@ -134,24 +171,39 @@ export function SubscriptionsPage() {
       {channels.length > 0 && (
         <section className="gl-yt-channel-rail-wrap">
           <div className="gl-yt-channel-rail" role="list">
+            <button
+              type="button"
+              className={`gl-yt-channel-chip gl-yt-channel-all${allSelected ? ' is-active' : ''}`}
+              role="listitem"
+              aria-pressed={allSelected}
+              onClick={() => setSelectedChannelId('all')}
+            >
+              <div className="gl-yt-channel-all-icon">
+                <UsersRound size={28} />
+              </div>
+              <div className="gl-yt-channel-name" title={t('library.subscriptions.all')}>
+                <span>{t('library.subscriptions.all', { defaultValue: '全部' })}</span>
+              </div>
+            </button>
             {channels.map((channel) => (
-              <Link
+              <button
+                type="button"
                 key={channel.channelId}
-                to={`/channel/${encodeURIComponent(channel.key)}`}
-                className="gl-yt-channel-chip"
+                className={`gl-yt-channel-chip${
+                  !allSelected && selectedChannel?.channelId === channel.channelId ? ' is-active' : ''
+                }`}
                 role="listitem"
+                aria-pressed={!allSelected && selectedChannel?.channelId === channel.channelId}
+                onClick={() => setSelectedChannelId(channel.channelId)}
               >
                 <div className="gl-yt-channel-avatar">
                   <Avatar name={channel.name} src={channel.avatar} size={64} />
+                  {channel.live && <span className="gl-yt-live-dot" aria-hidden="true" />}
                 </div>
                 <div className="gl-yt-channel-name" title={channel.name}>
                   <span>{channel.name}</span>
-                  {channel.verified && <CheckCircle2 size={12} />}
                 </div>
-                <div className={`gl-yt-channel-status${channel.live ? '' : 'is-offline'}`}>
-                  {channel.live ? t('library.status.live') : t('library.status.offline')}
-                </div>
-              </Link>
+              </button>
             ))}
           </div>
         </section>
@@ -161,27 +213,42 @@ export function SubscriptionsPage() {
         <div className="gl-section-title-row">
           <div>
             <h2>
-              {t('library.subscriptions.appointments.title', {
-                defaultValue: 'Appointments from subscriptions',
-              })}
+              {allSelected
+                ? t('library.subscriptions.appointments.title', {
+                    defaultValue: '订阅主播的直播预约',
+                  })
+                : t('library.subscriptions.appointments.channelTitle', {
+                    defaultValue: '直播预约',
+                  })}
             </h2>
             <span>
-              {t('library.subscriptions.appointments.subtitle', {
-                defaultValue: 'Browse upcoming live rooms from creators you follow.',
-              })}
+              {allSelected
+                ? t('library.subscriptions.appointments.subtitle', {
+                    defaultValue: '浏览你关注的主播即将开始的直播。',
+                  })
+                : t('library.subscriptions.appointments.channelSubtitle', {
+                    name: selectedChannelName,
+                    defaultValue: '{{name}} 即将开始的直播会显示在这里。',
+                  })}
             </span>
           </div>
+          {!allSelected && selectedChannelUrl && (
+            <Link className="gl-secondary-btn gl-subscription-channel-action" to={selectedChannelUrl}>
+              {t('library.subscriptions.enterChannel', { defaultValue: '进入频道' })}
+              <ChevronRight size={14} />
+            </Link>
+          )}
         </div>
-        {isAuthed && subscriptionAppointments.isPending ? (
+        {isAuthed && visibleAppointments.isPending ? (
           <div className="gl-grid" aria-busy="true">
             {Array.from({ length: 4 }).map((_, i) => (
               <LiveCardSkeleton key={i} />
             ))}
           </div>
-        ) : isAuthed && subscriptionAppointments.data?.items.length ? (
+        ) : isAuthed && visibleAppointments.data?.items.length ? (
           <>
             <div className="gl-appointment-grid">
-              {subscriptionAppointments.data.items.map((item) => (
+              {visibleAppointments.data.items.map((item) => (
                 <AppointmentViewerCard
                   key={item.id}
                   appointment={item}
@@ -202,11 +269,15 @@ export function SubscriptionsPage() {
         ) : (
           <div className="gl-creator-empty-soft">
             {isAuthed
-              ? t('library.subscriptions.appointments.empty', {
-                  defaultValue: 'No upcoming appointments from your subscriptions.',
-                })
+              ? allSelected
+                ? t('library.subscriptions.appointments.empty', {
+                    defaultValue: '你订阅的主播暂无直播预约。',
+                  })
+                : t('library.subscriptions.appointments.channelEmpty', {
+                    defaultValue: '这个主播暂无直播预约。',
+                  })
               : t('library.subscriptions.appointments.signIn', {
-                  defaultValue: 'Sign in to browse appointment schedules.',
+                  defaultValue: '登录后查看直播预约。',
                 })}
           </div>
         )}
@@ -216,34 +287,45 @@ export function SubscriptionsPage() {
         <div className="gl-section-title-row">
           <div>
             <h2>
-              {t('library.subscriptions.posts.title', { defaultValue: '订阅主播的最新动态' })}
+              {allSelected
+                ? t('library.subscriptions.posts.title', { defaultValue: '订阅主播的最新动态' })
+                : t('library.subscriptions.posts.channelTitle', { defaultValue: '最新动态' })}
             </h2>
             <span>
-              {t('library.subscriptions.posts.subtitle', {
-                defaultValue: '每位已订阅主播最近发布的一条动态会显示在这里。',
-              })}
+              {allSelected
+                ? t('library.subscriptions.posts.subtitle', {
+                    defaultValue: '每位已订阅主播最近发布的一条动态会显示在这里。',
+                  })
+                : t('library.subscriptions.posts.channelSubtitle', {
+                    name: selectedChannelName,
+                    defaultValue: '查看 {{name}} 最近发布的动态。',
+                  })}
             </span>
           </div>
           <FileText size={22} />
         </div>
-        {isAuthed && subscriptionPosts.isPending ? (
+        {isAuthed && visiblePosts.isPending ? (
           <div className="gl-post-feed-list gl-subscription-post-feed" aria-busy="true">
             {Array.from({ length: 2 }).map((_, index) => (
               <div className="gl-post-card is-loading" key={index} />
             ))}
           </div>
-        ) : isAuthed && subscriptionPosts.data?.items.length ? (
+        ) : isAuthed && visiblePosts.data?.items.length ? (
           <div className="gl-post-feed-list gl-subscription-post-feed">
-            {subscriptionPosts.data.items.map((post) => (
+            {visiblePosts.data.items.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
           </div>
         ) : (
           <div className="gl-creator-empty-soft">
             {isAuthed
-              ? t('library.subscriptions.posts.empty', {
-                  defaultValue: '你订阅的主播暂时还没有发布动态。',
-                })
+              ? allSelected
+                ? t('library.subscriptions.posts.empty', {
+                    defaultValue: '你订阅的主播暂时还没有发布动态。',
+                  })
+                : t('library.subscriptions.posts.channelEmpty', {
+                    defaultValue: '这个主播暂时还没有发布动态。',
+                  })
               : t('library.subscriptions.posts.signIn', {
                   defaultValue: '登录后查看订阅主播的动态。',
                 })}
@@ -253,11 +335,25 @@ export function SubscriptionsPage() {
 
       <section className="gl-library-section">
         <div className="gl-section-title-row">
-          <h2>{t('library.latest')}</h2>
+          <div>
+            <h2>
+              {allSelected
+                ? t('library.latest')
+                : t('library.subscriptions.latest.channelTitle', { defaultValue: '最新' })}
+            </h2>
+            {!allSelected && (
+              <span>
+                {t('library.subscriptions.latest.channelSubtitle', {
+                  name: selectedChannelName,
+                  defaultValue: '{{name}} 的直播状态和最近内容。',
+                })}
+              </span>
+            )}
+          </div>
         </div>
         <StreamGrid
           isPending={isAuthed && subscriptions.isPending}
-          streams={hydratedStreams.slice(0, 12)}
+          streams={visibleStreams}
           emptyTitle={
             isAuthed
               ? t('library.subscriptions.emptyAuthed')

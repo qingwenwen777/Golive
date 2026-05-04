@@ -2657,7 +2657,7 @@ input:focus-visible,
 .gl-cover-preview {
   position: relative;
   display: flex;
-  aspect-ratio: 16 / 5;
+  aspect-ratio: 20 / 3;
   width: 100%;
   overflow: hidden;
   align-items: center;
@@ -2732,7 +2732,7 @@ input:focus-visible,
   box-shadow: inset 0 0 0 1px var(--gl-border);
 }
 .gl-cover-crop .gl-image-crop-stage {
-  aspect-ratio: 16 / 5;
+  aspect-ratio: 20 / 3;
   border: 1px solid var(--gl-border);
   border-radius: 10px;
 }
@@ -4515,30 +4515,46 @@ button.gl-fan-badge-empty {
   background: var(--gl-bg-card);
 }
 .gl-channel-hero-v2 {
-  overflow: hidden;
-  border: 1px solid var(--gl-border);
-  border-radius: 12px;
-  background: var(--gl-bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .gl-channel-page {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 20px;
+  width: 100%;
+  max-width: 1680px;
+  min-width: 0;
+  margin: 0 auto;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
-.gl-channel-page > .gl-library-section {
-  gap: 8px;
+.gl-channel-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
-.gl-channel-page > .gl-library-section .gl-section-title-row {
-  min-height: 28px;
-  align-items: flex-end;
+.gl-channel-tab-panel > .gl-library-section {
+  gap: 12px;
 }
 .gl-channel-cover {
   position: relative;
   isolation: isolate;
-  min-height: 156px;
-  padding: 22px;
-  border-bottom: 1px solid var(--gl-border);
-  background: var(--gl-bg-card);
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  height: clamp(132px, 15vw, 252px);
+  min-height: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 20px;
+  background: var(--gl-bg-hover);
   color: var(--gl-text);
 }
 .gl-channel-cover.has-cover::after {
@@ -4558,22 +4574,11 @@ button.gl-fan-badge-empty {
   position: absolute;
   inset: 0;
   z-index: 1;
+  display: block;
   width: 100%;
   height: 100%;
+  max-width: none;
   object-fit: cover;
-}
-.gl-channel-cover-mark {
-  position: relative;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 24px;
-  font-weight: 900;
-}
-.gl-channel-cover.has-cover .gl-channel-cover-mark {
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 .gl-channel-cover-action {
   position: absolute;
@@ -4597,33 +4602,28 @@ button.gl-fan-badge-empty {
   background: #fff;
 }
 .gl-channel-profile-v2 {
-  position: relative;
-  z-index: 2;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 20px;
-  align-items: end;
-  padding: 0 24px 22px;
+  gap: 22px;
+  align-items: center;
+  padding: 0 4px;
 }
 .gl-channel-avatar {
-  position: relative;
-  z-index: 3;
-  margin-top: -48px;
-  border: 4px solid var(--gl-bg-card);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  flex: 0 0 auto;
+  border: 4px solid var(--gl-bg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 .gl-channel-profile-main {
   min-width: 0;
-  padding-top: 18px;
 }
 .gl-channel-profile-main h1 {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  margin: 2px 0 0;
+  margin: 0;
   color: var(--gl-text);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 900;
   line-height: 1.12;
 }
@@ -4637,42 +4637,258 @@ button.gl-fan-badge-empty {
 .gl-channel-handle {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px 14px;
+  margin-top: 10px;
   color: var(--gl-text-2);
   font-size: 13px;
 }
 .gl-channel-handle span + span::before {
-  content: '·';
-  margin-right: 8px;
-  color: var(--gl-text-3);
+  content: none;
 }
-.gl-channel-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  border-top: 1px solid var(--gl-border);
-  background: var(--gl-border);
+.gl-channel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
 }
-.gl-channel-stat {
-  min-width: 0;
-  background: var(--gl-bg-card);
-  padding: 14px 18px;
+.gl-channel-actions .gl-retry-btn,
+.gl-channel-actions .gl-secondary-btn {
+  min-height: 40px;
+  padding-inline: 16px;
 }
-.gl-channel-stat span {
-  display: block;
+.gl-channel-tabs {
+  display: flex;
+  gap: 30px;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 0 4px;
+  margin: 6px 0 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gl-channel-tabs::-webkit-scrollbar {
+  display: none;
+}
+.gl-channel-tabs button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 0 2px 12px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
-.gl-channel-stat strong {
-  display: block;
-  overflow: hidden;
-  margin-top: 4px;
+.gl-channel-tabs button.is-active {
+  color: var(--gl-text);
+}
+.gl-channel-tabs button.is-active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: var(--gl-text);
+}
+.gl-fan-club-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  border: 1px solid var(--gl-border);
+  border-radius: 18px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+  padding: 20px 22px;
+}
+.gl-fan-club-copy {
+  min-width: 0;
+}
+.gl-fan-club-copy h2 {
+  margin: 0;
   color: var(--gl-text);
   font-size: 18px;
-  text-overflow: ellipsis;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.gl-fan-club-copy p {
+  margin: 6px 0 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.gl-fan-club-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.gl-fan-club-avatars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.gl-fan-club-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 42px;
+  height: 48px;
+  align-items: flex-start;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.gl-fan-club-avatar-wrap .gl-avatar {
+  border: 2px solid var(--gl-bg-card);
+  border-radius: 999px;
+}
+.gl-fan-club-avatar-wrap span {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  min-width: 34px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--gl-text);
+  color: var(--gl-bg);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 3px 5px;
+  text-align: center;
   white-space: nowrap;
+}
+.gl-fan-club-empty-avatars {
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-fan-club-join {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-text);
+  color: var(--gl-bg);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 0 16px;
+}
+.gl-fan-club-join:hover {
+  opacity: 0.92;
+}
+.gl-fan-club-join:disabled,
+.gl-fan-club-join.is-lit {
+  border: 1px solid var(--gl-border);
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  cursor: default;
+  opacity: 1;
+}
+.gl-fan-badge-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.gl-fan-badge-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+.gl-fan-badge-dialog-icon {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-fan-badge-dialog-body .text-lg {
+  font-size: 18px;
+  line-height: 1.25;
+}
+.gl-fan-badge-dialog-body .text-sm {
+  color: var(--gl-text-2);
+}
+.gl-fan-badge-dialog-cost {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg);
+  padding: 14px 16px;
+}
+.gl-fan-badge-dialog-cost span {
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 800;
+}
+.gl-fan-badge-dialog-cost strong {
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+.gl-fan-badge-dialog-note {
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.gl-fan-badge-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+.gl-fan-badge-cancel,
+.gl-fan-badge-confirm {
+  display: inline-flex;
+  height: 44px;
+  min-width: 92px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+.gl-fan-badge-cancel {
+  border: 1px solid var(--gl-border);
+  background: var(--gl-bg);
+  color: var(--gl-text);
+}
+.gl-fan-badge-cancel:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-fan-badge-confirm {
+  border: 0;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+}
+.gl-fan-badge-confirm:hover:not(:disabled) {
+  background: var(--gl-btn-primary-hover);
+}
+.gl-fan-badge-confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .gl-channel-banner {
   position: relative;
@@ -4703,32 +4919,6 @@ button.gl-fan-badge-empty {
   align-items: center;
   gap: 8px;
 }
-.gl-channel-tabs {
-  display: flex;
-  gap: 22px;
-  border-bottom: 1px solid var(--gl-border);
-  margin-bottom: 12px;
-}
-.gl-channel-tabs a {
-  position: relative;
-  padding: 0 0 10px;
-  color: var(--gl-text-2);
-  font-size: 14px;
-  font-weight: 800;
-}
-.gl-channel-tabs a.is-active {
-  color: var(--gl-text);
-}
-.gl-channel-tabs a.is-active::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 3px;
-  border-radius: 999px 999px 0 0;
-  background: var(--gl-text);
-}
 .gl-channel-tabs + .gl-library-section {
   gap: 16px;
   padding-top: 8px;
@@ -4738,6 +4928,9 @@ button.gl-fan-badge-empty {
 }
 .gl-channel-tabs + .gl-library-section .gl-section-title-row h2 {
   line-height: 1.15;
+}
+.gl-channel-post-pager {
+  justify-content: flex-end;
 }
 .gl-schedule-row {
   align-items: flex-start;
@@ -4750,7 +4943,8 @@ button.gl-fan-badge-empty {
   align-items: center;
   gap: 14px;
   min-height: 140px;
-  border: 1px dashed var(--gl-border);
+  border: 1px solid var(--gl-border);
+  border-style: dashed;
   border-radius: 12px;
   background: var(--gl-bg-card);
   color: var(--gl-text-2);
@@ -6617,7 +6811,7 @@ button.gl-fan-badge-empty {
     min-height: 132px;
   }
   .gl-channel-cover {
-    min-height: 120px;
+    height: clamp(118px, 28vw, 156px);
   }
   .gl-channel-cover-action {
     right: 14px;
@@ -6714,15 +6908,16 @@ button.gl-fan-badge-empty {
 }
 .gl-yt-channel-rail-wrap {
   margin: 0 -8px;
-  padding: 8px 0;
+  padding: 4px 0 2px;
   border-bottom: 1px solid var(--gl-border);
 }
 .gl-yt-channel-rail {
   display: flex;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 14px;
   overflow-x: auto;
   scrollbar-width: thin;
-  padding: 4px 8px 14px;
+  padding: 6px 8px 8px;
 }
 .gl-yt-channel-rail::-webkit-scrollbar {
   height: 8px;
@@ -6736,53 +6931,99 @@ button.gl-fan-badge-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 86px;
-  padding: 8px 6px;
-  border-radius: 12px;
+  gap: 10px;
+  width: 92px;
+  padding: 6px 4px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   text-decoration: none;
 }
-.gl-yt-channel-chip:hover {
-  background: var(--gl-bg-hover);
+.gl-yt-channel-chip:hover,
+.gl-yt-channel-chip.is-active {
+  background: transparent;
+}
+.gl-yt-channel-chip:focus-visible {
+  outline: 2px solid #1c62b9;
+  outline-offset: 3px;
 }
 .gl-yt-channel-avatar {
   position: relative;
+  display: inline-flex;
+  width: 64px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+.gl-yt-channel-all-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 50%;
+  background: #eef0f3;
+  color: #6b7280;
+}
+.gl-yt-channel-avatar::after,
+.gl-yt-channel-all-icon::after {
+  position: absolute;
+  inset: -5px;
+  border: 3px solid var(--gl-text);
+  border-radius: 50%;
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+}
+.gl-yt-channel-chip.is-active .gl-yt-channel-avatar::after,
+.gl-yt-channel-chip.is-active .gl-yt-channel-all-icon::after {
+  opacity: 1;
+}
+.dark .gl-yt-channel-all-icon {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+  color: #aeb5c1;
 }
 .gl-yt-live-dot {
   position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 14px;
-  height: 14px;
+  right: -4px;
+  bottom: -4px;
+  z-index: 2;
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--gl-bg);
   border-radius: 50%;
   background: var(--gl-red);
-  box-shadow: 0 0 0 2px var(--gl-bg);
 }
 .gl-yt-channel-name {
   display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
   max-width: 100%;
   color: var(--gl-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
 }
 .gl-yt-channel-name span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 64px;
+  max-width: 84px;
 }
-.gl-yt-channel-status {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--gl-red);
-}
-.gl-yt-channel-status.is-offline {
-  color: var(--gl-text-secondary);
-  font-weight: 700;
-  letter-spacing: 0;
+.gl-subscription-channel-action {
+  min-height: 32px;
+  padding-inline: 12px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .gl-yt-you-head {
   display: grid;
@@ -8356,53 +8597,42 @@ button.gl-fan-badge-empty {
   }
 
   .gl-channel-hero-v2 {
-    border-radius: 10px;
+    gap: 14px;
   }
 
   .gl-channel-profile-v2 {
-    display: block;
-    padding: 0 16px 18px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 14px;
+    padding: 0 2px;
   }
 
   .gl-channel-avatar {
     width: 92px !important;
     height: 92px !important;
-    margin-top: -46px;
-  }
-
-  .gl-channel-profile-main {
-    padding-top: 12px;
-  }
-
-  .gl-channel-kicker {
-    font-size: 11px;
   }
 
   .gl-channel-profile-main h1 {
-    margin-top: 4px;
     font-size: 26px;
     line-height: 1.08;
   }
 
   .gl-channel-handle {
-    display: block;
     margin-top: 10px;
     font-size: 13px;
     line-height: 1.55;
   }
 
   .gl-channel-handle span {
-    display: inline;
+    display: inline-flex;
   }
 
   .gl-channel-handle span + span::before {
-    content: '·';
-    margin-inline: 8px;
+    content: none;
   }
 
   .gl-channel-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 10px;
   }
 
@@ -8417,20 +8647,22 @@ button.gl-fan-badge-empty {
     white-space: nowrap;
   }
 
-  .gl-channel-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .gl-channel-stat {
-    padding: 13px 16px;
-  }
-
   .gl-channel-tabs {
     overflow-x: auto;
     margin-inline: -14px;
     padding-inline: 14px;
     margin-bottom: 10px;
     scrollbar-width: none;
+  }
+
+  .gl-fan-club-banner {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .gl-fan-club-side {
+    flex-wrap: wrap;
   }
 
   .gl-channel-tabs::-webkit-scrollbar {
@@ -8567,17 +8799,13 @@ button.gl-fan-badge-empty {
   }
 
   .gl-channel-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .gl-channel-cover-mark {
-    font-size: 20px;
+    align-items: stretch;
   }
 
   .gl-channel-avatar {
     width: 84px !important;
     height: 84px !important;
-    margin-top: -42px;
+    margin-top: 0;
   }
 
   .gl-channel-profile-main h1 {

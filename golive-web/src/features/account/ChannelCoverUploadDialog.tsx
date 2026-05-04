@@ -62,7 +62,11 @@ export function ChannelCoverUploadDialog({
     setProcessing(true);
     setError(null);
     try {
-      const cropped = await cropSelectionToFile(selection, CHANNEL_COVER_CROP_CONFIG, 'channel-cover');
+      const cropped = await cropSelectionToFile(
+        selection,
+        CHANNEL_COVER_CROP_CONFIG,
+        'channel-cover',
+      );
       uploadCover.mutate(cropped, {
         onSuccess: () => {
           toast.success(t('upload.cover.success'));
@@ -141,7 +145,9 @@ export function ChannelCoverUploadDialog({
             className="gl-auth-submit"
           >
             <Save size={18} />
-            <span>{uploadCover.isPending || processing ? t('upload.saving') : t('upload.cover.save')}</span>
+            <span>
+              {uploadCover.isPending || processing ? t('upload.saving') : t('upload.cover.save')}
+            </span>
           </button>
         </form>
       </DialogContent>
@@ -150,9 +156,9 @@ export function ChannelCoverUploadDialog({
 }
 
 const CHANNEL_COVER_CROP_CONFIG = {
-  aspectRatio: 16 / 5,
-  outputWidth: 1600,
-  outputHeight: 500,
+  aspectRatio: 20 / 3,
+  outputWidth: 2000,
+  outputHeight: 300,
   quality: 0.93,
   mimeType: 'image/jpeg',
 } as const;

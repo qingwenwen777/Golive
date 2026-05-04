@@ -263,6 +263,9 @@
     "share": "Share",
     "sections": "Channel sections",
     "tabs": {
+      "home": "Home",
+      "posts": "Posts",
+      "liveHistory": "Live history",
       "live": "Live",
       "history": "History"
     },
@@ -300,6 +303,38 @@
       "subtitle": "Reserve or follow upcoming live rooms from this channel.",
       "empty": "No upcoming appointments.",
       "emptySub": "Check back later or browse other creators."
+    },
+    "posts": {
+      "title": "Posts",
+      "subtitle": "See the latest posts from this creator.",
+      "empty": "No posts yet.",
+      "emptySub": "New updates from this creator will appear here.",
+      "pagination": "Post pagination",
+      "previous": "Previous posts page",
+      "next": "Next posts page"
+    },
+    "fanClub": {
+      "label": "{{channelName}} fan club",
+      "title": "Fan club",
+      "subtitle": "Thanks to every viewer who has lit a fan badge.",
+      "members": "Fan badge members",
+      "emptyMembers": "Waiting for the first fan",
+      "join": "Join fan club",
+      "lit": "Lit",
+      "alreadyLit": "Fan badge already lit."
+    },
+    "fanBadge": {
+      "title": "Join {{channelName}} fan club",
+      "description": "Spend {{amount}} coins to buy a fan badge.",
+      "name": "Fan badge",
+      "price": "{{amount}} coins",
+      "noRoom": "This channel has no live room where a fan badge can be purchased right now.",
+      "cancel": "Cancel",
+      "confirm": "Confirm purchase",
+      "pending": "Purchasing...",
+      "success": "Fan badge lit.",
+      "insufficient": "Not enough coins to buy this fan badge.",
+      "failed": "Could not purchase the fan badge."
     }
   },
   "library": {
