@@ -78,7 +78,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Roboto', 'Arial', '"PingFang SC"', '"Microsoft YaHei"', 'sans-serif'],
+        sans: ['var(--gl-font-ui)'],
       },
       boxShadow: {
         card: 'var(--gl-shadow)',

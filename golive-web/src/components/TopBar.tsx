@@ -126,7 +126,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
             <Icons.Menu size={24} />
           </button>
           <button type="button" className="gl-logo" onClick={onLogoClick} aria-label="GoLive">
-            <GoLiveLogo height={24} />
+            <GoLiveLogo height={28} />
             <span className="gl-logo-country">{t(`lang.short.${lang}`)}</span>
           </button>
         </div>
@@ -224,7 +224,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="gl-lang-toggle" aria-label={t('lang.toggle')}>
-                {t(`lang.short.${lang}`)}
+                {t(`lang.${lang}`)}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">

@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/roboto-latin-wght-normal.woff2') format('woff2');
+}
+
 :root {
   /* shadcn semantic tokens — HSL triples (no `hsl()` wrapper) so Tailwind
      can apply opacity modifiers. Light theme. */
@@ -46,6 +54,9 @@
   --gl-analytics-accent: #2f6f4e;
   --gl-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   --gl-sc-body-tint: rgba(255, 255, 255, 0.3);
+  --gl-font-latin: Roboto, Arial;
+  --gl-font-cjk: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --gl-font-ui: var(--gl-font-latin), var(--gl-font-cjk);
 }
 
 .gl-creator-replay-page {
@@ -1013,11 +1024,12 @@ body,
 
 body {
   margin: 0;
-  font-family: Roboto, Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: var(--gl-font-ui);
   font-size: 14px;
   line-height: 1.4;
   background: var(--gl-bg);
   color: var(--gl-text);
+  font-variant-numeric: lining-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -1524,11 +1536,12 @@ input:focus-visible,
 .gl-logo {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  position: relative;
   background: none;
   border: 0;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 28px 4px 4px;
   white-space: nowrap;
 }
 .gl-brand-logo {
@@ -1555,19 +1568,26 @@ input:focus-visible,
 .gl-logo-word {
   font-weight: 700;
   font-size: 20px;
-  letter-spacing: -0.02em;
-  font-family: Roboto, Arial, sans-serif;
+  letter-spacing: 0;
+  font-family: var(--gl-font-latin);
 }
 .gl-logo-country {
-  align-self: center;
+  position: absolute;
+  top: 2px;
+  right: 3px;
   display: inline-flex;
   align-items: center;
-  height: 24px;
-  font-size: 10px;
+  justify-content: center;
+  min-width: 20px;
+  height: 16px;
+  border-radius: 999px;
+  font-family: var(--gl-font-latin);
+  font-size: 11px;
   color: var(--gl-text-2);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
-  margin-left: 2px;
+  letter-spacing: 0;
+  pointer-events: none;
 }
 
 .gl-search-pill {
@@ -1751,11 +1771,11 @@ input:focus-visible,
   border-radius: 16px;
   background: transparent;
   color: var(--gl-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  min-width: 44px;
+  min-width: 58px;
   flex-shrink: 0;
 }
 .gl-lang-toggle:hover {
@@ -1904,6 +1924,15 @@ input:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.gl-sidebar.is-en .gl-side-heading,
+.gl-sidebar.is-en .gl-side-item,
+.gl-sidebar.is-en .gl-side-sub-item {
+  font-weight: 800;
+}
+.gl-sidebar.is-en .gl-side-item.is-active,
+.gl-sidebar.is-en .gl-side-sub-item.is-active {
+  font-weight: 900;
 }
 .gl-side-channel .gl-side-label {
   font-size: 14px;
@@ -9615,8 +9644,8 @@ button.gl-fan-badge-empty {
   }
 
   .gl-logo {
-    gap: 3px;
-    padding: 4px 2px;
+    gap: 6px;
+    padding: 4px 24px 4px 2px;
   }
 
   .gl-page {
@@ -9837,7 +9866,11 @@ button.gl-fan-badge-empty {
   }
 
   .gl-logo-country {
-    display: none;
+    top: 1px;
+    right: 1px;
+    min-width: 18px;
+    height: 15px;
+    font-size: 10px;
   }
 
   .gl-icon-btn {

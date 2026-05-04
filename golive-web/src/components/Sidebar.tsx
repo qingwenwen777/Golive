@@ -24,7 +24,7 @@ interface NavItem {
 }
 
 export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
   const me = useMe();
@@ -183,7 +183,13 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
   };
 
   return (
-    <aside className={cn('gl-sidebar', collapsed && 'is-col')}>
+    <aside
+      className={cn(
+        'gl-sidebar',
+        collapsed && 'is-col',
+        (i18n.resolvedLanguage ?? i18n.language).startsWith('en') && 'is-en',
+      )}
+    >
       <nav className="gl-side-sec">
         {mainItems.map(renderItem)}
         {!collapsed && canShowStudioSubnav && isStudioActive && studioSubnavOpen && (
