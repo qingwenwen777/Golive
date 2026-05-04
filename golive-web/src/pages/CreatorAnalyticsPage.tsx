@@ -42,9 +42,7 @@ export function CreatorAnalyticsPage() {
       />
 
       {analytics.isPending ? (
-        <div className="gl-studio-panel gl-studio-loading">
-          {t('studio.analytics.loading')}
-        </div>
+        <div className="gl-studio-panel gl-studio-loading">{t('studio.analytics.loading')}</div>
       ) : analytics.isError ? (
         <div className="gl-channel-empty">
           <BarChart3 size={34} />
@@ -57,24 +55,28 @@ export function CreatorAnalyticsPage() {
         <>
           <section className="gl-studio-kpis" aria-label={t('studio.analytics.kpis')}>
             <StudioKpi
+              tone="revenue"
               icon={<Coins size={18} />}
               label={t('studio.analytics.cards.revenue')}
               value={formatCoin(data.revenueCoin, locale, t)}
               trend={t('studio.analytics.cards.revenueSub')}
             />
             <StudioKpi
+              tone="growth"
               icon={<UserPlus size={18} />}
               label={t('studio.analytics.cards.subscribers')}
               value={data.subscriberCount.toLocaleString(locale)}
               trend={t('studio.analytics.cards.subscribersSub')}
             />
             <StudioKpi
+              tone="activity"
               icon={<Radio size={18} />}
               label={t('studio.analytics.cards.streams')}
               value={data.streams.toLocaleString(locale)}
               trend={t('studio.analytics.cards.streamsSub')}
             />
             <StudioKpi
+              tone="attention"
               icon={<Eye size={18} />}
               label={t('studio.analytics.cards.peakOnline')}
               value={data.peakViewers.toLocaleString(locale)}
@@ -92,6 +94,7 @@ export function CreatorAnalyticsPage() {
                 <BarChart3 size={22} />
               </div>
               <BarChart
+                tone="revenue"
                 items={data.monthly}
                 value={(item) => item.revenueCoin}
                 label={(item) => formatMonth(item.month, locale)}
@@ -107,7 +110,7 @@ export function CreatorAnalyticsPage() {
                 </div>
                 <TrendingUp size={22} />
               </div>
-              <LineChart items={data.monthly} value={(item) => item.subscribers} />
+              <LineChart tone="growth" items={data.monthly} value={(item) => item.subscribers} />
             </div>
 
             <div className="gl-studio-panel">
@@ -222,24 +225,28 @@ export function LiveAnalysisPage() {
               </div>
               <div className="gl-studio-kpis compact">
                 <StudioKpi
+                  tone="revenue"
                   icon={<Coins size={18} />}
                   label={t('studio.analytics.cards.revenue')}
                   value={formatCoin(record.revenueCoin, locale, t)}
                   trend={t('studio.analytics.live.cards.revenueSub')}
                 />
                 <StudioKpi
+                  tone="attention"
                   icon={<Eye size={18} />}
                   label={t('studio.analytics.cards.peakOnline')}
                   value={record.peakViewers.toLocaleString(locale)}
                   trend={t('studio.analytics.live.cards.peakOnlineSub')}
                 />
                 <StudioKpi
+                  tone="growth"
                   icon={<UserPlus size={18} />}
                   label={t('studio.analytics.live.cards.newSubscribers')}
                   value={record.newSubscribers.toLocaleString(locale)}
                   trend={t('studio.analytics.live.cards.newSubscribersSub')}
                 />
                 <StudioKpi
+                  tone="activity"
                   icon={<MessageSquare size={18} />}
                   label={t('studio.analytics.live.cards.danmu')}
                   value={(record.danmuCount ?? 0).toLocaleString(locale)}
@@ -249,6 +256,7 @@ export function LiveAnalysisPage() {
                   })}
                 />
                 <StudioKpi
+                  tone="revenue"
                   icon={<Crown size={18} />}
                   label={t('studio.analytics.live.cards.topFan')}
                   value={record.topFan?.name ?? '-'}
@@ -336,18 +344,20 @@ function StudioHeader({
 }
 
 function StudioKpi({
+  tone = 'neutral',
   icon,
   label,
   value,
   trend,
 }: {
+  tone?: 'revenue' | 'growth' | 'activity' | 'attention' | 'neutral';
   icon: ReactNode;
   label: string;
   value: string;
   trend: string;
 }) {
   return (
-    <div className="gl-studio-kpi">
+    <div className={`gl-studio-kpi is-${tone}`}>
       <div className="gl-studio-kpi-icon">{icon}</div>
       <span>{label}</span>
       <strong>{value}</strong>
@@ -397,7 +407,7 @@ function LiveHistoryStudioRow({
 
 function HistoryCover({ record }: { record: LiveHistoryItem }) {
   return (
-    <div className={`gl-history-cover${record.cover ? ' has-image' : ''}`}>
+    <div className={`gl-history-cover${record.cover ? 'has-image' : ''}`}>
       <div className="gl-history-cover-fallback" aria-hidden>
         {(record.title || 'GL').slice(0, 2).toUpperCase()}
       </div>
@@ -408,11 +418,13 @@ function HistoryCover({ record }: { record: LiveHistoryItem }) {
 }
 
 function BarChart({
+  tone = 'neutral',
   items,
   value,
   label,
   valueLabel,
 }: {
+  tone?: 'revenue' | 'growth' | 'activity' | 'attention' | 'neutral';
   items: MonthlyCreatorMetric[];
   value: (item: MonthlyCreatorMetric) => number;
   label: (item: MonthlyCreatorMetric) => string;
@@ -420,7 +432,7 @@ function BarChart({
 }) {
   const max = Math.max(...items.map(value), 1);
   return (
-    <div className="gl-studio-bars">
+    <div className={`gl-studio-bars is-${tone}`}>
       {items.map((item) => {
         const raw = value(item);
         return (
@@ -438,9 +450,11 @@ function BarChart({
 }
 
 function LineChart({
+  tone = 'neutral',
   items,
   value,
 }: {
+  tone?: 'revenue' | 'growth' | 'activity' | 'attention' | 'neutral';
   items: MonthlyCreatorMetric[];
   value: (item: MonthlyCreatorMetric) => number;
 }) {
@@ -455,7 +469,12 @@ function LineChart({
     .join(' ');
 
   return (
-    <svg className="gl-studio-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+    <svg
+      className={`gl-studio-line is-${tone}`}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
       <polyline points={points} />
     </svg>
   );
@@ -505,12 +524,12 @@ function BreakdownBars({
       <div>
         <span>{t('studio.analytics.breakdown.gifts')}</span>
         <strong>{formatCoin(gift, locale, t)}</strong>
-        <i style={{ width: `${(gift / total) * 100}%` }} />
+        <i className="is-gift" style={{ width: `${(gift / total) * 100}%` }} />
       </div>
       <div>
         <span>{t('studio.analytics.breakdown.superChat')}</span>
         <strong>{formatCoin(superChat, locale, t)}</strong>
-        <i style={{ width: `${(superChat / total) * 100}%` }} />
+        <i className="is-super-chat" style={{ width: `${(superChat / total) * 100}%` }} />
       </div>
     </div>
   );
@@ -540,7 +559,5 @@ function formatDate(value: string, locale: string): string {
 function formatMonth(value: string, locale: string): string {
   const [year, month] = value.split('-').map(Number);
   if (!year || !month) return value;
-  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(
-    new Date(year, month - 1, 1),
-  );
+  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(year, month - 1, 1));
 }
