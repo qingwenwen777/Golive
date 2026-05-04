@@ -421,7 +421,74 @@
         "news": "ニュース"
       },
       "chatAssist": "チャット安全補助",
-      "chatAssistSub": "流れの速いチャットやモデレーションの急増を目立たせます。"
+      "chatAssistSub": "流れの速いチャットやモデレーションの急増を目立たせます。",
+      "heroSub": "プロフィール、セキュリティ、よく使う設定を管理します。",
+      "nav": {
+        "profile": {
+          "label": "アカウント情報",
+          "sub": "ユーザー名、表示名、アバター"
+        },
+        "security": {
+          "label": "セキュリティ",
+          "sub": "パスワードとアカウント保護"
+        },
+        "preferences": {
+          "label": "設定",
+          "sub": "外観、言語、ショートカット"
+        }
+      },
+      "auth": {
+        "title": "ログインしてアカウントを管理",
+        "subtitle": "設定はチャンネル、配信予約、公開プロフィールに反映されます。"
+      },
+      "profile": {
+        "noUsername": "ユーザー名は未設定です",
+        "changeAvatar": "アバターを変更",
+        "viewChannel": "チャンネルを見る",
+        "editTitle": "プロフィール編集",
+        "editSub": "ユーザー名は一意です。変更後 7 日間は再変更できません。",
+        "username": "ユーザー名",
+        "usernameHelp": "3〜32 文字。英数字、ドット、ハイフン、アンダースコアが使えます",
+        "usernameAvailable": "{{date}} 以降に再変更できます",
+        "displayName": "表示名",
+        "displayNameHelp": "チャンネル、ライブルーム、通知に表示される名前です。",
+        "save": "プロフィールを保存",
+        "updated": "プロフィールを更新しました。"
+      },
+      "security": {
+        "passwordTitle": "パスワード変更",
+        "passwordSub": "現在のパスワードを入力してください。次回ログインから新しいパスワードを使用します。",
+        "currentPassword": "現在のパスワード",
+        "newPassword": "新しいパスワード",
+        "confirmPassword": "新しいパスワードを確認",
+        "passwordHint": "8 文字以上で英字と数字を含めてください",
+        "updatePassword": "パスワードを更新",
+        "updated": "パスワードを更新しました。",
+        "usernameProtectionTitle": "ユーザー名の保護",
+        "usernameProtection": "ユーザー名は全体で一意です。変更後は 7 日間のクールダウンが始まります。",
+        "usernameProtectionWithDate": "ユーザー名は全体で一意です。変更後は 7 日間のクールダウンが始まります。次回変更可能日時は {{date}} です。"
+      },
+      "preferences": {
+        "displayTitle": "表示設定",
+        "displaySub": "GoLive を使いやすい表示に調整します。",
+        "darkActive": "現在はダークモードです",
+        "lightActive": "現在はライトモードです",
+        "shortcutsTitle": "よく使う入口",
+        "shortcutsSub": "頻繁に使う操作をここに置き、メニューを探す手間を減らします。",
+        "coins": "コインセンター",
+        "studio": "クリエイタースタジオ"
+      },
+      "errors": {
+        "invalidUsername": "ユーザー名は 3〜32 文字で、英数字、ドット、ハイフン、アンダースコアが使えます。",
+        "displayNameRequired": "表示名は空にできません。",
+        "weakPassword": "新しいパスワードは 8 文字以上で、英字と数字の両方を含めてください。",
+        "passwordMismatch": "新しいパスワードが一致しません。",
+        "usernameTaken": "このユーザー名はすでに使われています。",
+        "usernameCooldown": "ユーザー名はクールダウン中です。{{date}} 以降に再変更できます。",
+        "usernameCooldownUnknown": "ユーザー名の変更はまだクールダウン中です。",
+        "invalidCurrentPassword": "現在のパスワードが正しくありません。",
+        "failed": "操作に失敗しました。時間をおいて再度お試しください。"
+      }
     }
   },
   "createLive": {

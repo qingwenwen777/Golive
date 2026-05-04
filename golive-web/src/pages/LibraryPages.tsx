@@ -592,7 +592,7 @@ export function LikedPage() {
 type SettingsTab = 'profile' | 'security' | 'preferences';
 
 export function SettingsPage() {
-  const { t } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
   const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeStore();
   const { lang, setLang } = useLangStore();
@@ -620,9 +620,24 @@ export function SettingsPage() {
   }, [currentUser]);
 
   const tabs: Array<{ id: SettingsTab; label: string; sub: string; icon: ReactNode }> = [
-    { id: 'profile', label: '账号资料', sub: '用户名、昵称与头像', icon: <UserRound size={18} /> },
-    { id: 'security', label: '安全', sub: '登录密码与账号保护', icon: <ShieldCheck size={18} /> },
-    { id: 'preferences', label: '偏好', sub: '外观、语言与快捷入口', icon: <Sparkles size={18} /> },
+    {
+      id: 'profile',
+      label: t('library.settings.nav.profile.label'),
+      sub: t('library.settings.nav.profile.sub'),
+      icon: <UserRound size={18} />,
+    },
+    {
+      id: 'security',
+      label: t('library.settings.nav.security.label'),
+      sub: t('library.settings.nav.security.sub'),
+      icon: <ShieldCheck size={18} />,
+    },
+    {
+      id: 'preferences',
+      label: t('library.settings.nav.preferences.label'),
+      sub: t('library.settings.nav.preferences.sub'),
+      icon: <Sparkles size={18} />,
+    },
   ];
 
   const submitProfile = (event: FormEvent<HTMLFormElement>) => {
@@ -634,18 +649,18 @@ export function SettingsPage() {
     const username = profileUsername.trim();
     const nextDisplayName = profileDisplayName.trim();
     if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/.test(username)) {
-      toast.error('用户名需为 3-32 位字母、数字、点、横线或下划线。');
+      toast.error(t('library.settings.errors.invalidUsername'));
       return;
     }
     if (!nextDisplayName) {
-      toast.error('昵称不能为空。');
+      toast.error(t('library.settings.errors.displayNameRequired'));
       return;
     }
     updateProfile.mutate(
       { username, displayName: nextDisplayName },
       {
-        onSuccess: () => toast.success('账号资料已更新。'),
-        onError: (err) => toast.error(settingsErrorMessage(err)),
+        onSuccess: () => toast.success(t('library.settings.profile.updated')),
+        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
       },
     );
   };
@@ -657,11 +672,11 @@ export function SettingsPage() {
       return;
     }
     if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword)) {
-      toast.error('新密码至少 8 位，且必须同时包含字母和数字。');
+      toast.error(t('library.settings.errors.weakPassword'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error('两次输入的新密码不一致。');
+      toast.error(t('library.settings.errors.passwordMismatch'));
       return;
     }
     changePassword.mutate(
@@ -671,9 +686,9 @@ export function SettingsPage() {
           setCurrentPassword('');
           setNewPassword('');
           setConfirmPassword('');
-          toast.success('密码已更新。');
+          toast.success(t('library.settings.security.updated'));
         },
-        onError: (err) => toast.error(settingsErrorMessage(err)),
+        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
       },
     );
   };
@@ -686,7 +701,7 @@ export function SettingsPage() {
         </div>
         <div>
           <h1>{t('library.settings.title')}</h1>
-          <p>管理你的资料、安全设置和常用体验。</p>
+          <p>{t('library.settings.heroSub')}</p>
         </div>
       </header>
 
@@ -707,8 +722,8 @@ export function SettingsPage() {
         <div className="gl-settings-content">
           {!isAuthed ? (
             <section className="gl-settings-card gl-settings-auth-card">
-              <h2>登录后管理账号</h2>
-              <p>设置会同步到你的频道、直播预约和个人资料。</p>
+              <h2>{t('library.settings.auth.title')}</h2>
+              <p>{t('library.settings.auth.subtitle')}</p>
               <button
                 className="gl-settings-button is-primary"
                 type="button"
@@ -778,7 +793,7 @@ function SettingsNavButton({
   return (
     <button
       type="button"
-      className={`gl-settings-nav-item${active ? 'is-active' : ''}`}
+      className={`gl-settings-nav-item${active ? ' is-active' : ''}`}
       onClick={onClick}
     >
       <span className="gl-settings-nav-icon">{icon}</span>
@@ -819,21 +834,22 @@ function ProfileSettings({
   onDisplayNameChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t, i18n } = useTranslation('pages');
   return (
     <>
       <section className="gl-settings-card gl-settings-profile-card">
         <Avatar name={displayName} src={avatar} size={74} />
         <div className="gl-settings-profile-main">
           <h2>{displayName}</h2>
-          <span>{username ? `@${username}` : '尚未设置用户名'}</span>
+          <span>{username ? `@${username}` : t('library.settings.profile.noUsername')}</span>
         </div>
         <div className="gl-settings-profile-actions">
           <button className="gl-settings-button" type="button" onClick={onAvatar}>
             <Camera size={15} />
-            更换头像
+            {t('library.settings.profile.changeAvatar')}
           </button>
           <button className="gl-settings-button" type="button" onClick={onChannel}>
-            查看频道
+            {t('library.settings.profile.viewChannel')}
           </button>
         </div>
       </section>
@@ -844,15 +860,15 @@ function ProfileSettings({
             <PencilLine size={18} />
           </span>
           <div>
-            <h2>编辑资料</h2>
-            <p>用户名用于唯一识别账号，修改后 7 天内不能再次修改。</p>
+            <h2>{t('library.settings.profile.editTitle')}</h2>
+            <p>{t('library.settings.profile.editSub')}</p>
           </div>
         </div>
         <div className="gl-settings-form-grid">
           <label className="gl-settings-field">
             <span>
               <AtSign size={14} />
-              用户名
+              {t('library.settings.profile.username')}
             </span>
             <input
               value={profileUsername}
@@ -864,14 +880,16 @@ function ProfileSettings({
             />
             <small>
               {usernameLocked && usernameAvailableAt
-                ? `${formatSettingsDate(usernameAvailableAt)} 后可再次修改`
-                : '3-32 位，支持字母、数字、点、横线和下划线'}
+                ? t('library.settings.profile.usernameAvailable', {
+                    date: formatSettingsDate(usernameAvailableAt, i18n.language),
+                  })
+                : t('library.settings.profile.usernameHelp')}
             </small>
           </label>
           <label className="gl-settings-field">
             <span>
               <UserRound size={14} />
-              昵称
+              {t('library.settings.profile.displayName')}
             </span>
             <input
               value={profileDisplayName}
@@ -880,12 +898,12 @@ function ProfileSettings({
               autoComplete="name"
               className="gl-settings-input"
             />
-            <small>展示在频道页、直播间和通知里的名字。</small>
+            <small>{t('library.settings.profile.displayNameHelp')}</small>
           </label>
         </div>
         <div className="gl-settings-actions">
           <button className="gl-settings-button is-primary" type="submit" disabled={pending}>
-            保存资料
+            {t('library.settings.profile.save')}
           </button>
         </div>
       </form>
@@ -914,6 +932,7 @@ function SecuritySettings({
   onConfirmPasswordChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t, i18n } = useTranslation('pages');
   return (
     <>
       <form className="gl-settings-card gl-settings-form" onSubmit={onSubmit}>
@@ -922,13 +941,13 @@ function SecuritySettings({
             <KeyRound size={18} />
           </span>
           <div>
-            <h2>修改密码</h2>
-            <p>需要先输入当前密码，修改成功后下次登录使用新密码。</p>
+            <h2>{t('library.settings.security.passwordTitle')}</h2>
+            <p>{t('library.settings.security.passwordSub')}</p>
           </div>
         </div>
         <div className="gl-settings-form-grid">
           <label className="gl-settings-field">
-            <span>当前密码</span>
+            <span>{t('library.settings.security.currentPassword')}</span>
             <input
               type="password"
               value={currentPassword}
@@ -938,7 +957,7 @@ function SecuritySettings({
             />
           </label>
           <label className="gl-settings-field">
-            <span>新密码</span>
+            <span>{t('library.settings.security.newPassword')}</span>
             <input
               type="password"
               value={newPassword}
@@ -946,12 +965,12 @@ function SecuritySettings({
               autoComplete="new-password"
               minLength={8}
               pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}"
-              title="至少 8 位，包含英文和数字"
+              title={t('library.settings.security.passwordHint')}
               className="gl-settings-input"
             />
           </label>
           <label className="gl-settings-field">
-            <span>确认新密码</span>
+            <span>{t('library.settings.security.confirmPassword')}</span>
             <input
               type="password"
               value={confirmPassword}
@@ -959,14 +978,14 @@ function SecuritySettings({
               autoComplete="new-password"
               minLength={8}
               pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}"
-              title="至少 8 位，包含英文和数字"
+              title={t('library.settings.security.passwordHint')}
               className="gl-settings-input"
             />
           </label>
         </div>
         <div className="gl-settings-actions">
           <button className="gl-settings-button is-primary" type="submit" disabled={pending}>
-            更新密码
+            {t('library.settings.security.updatePassword')}
           </button>
         </div>
       </form>
@@ -976,12 +995,13 @@ function SecuritySettings({
           <ShieldCheck size={18} />
         </span>
         <div>
-          <h2>用户名保护</h2>
+          <h2>{t('library.settings.security.usernameProtectionTitle')}</h2>
           <p>
-            用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期
             {usernameAvailableAt
-              ? `，下一次可修改时间为 ${formatSettingsDate(usernameAvailableAt)}`
-              : '。'}
+              ? t('library.settings.security.usernameProtectionWithDate', {
+                  date: formatSettingsDate(usernameAvailableAt, i18n.language),
+                })
+              : t('library.settings.security.usernameProtection')}
           </p>
         </div>
       </section>
@@ -1013,13 +1033,17 @@ function PreferencesSettings({
             <Moon size={18} />
           </span>
           <div>
-            <h2>显示偏好</h2>
-            <p>让界面更贴合你的使用习惯。</p>
+            <h2>{t('library.settings.preferences.displayTitle')}</h2>
+            <p>{t('library.settings.preferences.displaySub')}</p>
           </div>
         </div>
         <SettingRow
           title={t('library.settings.darkTheme')}
-          sub={theme === 'dark' ? '当前为深色模式' : '当前为浅色模式'}
+          sub={
+            theme === 'dark'
+              ? t('library.settings.preferences.darkActive')
+              : t('library.settings.preferences.lightActive')
+          }
           checked={theme === 'dark'}
           onChange={onThemeToggle}
         />
@@ -1048,18 +1072,18 @@ function PreferencesSettings({
             <Wallet size={18} />
           </span>
           <div>
-            <h2>常用入口</h2>
-            <p>把高频操作留在设置页，避免来回找菜单。</p>
+            <h2>{t('library.settings.preferences.shortcutsTitle')}</h2>
+            <p>{t('library.settings.preferences.shortcutsSub')}</p>
           </div>
         </div>
         <div className="gl-settings-shortcut-row">
           <button className="gl-settings-button" type="button" onClick={onCoins}>
             <Wallet size={15} />
-            金币中心
+            {t('library.settings.preferences.coins')}
           </button>
           <button className="gl-settings-button" type="button" onClick={onStudio}>
             <Video size={15} />
-            创作者中心
+            {t('library.settings.preferences.studio')}
           </button>
         </div>
       </section>
@@ -1073,8 +1097,8 @@ function parseDate(value: string | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function formatSettingsDate(date: Date): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+function formatSettingsDate(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -1082,22 +1106,30 @@ function formatSettingsDate(date: Date): string {
   }).format(date);
 }
 
-function settingsErrorMessage(err: Error): string {
+function settingsErrorMessage(
+  err: Error,
+  t: ReturnType<typeof useTranslation>['t'],
+  locale: string,
+): string {
   if (err instanceof AxiosError) {
     const data = err.response?.data as
       | { message?: string; reason?: string; availableAt?: string }
       | undefined;
-    if (data?.reason === 'username_taken') return '这个用户名已被使用。';
+    if (data?.reason === 'username_taken') return t('library.settings.errors.usernameTaken');
     if (data?.reason === 'username_cooldown') {
       const date = parseDate(data.availableAt);
       return date
-        ? `用户名冷却中，${formatSettingsDate(date)} 后可再次修改。`
-        : '用户名修改仍在冷却期。';
+        ? t('library.settings.errors.usernameCooldown', {
+            date: formatSettingsDate(date, locale),
+          })
+        : t('library.settings.errors.usernameCooldownUnknown');
     }
-    if (data?.reason === 'invalid_current_password') return '当前密码不正确。';
+    if (data?.reason === 'invalid_current_password') {
+      return t('library.settings.errors.invalidCurrentPassword');
+    }
     if (data?.message) return data.message;
   }
-  return err.message || '操作失败，请稍后重试。';
+  return err.message || t('library.settings.errors.failed');
 }
 
 function LibraryCollectionPage({

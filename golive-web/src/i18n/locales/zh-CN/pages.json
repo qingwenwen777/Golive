@@ -422,7 +422,74 @@
         "news": "新闻"
       },
       "chatAssist": "聊天安全辅助",
-      "chatAssistSub": "提示高速聊天和可能需要管理的波动。"
+      "chatAssistSub": "提示高速聊天和可能需要管理的波动。",
+      "heroSub": "管理你的资料、安全设置和常用体验。",
+      "nav": {
+        "profile": {
+          "label": "账号资料",
+          "sub": "用户名、昵称与头像"
+        },
+        "security": {
+          "label": "安全",
+          "sub": "登录密码与账号保护"
+        },
+        "preferences": {
+          "label": "偏好",
+          "sub": "外观、语言与快捷入口"
+        }
+      },
+      "auth": {
+        "title": "登录后管理账号",
+        "subtitle": "设置会同步到你的频道、直播预约和个人资料。"
+      },
+      "profile": {
+        "noUsername": "尚未设置用户名",
+        "changeAvatar": "更换头像",
+        "viewChannel": "查看频道",
+        "editTitle": "编辑资料",
+        "editSub": "用户名用于唯一识别账号，修改后 7 天内不能再次修改。",
+        "username": "用户名",
+        "usernameHelp": "3-32 位，支持字母、数字、点、横线和下划线",
+        "usernameAvailable": "{{date}} 后可再次修改",
+        "displayName": "昵称",
+        "displayNameHelp": "展示在频道页、直播间和通知里的名字。",
+        "save": "保存资料",
+        "updated": "账号资料已更新。"
+      },
+      "security": {
+        "passwordTitle": "修改密码",
+        "passwordSub": "需要先输入当前密码，修改成功后下次登录使用新密码。",
+        "currentPassword": "当前密码",
+        "newPassword": "新密码",
+        "confirmPassword": "确认新密码",
+        "passwordHint": "至少 8 位，包含英文和数字",
+        "updatePassword": "更新密码",
+        "updated": "密码已更新。",
+        "usernameProtectionTitle": "用户名保护",
+        "usernameProtection": "用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期。",
+        "usernameProtectionWithDate": "用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期，下一次可修改时间为 {{date}}。"
+      },
+      "preferences": {
+        "displayTitle": "显示偏好",
+        "displaySub": "让界面更贴合你的使用习惯。",
+        "darkActive": "当前为深色模式",
+        "lightActive": "当前为浅色模式",
+        "shortcutsTitle": "常用入口",
+        "shortcutsSub": "把高频操作留在设置页，避免来回找菜单。",
+        "coins": "金币中心",
+        "studio": "创作者中心"
+      },
+      "errors": {
+        "invalidUsername": "用户名需为 3-32 位字母、数字、点、横线或下划线。",
+        "displayNameRequired": "昵称不能为空。",
+        "weakPassword": "新密码至少 8 位，且必须同时包含字母和数字。",
+        "passwordMismatch": "两次输入的新密码不一致。",
+        "usernameTaken": "这个用户名已被使用。",
+        "usernameCooldown": "用户名冷却中，{{date}} 后可再次修改。",
+        "usernameCooldownUnknown": "用户名修改仍在冷却期。",
+        "invalidCurrentPassword": "当前密码不正确。",
+        "failed": "操作失败，请稍后重试。"
+      }
     }
   },
   "createLive": {

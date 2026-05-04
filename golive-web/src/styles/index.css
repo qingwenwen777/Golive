@@ -7217,15 +7217,25 @@ button.gl-fan-badge-empty {
   color: var(--gl-text);
   padding: 8px 10px;
   text-align: left;
+  transition: none;
 }
 
 .gl-settings-nav-item:hover,
 .gl-settings-nav-item.is-active {
-  border-color: var(--gl-border);
   background: var(--gl-bg-hover);
+  border-color: transparent;
 }
 
-.gl-settings-nav-icon,
+.gl-settings-nav-item:active {
+  transform: none;
+}
+
+.gl-settings-nav-icon {
+  width: 34px;
+  height: 34px;
+  background: transparent;
+}
+
 .gl-settings-card-icon {
   width: 34px;
   height: 34px;
