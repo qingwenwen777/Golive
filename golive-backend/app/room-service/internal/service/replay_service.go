@@ -16,6 +16,8 @@ import (
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/logger"
+	"go.uber.org/zap"
 )
 
 const defaultBunnyAPIBase = "https://video.bunnycdn.com"
@@ -295,6 +297,10 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 	}
 	if err := s.rooms.SetReplayUploaded(ctx, room.ID, s.libraryID, videoID, model.ReplayStatusReady, s.now()); err != nil {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		return
+	}
+	if err := removeRecording(recordPath); err != nil {
+		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
 	}
 }
 
@@ -327,6 +333,17 @@ func (s *ReplayService) findRecording(streamKey string) (string, error) {
 		return "", fmt.Errorf("recording file not found for stream %s", key)
 	}
 	return newest, nil
+}
+
+func removeRecording(recordPath string) error {
+	path := strings.TrimSpace(recordPath)
+	if path == "" {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func replayVideoTitle(room model.Room) string {
