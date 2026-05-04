@@ -43,6 +43,7 @@
   --gl-chip-bg-active: #0f0f0f;
   --gl-chip-text-active: #ffffff;
   --gl-red: #ff3d5c;
+  --gl-analytics-accent: #2f6f4e;
   --gl-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   --gl-sc-body-tint: rgba(255, 255, 255, 0.3);
 }
@@ -988,6 +989,7 @@
   --gl-chip-bg-active: #ffffff;
   --gl-chip-text-active: #0f0f0f;
   --gl-red: #ff3d5c;
+  --gl-analytics-accent: #78b88d;
   --gl-shadow: 0 0 0 rgba(0, 0, 0, 0);
 }
 
@@ -5298,7 +5300,7 @@ button.gl-fan-badge-empty {
 .gl-studio-bar span {
   align-self: end;
   border-radius: 7px 7px 2px 2px;
-  background: var(--gl-text-2);
+  background: var(--gl-analytics-accent);
 }
 .gl-studio-bar small {
   color: var(--gl-text-2);
@@ -5312,7 +5314,7 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-line polyline {
   fill: none;
-  stroke: var(--gl-text-2);
+  stroke: var(--gl-analytics-accent);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
@@ -5377,7 +5379,7 @@ button.gl-fan-badge-empty {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--gl-text-2);
+  background: var(--gl-analytics-accent);
 }
 .gl-fan-badge-distribution-row strong,
 .gl-fan-badge-distribution-row small {
@@ -5525,7 +5527,7 @@ button.gl-fan-badge-empty {
   left: 0;
   height: 6px;
   border-radius: 999px;
-  background: var(--gl-text-2);
+  background: var(--gl-analytics-accent);
 }
 
 @media (max-width: 1199px) {
