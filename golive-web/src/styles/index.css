@@ -2166,30 +2166,23 @@ input:focus-visible,
 }
 .gl-home-replay-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
 }
 .gl-home-replay-card {
-  display: flex;
+  display: block;
   min-width: 0;
-  min-height: 176px;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--gl-border);
-  border-radius: 10px;
-  background: var(--gl-bg-card);
-  box-shadow: var(--gl-shadow);
   color: inherit;
-  transition:
-    border-color 0.15s ease,
-    transform 0.15s ease;
+  text-decoration: none;
 }
 .gl-home-replay-card:hover {
-  border-color: color-mix(in srgb, var(--gl-text) 24%, var(--gl-border));
-  transform: translateY(-2px);
+  color: inherit;
 }
 .gl-home-replay-card.is-loading {
   position: relative;
+  min-height: 260px;
+  overflow: hidden;
+  border-radius: 12px;
   background: var(--gl-bg-hover);
 }
 .gl-home-replay-card.is-loading::after {
@@ -2206,26 +2199,35 @@ input:focus-visible,
 .gl-home-replay-cover {
   position: relative;
   display: grid;
-  height: 82px;
+  aspect-ratio: 16 / 9;
+  width: 100%;
   place-items: center;
   overflow: hidden;
+  border-radius: 12px;
   background: var(--gl-bg-hover);
   color: var(--gl-text);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.gl-home-replay-card:hover .gl-home-replay-cover {
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.16);
+  transform: translateY(-2px);
 }
 .gl-home-replay-cover.has-image {
-  background: #111827;
+  background: #111111;
 }
 .gl-home-replay-cover .gl-loadable-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 .gl-home-replay-cover > span {
   color: var(--gl-text-2);
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 850;
 }
-.gl-home-replay-rank,
+.gl-home-replay-badge,
 .gl-home-replay-duration {
   position: absolute;
   z-index: 2;
@@ -2240,10 +2242,9 @@ input:focus-visible,
   line-height: 1;
   padding: 0 6px;
 }
-.gl-home-replay-rank {
+.gl-home-replay-badge {
   top: 8px;
   left: 8px;
-  gap: 4px;
 }
 .gl-home-replay-duration {
   right: 8px;
@@ -2252,83 +2253,44 @@ input:focus-visible,
 .gl-home-replay-body {
   display: flex;
   min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 2px 0;
+}
+.gl-home-replay-copy {
+  min-width: 0;
   flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px 12px;
 }
 .gl-home-replay-title {
   display: -webkit-box;
-  min-height: 36px;
   overflow: hidden;
   color: var(--gl-text);
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1.3;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 .gl-home-replay-channel {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-  color: var(--gl-text-2);
-  font-size: 12px;
-}
-.gl-home-replay-channel span {
   overflow: hidden;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.35;
+  margin-top: 4px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.gl-home-replay-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-}
-.gl-home-replay-stats span {
-  display: inline-flex;
-  min-width: 0;
-  min-height: 24px;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+.gl-home-replay-meta {
   overflow: hidden;
-  border-radius: 4px;
-  background: var(--gl-bg-hover);
   color: var(--gl-text-2);
-  font-size: 11px;
-  font-weight: 750;
-  line-height: 1;
-  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1.35;
+  margin-top: 2px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.gl-home-replay-stats svg {
-  flex: 0 0 auto;
-}
-.gl-home-replay-foot {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--gl-text-2);
-  font-size: 12px;
-}
-.gl-home-replay-foot span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gl-home-replay-foot strong {
-  flex: 0 0 auto;
-  border-radius: 4px;
-  background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
-  font-size: 11px;
-  line-height: 1;
-  padding: 4px 6px;
+.dark .gl-home-replay-card:hover .gl-home-replay-cover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
 }
 .gl-home-level-gifts {
   display: flex;

@@ -9,12 +9,8 @@ import {
   Gift as GiftIcon,
   Inbox,
   LockKeyhole,
-  MessageCircle,
   Radio,
   Sparkles,
-  ThumbsUp,
-  TrendingUp,
-  UsersRound,
   UserPlus,
 } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
@@ -237,7 +233,7 @@ function HomeRecommendationsSection() {
 
 function HomeHotReplaysSection() {
   const { t } = useTranslation('pages');
-  const hotReplays = useHotReplays(4, 3);
+  const hotReplays = useHotReplays(3, 3);
   const items = hotReplays.data?.items ?? [];
 
   return (
@@ -258,14 +254,14 @@ function HomeHotReplaysSection() {
       </div>
       {hotReplays.isPending ? (
         <div className="gl-home-replay-grid" aria-busy="true">
-          {Array.from({ length: 4 }).map((_, index) => (
+          {Array.from({ length: 3 }).map((_, index) => (
             <div className="gl-home-replay-card is-loading" key={index} />
           ))}
         </div>
       ) : items.length > 0 ? (
         <div className="gl-home-replay-grid">
-          {items.map((replay, index) => (
-            <HotReplayCard key={replay.id} replay={replay} rank={index + 1} />
+          {items.map((replay) => (
+            <HotReplayCard key={replay.id} replay={replay} />
           ))}
         </div>
       ) : (
@@ -277,9 +273,8 @@ function HomeHotReplaysSection() {
   );
 }
 
-function HotReplayCard({ replay, rank }: { replay: HotReplayItem; rank: number }) {
+function HotReplayCard({ replay }: { replay: HotReplayItem }) {
   const { t, i18n } = useTranslation('pages');
-  const locale = i18n.resolvedLanguage ?? i18n.language;
   const channelName = streamChannelName(replay);
   const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
   const category =
@@ -289,68 +284,25 @@ function HotReplayCard({ replay, rank }: { replay: HotReplayItem; rank: number }
     <Link className="gl-home-replay-card" to={`/live/${encodeURIComponent(replay.id)}`}>
       <div className={cn('gl-home-replay-cover', replay.cover && 'has-image')}>
         {replay.cover ? (
-          <LoadableImage src={replay.cover} alt="" loading={rank === 1 ? 'eager' : 'lazy'} />
+          <LoadableImage src={replay.cover} alt="" loading="lazy" />
         ) : (
           <span>{channelName.slice(0, 1).toUpperCase()}</span>
         )}
-        <div className="gl-home-replay-rank">
-          <TrendingUp size={12} />
-          {t('home.hotReplays.rank', { rank, defaultValue: '#{{rank}}' })}
+        <div className="gl-home-replay-badge">
+          {t('liveRoom.replay.badge', { defaultValue: 'Replay' })}
         </div>
         <div className="gl-home-replay-duration">{replay.duration}</div>
       </div>
       <div className="gl-home-replay-body">
-        <div className="gl-home-replay-title" title={title}>
-          {title}
-        </div>
-        <div className="gl-home-replay-channel">
-          <Avatar name={channelName} src={replay.avatar} size={22} />
-          <span>{channelName}</span>
-        </div>
-        <div
-          className="gl-home-replay-stats"
-          aria-label={t('home.hotReplays.metrics', { defaultValue: 'Replay metrics' })}
-        >
-          <span
-            title={t('home.hotReplays.likes', {
-              count: replay.likes,
-              defaultValue: '{{count}} likes',
-            })}
-          >
-            <ThumbsUp size={12} />
-            {formatCompactNumber(replay.likes, locale)}
-          </span>
-          <span
-            title={t('home.hotReplays.comments', {
-              count: replay.commentCount,
-              defaultValue: '{{count}} comments',
-            })}
-          >
-            <MessageCircle size={12} />
-            {formatCompactNumber(replay.commentCount, locale)}
-          </span>
-          <span
-            title={t('home.hotReplays.revenue', {
-              count: replay.revenueCoin,
-              defaultValue: '{{count}} coins',
-            })}
-          >
-            <Coins size={12} />
-            {formatCompactNumber(replay.revenueCoin, locale)}
-          </span>
-          <span
-            title={t('home.hotReplays.peakViewers', {
-              count: replay.peakViewers ?? 0,
-              defaultValue: '{{count}} peak viewers',
-            })}
-          >
-            <UsersRound size={12} />
-            {formatCompactNumber(replay.peakViewers ?? 0, locale)}
-          </span>
-        </div>
-        <div className="gl-home-replay-foot">
-          <span>{category}</span>
-          <strong>{t('liveRoom.replay.badge', { defaultValue: 'Replay' })}</strong>
+        <Avatar name={channelName} src={replay.avatar} size={44} />
+        <div className="gl-home-replay-copy">
+          <div className="gl-home-replay-title" title={title}>
+            {title}
+          </div>
+          <div className="gl-home-replay-channel">{channelName}</div>
+          <div className="gl-home-replay-meta">
+            {t('liveRoom.replay.badge', { defaultValue: 'Replay' })} · {category}
+          </div>
         </div>
       </div>
     </Link>
@@ -514,11 +466,4 @@ function formatRecommendationTime(value: string, locale: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value));
-}
-
-function formatCompactNumber(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value);
 }
