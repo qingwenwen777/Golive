@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Clock3,
   Crown,
-  FileText,
   Heart,
   History,
   KeyRound,
@@ -214,7 +213,7 @@ export function SubscriptionsPage() {
 
       {!allSelected && selectedChannelUrl && (
         <div className="gl-subscription-channel-action-row">
-          <Link className="gl-secondary-btn gl-subscription-channel-action" to={selectedChannelUrl}>
+          <Link className="gl-subscription-channel-action" to={selectedChannelUrl}>
             {t('library.subscriptions.enterChannel')}
             <ChevronRight size={14} />
           </Link>
@@ -317,7 +316,6 @@ export function SubscriptionsPage() {
                   })}
             </span>
           </div>
-          <FileText size={22} />
         </div>
         {isAuthed && visiblePosts.isPending ? (
           <div className="gl-post-feed-list gl-subscription-post-feed" aria-busy="true">

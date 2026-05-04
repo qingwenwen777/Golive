@@ -65,7 +65,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
     {
       key: 'studio-posts',
       icon: Icons.FileText,
-      label: t('nav.studioPosts', { defaultValue: 'Posts' }),
+      label: t('nav.studioPosts'),
       route: '/studio/posts',
     },
     {

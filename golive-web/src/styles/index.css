@@ -7020,15 +7020,29 @@ button.gl-fan-badge-empty {
   max-width: 84px;
 }
 .gl-subscription-channel-action {
-  min-height: 32px;
-  padding-inline: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+  padding: 0 13px 0 14px;
   font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
   white-space: nowrap;
+}
+.gl-subscription-channel-action:hover {
+  background: color-mix(in srgb, var(--gl-bg-hover) 88%, var(--gl-text) 12%);
 }
 .gl-subscription-channel-action-row {
   display: flex;
-  justify-content: flex-end;
-  margin: 10px 0 6px;
+  justify-content: flex-start;
+  margin: 6px 0 2px;
 }
 .gl-yt-you-head {
   display: grid;
