@@ -277,6 +277,7 @@
       "home": "主页",
       "posts": "帖子动态",
       "liveHistory": "直播历史",
+      "liveReplays": "直播回放",
       "live": "直播",
       "history": "历史"
     },
@@ -293,10 +294,13 @@
     "noLiveOwnerSub": "准备好后就可以开始直播。",
     "noLiveViewerSub": "订阅这个频道，等创作者开播后再回来看看。",
     "liveHistory": "直播历史",
+    "liveReplays": "直播回放",
     "channelAnalytics": "频道数据",
     "noHistory": "还没有已结束的直播",
     "noHistoryOwnerSub": "结束后的直播会在这里显示时长、封面、标题和数据表现。",
     "noHistoryViewerSub": "这个创作者还没有可展示的已结束直播。",
+    "noReplays": "还没有直播回放",
+    "noReplaysViewerSub": "这个主播还没有发布可观看的直播回放。",
     "history": {
       "pagination": "直播历史分页",
       "pageCount": "{{start}}-{{end}} / {{total}}",

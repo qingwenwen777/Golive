@@ -102,13 +102,20 @@ export default function ChannelPage() {
   const channelId =
     primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
+  const historyMode = isOwner ? 'history' : 'replay';
   const followState = useFollowState(channelId, !!channelId);
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
-  const liveHistory = useChannelLiveHistory(channelKey, historyPage, HISTORY_PAGE_SIZE);
+  const liveHistory = useChannelLiveHistory(
+    channelKey,
+    historyPage,
+    HISTORY_PAGE_SIZE,
+    historyMode,
+  );
   const historyTotal = liveHistory.data?.total ?? 0;
   const historyPageSize = liveHistory.data?.size ?? HISTORY_PAGE_SIZE;
   const historyPageCount = Math.max(1, Math.ceil(historyTotal / historyPageSize));
+  const historyItems = liveHistory.data?.items ?? [];
   const channelAppointments = useChannelAppointments(channelKey, true, appointmentPage, 4);
   const appointmentTotal = channelAppointments.data?.total ?? 0;
   const appointmentPageSize = channelAppointments.data?.size ?? 4;
@@ -145,7 +152,7 @@ export default function ChannelPage() {
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [channelKey]);
+  }, [channelKey, historyMode]);
 
   useEffect(() => {
     setAppointmentPage(1);
@@ -343,18 +350,26 @@ export default function ChannelPage() {
       </section>
 
       <nav className="gl-channel-tabs" role="tablist" aria-label={t('channel.sections')}>
-        {CHANNEL_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id ? 'is-active' : undefined}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {t(tab.labelKey, { defaultValue: tab.defaultValue })}
-          </button>
-        ))}
+        {CHANNEL_TABS.map((tab) => {
+          const labelKey =
+            tab.id === 'history' && historyMode === 'replay'
+              ? 'channel.tabs.liveReplays'
+              : tab.labelKey;
+          const defaultValue =
+            tab.id === 'history' && historyMode === 'replay' ? 'Live replays' : tab.defaultValue;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={activeTab === tab.id ? 'is-active' : undefined}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {t(labelKey, { defaultValue })}
+            </button>
+          );
+        })}
       </nav>
 
       {activeTab === 'home' && (
@@ -517,7 +532,11 @@ export default function ChannelPage() {
       {activeTab === 'history' && (
         <section className="gl-library-section gl-channel-tab-panel" id="history">
           <div className="gl-section-title-row">
-            <h2>{t('channel.liveHistory')}</h2>
+            <h2>
+              {isOwner
+                ? t('channel.liveHistory')
+                : t('channel.liveReplays', { defaultValue: 'Live replays' })}
+            </h2>
           </div>
           {liveHistory.isPending ? (
             <div className="gl-history-list" aria-busy="true">
@@ -525,10 +544,10 @@ export default function ChannelPage() {
                 <div className="gl-history-row is-loading" key={i} />
               ))}
             </div>
-          ) : liveHistory.data?.items.length ? (
+          ) : historyItems.length ? (
             <>
               <div className="gl-history-list">
-                {liveHistory.data.items.map((record) => (
+                {historyItems.map((record) => (
                   <ChannelHistoryRow
                     key={record.id}
                     record={record}
@@ -551,9 +570,17 @@ export default function ChannelPage() {
             <div className="gl-channel-empty">
               <Clock3 size={34} />
               <div>
-                <strong>{t('channel.noHistory')}</strong>
+                <strong>
+                  {isOwner
+                    ? t('channel.noHistory')
+                    : t('channel.noReplays', { defaultValue: 'No live replays yet' })}
+                </strong>
                 <span>
-                  {isOwner ? t('channel.noHistoryOwnerSub') : t('channel.noHistoryViewerSub')}
+                  {isOwner
+                    ? t('channel.noHistoryOwnerSub')
+                    : t('channel.noReplaysViewerSub', {
+                        defaultValue: 'This creator has not published a replay yet.',
+                      })}
                 </span>
               </div>
             </div>

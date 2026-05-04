@@ -435,13 +435,20 @@ export interface NotificationListResp {
   size: number;
 }
 
-export function useChannelLiveHistory(channelKey: string, page = 1, size = 4) {
+export type ChannelHistoryMode = 'history' | 'replay';
+
+export function useChannelLiveHistory(
+  channelKey: string,
+  page = 1,
+  size = 4,
+  mode: ChannelHistoryMode = 'history',
+) {
   return useQuery<LiveHistoryResp, Error>({
-    queryKey: ['channel-live-history', channelKey, page, size],
+    queryKey: ['channel-live-history', channelKey, page, size, mode],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<LiveHistoryResp>(
         `/rooms/channels/${encodeURIComponent(channelKey)}/history`,
-        { params: { page, size }, signal },
+        { params: { page, size, ...(mode === 'replay' ? { mode: 'replay' } : {}) }, signal },
       );
       return data;
     },

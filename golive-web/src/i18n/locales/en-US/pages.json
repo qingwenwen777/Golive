@@ -276,6 +276,7 @@
       "home": "Home",
       "posts": "Posts",
       "liveHistory": "Live history",
+      "liveReplays": "Live replays",
       "live": "Live",
       "history": "History"
     },
@@ -292,10 +293,13 @@
     "noLiveOwnerSub": "Start a live room when you are ready to broadcast.",
     "noLiveViewerSub": "Follow this channel and check back when the creator goes live.",
     "liveHistory": "Live history",
+    "liveReplays": "Live replays",
     "channelAnalytics": "Channel analytics",
     "noHistory": "No completed live streams yet",
     "noHistoryOwnerSub": "Finished broadcasts will appear here with duration, cover, title, and performance data.",
     "noHistoryViewerSub": "This creator has not finished a broadcast that can be shown here yet.",
+    "noReplays": "No live replays yet",
+    "noReplaysViewerSub": "This creator has not published a watchable replay yet.",
     "history": {
       "pagination": "Live history pagination",
       "pageCount": "{{start}}-{{end}} of {{total}}",

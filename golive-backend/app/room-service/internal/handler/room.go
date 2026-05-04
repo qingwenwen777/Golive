@@ -48,7 +48,8 @@ func (h *RoomHandler) ChannelHistory(c *gin.Context) {
 	if size < 1 || size > 100 {
 		size = 24
 	}
-	resp, err := h.svc.HistoryByChannel(c.Request.Context(), c.Param("channel"), UserIDFromCtx(c), page, size)
+	replaysOnly := c.Query("mode") == "replay" || c.Query("replaysOnly") == "1" || c.Query("replaysOnly") == "true"
+	resp, err := h.svc.HistoryByChannel(c.Request.Context(), c.Param("channel"), UserIDFromCtx(c), page, size, replaysOnly)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

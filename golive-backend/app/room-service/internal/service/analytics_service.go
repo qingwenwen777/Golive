@@ -83,13 +83,20 @@ type LiveAnalysisResp struct {
 	SuperChatRevenue int64             `json:"superChatRevenue"`
 }
 
-func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID string, page, size int) (*LiveHistoryResp, error) {
+func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID string, page, size int, replaysOnly bool) (*LiveHistoryResp, error) {
 	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelKey)
 	if err != nil {
 		if errors.Is(err, repo.ErrRoomNotFound) {
 			return &LiveHistoryResp{Items: []LiveHistoryItem{}, Total: 0, Page: page, Size: size}, nil
 		}
 		return nil, err
+	}
+	if replaysOnly && viewerID != ownerID {
+		items, total, err := s.replayItemsForViewer(ctx, ownerID, viewerID, page, size)
+		if err != nil {
+			return nil, err
+		}
+		return &LiveHistoryResp{Items: items, Total: total, Page: page, Size: size}, nil
 	}
 	items, _, total, err := s.historyItemsForOwner(ctx, ownerID, viewerID, page, size)
 	if err != nil {
@@ -191,13 +198,68 @@ func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID, viewerI
 	if err != nil {
 		return nil, nil, 0, err
 	}
+	items, err := s.historyItemsFromRooms(ctx, rooms, viewerID)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	return items, rooms, total, nil
+}
+
+func (s *RoomService) replayItemsForViewer(ctx context.Context, ownerID, viewerID string, page, size int) ([]LiveHistoryItem, int64, error) {
+	if s.replay == nil {
+		return []LiveHistoryItem{}, 0, nil
+	}
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 24
+	}
+	if size > 100 {
+		size = 100
+	}
+	rooms, err := s.rooms.ReplayCandidateRoomsByOwner(ctx, ownerID)
+	if err != nil {
+		return nil, 0, err
+	}
+	visible := make([]model.Room, 0, len(rooms))
+	for _, room := range rooms {
+		replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
+		if err != nil {
+			return nil, 0, err
+		}
+		if replay != nil && replay.CanWatch {
+			visible = append(visible, room)
+		}
+	}
+	total := int64(len(visible))
+	start := (page - 1) * size
+	if start >= len(visible) {
+		return []LiveHistoryItem{}, total, nil
+	}
+	end := start + size
+	if end > len(visible) {
+		end = len(visible)
+	}
+	items, err := s.historyItemsFromRooms(ctx, visible[start:end], viewerID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (s *RoomService) historyItemsFromRooms(ctx context.Context, rooms []model.Room, viewerID string) ([]LiveHistoryItem, error) {
+	items := make([]LiveHistoryItem, 0, len(rooms))
+	if len(rooms) == 0 {
+		return items, nil
+	}
 	roomIDs := make([]string, 0, len(rooms))
 	for _, room := range rooms {
 		roomIDs = append(roomIDs, room.ID)
 	}
 	rows, err := s.revenueRows(ctx, roomIDs)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
 	rowsByRoom := map[string][]repo.RevenueRow{}
 	for _, row := range rows {
@@ -205,23 +267,22 @@ func (s *RoomService) historyItemsForOwner(ctx context.Context, ownerID, viewerI
 	}
 	danmuCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, err
 	}
 
-	items := make([]LiveHistoryItem, 0, len(rooms))
 	for _, room := range rooms {
 		item := s.historyItem(room, rowsByRoom[room.ID], danmuCounts[room.ID])
 		item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
 		if s.replay != nil {
 			replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
 			if err != nil {
-				return nil, nil, 0, err
+				return nil, err
 			}
 			item.Replay = replay
 		}
 		items = append(items, item)
 	}
-	return items, rooms, total, nil
+	return items, nil
 }
 
 func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow, danmuCount int64) LiveHistoryItem {

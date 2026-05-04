@@ -374,6 +374,15 @@ func (r *RoomRepo) ReplayRoomsByOwner(ctx context.Context, ownerID string, page,
 	return rooms, total, err
 }
 
+func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID string) ([]model.Room, error) {
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("owner_id = ? AND status = ? AND replay_status = ? AND replay_bunny_video_id <> ?", ownerID, model.StatusEnded, model.ReplayStatusReady, "").
+		Order("COALESCE(replay_uploaded_at, ended_at, updated_at) DESC").
+		Find(&rooms).Error
+	return rooms, err
+}
+
 func (r *RoomRepo) EndedRoomByOwner(ctx context.Context, ownerID, roomID string) (*model.Room, error) {
 	var room model.Room
 	err := r.db.WithContext(ctx).

@@ -276,6 +276,7 @@
       "home": "ホーム",
       "posts": "投稿",
       "liveHistory": "ライブ履歴",
+      "liveReplays": "ライブリプレイ",
       "live": "ライブ",
       "history": "履歴"
     },
@@ -292,10 +293,13 @@
     "noLiveOwnerSub": "配信準備ができたらライブルームを開始できます。",
     "noLiveViewerSub": "このチャンネルを登録して、クリエイターの配信開始後にまた確認してください。",
     "liveHistory": "ライブ履歴",
+    "liveReplays": "ライブリプレイ",
     "channelAnalytics": "チャンネル分析",
     "noHistory": "終了したライブはまだありません",
     "noHistoryOwnerSub": "終了した配信は、時間、カバー、タイトル、パフォーマンスデータと一緒にここへ表示されます。",
     "noHistoryViewerSub": "このクリエイターには、まだ表示できる終了済み配信がありません。",
+    "noReplays": "ライブリプレイはまだありません",
+    "noReplaysViewerSub": "このクリエイターはまだ視聴できるリプレイを公開していません。",
     "history": {
       "pagination": "ライブ履歴ページ",
       "pageCount": "{{start}}-{{end}} / {{total}}",
