@@ -10,6 +10,7 @@ import {
   Inbox,
   LockKeyhole,
   Radio,
+  RefreshCw,
   Sparkles,
   UserPlus,
 } from 'lucide-react';
@@ -35,6 +36,8 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
 import { localizedGiftName } from '@/lib/gift';
 import { streamChannelName, type Stream } from '@/types/stream';
+
+const UPCOMING_APPOINTMENT_LIMIT = 4;
 
 export default function HomePage() {
   const { t } = useTranslation('pages');
@@ -153,8 +156,28 @@ export default function HomePage() {
 
 function UpcomingAppointmentsSection() {
   const { t } = useTranslation('pages');
+  const [shuffleSeed, setShuffleSeed] = useState(() => Date.now());
   const appointments = useUpcomingAppointments(1, 100);
   const items = appointments.data?.items ?? [];
+  const visibleItems = useMemo(
+    () =>
+      items
+        .map((item, index) => ({
+          item,
+          score: appointmentShuffleScore(`${item.id}:${item.scheduledAt}:${index}`, shuffleSeed),
+        }))
+        .sort((a, b) => a.score - b.score)
+        .slice(0, UPCOMING_APPOINTMENT_LIMIT)
+        .map(({ item }) => item),
+    [items, shuffleSeed],
+  );
+
+  const refreshAppointments = () => {
+    setShuffleSeed((current) => {
+      const next = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+      return next === current ? current + 1 : next;
+    });
+  };
 
   return (
     <section className="gl-home-my-appointments">
@@ -163,6 +186,16 @@ function UpcomingAppointmentsSection() {
           <h2>{t('home.upcoming.title')}</h2>
           <span>{t('home.upcoming.subtitle')}</span>
         </div>
+        <button
+          type="button"
+          className="gl-home-upcoming-refresh"
+          disabled={appointments.isPending || items.length <= 1}
+          aria-label={t('home.upcoming.refresh', { defaultValue: '刷新预约推荐' })}
+          onClick={refreshAppointments}
+        >
+          <RefreshCw size={16} />
+          <span>{t('home.upcoming.refresh', { defaultValue: '刷新' })}</span>
+        </button>
       </div>
       {appointments.isPending ? (
         <div className="gl-grid" aria-busy="true">
@@ -172,7 +205,7 @@ function UpcomingAppointmentsSection() {
         </div>
       ) : items.length > 0 ? (
         <div className="gl-home-appointment-grid">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <AppointmentViewerCard
               key={item.id}
               appointment={item}
@@ -186,6 +219,15 @@ function UpcomingAppointmentsSection() {
       )}
     </section>
   );
+}
+
+function appointmentShuffleScore(key: string, seed: number): number {
+  let hash = seed >>> 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function HomeNoLiveEmpty() {

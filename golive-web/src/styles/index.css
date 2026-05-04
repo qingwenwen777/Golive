@@ -9319,6 +9319,32 @@ button.gl-fan-badge-empty {
   line-height: 1.35;
 }
 
+.gl-home-upcoming-refresh {
+  display: inline-flex;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.gl-home-upcoming-refresh:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-home-upcoming-refresh:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .gl-appointment-grid,
 .gl-home-appointment-grid {
   display: grid;
