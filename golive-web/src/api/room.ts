@@ -356,6 +356,16 @@ export interface MonthlyCreatorMetric {
   peakViewers: number;
 }
 
+export type FanBadgeDistributionKey = 'under20' | 'level20To39' | 'level40To59' | 'level60Plus';
+
+export interface FanBadgeDistributionBucket {
+  bucket: FanBadgeDistributionKey;
+  minLevel: number;
+  maxLevel?: number;
+  fanCount: number;
+  totalContribution: number;
+}
+
 export interface CreatorAnalyticsResp {
   channelId: string;
   revenueCoin: number;
@@ -364,6 +374,7 @@ export interface CreatorAnalyticsResp {
   watchHours: number;
   peakViewers: number;
   monthly: MonthlyCreatorMetric[];
+  fanBadgeDistribution: FanBadgeDistributionBucket[];
   history: LiveHistoryItem[];
 }
 

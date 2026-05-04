@@ -5045,21 +5045,12 @@ button.gl-fan-badge-empty {
 .gl-history-cover-fallback {
   font-size: 20px;
 }
-.gl-history-thumb span,
-.gl-history-cover span {
+.gl-history-thumb .gl-dur-pill,
+.gl-history-cover .gl-dur-pill {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.78);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  z-index: 2;
 }
 .gl-history-main {
   min-width: 0;
@@ -5307,7 +5298,7 @@ button.gl-fan-badge-empty {
 .gl-studio-bar span {
   align-self: end;
   border-radius: 7px 7px 2px 2px;
-  background: #1c62b9;
+  background: var(--gl-text-2);
 }
 .gl-studio-bar small {
   color: var(--gl-text-2);
@@ -5321,11 +5312,80 @@ button.gl-fan-badge-empty {
 }
 .gl-studio-line polyline {
   fill: none;
-  stroke: #1c62b9;
+  stroke: var(--gl-text-2);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 4;
   vector-effect: non-scaling-stroke;
+}
+.gl-fan-badge-distribution {
+  margin-top: 22px;
+  border-top: 1px solid var(--gl-border);
+  padding-top: 16px;
+}
+.gl-fan-badge-distribution-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.gl-fan-badge-distribution-head span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-fan-badge-distribution-head strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 900;
+}
+.gl-fan-badge-distribution-head small {
+  max-width: 320px;
+  color: var(--gl-text-3);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: right;
+}
+.gl-fan-badge-distribution-rows {
+  display: grid;
+  gap: 10px;
+}
+.gl-fan-badge-distribution-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr) minmax(64px, auto) minmax(96px, auto);
+  gap: 10px;
+  align-items: center;
+}
+.gl-fan-badge-distribution-row > span {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-fan-badge-distribution-row > div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+}
+.gl-fan-badge-distribution-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gl-text-2);
+}
+.gl-fan-badge-distribution-row strong,
+.gl-fan-badge-distribution-row small {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: right;
+  white-space: nowrap;
 }
 .gl-studio-metric-rows,
 .gl-studio-fans,
@@ -5372,7 +5432,7 @@ button.gl-fan-badge-empty {
   border-radius: 10px;
 }
 
-.gl-studio-live-row > div {
+.gl-studio-live-row-main {
   min-width: 0;
 }
 
@@ -5388,7 +5448,7 @@ button.gl-fan-badge-empty {
   white-space: nowrap;
 }
 .gl-studio-live-row > span,
-.gl-studio-live-row > div > span {
+.gl-studio-live-row-main > span {
   color: var(--gl-text-2);
   font-size: 13px;
   min-width: 0;
@@ -5465,7 +5525,7 @@ button.gl-fan-badge-empty {
   left: 0;
   height: 6px;
   border-radius: 999px;
-  background: #1c62b9;
+  background: var(--gl-text-2);
 }
 
 @media (max-width: 1199px) {
@@ -5549,6 +5609,31 @@ button.gl-fan-badge-empty {
 
   .gl-studio-line {
     height: 160px;
+  }
+
+  .gl-fan-badge-distribution-head {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .gl-fan-badge-distribution-head small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .gl-fan-badge-distribution-row {
+    grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1.2fr);
+    gap: 6px 10px;
+  }
+
+  .gl-fan-badge-distribution-row > div {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .gl-fan-badge-distribution-row strong,
+  .gl-fan-badge-distribution-row small {
+    justify-self: end;
   }
 
   .gl-studio-live-table {

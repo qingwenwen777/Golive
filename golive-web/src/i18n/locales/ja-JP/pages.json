@@ -735,6 +735,17 @@
         "topContributions": "貢献ランキング",
         "emptyContributions": "この配信の貢献データはありません。"
       },
+      "fanBadges": {
+        "title": "ファンバッジ分布",
+        "subtitle": "バッジレベル別の人数と累計貢献を表示します。",
+        "fanCount": "{{formattedCount}} 人",
+        "ranges": {
+          "under20": "Lv.20未満",
+          "level20To39": "Lv.20-39",
+          "level40To59": "Lv.40-59",
+          "level60Plus": "Lv.60以上"
+        }
+      },
       "live": {
         "title": "ライブ分析",
         "subtitle": "単一配信の収益、ピーク視聴者、トップファン貢献。",

@@ -18,6 +18,7 @@ import {
 import {
   useCreatorAnalytics,
   useLiveAnalysis,
+  type FanBadgeDistributionBucket,
   type LiveHistoryItem,
   type MonthlyCreatorMetric,
 } from '@/api/room';
@@ -42,9 +43,7 @@ export function CreatorAnalyticsPage() {
       />
 
       {analytics.isPending ? (
-        <div className="gl-studio-panel gl-studio-loading">
-          {t('studio.analytics.loading')}
-        </div>
+        <div className="gl-studio-panel gl-studio-loading">{t('studio.analytics.loading')}</div>
       ) : analytics.isError ? (
         <div className="gl-channel-empty">
           <BarChart3 size={34} />
@@ -96,6 +95,11 @@ export function CreatorAnalyticsPage() {
                 value={(item) => item.revenueCoin}
                 label={(item) => formatMonth(item.month, locale)}
                 valueLabel={(value) => formatCoin(value, locale, t)}
+              />
+              <FanBadgeDistribution
+                buckets={data.fanBadgeDistribution ?? []}
+                locale={locale}
+                t={t}
               />
             </div>
 
@@ -373,7 +377,7 @@ function LiveHistoryStudioRow({
       to={`/studio/analytics/${encodeURIComponent(channelKey)}/live/${encodeURIComponent(record.id)}`}
     >
       <HistoryCover record={record} />
-      <div>
+      <div className="gl-studio-live-row-main">
         <strong>{record.title}</strong>
         <span>
           {formatDate(record.startedAt, locale)} · {record.duration}
@@ -397,12 +401,14 @@ function LiveHistoryStudioRow({
 
 function HistoryCover({ record }: { record: LiveHistoryItem }) {
   return (
-    <div className={`gl-history-cover${record.cover ? ' has-image' : ''}`}>
+    <div
+      className={['gl-history-cover', record.cover ? 'has-image' : ''].filter(Boolean).join(' ')}
+    >
       <div className="gl-history-cover-fallback" aria-hidden>
         {(record.title || 'GL').slice(0, 2).toUpperCase()}
       </div>
       {record.cover && <LoadableImage src={record.cover} alt="" />}
-      <span>{record.duration}</span>
+      <span className="gl-dur-pill">{record.duration}</span>
     </div>
   );
 }
@@ -516,6 +522,63 @@ function BreakdownBars({
   );
 }
 
+function FanBadgeDistribution({
+  buckets,
+  locale,
+  t,
+}: {
+  buckets: FanBadgeDistributionBucket[];
+  locale: string;
+  t: TFunction;
+}) {
+  const rows = fanBadgeBucketOrder.map((bucket) => {
+    const data = buckets.find((item) => item.bucket === bucket) ?? {
+      bucket,
+      fanCount: 0,
+      totalContribution: 0,
+    };
+    return data;
+  });
+  const totalFans = rows.reduce((sum, item) => sum + item.fanCount, 0);
+  const maxFans = Math.max(...rows.map((item) => item.fanCount), 1);
+
+  return (
+    <div className="gl-fan-badge-distribution">
+      <div className="gl-fan-badge-distribution-head">
+        <div>
+          <span>{t('studio.analytics.fanBadges.title')}</span>
+          <strong>
+            {t('studio.analytics.fanBadges.fanCount', {
+              count: totalFans,
+              formattedCount: totalFans.toLocaleString(locale),
+            })}
+          </strong>
+        </div>
+        <small>{t('studio.analytics.fanBadges.subtitle')}</small>
+      </div>
+      <div className="gl-fan-badge-distribution-rows">
+        {rows.map((item) => (
+          <div className="gl-fan-badge-distribution-row" key={item.bucket}>
+            <span>{t(`studio.analytics.fanBadges.ranges.${item.bucket}`)}</span>
+            <div aria-hidden>
+              <i style={{ width: `${Math.max(4, (item.fanCount / maxFans) * 100)}%` }} />
+            </div>
+            <strong>
+              {t('studio.analytics.fanBadges.fanCount', {
+                count: item.fanCount,
+                formattedCount: item.fanCount.toLocaleString(locale),
+              })}
+            </strong>
+            <small>{formatCoin(item.totalContribution, locale, t)}</small>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const fanBadgeBucketOrder = ['under20', 'level20To39', 'level40To59', 'level60Plus'] as const;
+
 function formatCoin(value: number, locale: string, t: TFunction): string {
   return t('studio.analytics.units.coinAmount', {
     amount: Math.round(value).toLocaleString(locale),
@@ -540,7 +603,5 @@ function formatDate(value: string, locale: string): string {
 function formatMonth(value: string, locale: string): string {
   const [year, month] = value.split('-').map(Number);
   if (!year || !month) return value;
-  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(
-    new Date(year, month - 1, 1),
-  );
+  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(new Date(year, month - 1, 1));
 }

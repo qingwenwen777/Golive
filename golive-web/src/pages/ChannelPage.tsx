@@ -778,7 +778,7 @@ function HistoryThumb({ record }: { record: LiveHistoryItem }) {
     >
       <div className="gl-history-thumb-fallback">{initials}</div>
       {record.cover && <LoadableImage src={record.cover} alt="" />}
-      <span>{record.duration}</span>
+      <span className="gl-dur-pill">{record.duration}</span>
     </div>
   );
 }

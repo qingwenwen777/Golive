@@ -736,6 +736,17 @@
         "topContributions": "贡献排行",
         "emptyContributions": "这场直播暂无贡献数据。"
       },
+      "fanBadges": {
+        "title": "粉丝牌分布",
+        "subtitle": "按粉丝牌等级统计人数和累计贡献。",
+        "fanCount": "{{formattedCount}} 人",
+        "ranges": {
+          "under20": "20级以下",
+          "level20To39": "20-39级",
+          "level40To59": "40-59级",
+          "level60Plus": "60级以上"
+        }
+      },
       "live": {
         "title": "直播分析",
         "subtitle": "单场直播收益、峰值观众和头号粉丝贡献。",

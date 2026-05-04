@@ -56,15 +56,24 @@ type MonthlyMetric struct {
 	PeakViewers int64  `json:"peakViewers"`
 }
 
+type FanBadgeDistributionBucket struct {
+	Bucket            string `json:"bucket"`
+	MinLevel          int    `json:"minLevel"`
+	MaxLevel          int    `json:"maxLevel,omitempty"`
+	FanCount          int64  `json:"fanCount"`
+	TotalContribution int64  `json:"totalContribution"`
+}
+
 type CreatorAnalyticsResp struct {
-	ChannelID       string            `json:"channelId"`
-	RevenueCoin     int64             `json:"revenueCoin"`
-	SubscriberCount int64             `json:"subscriberCount"`
-	Streams         int64             `json:"streams"`
-	WatchHours      int64             `json:"watchHours"`
-	PeakViewers     int64             `json:"peakViewers"`
-	Monthly         []MonthlyMetric   `json:"monthly"`
-	History         []LiveHistoryItem `json:"history"`
+	ChannelID            string                       `json:"channelId"`
+	RevenueCoin          int64                        `json:"revenueCoin"`
+	SubscriberCount      int64                        `json:"subscriberCount"`
+	Streams              int64                        `json:"streams"`
+	WatchHours           int64                        `json:"watchHours"`
+	PeakViewers          int64                        `json:"peakViewers"`
+	Monthly              []MonthlyMetric              `json:"monthly"`
+	FanBadgeDistribution []FanBadgeDistributionBucket `json:"fanBadgeDistribution"`
+	History              []LiveHistoryItem            `json:"history"`
 }
 
 type LiveAnalysisResp struct {
@@ -109,6 +118,10 @@ func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID
 
 	channelID := "ch-" + ownerID
 	monthly, totals := s.monthlyMetrics(ctx, ownerID, channelID, rooms)
+	fanBadgeDistribution, err := s.fanBadgeDistribution(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
 	subscriberCount := int64(0)
 	if s.social != nil {
 		count, err := s.social.FollowerCount(ctx, channelID)
@@ -119,14 +132,15 @@ func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID
 	}
 
 	return &CreatorAnalyticsResp{
-		ChannelID:       channelID,
-		RevenueCoin:     totals.RevenueCoin,
-		SubscriberCount: subscriberCount,
-		Streams:         totals.Streams,
-		WatchHours:      totals.WatchHours,
-		PeakViewers:     totals.PeakViewers,
-		Monthly:         monthly,
-		History:         history,
+		ChannelID:            channelID,
+		RevenueCoin:          totals.RevenueCoin,
+		SubscriberCount:      subscriberCount,
+		Streams:              totals.Streams,
+		WatchHours:           totals.WatchHours,
+		PeakViewers:          totals.PeakViewers,
+		Monthly:              monthly,
+		FanBadgeDistribution: fanBadgeDistribution,
+		History:              history,
 	}, nil
 }
 
@@ -303,6 +317,35 @@ func (s *RoomService) monthlyMetrics(ctx context.Context, ownerID, channelID str
 		}
 	}
 	return months, totals
+}
+
+func (s *RoomService) fanBadgeDistribution(ctx context.Context, ownerID string) ([]FanBadgeDistributionBucket, error) {
+	buckets := []FanBadgeDistributionBucket{
+		{Bucket: "under20", MinLevel: 1, MaxLevel: 19},
+		{Bucket: "level20To39", MinLevel: 20, MaxLevel: 39},
+		{Bucket: "level40To59", MinLevel: 40, MaxLevel: 59},
+		{Bucket: "level60Plus", MinLevel: 60},
+	}
+	rows, err := s.rooms.FanBadgeDistribution(ctx, ownerID)
+	if err != nil {
+		if isMissingAnalyticsTable(err) {
+			return buckets, nil
+		}
+		return nil, err
+	}
+	byBucket := map[string]repo.FanBadgeDistributionRow{}
+	for _, row := range rows {
+		byBucket[row.Bucket] = row
+	}
+	for i := range buckets {
+		row, ok := byBucket[buckets[i].Bucket]
+		if !ok {
+			continue
+		}
+		buckets[i].FanCount = row.FanCount
+		buckets[i].TotalContribution = row.TotalContribution
+	}
+	return buckets, nil
 }
 
 func (s *RoomService) revenueRows(ctx context.Context, roomIDs []string) ([]repo.RevenueRow, error) {

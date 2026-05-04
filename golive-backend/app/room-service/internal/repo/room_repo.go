@@ -478,6 +478,12 @@ type RevenueRow struct {
 	Kind      string
 }
 
+type FanBadgeDistributionRow struct {
+	Bucket            string `gorm:"column:bucket"`
+	FanCount          int64  `gorm:"column:fan_count"`
+	TotalContribution int64  `gorm:"column:total_contribution"`
+}
+
 func (r *RoomRepo) RevenueRowsByRooms(ctx context.Context, roomIDs []string) ([]RevenueRow, error) {
 	if len(roomIDs) == 0 {
 		return nil, nil
@@ -508,6 +514,28 @@ FROM super_chat_orders s
 LEFT JOIN users u ON u.id = s.user_id
 WHERE s.status = 'success' AND s.room_id IN ?
 `, roomIDs, roomIDs).Scan(&rows).Error
+	return rows, err
+}
+
+func (r *RoomRepo) FanBadgeDistribution(ctx context.Context, creatorID string) ([]FanBadgeDistributionRow, error) {
+	if creatorID == "" {
+		return nil, nil
+	}
+	var rows []FanBadgeDistributionRow
+	err := r.db.WithContext(ctx).Raw(`
+SELECT
+  CASE
+    WHEN level < 20 THEN 'under20'
+    WHEN level < 40 THEN 'level20To39'
+    WHEN level < 60 THEN 'level40To59'
+    ELSE 'level60Plus'
+  END AS bucket,
+  COUNT(*) AS fan_count,
+  COALESCE(SUM(total_contribution), 0) AS total_contribution
+FROM fan_badges
+WHERE creator_id = ?
+GROUP BY bucket
+`, creatorID).Scan(&rows).Error
 	return rows, err
 }
 

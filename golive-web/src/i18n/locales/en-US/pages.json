@@ -735,6 +735,17 @@
         "topContributions": "Top contributions",
         "emptyContributions": "No contribution data for this live."
       },
+      "fanBadges": {
+        "title": "Fan Badge Distribution",
+        "subtitle": "Fans grouped by badge level and their lifetime contribution.",
+        "fanCount": "{{formattedCount}} fans",
+        "ranges": {
+          "under20": "Below Lv.20",
+          "level20To39": "Lv.20-39",
+          "level40To59": "Lv.40-59",
+          "level60Plus": "Lv.60+"
+        }
+      },
       "live": {
         "title": "Live analysis",
         "subtitle": "Single-stream revenue, peak audience, and top fan contribution.",
