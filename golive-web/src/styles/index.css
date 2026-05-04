@@ -1521,6 +1521,13 @@ input:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.gl-side-chevron {
+  flex-shrink: 0;
+  transition: transform 0.16s ease;
+}
+.gl-side-item.is-sub-open .gl-side-chevron {
+  transform: rotate(90deg);
+}
 .gl-side-divider {
   height: 1px;
   background: var(--gl-border);
@@ -1533,6 +1540,17 @@ input:focus-visible,
   margin: 6px 0 10px 28px;
   padding: 4px 0 4px 12px;
   border-left: 1px solid var(--gl-border);
+  animation: gl-side-subsec-in 0.16s ease-out;
+}
+@keyframes gl-side-subsec-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .gl-side-sub-item {
   display: flex;
@@ -5921,6 +5939,26 @@ button.gl-fan-badge-empty {
 
 .gl-creator-step-body > .gl-creator-start {
   min-width: 132px;
+}
+.gl-creator-step-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-2);
+  padding: 10px;
+}
+.gl-creator-step-tools .gl-creator-secondary {
+  min-height: 36px;
+}
+.gl-creator-step-tools > span {
+  flex: 1 1 220px;
+  min-width: 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.4;
 }
 .gl-creator-field {
   display: flex;

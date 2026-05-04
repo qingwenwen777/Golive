@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { LucideProps } from 'lucide-react';
@@ -31,8 +31,44 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
 
   const active = activeKey ?? deriveActiveKey(location.pathname);
   const activeLiveId = useActiveCreatorLiveId(me.data?.id);
+  const isStudioActive = active.startsWith('studio');
+  const canShowStudioSubnav = me.data?.livePermissionStatus === 'approved';
+  const [studioSubnavOpen, setStudioSubnavOpen] = useState(() => isStudioActive);
+  const wasStudioActiveRef = useRef(isStudioActive);
+  const wasCollapsedRef = useRef(collapsed);
+  const couldShowStudioSubnavRef = useRef(canShowStudioSubnav);
+
+  useEffect(() => {
+    const expandedFromCollapsed = wasCollapsedRef.current && !collapsed;
+    const becameAllowed = !couldShowStudioSubnavRef.current && canShowStudioSubnav;
+
+    if (!canShowStudioSubnav || collapsed) {
+      setStudioSubnavOpen(false);
+    } else if (
+      isStudioActive &&
+      (!wasStudioActiveRef.current || expandedFromCollapsed || becameAllowed)
+    ) {
+      setStudioSubnavOpen(true);
+    } else if (!isStudioActive) {
+      setStudioSubnavOpen(false);
+    }
+
+    wasStudioActiveRef.current = isStudioActive;
+    wasCollapsedRef.current = collapsed;
+    couldShowStudioSubnavRef.current = canShowStudioSubnav;
+  }, [canShowStudioSubnav, collapsed, isStudioActive]);
 
   const handleNav = (key: string, route?: string): void => {
+    if (key === 'studio') {
+      if (canShowStudioSubnav && !collapsed && isStudioActive) {
+        setStudioSubnavOpen((open) => !open);
+        return;
+      }
+      if (canShowStudioSubnav && !collapsed) {
+        setStudioSubnavOpen(true);
+      }
+    }
+
     if (onNav) onNav(key);
     else if (route) navigate(route);
   };
@@ -45,6 +81,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       key: 'studio',
       icon: Icons.Live,
       label: t('nav.creatorStudio', { defaultValue: 'Creator Studio' }),
+      chev: canShowStudioSubnav,
       route: activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/overview',
     },
   ];
@@ -103,22 +140,26 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
 
   const renderItem = (it: NavItem) => {
     const Icon = it.icon;
+    const controlsStudioSubnav = it.key === 'studio' && canShowStudioSubnav && !collapsed;
     return (
       <button
         key={it.key}
         type="button"
         aria-label={it.label}
+        aria-controls={controlsStudioSubnav ? 'gl-sidebar-studio-subnav' : undefined}
+        aria-expanded={controlsStudioSubnav ? studioSubnavOpen : undefined}
         title={it.label}
         className={cn(
           'gl-side-item',
           isNavItemActive(it.key, active) && 'is-active',
+          it.key === 'studio' && studioSubnavOpen && canShowStudioSubnav && 'is-sub-open',
           collapsed && 'is-col',
         )}
         onClick={() => handleNav(it.key, it.route)}
       >
         <Icon size={22} />
         {!collapsed && <span className="gl-side-label">{it.label}</span>}
-        {!collapsed && it.chev && <Icons.ChevronRight size={16} />}
+        {!collapsed && it.chev && <Icons.ChevronRight className="gl-side-chevron" size={16} />}
       </button>
     );
   };
@@ -144,8 +185,10 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
     <aside className={cn('gl-sidebar', collapsed && 'is-col')}>
       <nav className="gl-side-sec">
         {mainItems.map(renderItem)}
-        {!collapsed && active.startsWith('studio') && (
-          <div className="gl-side-subsec">{studioItems.map(renderSubItem)}</div>
+        {!collapsed && canShowStudioSubnav && isStudioActive && studioSubnavOpen && (
+          <div id="gl-sidebar-studio-subnav" className="gl-side-subsec">
+            {studioItems.map(renderSubItem)}
+          </div>
         )}
       </nav>
       {!collapsed && (

@@ -12,6 +12,7 @@ import {
   FileText,
   Gift,
   Globe2,
+  History,
   ImagePlus,
   ListChecks,
   LockKeyhole,
@@ -337,6 +338,9 @@ export function CreatorPreparePage() {
   const activeLive = useActiveCreatorStream(user);
   const uploadCover = useUploadLiveCover();
   const goLive = useGoLive();
+  const channelKey = currentChannelKey(user);
+  const analytics = useCreatorAnalytics(channelKey, Boolean(channelKey));
+  const lastLive = analytics.data?.history[0] ?? null;
   const [title, setTitle] = useState(() => t('createLive.defaultTitle'));
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
@@ -364,6 +368,20 @@ export function CreatorPreparePage() {
   if (activeLive.stream) {
     return <Navigate to={`/studio/live/${encodeURIComponent(activeLive.stream.id)}`} replace />;
   }
+
+  const applyLastLiveInfo = () => {
+    if (!lastLive) return;
+    setTitle(lastLive.title || t('createLive.defaultTitle'));
+    setDescription(lastLive.description ?? '');
+    setCategory(lastLive.category || DEFAULT_CATEGORY);
+    setCoverFile(null);
+    setCoverPreview(lastLive.cover || '');
+    toast.success(
+      t('studio.prepare.reuseLastDone', {
+        defaultValue: 'Reused the previous live info.',
+      }),
+    );
+  };
 
   const startLive = async () => {
     if (!done3 || !user) return;
@@ -421,6 +439,29 @@ export function CreatorPreparePage() {
           }
           onOpen={() => setStep(1)}
         >
+          <div className="gl-creator-step-tools">
+            <button
+              className="gl-creator-secondary"
+              type="button"
+              disabled={!lastLive}
+              onClick={applyLastLiveInfo}
+            >
+              <History size={16} />
+              {lastLive
+                ? t('studio.prepare.reuseLast', { defaultValue: 'Reuse last live info' })
+                : analytics.isPending
+                  ? t('studio.prepare.loadingLast', { defaultValue: 'Loading last live...' })
+                  : t('studio.prepare.noLastLive', { defaultValue: 'No previous live yet' })}
+            </button>
+            {lastLive && (
+              <span>
+                {t('studio.prepare.reuseLastHint', {
+                  title: lastLive.title,
+                  defaultValue: 'Use the title, description, category, and cover from "{{title}}".',
+                })}
+              </span>
+            )}
+          </div>
           <label className="gl-creator-field">
             <span>{t('createLive.fields.title')}</span>
             <input
