@@ -1041,6 +1041,13 @@ input:focus-visible,
   outline: 2px solid #1c62b9;
   outline-offset: 2px;
 }
+.gl-topbar-search button:focus,
+.gl-topbar-search button:focus-visible,
+.gl-topbar-search input:focus,
+.gl-topbar-search input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
 
 /* ── TopBar ──────────────────────────────────────────────────────────── */
 .gl-topbar {
@@ -1098,7 +1105,9 @@ input:focus-visible,
 .gl-topbar-search {
   position: relative;
   display: flex;
+  width: min(720px, 100%);
   justify-content: center;
+  justify-self: center;
   align-items: center;
   gap: 8px;
 }
@@ -1560,7 +1569,7 @@ input:focus-visible,
   border-radius: 40px;
   overflow: hidden;
   background: var(--gl-bg);
-  width: 540px;
+  width: 100%;
   max-width: 100%;
   height: 40px;
   transition:
@@ -1572,8 +1581,8 @@ input:focus-visible,
   border-color: #303030;
 }
 .gl-search-pill:focus-within {
-  border-color: #1c62b9;
-  box-shadow: inset 0 0 0 1px #1c62b9;
+  border-color: color-mix(in srgb, var(--gl-border) 72%, var(--gl-text));
+  box-shadow: none;
 }
 .gl-search-input {
   flex: 1;
@@ -1629,7 +1638,7 @@ input:focus-visible,
   top: 46px;
   left: 0;
   z-index: 70;
-  width: min(640px, calc(100vw - 24px));
+  width: 100%;
   max-height: min(72vh, 620px);
   overflow-y: auto;
   border: 1px solid var(--gl-border);
