@@ -74,7 +74,7 @@ func NewCloudflareStreamClient(cfg CloudflareStreamConfig) *CloudflareStreamClie
 	}
 	recordingMode := strings.TrimSpace(cfg.RecordingMode)
 	if recordingMode == "" {
-		recordingMode = "off"
+		recordingMode = "automatic"
 	}
 	timeout := cfg.HTTPTimeout
 	if timeout <= 0 {
