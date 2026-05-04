@@ -173,6 +173,7 @@ func (s *ReplayService) DeleteReplay(ctx context.Context, ownerID, roomID string
 
 func (s *ReplayService) EnqueueUpload(ctx context.Context, room model.Room) {
 	if !room.ReplayUploadEnabled {
+		go s.cleanupRoomRecording(room)
 		return
 	}
 	_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
@@ -297,6 +298,20 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 	}
 	if err := s.rooms.SetReplayUploaded(ctx, room.ID, s.libraryID, videoID, model.ReplayStatusReady, s.now()); err != nil {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		return
+	}
+	if err := removeRecording(recordPath); err != nil {
+		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
+	}
+}
+
+func (s *ReplayService) cleanupRoomRecording(room model.Room) {
+	time.Sleep(5 * time.Second)
+	if s.recordDir == "" {
+		return
+	}
+	recordPath, err := s.findRecording(room.StreamKey)
+	if err != nil {
 		return
 	}
 	if err := removeRecording(recordPath); err != nil {
