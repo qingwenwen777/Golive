@@ -71,6 +71,7 @@
     "title": "Live Room",
     "roomId": "Room id: {{id}}",
     "ended": "This stream has ended",
+    "endingChatReadOnly": "Live has ended. Chat is now read-only.",
     "chat": "Live chat",
     "openChat": "Open chat",
     "close": "Close",
@@ -245,7 +246,11 @@
     "jumpLive": "Jump to live",
     "liveProgress": "Live progress",
     "retry": "Retry",
-    "buffering": "Buffering..."
+    "buffering": "Buffering...",
+    "streamEnded": "Live has ended.",
+    "endingBadge": "Ended",
+    "endingTitle": "Live ended",
+    "endingSubtitle": "Thanks for watching. Preparing the room..."
   },
   "channel": {
     "title": "Channel",

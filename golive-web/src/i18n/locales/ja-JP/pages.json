@@ -71,6 +71,7 @@
     "title": "ライブルーム",
     "roomId": "ルーム ID: {{id}}",
     "ended": "この配信は終了しました",
+    "endingChatReadOnly": "配信は終了しました。チャットは閲覧のみです。",
     "chat": "ライブ チャット",
     "openChat": "チャットを開く",
     "close": "閉じる",
@@ -245,7 +246,11 @@
     "jumpLive": "ライブに戻る",
     "liveProgress": "ライブ進行",
     "retry": "再試行",
-    "buffering": "バッファリング中..."
+    "buffering": "バッファリング中...",
+    "streamEnded": "配信は終了しました。",
+    "endingBadge": "終了",
+    "endingTitle": "配信は終了しました",
+    "endingSubtitle": "ご視聴ありがとうございました。ルームを整理しています..."
   },
   "channel": {
     "title": "チャンネル",

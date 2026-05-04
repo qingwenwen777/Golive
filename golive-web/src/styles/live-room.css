@@ -132,6 +132,140 @@
   }
 }
 
+.gl-player.is-ending .gl-player-ctl {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gl-player-ending {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.72)), rgba(0, 0, 0, 0.46);
+  color: #fff;
+  padding: 22px;
+  text-align: center;
+  backdrop-filter: blur(2px);
+  animation: glPlayerEndFade 0.26s ease-out both;
+  pointer-events: none;
+}
+
+.gl-player-ending-card {
+  position: relative;
+  display: inline-flex;
+  width: min(360px, 92%);
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(18, 18, 20, 0.78);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+  padding: 22px 22px 20px;
+  transform-origin: center;
+  animation: glPlayerEndCard 0.48s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.gl-player-ending-card strong {
+  color: #fff;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.gl-player-ending-card > span:last-of-type {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.gl-player-ending-badge {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.gl-player-ending-badge .gl-live-dot-red {
+  width: 8px;
+  height: 8px;
+  animation: glPlayerEndDot 1.8s ease-in-out infinite;
+}
+
+.gl-player-ending-card > i {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.gl-player-ending-card > i::after {
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  border-radius: inherit;
+  background: var(--gl-red);
+  content: '';
+  animation: glPlayerEndLine 2.4s ease-in-out infinite;
+}
+
+@keyframes glPlayerEndFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes glPlayerEndCard {
+  from {
+    transform: translateY(12px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes glPlayerEndDot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.44;
+    transform: scale(0.72);
+  }
+}
+
+@keyframes glPlayerEndLine {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(80%);
+  }
+  100% {
+    transform: translateX(240%);
+  }
+}
+
 .gl-player-top {
   position: absolute;
   top: 0;
@@ -1760,6 +1894,15 @@
     font-size: 11px;
   }
 
+  .gl-player-ending-card {
+    width: min(320px, 94%);
+    padding: 18px 18px 17px;
+  }
+
+  .gl-player-ending-card strong {
+    font-size: 19px;
+  }
+
   .gl-player-ctl {
     padding-right: 8px;
     padding-left: 8px;
@@ -2042,5 +2185,14 @@
   .gl-emoji-popover {
     right: auto;
     width: min(312px, calc(100vw - 40px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-player-ending,
+  .gl-player-ending-card,
+  .gl-player-ending-badge .gl-live-dot-red,
+  .gl-player-ending-card > i::after {
+    animation: none;
   }
 }

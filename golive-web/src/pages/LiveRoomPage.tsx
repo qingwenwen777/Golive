@@ -76,6 +76,8 @@ import { streamChannelName, type Stream } from '@/types/stream';
 import type { FanBadge } from '@/types/gift';
 import type { Message } from '@/types/message';
 
+const LIVE_END_TRANSITION_MS = 3200;
+
 function fanBadgeLevel(totalContribution: number): number {
   if (totalContribution <= 0) return 1;
   let level = 1;
@@ -108,6 +110,11 @@ export default function LiveRoomPage() {
   const incrementViewerContribution = useRealtimeStore((s) => s.incrementViewerContribution);
   const stopLive = useStopLive();
   const liveEndedRef = useRef(false);
+  const endTransitionTimerRef = useRef<number | null>(null);
+  const [endTransition, setEndTransition] = useState<{
+    stream: Stream;
+    startedAt: number;
+  } | null>(null);
   const betAnchorRef = useRef<HTMLDivElement | null>(null);
   const [publisherSession, setPublisherSession] = useState<PublisherSession | null>(() =>
     loadPublisherSession(),
@@ -172,6 +179,14 @@ export default function LiveRoomPage() {
     canModerate,
     chatMuted: Boolean(moderationState.data?.muted),
     onOpenModeration: setModerationTarget,
+    ...(endTransition
+      ? {
+          readOnly: true,
+          readOnlyLabel: t('liveRoom.endingChatReadOnly', {
+            defaultValue: 'Live has ended. Chat is now read-only.',
+          }),
+        }
+      : {}),
   };
   const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
     if (!moderationTarget) return;
@@ -224,6 +239,19 @@ export default function LiveRoomPage() {
   const handleLiveEnded = useCallback(() => {
     if (liveEndedRef.current) return;
     liveEndedRef.current = true;
+    if (stream) {
+      setEndTransition({
+        stream: { ...stream, isLive: true, status: 'live' },
+        startedAt: Date.now(),
+      });
+      if (endTransitionTimerRef.current) {
+        window.clearTimeout(endTransitionTimerRef.current);
+      }
+      endTransitionTimerRef.current = window.setTimeout(() => {
+        setEndTransition(null);
+        endTransitionTimerRef.current = null;
+      }, LIVE_END_TRANSITION_MS);
+    }
     clearPublisherSession();
     setPublisherSession(null);
 
@@ -233,7 +261,9 @@ export default function LiveRoomPage() {
     queryClient.setQueryData(['room', id], (prev: typeof stream | undefined) => {
       const base = prev ?? stream;
       if (!base) return base;
-      const { playbackUrl: _playbackUrl, streamKey: _streamKey, ...rest } = base;
+      const rest = { ...base };
+      delete rest.playbackUrl;
+      delete rest.streamKey;
       return { ...rest, isLive: false, status: 'ended' };
     });
     void queryClient.invalidateQueries({ queryKey: ['rooms'] });
@@ -262,7 +292,21 @@ export default function LiveRoomPage() {
 
   useEffect(() => {
     liveEndedRef.current = false;
+    if (endTransitionTimerRef.current) {
+      window.clearTimeout(endTransitionTimerRef.current);
+      endTransitionTimerRef.current = null;
+    }
+    setEndTransition(null);
   }, [id]);
+
+  useEffect(() => {
+    return () => {
+      if (endTransitionTimerRef.current) {
+        window.clearTimeout(endTransitionTimerRef.current);
+        endTransitionTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Connection state toasts.
   const prevStateRef = useRef(readyState);
@@ -343,7 +387,9 @@ export default function LiveRoomPage() {
     );
   }
 
-  if ((isError && !stream) || !stream) {
+  const displayStream = endTransition?.stream ?? stream;
+
+  if ((isError && !displayStream) || !displayStream) {
     return (
       <div className="gl-empty">
         <CloudOff size={64} strokeWidth={1.5} />
@@ -355,15 +401,17 @@ export default function LiveRoomPage() {
     );
   }
 
-  const effectiveViewers = viewerCount > 0 ? viewerCount : stream.viewers;
+  const liveEnding = Boolean(endTransition);
+  const effectiveViewers = viewerCount > 0 ? viewerCount : displayStream.viewers;
   const reconnecting = readyState === 'reconnecting' || readyState === 'closed';
   const reconnectingLabel =
     readyState === 'closed'
       ? t('liveRoom.connection.disconnected')
       : t('liveRoom.connection.reconnecting', { count: retryCount });
 
-  const ownsStream = Boolean(currentUser?.id && stream.ownerId === currentUser.id);
+  const ownsStream = Boolean(currentUser?.id && displayStream.ownerId === currentUser.id);
   const activeBetRound =
+    !liveEnding &&
     !ownsStream &&
     latestBet.data?.round &&
     latestBet.data.round.status !== 'settled' &&
@@ -374,11 +422,11 @@ export default function LiveRoomPage() {
     betAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const effectivePublisherSession = ownsStream
-    ? (publisherSessionFromStream(stream) ??
-      (publisherSession?.streamId === stream.id ? publisherSession : null))
+    ? (publisherSessionFromStream(displayStream) ??
+      (publisherSession?.streamId === displayStream.id ? publisherSession : null))
     : null;
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
-  const ownerName = streamChannelName(stream, currentUser);
+  const ownerName = streamChannelName(displayStream, currentUser);
   const openSuperChat = () => {
     if (!isAuthed) {
       openLogin(() => setSuperChatOpen(true));
@@ -387,8 +435,9 @@ export default function LiveRoomPage() {
     setSuperChatOpen(true);
   };
   const updateLocalFanBadge = (coin: number, createIfMissing: boolean) => {
-    if (!currentUser?.id || !stream.ownerId || currentUser.id === stream.ownerId) return;
-    const creatorId = stream.ownerId;
+    if (!currentUser?.id || !displayStream.ownerId || currentUser.id === displayStream.ownerId)
+      return;
+    const creatorId = displayStream.ownerId;
     queryClient.setQueryData<FanBadge[]>(fanBadgesQueryKey(currentUser.id), (prev = []) => {
       const now = new Date().toISOString();
       const existing = prev.find((badge) => badge.creatorId === creatorId);
@@ -402,7 +451,7 @@ export default function LiveRoomPage() {
             ? {
                 ...badge,
                 creatorName: ownerName,
-                creatorAvatar: stream.avatar || badge.creatorAvatar,
+                creatorAvatar: displayStream.avatar || badge.creatorAvatar,
                 totalContribution,
                 level: fanBadgeLevel(totalContribution),
                 updatedAt: now,
@@ -416,7 +465,7 @@ export default function LiveRoomPage() {
           userId: currentUser.id,
           creatorId,
           creatorName: ownerName,
-          creatorAvatar: stream.avatar,
+          creatorAvatar: displayStream.avatar,
           totalContribution: contribution,
           level: fanBadgeLevel(contribution),
           createdAt: now,
@@ -430,7 +479,7 @@ export default function LiveRoomPage() {
     stopLive.mutate(undefined, {
       onSuccess: () => {
         clearPublisherSession();
-        markStreamEndedInLibraries(stream);
+        markStreamEndedInLibraries(displayStream);
         setPublisherSession(null);
         toast.success('Live ended.');
         navigate('/');
@@ -454,7 +503,7 @@ export default function LiveRoomPage() {
     />
   );
 
-  if (roomIsReplay && stream?.replay?.embedUrl) {
+  if (!liveEnding && roomIsReplay && stream?.replay?.embedUrl) {
     return (
       <ReplayRoomView
         stream={stream}
@@ -470,7 +519,7 @@ export default function LiveRoomPage() {
     );
   }
 
-  if (!roomIsLive && !isScheduledRoom && !roomIsStarting) {
+  if (!liveEnding && !roomIsLive && !isScheduledRoom && !roomIsStarting) {
     if (!canShowPublisherPanel) {
       return (
         <div className="gl-empty">
@@ -502,7 +551,7 @@ export default function LiveRoomPage() {
         </div>
         <PublisherPanel
           session={canShowPublisherPanel}
-          playbackUrl={stream.playbackUrl}
+          playbackUrl={displayStream.playbackUrl}
           stopping={stopLive.isPending}
           onStop={handleStopLive}
         />
@@ -876,13 +925,14 @@ export default function LiveRoomPage() {
   const Left = (
     <div className="min-w-0 flex-1 xl:pt-6">
       <Player
-        stream={stream}
+        stream={displayStream}
         viewerCount={effectiveViewers}
         bullets={bullets}
         onBulletEnd={clearBullet}
+        liveEnding={liveEnding}
       />
       <InfoBlock
-        stream={stream}
+        stream={displayStream}
         viewerCount={effectiveViewers}
         onOpenGifts={() => {
           if (!isAuthed) {
@@ -915,7 +965,7 @@ export default function LiveRoomPage() {
       {canShowPublisherPanel && (
         <PublisherPanel
           session={canShowPublisherPanel}
-          playbackUrl={stream.playbackUrl}
+          playbackUrl={displayStream.playbackUrl}
           stopping={stopLive.isPending}
           onStop={handleStopLive}
         />
@@ -929,7 +979,7 @@ export default function LiveRoomPage() {
             messages={messages}
             viewers={viewers}
             viewerTotal={effectiveViewers}
-            ownerId={stream.ownerId}
+            ownerId={displayStream.ownerId}
             ownerName={ownerName}
             onSendChat={guardedSendChat}
             onSendSuperChat={openSuperChat}
@@ -965,7 +1015,7 @@ export default function LiveRoomPage() {
               messages={messages}
               viewers={viewers}
               viewerTotal={effectiveViewers}
-              ownerId={stream.ownerId}
+              ownerId={displayStream.ownerId}
               ownerName={ownerName}
               onSendChat={guardedSendChat}
               onSendSuperChat={openSuperChat}
@@ -998,7 +1048,7 @@ export default function LiveRoomPage() {
                 messages={messages}
                 viewers={viewers}
                 viewerTotal={effectiveViewers}
-                ownerId={stream.ownerId}
+                ownerId={displayStream.ownerId}
                 ownerName={ownerName}
                 onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}

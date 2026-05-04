@@ -14,10 +14,8 @@ import {
   Type,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import {
-  type DanmuFontSize,
-  useDanmuStore,
-} from '@/stores/useDanmuStore';
+import { type DanmuFontSize, useDanmuStore } from '@/stores/useDanmuStore';
+import { usePlayerPreferenceStore } from '@/stores/usePlayerPreferenceStore';
 import { DanmuLayer } from './DanmuLayer';
 import {
   DropdownMenu,
@@ -54,6 +52,17 @@ type WebKitVideoElement = HTMLVideoElement & {
   webkitExitFullscreen?: () => void;
 };
 
+type ScreenWakeLockSentinel = EventTarget & {
+  released: boolean;
+  release: () => Promise<void>;
+};
+
+type ScreenWakeLockNavigator = Navigator & {
+  wakeLock?: {
+    request: (type: 'screen') => Promise<ScreenWakeLockSentinel>;
+  };
+};
+
 function bufferedRangeAtLiveEdge(video: HTMLVideoElement): { start: number; end: number } | null {
   const { buffered } = video;
   if (buffered.length === 0) return null;
@@ -83,6 +92,7 @@ export interface PlayerProps {
   viewerCount?: number;
   bullets?: Bullet[];
   onBulletEnd?: (id: string) => void;
+  liveEnding?: boolean;
 }
 
 function streamPlaybackKey(stream: Stream): string {
@@ -115,20 +125,23 @@ export function Player({
   viewerCount,
   bullets = [],
   onBulletEnd,
+  liveEnding = false,
 }: PlayerProps) {
   const { t } = useTranslation('pages');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [playing, setPlaying] = useState(true);
-  const [muted, setMuted] = useState(true);
-  const [volume, setVolume] = useState(1);
+  const muted = usePlayerPreferenceStore((s) => s.muted);
+  const volume = usePlayerPreferenceStore((s) => s.volume);
+  const setPlayerAudio = usePlayerPreferenceStore((s) => s.setAudio);
   const [fullscreen, setFullscreen] = useState(false);
   const [pip, setPip] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<number | null>(null);
   const stallTimerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const wakeLockRef = useRef<ScreenWakeLockSentinel | null>(null);
   const lastPlaybackRef = useRef({ time: 0, changedAt: Date.now() });
 
   const danmuOn = useDanmuStore((s) => s.on);
@@ -145,11 +158,11 @@ export function Player({
   const [retryNonce, setRetryNonce] = useState(0);
   const endedRef = useRef(false);
   const showPlaybackEnded = useCallback(() => {
-    if (endedRef.current) return;
+    if (endedRef.current || liveEnding) return;
     endedRef.current = true;
     setBuffering(false);
-    setFlvError('Stream ended.');
-  }, []);
+    setFlvError(t('player.streamEnded', { defaultValue: 'Stream ended.' }));
+  }, [liveEnding, t]);
 
   const showControlsTemporarily = useCallback(() => {
     setControlsVisible(true);
@@ -175,7 +188,7 @@ export function Player({
   }, []);
 
   const scheduleLiveReconnect = useCallback(() => {
-    if (!isLiveFlv || stream.isLive === false || endedRef.current) return false;
+    if (!isLiveFlv || stream.isLive === false || endedRef.current || liveEnding) return false;
     setFlvError(null);
     setBuffering(true);
     showControlsTemporarily();
@@ -186,19 +199,17 @@ export function Player({
       setRetryNonce((n) => n + 1);
     }, LIVE_RECONNECT_DELAY_MS);
     return true;
-  }, [
-    clearReconnectTimer,
-    isLiveFlv,
-    showControlsTemporarily,
-    stream.isLive,
-  ]);
+  }, [clearReconnectTimer, isLiveFlv, liveEnding, showControlsTemporarily, stream.isLive]);
 
-  const recoverLivePlayback = useCallback((secondsBehindLive = LIVE_RECOVERY_BACKOFF_SECONDS) => {
-    const v = videoRef.current;
-    if (!v || !isLiveFlv || endedRef.current) return;
-    seekNearLiveEdge(v, secondsBehindLive);
-    void v.play()?.catch?.(() => undefined);
-  }, [isLiveFlv]);
+  const recoverLivePlayback = useCallback(
+    (secondsBehindLive = LIVE_RECOVERY_BACKOFF_SECONDS) => {
+      const v = videoRef.current;
+      if (!v || !isLiveFlv || endedRef.current || liveEnding) return;
+      seekNearLiveEdge(v, secondsBehindLive);
+      void v.play()?.catch?.(() => undefined);
+    },
+    [isLiveFlv, liveEnding],
+  );
 
   useEffect(() => {
     endedRef.current = false;
@@ -213,6 +224,22 @@ export function Player({
       clearReconnectTimer();
     };
   }, [clearReconnectTimer, clearStallTimer]);
+
+  useEffect(() => {
+    if (!liveEnding) return;
+    endedRef.current = true;
+    setBuffering(false);
+    setFlvError(null);
+    clearStallTimer();
+    clearReconnectTimer();
+  }, [clearReconnectTimer, clearStallTimer, liveEnding]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (Math.abs(v.volume - volume) > 0.001) v.volume = volume;
+    if (v.muted !== muted) v.muted = muted;
+  }, [flvUrl, muted, volume]);
 
   useEffect(() => {
     if (!isLiveFlv || !flvUrl || !videoRef.current) return;
@@ -239,6 +266,11 @@ export function Player({
       },
     );
     const onErr = (errType: string, errDetail: string) => {
+      if (liveEnding) {
+        setBuffering(false);
+        setFlvError(null);
+        return;
+      }
       const detail = `${errType} ${errDetail}`.toLowerCase();
       if (
         detail.includes('eof') ||
@@ -256,6 +288,10 @@ export function Player({
       setFlvError(`Stream error: ${errType}${errDetail ? ' / ' + errDetail : ''}`);
     };
     const onEnd = () => {
+      if (liveEnding) {
+        setBuffering(false);
+        return;
+      }
       if (!scheduleLiveReconnect()) showPlaybackEnded();
     };
     player.on(mpegts.Events.ERROR, onErr);
@@ -265,7 +301,8 @@ export function Player({
     try {
       player.load();
       void player.play()?.catch?.(() => {
-        // Autoplay blocked; user can click play.
+        setPlaying(false);
+        showControlsTemporarily();
       });
     } catch (e) {
       setFlvError(e instanceof Error ? e.message : 'Failed to start stream.');
@@ -303,32 +340,40 @@ export function Player({
     clearStallTimer,
     isLiveFlv,
     flvUrl,
+    liveEnding,
     retryNonce,
     scheduleLiveReconnect,
     showPlaybackEnded,
+    showControlsTemporarily,
     stream.isLive,
   ]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || liveEnding) return;
     if (v.paused) void v.play();
     else v.pause();
-  }, []);
+  }, [liveEnding]);
 
   const toggleMute = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
-    v.muted = !v.muted;
-  }, []);
+    const nextMuted = !v.muted;
+    v.muted = nextMuted;
+    setPlayerAudio({ muted: nextMuted, volume: v.volume });
+  }, [setPlayerAudio]);
 
-  const changeVolume = useCallback((value: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const clamped = Math.min(1, Math.max(0, value));
-    v.volume = clamped;
-    if (clamped > 0 && v.muted) v.muted = false;
-  }, []);
+  const changeVolume = useCallback(
+    (value: number) => {
+      const v = videoRef.current;
+      if (!v) return;
+      const clamped = Math.min(1, Math.max(0, value));
+      v.volume = clamped;
+      if (clamped > 0 && v.muted) v.muted = false;
+      setPlayerAudio({ muted: v.muted, volume: clamped });
+    },
+    [setPlayerAudio],
+  );
 
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -380,11 +425,11 @@ export function Player({
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onEnded = () => {
+      if (liveEnding) return;
       if (isLiveFlv) scheduleLiveReconnect();
     };
     const onVol = () => {
-      setMuted(v.muted);
-      setVolume(v.volume);
+      setPlayerAudio({ muted: v.muted, volume: v.volume });
     };
     const onEnterPip = () => setPip(true);
     const onLeavePip = () => setPip(false);
@@ -408,7 +453,7 @@ export function Player({
       v.removeEventListener('webkitbeginfullscreen', onWebkitBeginFullscreen);
       v.removeEventListener('webkitendfullscreen', onWebkitEndFullscreen);
     };
-  }, [isLiveFlv, scheduleLiveReconnect]);
+  }, [isLiveFlv, liveEnding, scheduleLiveReconnect, setPlayerAudio]);
 
   useEffect(() => {
     const onFsChange = () => {
@@ -467,7 +512,7 @@ export function Player({
 
   const jumpToLive = () => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || liveEnding) return;
     try {
       if (isLiveFlv) {
         seekNearLiveEdge(v, LIVE_RECOVERY_BACKOFF_SECONDS);
@@ -492,10 +537,10 @@ export function Player({
 
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !isLiveFlv) return;
+    if (!v || !isLiveFlv || liveEnding) return;
 
     const onBuffering = () => {
-      if (endedRef.current) return;
+      if (endedRef.current || liveEnding) return;
       setBuffering(true);
       showControlsTemporarily();
       clearStallTimer();
@@ -525,17 +570,17 @@ export function Player({
       v.removeEventListener('timeupdate', onTimeUpdate);
       clearStallTimer();
     };
-  }, [clearStallTimer, isLiveFlv, recoverLivePlayback, showControlsTemporarily]);
+  }, [clearStallTimer, isLiveFlv, liveEnding, recoverLivePlayback, showControlsTemporarily]);
 
   useEffect(() => {
-    if (!isLiveFlv || flvError) return;
+    if (!isLiveFlv || flvError || liveEnding) return;
     const v = videoRef.current;
     if (!v) return;
     lastPlaybackRef.current = { time: v.currentTime, changedAt: Date.now() };
 
     const timer = window.setInterval(() => {
       const video = videoRef.current;
-      if (!video || video.paused || endedRef.current) return;
+      if (!video || video.paused || endedRef.current || liveEnding) return;
 
       const now = Date.now();
       const moved = Math.abs(video.currentTime - lastPlaybackRef.current.time) > 0.08;
@@ -557,7 +602,53 @@ export function Player({
     }, LIVE_BUFFER_CHECK_MS);
 
     return () => window.clearInterval(timer);
-  }, [flvError, isLiveFlv, recoverLivePlayback]);
+  }, [flvError, isLiveFlv, liveEnding, recoverLivePlayback]);
+
+  useEffect(() => {
+    if (!isLiveFlv || liveEnding) return;
+
+    let cancelled = false;
+    const releaseWakeLock = () => {
+      const lock = wakeLockRef.current;
+      wakeLockRef.current = null;
+      if (lock && !lock.released) {
+        void lock.release().catch(() => undefined);
+      }
+    };
+    const requestWakeLock = async () => {
+      if (cancelled || wakeLockRef.current || document.visibilityState !== 'visible') return;
+      const wakeLock = (navigator as ScreenWakeLockNavigator).wakeLock;
+      if (!wakeLock?.request) return;
+      try {
+        const lock = await wakeLock.request('screen');
+        if (cancelled) {
+          await lock.release().catch(() => undefined);
+          return;
+        }
+        wakeLockRef.current = lock;
+        lock.addEventListener('release', () => {
+          if (wakeLockRef.current === lock) wakeLockRef.current = null;
+        });
+      } catch {
+        // Unsupported browsers simply fall back to normal system behavior.
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void requestWakeLock();
+      } else {
+        releaseWakeLock();
+      }
+    };
+
+    void requestWakeLock();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [isLiveFlv, liveEnding]);
 
   const viewers = viewerCount ?? stream.viewers + extraViewers;
   const menuPortalContainer = fullscreen ? containerRef.current : undefined;
@@ -569,6 +660,7 @@ export function Player({
         'gl-player group',
         fullscreen && 'is-fullscreen',
         fullscreen && !controlsVisible && 'is-idle',
+        liveEnding && 'is-ending',
       )}
       onMouseEnter={showControlsTemporarily}
       onMouseMove={showControlsTemporarily}
@@ -596,7 +688,7 @@ export function Player({
         </span>
       </div>
 
-      {isLiveFlv && flvError && (
+      {isLiveFlv && flvError && !liveEnding && (
         <div
           role="alert"
           className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/80 text-center text-sm text-white"
@@ -615,7 +707,7 @@ export function Player({
         </div>
       )}
 
-      {isLiveFlv && buffering && !flvError && (
+      {isLiveFlv && buffering && !flvError && !liveEnding && (
         <div className="gl-player-buffering" role="status" aria-live="polite">
           <span>
             <i aria-hidden="true" />
@@ -625,6 +717,24 @@ export function Player({
       )}
 
       <DanmuLayer bullets={bullets} onBulletEnd={onBulletEnd} />
+
+      {liveEnding && (
+        <div className="gl-player-ending" role="status" aria-live="polite">
+          <div className="gl-player-ending-card">
+            <span className="gl-player-ending-badge">
+              <span className="gl-live-dot-red" aria-hidden="true" />
+              {t('player.endingBadge', { defaultValue: 'Ended' })}
+            </span>
+            <strong>{t('player.endingTitle', { defaultValue: 'Live ended' })}</strong>
+            <span>
+              {t('player.endingSubtitle', {
+                defaultValue: 'Thanks for watching. Preparing the room...',
+              })}
+            </span>
+            <i aria-hidden="true" />
+          </div>
+        </div>
+      )}
 
       <div
         className={cn('gl-player-ctl', controlsVisible && 'is-on')}

@@ -71,6 +71,7 @@
     "title": "直播间",
     "roomId": "房间 ID：{{id}}",
     "ended": "这场直播已结束",
+    "endingChatReadOnly": "直播已结束，聊天已转为只读。",
     "chat": "直播聊天",
     "openChat": "打开聊天",
     "close": "关闭",
@@ -246,7 +247,11 @@
     "jumpLive": "回到直播",
     "liveProgress": "直播进度",
     "retry": "重试",
-    "buffering": "正在缓冲..."
+    "buffering": "正在缓冲...",
+    "streamEnded": "直播已结束。",
+    "endingBadge": "已结束",
+    "endingTitle": "直播已结束",
+    "endingSubtitle": "正在整理直播间..."
   },
   "channel": {
     "title": "频道",
