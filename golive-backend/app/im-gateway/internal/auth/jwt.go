@@ -1,14 +1,9 @@
-// Package auth verifies handshake tokens. The contract is:
-//
-//	token absent  → anonymous (read-only)
-//	token invalid → reject handshake (HTTP 401)
-//	token valid   → authenticated, can chat
 package auth
 
 import (
 	"errors"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 )
 
 // ErrInvalidToken is returned when a token is present but does not validate.
@@ -16,7 +11,7 @@ var ErrInvalidToken = errors.New("invalid token")
 
 // Identity is what the WS handler attaches to each connection.
 type Identity struct {
-	UserID    string // empty for anonymous
+	UserID    string
 	Anonymous bool
 }
 
@@ -28,11 +23,19 @@ type Verifier interface {
 }
 
 type HMACVerifier struct {
-	secret []byte
+	keys *jwtauth.KeySet
 }
 
 func NewHMACVerifier(secret string) *HMACVerifier {
-	return &HMACVerifier{secret: []byte(secret)}
+	keys, err := jwtauth.NewKeySet(secret, "", nil)
+	if err != nil {
+		panic("im-gateway jwt key set: " + err.Error())
+	}
+	return &HMACVerifier{keys: keys}
+}
+
+func NewHMACVerifierWithKeySet(keys *jwtauth.KeySet) *HMACVerifier {
+	return &HMACVerifier{keys: keys}
 }
 
 // Verify implements the contract above. An empty token returns an anonymous
@@ -41,22 +44,9 @@ func (v *HMACVerifier) Verify(token string) (Identity, error) {
 	if token == "" {
 		return Identity{Anonymous: true}, nil
 	}
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return v.secret, nil
-	})
-	if err != nil || !parsed.Valid {
+	uid, err := v.keys.VerifyAccess(token)
+	if err != nil {
 		return Identity{}, ErrInvalidToken
 	}
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		return Identity{}, ErrInvalidToken
-	}
-	sub, _ := claims["sub"].(string)
-	if sub == "" {
-		return Identity{}, ErrInvalidToken
-	}
-	return Identity{UserID: sub}, nil
+	return Identity{UserID: uid}, nil
 }

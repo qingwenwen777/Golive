@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 )
 
 type Config struct {
@@ -39,7 +41,15 @@ type RedisCfg struct {
 }
 
 type JWTCfg struct {
-	Secret string `mapstructure:"secret"`
+	Secret    string      `mapstructure:"secret"`
+	ActiveKID string      `mapstructure:"active_kid"`
+	Secrets   []JWTKeyCfg `mapstructure:"secrets"`
+}
+
+type JWTKeyCfg = jwtauth.KeyConfig
+
+func (c JWTCfg) KeySet() (*jwtauth.KeySet, error) {
+	return jwtauth.NewKeySet(c.Secret, c.ActiveKID, c.Secrets)
 }
 
 type KafkaCfg struct {

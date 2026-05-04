@@ -98,9 +98,14 @@ func main() {
 	giftH := handler.NewGiftHandler(giftSvc, idem)
 	scH := handler.NewSuperChatHandler(scSvc, idem)
 	betH := handler.NewBetHandler(betSvc)
+	jwtKeys, err := cfg.JWT.KeySet()
+	if err != nil {
+		log.Fatal("jwt config", zap.Error(err))
+	}
 
 	r := server.NewRouter(server.Deps{
 		JWTSecret: cfg.JWT.Secret,
+		JWTKeys:   jwtKeys,
 		Gift:      giftH,
 		SuperChat: scH,
 		Bet:       betH,

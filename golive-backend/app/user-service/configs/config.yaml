@@ -18,6 +18,10 @@ redis:
 jwt:
   # CHANGE in production. 32+ random bytes recommended.
   secret: "dev-only-please-change-in-prod-9b1c0a"
+  active_kid: "dev"
+  secrets:
+    - kid: "dev"
+      secret: "dev-only-please-change-in-prod-9b1c0a"
   access_ttl: 2h
   refresh_ttl: 168h   # 7 days
 

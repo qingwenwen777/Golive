@@ -8,14 +8,19 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { http } from './axios';
+import { AuthRefreshError } from '@/lib/authToken';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const refreshAuthTokenMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/authToken', () => ({
-  refreshAuthToken: refreshAuthTokenMock,
-}));
+vi.mock('@/lib/authToken', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/authToken')>('@/lib/authToken');
+  return {
+    ...actual,
+    refreshAuthToken: refreshAuthTokenMock,
+  };
+});
 
 function response<T>(config: InternalAxiosRequestConfig, data: T): AxiosResponse<T> {
   return {
@@ -108,20 +113,48 @@ describe('http axios client', () => {
     ).toBe(true);
   });
 
-  it('logs out and opens the login modal when token refresh fails', async () => {
-    refreshAuthTokenMock.mockRejectedValueOnce(new Error('refresh down'));
+  it('logs out and opens the login modal when token refresh is unauthorized', async () => {
+    refreshAuthTokenMock.mockRejectedValueOnce(
+      new AuthRefreshError('refresh-failed', {
+        kind: 'unauthorized',
+        refreshToken: 'refresh-token',
+        status: 401,
+      }),
+    );
     const adapter = vi.fn<AxiosAdapter>(async (config) => {
       throw unauthorized(config);
     });
     setAdapter(adapter);
 
-    await expect(http.get('/rooms/room-1')).rejects.toThrow('refresh down');
+    await expect(http.get('/rooms/room-1')).rejects.toThrow('refresh-failed');
 
     expect(adapter).toHaveBeenCalledTimes(1);
     expect(useAuthStore.getState().token).toBeNull();
     expect(useAuthStore.getState().refreshToken).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthModalStore.getState().open).toBe(true);
+  });
+
+  it('keeps the session when token refresh fails transiently', async () => {
+    refreshAuthTokenMock.mockRejectedValueOnce(
+      new AuthRefreshError('refresh-failed', {
+        kind: 'transient',
+        refreshToken: 'refresh-token',
+        status: 503,
+      }),
+    );
+    const adapter = vi.fn<AxiosAdapter>(async (config) => {
+      throw unauthorized(config);
+    });
+    setAdapter(adapter);
+
+    await expect(http.get('/rooms/room-1')).rejects.toThrow('refresh-failed');
+
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().token).toBe('old-token');
+    expect(useAuthStore.getState().refreshToken).toBe('refresh-token');
+    expect(useAuthStore.getState().user?.id).toBe('user-1');
+    expect(useAuthModalStore.getState().open).toBe(false);
   });
 
   it('does not try to refresh auth endpoint failures', async () => {

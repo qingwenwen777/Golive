@@ -1,7 +1,7 @@
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
-import { refreshAuthToken } from '@/lib/authToken';
+import { isSessionInvalidAfterRefreshFailure, refreshAuthToken } from '@/lib/authToken';
 
 interface RetriableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -23,6 +23,10 @@ http.interceptors.request.use((config) => {
 
 async function doRefresh(): Promise<string> {
   return refreshAuthToken();
+}
+
+function shouldResetSessionAfterRefreshFailure(err: unknown): boolean {
+  return isSessionInvalidAfterRefreshFailure(err, useAuthStore.getState().refreshToken);
 }
 
 function isAuthEndpoint(url: string | undefined): boolean {
@@ -53,8 +57,10 @@ http.interceptors.response.use(
         config.headers.Authorization = `Bearer ${newToken}`;
         return http.request(config as AxiosRequestConfig);
       } catch (refreshErr) {
-        useAuthStore.getState().logout();
-        useAuthModalStore.getState().openLogin();
+        if (shouldResetSessionAfterRefreshFailure(refreshErr)) {
+          useAuthStore.getState().logout();
+          useAuthModalStore.getState().openLogin();
+        }
         return Promise.reject(refreshErr);
       }
     }

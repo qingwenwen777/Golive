@@ -5,7 +5,11 @@ import { useRealtimeStore, useRoomSlice } from '@/stores/useRealtimeStore';
 import { useDanmuStore } from '@/stores/useDanmuStore';
 import { useDanmuHistory } from '@/api/chat';
 import type { ChatFanBadge, ChatMessage, Message, SuperChatTier } from '@/types/message';
-import { getAuthToken, refreshAuthToken } from '@/lib/authToken';
+import {
+  getAuthToken,
+  isSessionInvalidAfterRefreshFailure,
+  refreshAuthToken,
+} from '@/lib/authToken';
 import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
@@ -221,8 +225,10 @@ export function useRoomRealtime(
     if (readyState !== 'reconnecting' || !authToken) return;
     if (refreshedTokenRef.current === authToken) return;
     refreshedTokenRef.current = authToken;
-    void refreshAuthToken().catch(() => {
-      logout();
+    void refreshAuthToken().catch((err: unknown) => {
+      if (isSessionInvalidAfterRefreshFailure(err, useAuthStore.getState().refreshToken)) {
+        logout();
+      }
     });
   }, [readyState, authToken, logout]);
 

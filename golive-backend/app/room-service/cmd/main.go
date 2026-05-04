@@ -107,9 +107,14 @@ func main() {
 	if err := moderationRepo.SyncActiveMutes(context.Background(), time.Now()); err != nil {
 		log.Warn("sync active mutes", zap.Error(err))
 	}
+	jwtKeys, err := cfg.JWT.KeySet()
+	if err != nil {
+		log.Fatal("jwt config", zap.Error(err))
+	}
 
 	r := server.NewRouter(server.Deps{
 		JWTSecret:      cfg.JWT.Secret,
+		JWTKeys:        jwtKeys,
 		Room:           roomSvc,
 		Social:         socialSvc,
 		Posts:          postSvc,

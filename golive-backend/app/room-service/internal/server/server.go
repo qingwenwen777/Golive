@@ -7,11 +7,13 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/handler"
 	"github.com/qingwenwen777/golive/app/room-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
 
 type Deps struct {
 	JWTSecret      string
+	JWTKeys        *jwtauth.KeySet
 	Room           *service.RoomService
 	Social         *service.SocialService
 	Posts          *service.PostService
@@ -46,6 +48,10 @@ func NewRouter(d Deps) *gin.Engine {
 
 	auth := handler.AuthRequired(d.JWTSecret)
 	optionalAuth := handler.OptionalAuth(d.JWTSecret)
+	if d.JWTKeys != nil {
+		auth = handler.AuthRequiredWithKeySet(d.JWTKeys)
+		optionalAuth = handler.OptionalAuthWithKeySet(d.JWTKeys)
+	}
 
 	r.GET("/subscriptions", auth, socialH.ListSubscriptions)
 	r.GET("/subscriptions/appointments", auth, appointmentH.ListSubscriptionAppointments)

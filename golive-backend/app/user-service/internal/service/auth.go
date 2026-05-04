@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 )
 
 // Errors surfaced by AuthService. Handlers should map these to errcode.AppError.
@@ -63,7 +63,7 @@ type TokenStore interface {
 type AuthService struct {
 	users      UserStore
 	tokens     TokenStore
-	jwtSecret  []byte
+	jwtKeys    *jwtauth.KeySet
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 	now        func() time.Time // injectable for tests
@@ -71,15 +71,24 @@ type AuthService struct {
 
 type Options struct {
 	JWTSecret  string
+	JWTKeys    *jwtauth.KeySet
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
 }
 
 func NewAuthService(users UserStore, tokens TokenStore, opts Options) *AuthService {
+	keys := opts.JWTKeys
+	if keys == nil {
+		var err error
+		keys, err = jwtauth.NewKeySet(opts.JWTSecret, "", nil)
+		if err != nil {
+			panic("auth service jwt key set: " + err.Error())
+		}
+	}
 	return &AuthService{
 		users:      users,
 		tokens:     tokens,
-		jwtSecret:  []byte(opts.JWTSecret),
+		jwtKeys:    keys,
 		accessTTL:  opts.AccessTTL,
 		refreshTTL: opts.RefreshTTL,
 		now:        time.Now,
@@ -313,36 +322,11 @@ func (s *AuthService) ParseAccess(token string) (string, error) {
 
 // signAccess produces an HS256 JWT with sub=userID, exp=now+accessTTL.
 func (s *AuthService) signAccess(userID string) (string, error) {
-	now := s.now()
-	claims := jwt.MapClaims{
-		"sub": userID,
-		"iat": now.Unix(),
-		"exp": now.Add(s.accessTTL).Unix(),
-		"typ": "access",
-	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return tok.SignedString(s.jwtSecret)
+	return s.jwtKeys.SignAccess(userID, s.now(), s.accessTTL)
 }
 
 func (s *AuthService) parseAccess(token string) (string, error) {
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return s.jwtSecret, nil
-	})
-	if err != nil || !parsed.Valid {
-		return "", fmt.Errorf("invalid token: %w", err)
-	}
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", errors.New("invalid claims")
-	}
-	sub, _ := claims["sub"].(string)
-	if sub == "" {
-		return "", errors.New("missing sub")
-	}
-	return sub, nil
+	return s.jwtKeys.VerifyAccess(token)
 }
 
 // HashPassword is a convenience for bootstrap and signup.

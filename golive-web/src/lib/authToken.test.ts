@@ -1,16 +1,24 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { refreshAuthToken } from './authToken';
+import { AuthRefreshError, refreshAuthToken } from './authToken';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const axiosPostMock = vi.hoisted(() => vi.fn());
 
 vi.mock('axios', () => ({
   default: {
+    isAxiosError: (err: unknown) => Boolean((err as { isAxiosError?: boolean }).isAxiosError),
     post: axiosPostMock,
   },
 }));
+
+function axiosError(status: number) {
+  return {
+    isAxiosError: true,
+    response: { status },
+  };
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -25,6 +33,7 @@ function deferred<T>() {
 describe('refreshAuthToken', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_API_BASE', '/api');
+    window.localStorage.clear();
     axiosPostMock.mockReset();
     useAuthStore.setState({
       token: 'old-token',
@@ -66,7 +75,10 @@ describe('refreshAuthToken', () => {
   it('clears the in-flight guard after failure so a later refresh can retry', async () => {
     axiosPostMock.mockRejectedValueOnce(new Error('refresh failed'));
 
-    await expect(refreshAuthToken()).rejects.toThrow('refresh failed');
+    await expect(refreshAuthToken()).rejects.toMatchObject({
+      kind: 'transient',
+      message: 'refresh-failed',
+    });
 
     axiosPostMock.mockResolvedValueOnce({
       data: { token: 'retry-token', refreshToken: 'retry-refresh' },
@@ -83,5 +95,33 @@ describe('refreshAuthToken', () => {
     await expect(refreshAuthToken()).rejects.toThrow('no-refresh-token');
 
     expect(axiosPostMock).not.toHaveBeenCalled();
+  });
+
+  it('marks refresh 401 responses as unauthorized for session cleanup', async () => {
+    axiosPostMock.mockRejectedValueOnce(axiosError(401));
+
+    const refresh = refreshAuthToken();
+    await expect(refresh).rejects.toBeInstanceOf(AuthRefreshError);
+    await expect(refresh).rejects.toMatchObject({
+      kind: 'unauthorized',
+      refreshToken: 'refresh-token',
+      status: 401,
+    });
+  });
+
+  it('adopts a newer token pair written by another tab after stale refresh 401', async () => {
+    window.localStorage.setItem(
+      'golive-auth',
+      JSON.stringify({
+        state: { token: 'tab-token', refreshToken: 'tab-refresh' },
+        version: 0,
+      }),
+    );
+    axiosPostMock.mockRejectedValueOnce(axiosError(401));
+
+    await expect(refreshAuthToken()).resolves.toBe('tab-token');
+
+    expect(useAuthStore.getState().token).toBe('tab-token');
+    expect(useAuthStore.getState().refreshToken).toBe('tab-refresh');
   });
 });

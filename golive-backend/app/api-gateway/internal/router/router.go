@@ -61,10 +61,14 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	if cfg.RateLimit.Enabled {
 		r.Use(middleware.RateLimit(cfg.RateLimit.RatePerSec, cfg.RateLimit.Burst))
 	}
+	jwtKeys, err := cfg.JWT.KeySet()
+	if err != nil {
+		return nil, err
+	}
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
-	api := r.Group("/api", middleware.JWT(cfg.JWT.Secret, publicRoutes()))
+	api := r.Group("/api", middleware.JWTWithKeySet(jwtKeys, publicRoutes()))
 	{
 		// user-service
 		api.Any("/auth/*action", gin.WrapH(userProxy))

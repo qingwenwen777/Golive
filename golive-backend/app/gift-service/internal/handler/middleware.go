@@ -1,24 +1,24 @@
 package handler
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 )
 
-// AuthRequired validates the access token. The api-gateway already verifies
-// the JWT for us and writes X-User-Id, but this defense-in-depth check
-// ensures direct hits to gift-service (e.g. internal LB bypass) still
-// require a valid token. We accept either:
-//
-//	X-User-Id (set by api-gateway after its own JWT check)
-//	Authorization: Bearer <jwt>     (verified locally)
+// AuthRequired accepts X-User-Id from api-gateway or verifies a direct JWT.
 func AuthRequired(secret string) gin.HandlerFunc {
-	keyBytes := []byte(secret)
+	keys, err := jwtauth.NewKeySet(secret, "", nil)
+	if err != nil {
+		panic("gift-service jwt key set: " + err.Error())
+	}
+	return AuthRequiredWithKeySet(keys)
+}
+
+func AuthRequiredWithKeySet(keys *jwtauth.KeySet) gin.HandlerFunc {
 	unauthorized := errcode.New(401, "Unauthorized")
 	return func(c *gin.Context) {
 		if uid := c.GetHeader("X-User-Id"); uid != "" {
@@ -32,7 +32,7 @@ func AuthRequired(secret string) gin.HandlerFunc {
 			errcode.Respond(c, unauthorized)
 			return
 		}
-		uid, err := parseJWT(strings.TrimPrefix(raw, prefix), keyBytes)
+		uid, err := keys.VerifyAccess(strings.TrimPrefix(raw, prefix))
 		if err != nil {
 			errcode.Respond(c, unauthorized)
 			return
@@ -49,25 +49,4 @@ func UserIDFromCtx(c *gin.Context) string {
 	}
 	s, _ := v.(string)
 	return s
-}
-
-func parseJWT(token string, secret []byte) (string, error) {
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return "", errors.New("alg")
-		}
-		return secret, nil
-	})
-	if err != nil || !parsed.Valid {
-		return "", errors.New("invalid")
-	}
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", errors.New("claims")
-	}
-	sub, _ := claims["sub"].(string)
-	if sub == "" {
-		return "", errors.New("sub")
-	}
-	return sub, nil
 }

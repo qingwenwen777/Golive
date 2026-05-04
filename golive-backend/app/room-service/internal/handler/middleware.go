@@ -1,21 +1,26 @@
 package handler
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 )
 
 const ctxUserIDKey = "userID"
 
-// AuthRequired verifies the Bearer JWT against the shared HS256 secret and
-// stashes the user id (sub) in the context. Returns 401 on any failure.
+// AuthRequired verifies the Bearer JWT and stashes the user id in the context.
 func AuthRequired(secret string) gin.HandlerFunc {
-	keyBytes := []byte(secret)
+	keys, err := jwtauth.NewKeySet(secret, "", nil)
+	if err != nil {
+		panic("room-service jwt key set: " + err.Error())
+	}
+	return AuthRequiredWithKeySet(keys)
+}
+
+func AuthRequiredWithKeySet(keys *jwtauth.KeySet) gin.HandlerFunc {
 	unauthorized := errcode.New(401, "Unauthorized")
 	return func(c *gin.Context) {
 		raw := c.GetHeader("Authorization")
@@ -24,7 +29,7 @@ func AuthRequired(secret string) gin.HandlerFunc {
 			errcode.Respond(c, unauthorized)
 			return
 		}
-		uid, err := parseAccess(strings.TrimPrefix(raw, prefix), keyBytes)
+		uid, err := keys.VerifyAccess(strings.TrimPrefix(raw, prefix))
 		if err != nil || uid == "" {
 			errcode.Respond(c, unauthorized)
 			return
@@ -34,15 +39,21 @@ func AuthRequired(secret string) gin.HandlerFunc {
 	}
 }
 
-// OptionalAuth parses a Bearer token when present and stores the user id. It
-// never blocks public endpoints; invalid or absent tokens behave as guests.
+// OptionalAuth stores the user id when a valid token is present.
 func OptionalAuth(secret string) gin.HandlerFunc {
-	keyBytes := []byte(secret)
+	keys, err := jwtauth.NewKeySet(secret, "", nil)
+	if err != nil {
+		panic("room-service jwt key set: " + err.Error())
+	}
+	return OptionalAuthWithKeySet(keys)
+}
+
+func OptionalAuthWithKeySet(keys *jwtauth.KeySet) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		raw := c.GetHeader("Authorization")
 		const prefix = "Bearer "
 		if strings.HasPrefix(raw, prefix) {
-			if uid, err := parseAccess(strings.TrimPrefix(raw, prefix), keyBytes); err == nil && uid != "" {
+			if uid, err := keys.VerifyAccess(strings.TrimPrefix(raw, prefix)); err == nil && uid != "" {
 				c.Set(ctxUserIDKey, uid)
 			}
 		}
@@ -56,25 +67,4 @@ func UserIDFromCtx(c *gin.Context) string {
 		return s
 	}
 	return ""
-}
-
-func parseAccess(token string, secret []byte) (string, error) {
-	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return secret, nil
-	})
-	if err != nil || !parsed.Valid {
-		return "", errors.New("invalid token")
-	}
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", errors.New("invalid claims")
-	}
-	sub, _ := claims["sub"].(string)
-	if sub == "" {
-		return "", errors.New("missing sub")
-	}
-	return sub, nil
 }

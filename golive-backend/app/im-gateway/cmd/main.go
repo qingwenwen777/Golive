@@ -53,8 +53,11 @@ func main() {
 
 	broker := pubsub.NewRedis(rdb)
 	h := hub.New(hubCtx, broker, cfg.Room.ViewerPushInterval)
-
-	verifier := auth.NewHMACVerifier(cfg.JWT.Secret)
+	jwtKeys, err := cfg.JWT.KeySet()
+	if err != nil {
+		log.Fatal("jwt config", zap.Error(err))
+	}
+	verifier := auth.NewHMACVerifierWithKeySet(jwtKeys)
 
 	var p producer.Producer
 	if cfg.Kafka.Enabled {

@@ -4,11 +4,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/handler"
+	"github.com/qingwenwen777/golive/pkg/jwtauth"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
 
 type Deps struct {
 	JWTSecret string
+	JWTKeys   *jwtauth.KeySet
 	Gift      *handler.GiftHandler
 	SuperChat *handler.SuperChatHandler
 	Bet       *handler.BetHandler
@@ -33,6 +35,9 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/bets/latest", d.Bet.Latest)
 
 	auth := handler.AuthRequired(d.JWTSecret)
+	if d.JWTKeys != nil {
+		auth = handler.AuthRequiredWithKeySet(d.JWTKeys)
+	}
 	r.GET("/gifts/fan-badges/me", auth, d.Gift.FanBadges)
 	r.POST("/gifts/send", auth, d.Gift.Send)
 	r.POST("/super-chats", auth, d.SuperChat.Send)

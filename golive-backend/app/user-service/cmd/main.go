@@ -77,11 +77,16 @@ func main() {
 			log.Warn("seed admin user", zap.Error(err))
 		}
 	}
+	jwtKeys, err := cfg.JWT.KeySet()
+	if err != nil {
+		log.Fatal("jwt config", zap.Error(err))
+	}
 
 	tokenRepo := repo.NewTokenRepo(rdb)
 	captcha := service.NewCaptchaService(rdb, 5*time.Minute)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
 		JWTSecret:  cfg.JWT.Secret,
+		JWTKeys:    jwtKeys,
 		AccessTTL:  cfg.JWT.AccessTTL,
 		RefreshTTL: cfg.JWT.RefreshTTL,
 	})

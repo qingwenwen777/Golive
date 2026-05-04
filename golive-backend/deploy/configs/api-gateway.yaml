@@ -17,6 +17,10 @@ proxy:
 
 jwt:
   secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
+  active_kid: "jwt-2026-05-04"
+  secrets:
+    - kid: "jwt-2026-05-04"
+      secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
 
 cors:
   allowed_origins:
