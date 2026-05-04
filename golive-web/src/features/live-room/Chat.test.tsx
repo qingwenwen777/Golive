@@ -255,4 +255,54 @@ describe('Chat', () => {
     expect(within(pinned).getByText('1,000 coins')).toBeTruthy();
     expect(within(pinned).getByText('Pinned hello')).toBeTruthy();
   });
+
+  it('orders pinned SuperChats by tier, amount, then latest send time', () => {
+    const now = Date.now();
+    render(
+      <Chat
+        messages={[
+          superChatMessage({
+            id: 'sc-low-tier',
+            user: 'Lower tier',
+            amount: '5000',
+            tier: 4,
+            ts: now + 4,
+          }),
+          superChatMessage({
+            id: 'sc-same-early',
+            user: 'Earlier same amount',
+            amount: '10000',
+            tier: 5,
+            ts: now + 2,
+          }),
+          superChatMessage({
+            id: 'sc-high',
+            user: 'Highest amount',
+            amount: '20000',
+            tier: 5,
+            ts: now + 1,
+          }),
+          superChatMessage({
+            id: 'sc-same-late',
+            user: 'Later same amount',
+            amount: '10000',
+            tier: 5,
+            ts: now + 3,
+          }),
+        ]}
+      />,
+    );
+
+    const pinned = screen.getByLabelText('liveRoom.chatPanel.pinnedSuperChats');
+    const names = Array.from(pinned.querySelectorAll('.gl-sc-pin-user')).map(
+      (node) => node.textContent,
+    );
+
+    expect(names).toEqual([
+      'Highest amount',
+      'Later same amount',
+      'Earlier same amount',
+      'Lower tier',
+    ]);
+  });
 });

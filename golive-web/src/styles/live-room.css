@@ -1040,8 +1040,10 @@
 .gl-sc-pin-popover {
   position: absolute;
   top: calc(100% + 8px);
+  left: 50%;
   z-index: 22;
-  width: min(320px, calc(100% - 20px));
+  width: min(286px, calc(100% - 24px));
+  transform: translateX(-50%);
   border: 1px solid color-mix(in srgb, var(--sc-soft) 55%, transparent);
   border-radius: 12px;
   background: var(--sc-soft);
@@ -1051,18 +1053,6 @@
   padding: 0;
   overflow: visible;
   animation: glScPinBubble 0.16s ease-out;
-}
-.gl-sc-pin-popover::before {
-  position: absolute;
-  top: -6px;
-  left: var(--sc-arrow-left);
-  width: 12px;
-  height: 12px;
-  background: var(--sc-soft);
-  border-top: 1px solid color-mix(in srgb, var(--sc-soft) 55%, transparent);
-  border-left: 1px solid color-mix(in srgb, var(--sc-soft) 55%, transparent);
-  content: '';
-  transform: translateX(-50%) rotate(45deg);
 }
 .gl-sc-pin-popover-head {
   display: flex;
@@ -1113,11 +1103,11 @@
 @keyframes glScPinBubble {
   from {
     opacity: 0;
-    transform: translateY(-3px);
+    transform: translateX(-50%) translateY(-3px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 }
 .gl-chat-list {

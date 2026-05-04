@@ -163,6 +163,20 @@ function formatCoinAmount(amount: string, locale: string): string {
   return `${n.toLocaleString(locale)} coins`;
 }
 
+function comparePinnedSuperChats(
+  a: {
+    message: SuperChatMessage;
+  },
+  b: {
+    message: SuperChatMessage;
+  },
+): number {
+  if (a.message.tier !== b.message.tier) return b.message.tier - a.message.tier;
+  const amountDelta = parseAmountValue(b.message.amount) - parseAmountValue(a.message.amount);
+  if (amountDelta !== 0) return amountDelta;
+  return b.message.ts - a.message.ts;
+}
+
 const GIFT_META: Record<string, { icon: string; tier: 0 | 1 | 2 | 3 }> = {
   flower: { icon: '\u{1f33c}', tier: 0 },
   donut: { icon: '\u{1f369}', tier: 0 },
@@ -315,14 +329,12 @@ function PinnedSuperChatPill({
   durationMs,
   active,
   onToggle,
-  buttonRef,
 }: {
   m: SuperChatMessage;
   remainingMs: number;
   durationMs: number;
   active: boolean;
   onToggle: () => void;
-  buttonRef: (node: HTMLButtonElement | null) => void;
 }) {
   const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
@@ -339,7 +351,6 @@ function PinnedSuperChatPill({
 
   return (
     <button
-      ref={buttonRef}
       type="button"
       className={cn('gl-sc-pin', active && 'is-expanded', m.pending && 'opacity-60')}
       style={style}
@@ -359,20 +370,16 @@ function PinnedSuperChatPill({
 function PinnedSuperChatBubble({
   m,
   locale,
-  position,
 }: {
   m: SuperChatMessage;
   locale: string;
-  position: { left: number; arrowLeft: number };
 }) {
   const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
   const style = {
-    left: position.left,
     '--sc-bg': spec.bg,
     '--sc-soft': spec.soft,
-    '--sc-arrow-left': `${position.arrowLeft}px`,
-  } as CSSProperties & { '--sc-bg': string; '--sc-soft': string; '--sc-arrow-left': string };
+  } as CSSProperties & { '--sc-bg': string; '--sc-soft': string };
 
   return (
     <div className="gl-sc-pin-popover" role="dialog" style={style}>
@@ -548,7 +555,6 @@ export function Chat({
   const emojiWrapRef = useRef<HTMLDivElement | null>(null);
   const pinStackRef = useRef<HTMLDivElement | null>(null);
   const pinRowRef = useRef<HTMLDivElement | null>(null);
-  const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const inputValueRef = useRef('');
   const lastMessageCountRef = useRef(messages.length);
   const stickToBottomRef = useRef(true);
@@ -559,7 +565,6 @@ export function Chat({
   const [now, setNow] = useState(() => Date.now());
   const [activeTab, setActiveTab] = useState<ChatPanelTab>('chat');
   const [expandedPinnedId, setExpandedPinnedId] = useState<string | null>(null);
-  const [pinBubblePosition, setPinBubblePosition] = useState({ left: 10, arrowLeft: 28 });
   const [pinnedScrollState, setPinnedScrollState] = useState({
     hasOverflow: false,
     canScrollLeft: false,
@@ -648,22 +653,6 @@ export function Chat({
     if (nearBottom) setNewMessageCount(0);
   };
 
-  const updatePinnedBubblePosition = useCallback((id: string) => {
-    const stack = pinStackRef.current;
-    const button = pinButtonRefs.current.get(id);
-    if (!stack || !button) return;
-
-    const stackRect = stack.getBoundingClientRect();
-    const buttonRect = button.getBoundingClientRect();
-    const bubbleWidth = Math.min(286, Math.max(0, stackRect.width - 24));
-    const buttonCenter = buttonRect.left - stackRect.left + buttonRect.width / 2;
-    const maxLeft = Math.max(12, stackRect.width - bubbleWidth - 12);
-    const left = Math.max(12, Math.min(maxLeft, buttonCenter - bubbleWidth / 2));
-    const arrowLeft = Math.max(22, Math.min(bubbleWidth - 22, buttonCenter - left));
-
-    setPinBubblePosition({ left, arrowLeft });
-  }, []);
-
   const updatePinnedScrollState = useCallback(() => {
     const row = pinRowRef.current;
     if (!row) {
@@ -685,7 +674,6 @@ export function Chat({
 
   const handlePinnedRowScroll = () => {
     updatePinnedScrollState();
-    if (expandedPinnedId) updatePinnedBubblePosition(expandedPinnedId);
   };
 
   const handlePinnedWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -696,7 +684,6 @@ export function Chat({
     event.preventDefault();
     row.scrollLeft += event.deltaY;
     updatePinnedScrollState();
-    if (expandedPinnedId) updatePinnedBubblePosition(expandedPinnedId);
   };
 
   const scrollPinnedRow = (direction: -1 | 1) => {
@@ -712,7 +699,6 @@ export function Chat({
     }
 
     window.setTimeout(updatePinnedScrollState, 220);
-    if (expandedPinnedId) window.setTimeout(() => updatePinnedBubblePosition(expandedPinnedId), 220);
   };
 
   useLayoutEffect(() => {
@@ -776,7 +762,7 @@ export function Chat({
       };
     })
     .filter((item) => item.remainingMs > 0)
-    .sort((a, b) => b.message.ts - a.message.ts);
+    .sort(comparePinnedSuperChats);
 
   useLayoutEffect(() => {
     updatePinnedScrollState();
@@ -802,11 +788,6 @@ export function Chat({
     setExpandedPinnedId(null);
   }, [expandedPinnedId, pinnedSuperChats]);
 
-  useLayoutEffect(() => {
-    if (!expandedPinnedId) return;
-    updatePinnedBubblePosition(expandedPinnedId);
-  }, [expandedPinnedId, pinnedSuperChats.length, updatePinnedBubblePosition]);
-
   useEffect(() => {
     if (!expandedPinnedId) return;
     const handlePointerDown = (event: PointerEvent) => {
@@ -817,17 +798,14 @@ export function Chat({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setExpandedPinnedId(null);
     };
-    const handleResize = () => updatePinnedBubblePosition(expandedPinnedId);
 
     document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('resize', handleResize);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', handleResize);
     };
-  }, [expandedPinnedId, updatePinnedBubblePosition]);
+  }, [expandedPinnedId]);
 
   return (
     <aside
@@ -898,17 +876,9 @@ export function Chat({
                 remainingMs={remainingMs}
                 durationMs={durationMs}
                 active={expandedPinnedId === message.id}
-                buttonRef={(node) => {
-                  if (node) {
-                    pinButtonRefs.current.set(message.id, node);
-                  } else {
-                    pinButtonRefs.current.delete(message.id);
-                  }
-                }}
                 onToggle={() => {
                   setExpandedPinnedId((current) => {
                     const next = current === message.id ? null : message.id;
-                    if (next) window.requestAnimationFrame(() => updatePinnedBubblePosition(next));
                     return next;
                   });
                 }}
@@ -933,7 +903,6 @@ export function Chat({
                 pinnedSuperChats[0].message
               }
               locale={locale}
-              position={pinBubblePosition}
             />
           )}
         </div>

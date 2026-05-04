@@ -106,6 +106,7 @@ import { userDisplayName, type User } from '@/types/user';
 
 const DEFAULT_CATEGORY = 'Just Chatting';
 const LEGACY_APPOINTMENT_CATEGORY = 'Scheduled';
+const CONSOLE_ACTIVITY_PAGE_SIZE = 5;
 
 function categoryKey(category: string): string {
   return category.toLowerCase().replace(/\s+/g, '');
@@ -3392,11 +3393,34 @@ function StudioInteractionRail({
   reconnectingLabel: string;
 }) {
   const { t } = useTranslation('pages');
+  const [giftPage, setGiftPage] = useState(0);
+  const [superChatPage, setSuperChatPage] = useState(0);
   const gifts = summarizeGifts(messages);
   const superChats = messages
-    .filter((item) => item.kind === 'super_chat')
-    .slice(-3)
-    .reverse();
+    .filter((item): item is Extract<Message, { kind: 'super_chat' }> => item.kind === 'super_chat')
+    .sort((a, b) => b.ts - a.ts);
+  const giftPageCount = pageCount(gifts.items.length);
+  const superChatPageCount = pageCount(superChats.length);
+  const visibleGifts = pageSlice(gifts.items, giftPage);
+  const visibleSuperChats = pageSlice(superChats, superChatPage);
+  const latestGiftTs = gifts.items[0]?.latestTs ?? 0;
+  const latestSuperChatTs = superChats[0]?.ts ?? 0;
+
+  useEffect(() => {
+    setGiftPage(0);
+  }, [latestGiftTs]);
+
+  useEffect(() => {
+    setSuperChatPage(0);
+  }, [latestSuperChatTs]);
+
+  useEffect(() => {
+    setGiftPage((page) => Math.min(page, giftPageCount - 1));
+  }, [giftPageCount]);
+
+  useEffect(() => {
+    setSuperChatPage((page) => Math.min(page, superChatPageCount - 1));
+  }, [superChatPageCount]);
 
   return (
     <aside className="gl-live-console-rail">
@@ -3442,8 +3466,8 @@ function StudioInteractionRail({
           <Gift size={22} />
         </div>
         <div className="gl-live-console-gifts">
-          {gifts.items.length > 0 ? (
-            gifts.items.map((item) => (
+          {visibleGifts.length > 0 ? (
+            visibleGifts.map((item) => (
               <div className="gl-live-console-gift-row" key={item.key}>
                 <span>{item.icon || item.name}</span>
                 <div className="gl-live-console-gift-main">
@@ -3459,6 +3483,15 @@ function StudioInteractionRail({
             </div>
           )}
         </div>
+        {gifts.items.length > CONSOLE_ACTIVITY_PAGE_SIZE && (
+          <ConsolePager
+            page={giftPage}
+            pageCount={giftPageCount}
+            onPage={setGiftPage}
+            newerLabel={t('studio.console.newerGifts', { defaultValue: 'Newer gifts' })}
+            olderLabel={t('studio.console.olderGifts', { defaultValue: 'Older gifts' })}
+          />
+        )}
       </section>
 
       <section className="gl-creator-panel">
@@ -3470,8 +3503,8 @@ function StudioInteractionRail({
           <Zap size={22} />
         </div>
         <div className="gl-live-console-superchats">
-          {superChats.length > 0 ? (
-            superChats.map((item) => (
+          {visibleSuperChats.length > 0 ? (
+            visibleSuperChats.map((item) => (
               <div key={item.id}>
                 <strong>{item.user}</strong>
                 <span>{item.amount}</span>
@@ -3484,8 +3517,68 @@ function StudioInteractionRail({
             </div>
           )}
         </div>
+        {superChats.length > CONSOLE_ACTIVITY_PAGE_SIZE && (
+          <ConsolePager
+            page={superChatPage}
+            pageCount={superChatPageCount}
+            onPage={setSuperChatPage}
+            newerLabel={t('studio.console.newerSuperChats', {
+              defaultValue: 'Newer SuperChats',
+            })}
+            olderLabel={t('studio.console.olderSuperChats', {
+              defaultValue: 'Older SuperChats',
+            })}
+          />
+        )}
       </section>
     </aside>
+  );
+}
+
+function pageCount(total: number): number {
+  return Math.max(1, Math.ceil(total / CONSOLE_ACTIVITY_PAGE_SIZE));
+}
+
+function pageSlice<T>(items: T[], page: number): T[] {
+  const start = page * CONSOLE_ACTIVITY_PAGE_SIZE;
+  return items.slice(start, start + CONSOLE_ACTIVITY_PAGE_SIZE);
+}
+
+function ConsolePager({
+  page,
+  pageCount: totalPages,
+  onPage,
+  newerLabel,
+  olderLabel,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+  newerLabel: string;
+  olderLabel: string;
+}) {
+  return (
+    <div className="gl-live-console-pager">
+      <button
+        type="button"
+        aria-label={newerLabel}
+        disabled={page <= 0}
+        onClick={() => onPage(Math.max(0, page - 1))}
+      >
+        <ChevronLeft size={15} strokeWidth={2.6} />
+      </button>
+      <span>
+        {page + 1} / {totalPages}
+      </span>
+      <button
+        type="button"
+        aria-label={olderLabel}
+        disabled={page >= totalPages - 1}
+        onClick={() => onPage(Math.min(totalPages - 1, page + 1))}
+      >
+        <ChevronRight size={15} strokeWidth={2.6} />
+      </button>
+    </div>
   );
 }
 
@@ -3597,7 +3690,15 @@ function useElapsed(startedAt: string | undefined, enabled: boolean): string {
 function summarizeGifts(messages: Message[]) {
   const map = new Map<
     string,
-    { key: string; user: string; name: string; icon?: string; count: number; totalCoin: number }
+    {
+      key: string;
+      user: string;
+      name: string;
+      icon?: string;
+      count: number;
+      totalCoin: number;
+      latestTs: number;
+    }
   >();
   let totalCoin = 0;
   for (const item of messages) {
@@ -3610,17 +3711,20 @@ function summarizeGifts(messages: Message[]) {
       icon: item.giftIcon,
       count: 0,
       totalCoin: 0,
+      latestTs: item.ts,
     };
     current.count += item.count ?? 1;
     current.totalCoin += item.totalCoin ?? 0;
+    current.latestTs = Math.max(current.latestTs, item.ts);
     totalCoin += item.totalCoin ?? 0;
     if (item.user) current.user = item.user;
     if (item.giftIcon) current.icon = item.giftIcon;
     map.set(key, current);
   }
-  const items = Array.from(map.values())
-    .sort((a, b) => b.totalCoin - a.totalCoin)
-    .slice(0, 5);
+  const items = Array.from(map.values()).sort((a, b) => {
+    if (a.latestTs !== b.latestTs) return b.latestTs - a.latestTs;
+    return b.totalCoin - a.totalCoin;
+  });
   return { items, totalCoin };
 }
 

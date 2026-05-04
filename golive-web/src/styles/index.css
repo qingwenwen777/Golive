@@ -7273,6 +7273,40 @@ button.gl-fan-badge-empty {
   font-size: 12px;
   line-height: 1.4;
 }
+.gl-live-console-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-top: 1px solid var(--gl-border);
+  padding-top: 10px;
+}
+.gl-live-console-pager button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+}
+.gl-live-console-pager button:hover:not(:disabled) {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-live-console-pager button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+.gl-live-console-pager span {
+  min-width: 44px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
 
 @media (max-width: 1199px) {
   .gl-library-hero {
