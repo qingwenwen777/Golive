@@ -314,14 +314,12 @@
   position: absolute;
   left: 100%;
   white-space: nowrap;
-  font-weight: 700;
-  font-family: Roboto, Arial, sans-serif;
+  color: #fff;
+  font-weight: 400;
+  font-family: Roboto, Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   text-shadow:
-    -2px -2px 0 #000,
-    2px -2px 0 #000,
-    -2px 2px 0 #000,
-    2px 2px 0 #000,
-    0 0 4px rgba(0, 0, 0, 0.8);
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.72);
   animation-name: glFly;
   animation-timing-function: linear;
   animation-fill-mode: forwards;
@@ -915,51 +913,50 @@
   font-size: 13px;
 }
 .gl-sc-pin-stack {
+  position: relative;
+  z-index: 5;
   display: flex;
   flex-shrink: 0;
   flex-direction: row;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: visible;
   border-bottom: 1px solid var(--gl-border);
   background: var(--gl-bg);
-  padding: 8px;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-}
-.gl-sc-pin-stack::-webkit-scrollbar {
-  display: none;
+  padding: 8px 10px;
 }
 .gl-sc-pin {
   position: relative;
-  display: block;
-  flex: 0 0 184px;
-  width: 184px;
-  min-height: 60px;
-  overflow: hidden;
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 38px;
+  overflow: visible;
   border: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   color: #fff;
   cursor: pointer;
   font-family: inherit;
   padding: 0;
-  scroll-snap-align: start;
   text-align: left;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 2px 10px color-mix(in srgb, currentColor 18%, transparent);
   transition:
-    flex-basis 0.16s ease,
-    width 0.16s ease;
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
+.gl-sc-pin:hover,
 .gl-sc-pin.is-expanded {
-  flex-basis: min(320px, 78vw);
-  width: min(320px, 78vw);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px color-mix(in srgb, currentColor 22%, transparent);
 }
 .gl-sc-pin-main {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 60px;
-  padding: 8px 10px 10px;
+  gap: 7px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 5px 10px 5px 6px;
 }
 .gl-sc-pin-copy {
   min-width: 0;
@@ -969,16 +966,17 @@
 .gl-sc-pin-hint {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 .gl-sc-pin-meta {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 850;
   line-height: 1.25;
 }
 .gl-sc-pin-user {
   min-width: 0;
+  max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -987,10 +985,9 @@
   flex: 0 0 auto;
 }
 .gl-sc-pin-hint {
-  margin-top: 2px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 11px;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 10px;
+  font-weight: 750;
   line-height: 1.25;
 }
 .gl-sc-pin-hint span:last-child {
@@ -1008,24 +1005,78 @@
   transform: rotate(180deg);
 }
 .gl-sc-pin-body {
-  margin: -2px 8px 10px;
-  border-radius: 4px;
+  position: absolute;
+  top: calc(100% + 9px);
+  left: 0;
+  z-index: 8;
+  width: min(312px, calc(100vw - 36px));
+  border: 1px solid color-mix(in srgb, var(--sc-soft) 55%, transparent);
+  border-radius: 12px;
   background: var(--sc-soft);
   color: #0f0f0f;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
+  cursor: default;
+  padding: 10px 12px;
+  animation: glScPinBubble 0.16s ease-out;
+}
+.gl-sc-pin-body::before {
+  position: absolute;
+  top: -6px;
+  left: 22px;
+  width: 12px;
+  height: 12px;
+  background: var(--sc-soft);
+  border-top: 1px solid color-mix(in srgb, var(--sc-soft) 55%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--sc-soft) 55%, transparent);
+  content: '';
+  transform: rotate(45deg);
+}
+.gl-sc-pin-body-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
-  font-weight: 600;
-  line-height: 1.35;
-  padding: 7px 8px;
-  word-break: break-word;
+  font-weight: 850;
+  line-height: 1.25;
+}
+.gl-sc-pin-body-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-sc-pin-body-head span {
+  flex: 0 0 auto;
+}
+.gl-sc-pin-body p {
+  margin: 7px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 .gl-sc-pin-progress {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 3px;
+  bottom: 2px;
+  left: 14px;
+  height: 2px;
   width: var(--sc-progress);
-  background: rgba(255, 255, 255, 0.9);
+  max-width: calc(100% - 28px);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
   transition: width 1s linear;
+}
+@keyframes glScPinBubble {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .gl-chat-list {
   flex: 1;
@@ -1813,12 +1864,48 @@
 }
 
 .gl-sc-dialog {
+  top: auto;
+  right: 24px;
+  bottom: 24px;
+  left: auto;
+  display: flex;
+  width: min(374px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(760px, calc(100dvh - 48px));
+  translate: none;
+  transform: none;
+  flex-direction: column;
+  gap: 13px;
+  overflow-y: auto;
   border-color: var(--gl-border);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--gl-bg);
+  padding: 18px;
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.22);
+}
+.gl-sc-dialog-head {
+  padding-right: 34px;
+}
+.gl-sc-dialog-head h2 {
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.15;
 }
 .gl-sc-preview {
   overflow: hidden;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.gl-sc-preview-message {
+  margin-top: 9px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
 }
 .gl-sc-amount-input {
   display: flex;
@@ -1841,17 +1928,82 @@
   font-size: 18px;
   font-weight: 800;
 }
+.gl-sc-quick-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
 .gl-sc-quick-btn {
+  display: inline-flex;
   min-height: 30px;
-  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 11px;
+}
+.gl-sc-quick-btn.is-active {
+  background: var(--gl-text);
+  color: var(--gl-bg);
 }
 .gl-sc-textarea {
+  width: 100%;
   min-height: 86px;
+  resize: none;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 14px;
   line-height: 1.45;
+  outline: 0;
+  padding: 10px 12px;
+}
+.gl-sc-textarea:focus {
+  border-color: var(--gl-text);
+}
+.gl-sc-textarea:disabled {
+  opacity: 0.5;
+}
+.gl-sc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .gl-sc-send,
 .gl-sc-cancel {
+  display: inline-flex;
   min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 18px;
+}
+.gl-sc-cancel {
+  background: transparent;
+  color: var(--gl-text-2);
+}
+.gl-sc-cancel:hover {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-sc-send.is-ready {
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+.gl-sc-send.is-ready:hover {
+  background: var(--gl-btn-primary-hover);
+}
+.gl-sc-send.is-disabled {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
 }
 
 @keyframes gl-gift-fly {

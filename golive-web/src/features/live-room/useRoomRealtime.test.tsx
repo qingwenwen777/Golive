@@ -152,7 +152,7 @@ describe('useRoomRealtime', () => {
         text: 'from server',
       });
       expect(slice.bullets).toHaveLength(1);
-      expect(slice.bullets[0]).toMatchObject({ text: 'Luna: from server', color: '#f43f5e' });
+      expect(slice.bullets[0]).toMatchObject({ text: 'from server', color: '#ffffff' });
     });
   });
 

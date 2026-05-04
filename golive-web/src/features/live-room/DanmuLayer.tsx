@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  useDanmuStore,
-  DENSITY_CAP,
-  FONT_SIZE_PX,
-} from '@/stores/useDanmuStore';
-import { DANMU_COLORS, randomPick } from '@/constants/chat';
+import { useDanmuStore, DENSITY_CAP, FONT_SIZE_PX } from '@/stores/useDanmuStore';
 import type { Bullet } from '@/stores/useRealtimeStore';
 
 interface RenderBullet {
@@ -58,7 +53,7 @@ export function DanmuLayer({ bullets, onBulletEnd }: DanmuLayerProps) {
       if (row === -1) continue;
 
       const dur = 5 + Math.random() * 2;
-      const color = b.color ?? randomPick(DANMU_COLORS);
+      const color = '#ffffff';
       const approxWidth = b.text.length * size * 0.6;
       const screenW = window.innerWidth || 1280;
       const tailMs = (approxWidth / (screenW + approxWidth)) * dur * 1000;

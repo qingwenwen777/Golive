@@ -133,12 +133,13 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
   const side = isMobile ? 'bottom' : 'right';
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side={side}
-        className={cn('flex flex-col p-0', isMobile ? 'h-[75vh]' : 'w-[420px] sm:max-w-[420px]')}
+        showOverlay={false}
+        className={cn('gl-gift-sheet flex flex-col p-0', isMobile && 'is-mobile')}
       >
-        <SheetHeader className="border-b border-border px-4 py-3">
+        <SheetHeader className="gl-gift-sheet-head">
           <SheetTitle>{t('liveRoom.giftPanel.title', { defaultValue: 'Gifts' })}</SheetTitle>
           <SheetDescription className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
             <span className="inline-flex items-center gap-1">
@@ -160,10 +161,8 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
               key={tabDef.id}
               onClick={() => setTab(tabDef.id)}
               className={cn(
-                'shrink-0 rounded-full px-3 py-1 text-sm',
-                tab === tabDef.id
-                  ? 'bg-accent text-white'
-                  : 'bg-bg-hover text-text-secondary hover:text-text-primary',
+                'gl-gift-tab',
+                tab === tabDef.id ? 'is-active' : 'text-text-secondary hover:text-text-primary',
               )}
             >
               {tabDef.labelKey ? t(tabDef.labelKey, { defaultValue: tabDef.label }) : tabDef.label}
@@ -171,7 +170,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-24">
+        <div className="gl-gift-scroll">
           {isPending ? (
             <div className="gl-gift-grid">
               {Array.from({ length: 12 }).map((_, i) => (
@@ -205,11 +204,11 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                         <LockKeyhole size={12} />
                       </span>
                     )}
-                    <span className="text-3xl" aria-hidden>
+                    <span className="gl-gift-icon" aria-hidden>
                       {g.icon}
                     </span>
-                    <span className="max-w-full truncate text-xs font-medium">{giftName}</span>
-                    <span className="flex items-center gap-1 text-[11px] text-text-secondary">
+                    <span className="gl-gift-name">{giftName}</span>
+                    <span className="gl-gift-price">
                       <Coins size={10} /> {g.priceCoin.toLocaleString(language)}
                     </span>
                     {giftRequiredLevel > 1 && (
@@ -229,30 +228,27 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
         </div>
 
         {selected && (
-          <div className="sticky bottom-0 left-0 right-0 border-t border-border bg-bg-primary p-3">
-            <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="gl-gift-sendbar">
+            <div className="gl-gift-counts">
               {COUNT_PRESETS.map((n) => (
                 <button
                   key={n}
                   onClick={() => setCount(n)}
-                  className={cn(
-                    'rounded-full px-2.5 py-1 text-xs',
-                    count === n ? 'bg-accent text-white' : 'bg-bg-hover text-text-secondary',
-                  )}
+                  className={cn('gl-gift-count', count === n && 'is-active')}
                 >
                   x{n}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl" aria-hidden>
+            <div className="gl-gift-sendrow">
+              <span className="gl-gift-selected-icon" aria-hidden>
                 {selected.icon}
               </span>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{selectedName}</div>
+              <div className="gl-gift-selected-copy">
+                <div className="gl-gift-selected-name">{selectedName}</div>
                 <div
                   className={cn(
-                    'text-xs',
+                    'gl-gift-selected-meta',
                     locked || insufficient ? 'text-red-500' : 'text-text-secondary',
                   )}
                 >
@@ -276,10 +272,8 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                 disabled={sendGift.isPending}
                 onClick={handleSend}
                 className={cn(
-                  'rounded-full px-5 py-2 text-sm font-semibold transition',
-                  locked || insufficient
-                    ? 'bg-bg-hover text-text-secondary'
-                    : 'bg-accent text-white hover:bg-accent/90',
+                  'gl-gift-send-btn',
+                  locked || insufficient ? 'is-muted' : 'is-ready',
                   sendGift.isPending && 'opacity-60',
                 )}
               >

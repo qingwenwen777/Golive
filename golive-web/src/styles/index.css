@@ -1124,44 +1124,103 @@ input:focus-visible,
   width: 28px;
   height: 28px;
 }
+.gl-gift-sheet {
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(382px, calc(100vw - 24px));
+  max-width: min(382px, calc(100vw - 24px));
+  height: auto;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--gl-bg-card) 94%, transparent);
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(18px);
+}
+.gl-gift-sheet-head {
+  border-bottom: 1px solid var(--gl-border);
+  padding: 16px 18px 13px;
+  text-align: left;
+}
+.gl-gift-sheet-head h2 {
+  font-size: 20px;
+  font-weight: 850;
+}
 .gl-gift-tabs {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 12px 16px;
+  padding: 12px 16px 10px;
+  scrollbar-width: none;
 }
-.gl-gift-tabs button {
-  min-width: 58px;
+.gl-gift-tabs::-webkit-scrollbar {
+  display: none;
+}
+.gl-gift-tab {
+  display: inline-flex;
+  min-width: 56px;
   height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  font-size: 13px;
+  font-weight: 800;
   line-height: 1;
+  padding: 0 12px;
   white-space: nowrap;
+}
+.gl-gift-tab.is-active {
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+.gl-gift-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 14px 114px;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
 }
 .gl-gift-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
 }
 .gl-gift-card {
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 136px;
+  min-height: 118px;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 4px;
-  border: 2px solid transparent;
+  gap: 5px;
+  overflow: hidden;
+  border: 1px solid transparent;
   border-radius: 8px;
-  padding: 8px;
   background: var(--gl-bg-hover);
+  color: var(--gl-text);
+  padding: 10px 8px;
   transition:
     border-color 0.15s ease,
-    background-color 0.15s ease;
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.gl-gift-card:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--gl-bg-hover) 74%, var(--gl-bg-card));
 }
 .gl-gift-card.is-level-gift {
-  border-color: rgba(99, 102, 241, 0.24);
+  border-color: rgba(99, 102, 241, 0.22);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(238, 242, 255, 0.82)), var(--gl-bg-hover);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(238, 242, 255, 0.74)),
+    var(--gl-bg-hover);
 }
 .gl-gift-card.is-level-gift.is-active {
   border-color: rgba(99, 102, 241, 0.72);
@@ -1172,10 +1231,43 @@ input:focus-visible,
 .gl-gift-card.is-locked > span:not(.gl-gift-lock-mark):not(.gl-gift-level-chip) {
   opacity: 0.58;
 }
+.gl-gift-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  font-size: 30px;
+  line-height: 1;
+}
+.gl-gift-name {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.22;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-gift-price {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gl-text-2);
+  font-size: 11px;
+  font-weight: 750;
+}
 .gl-gift-lock-mark {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
   display: inline-flex;
   width: 22px;
   height: 22px;
@@ -1183,10 +1275,12 @@ input:focus-visible,
   justify-content: center;
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.86);
   color: #334155;
 }
 .gl-gift-level-chip {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   max-width: 100%;
   align-items: center;
@@ -1202,6 +1296,138 @@ input:focus-visible,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.gl-gift-card.is-active {
+  border-color: #1c62b9;
+  background: rgba(28, 98, 185, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(28, 98, 185, 0.28);
+}
+.gl-gift-card.is-fan-light {
+  position: relative;
+  border-color: rgba(255, 139, 193, 0.34);
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.96), transparent 26px),
+    linear-gradient(145deg, rgba(255, 241, 248, 0.95), rgba(238, 242, 255, 0.92));
+}
+.gl-gift-card.is-fan-light::after {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 28%, #ffe9f4 0 20%, #ff8ac5 58%, #ff6fb7 100%);
+  box-shadow: 0 0 18px rgba(255, 139, 193, 0.28);
+  content: '';
+  opacity: 0.72;
+  transform: translateX(-50%);
+}
+.gl-gift-sendbar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-top: 1px solid var(--gl-border);
+  background: color-mix(in srgb, var(--gl-bg-card) 96%, transparent);
+  padding: 11px 14px 14px;
+  backdrop-filter: blur(14px);
+}
+.gl-gift-counts {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 9px;
+  scrollbar-width: none;
+}
+.gl-gift-counts::-webkit-scrollbar {
+  display: none;
+}
+.gl-gift-count {
+  display: inline-flex;
+  height: 28px;
+  min-width: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 10px;
+}
+.gl-gift-count.is-active {
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+.gl-gift-sendrow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.gl-gift-selected-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  font-size: 24px;
+}
+.gl-gift-selected-copy {
+  min-width: 0;
+  flex: 1;
+}
+.gl-gift-selected-name {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-gift-selected-meta {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-gift-send-btn {
+  display: inline-flex;
+  min-height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 18px;
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+.gl-gift-send-btn.is-ready {
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+.gl-gift-send-btn.is-ready:hover {
+  transform: translateY(-1px);
+}
+.gl-gift-send-btn.is-muted {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+}
+.dark .gl-gift-sheet {
+  background: color-mix(in srgb, var(--gl-bg-card) 94%, transparent);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.44);
+}
 .dark .gl-gift-card.is-level-gift {
   border-color: rgba(129, 140, 248, 0.24);
   background:
@@ -1216,57 +1442,38 @@ input:focus-visible,
   background: rgba(129, 140, 248, 0.18);
   color: #c7d2fe;
 }
-.gl-gift-card.is-active {
-  border-color: #1c62b9;
-  background: rgba(28, 98, 185, 0.14);
-}
-.gl-gift-card.is-fan-light {
-  position: relative;
-  overflow: hidden;
-  border-color: rgba(255, 139, 193, 0.38);
-  background:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.92), transparent 24px),
-    linear-gradient(145deg, rgba(255, 241, 248, 0.95), rgba(238, 242, 255, 0.92));
-}
-.gl-gift-card.is-fan-light::after {
-  position: absolute;
-  right: 10px;
-  bottom: 9px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: conic-gradient(from 210deg, #ff8ac5, #ffd1e6, #ff6fb7, #ffc1dd, #ff8ac5);
-  box-shadow: 0 0 16px rgba(255, 139, 193, 0.32);
-  content: '';
-  opacity: 0.78;
-}
-.gl-gift-card.is-fan-light > span {
-  position: relative;
-  z-index: 1;
+.dark .gl-gift-card.is-active {
+  background: rgba(62, 143, 255, 0.18);
 }
 .dark .gl-gift-card.is-fan-light {
   border-color: rgba(255, 139, 193, 0.36);
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.14), transparent 24px),
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.16), transparent 26px),
     linear-gradient(145deg, rgba(88, 28, 135, 0.35), rgba(190, 24, 93, 0.22));
 }
 
 @media (max-width: 640px) {
+  .gl-gift-sheet.is-mobile {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: min(72dvh, 620px);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
   .gl-gift-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
   .gl-gift-card {
-    min-height: 112px;
+    min-height: 108px;
     padding: 8px 6px;
-  }
-
-  .gl-gift-card.is-fan-light::after {
-    right: 7px;
-    bottom: 7px;
-    width: 24px;
-    height: 24px;
   }
 }
 
@@ -1413,7 +1620,7 @@ input:focus-visible,
   background: var(--gl-bg-hover);
   color: var(--gl-text);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 750;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1486,7 +1693,7 @@ input:focus-visible,
 }
 .gl-side-heading {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 750;
   padding: 8px 12px 4px;
 }
 .gl-side-item {
@@ -1502,6 +1709,7 @@ input:focus-visible,
   cursor: pointer;
   text-align: left;
   font-size: 14px;
+  font-weight: 700;
   width: 100%;
 }
 .gl-side-item.is-col {
@@ -1517,7 +1725,7 @@ input:focus-visible,
 }
 .gl-side-item.is-active {
   background: var(--gl-bg-hover);
-  font-weight: 500;
+  font-weight: 850;
 }
 .gl-side-label {
   flex: 1;
@@ -1643,7 +1851,7 @@ input:focus-visible,
   background: var(--gl-chip-bg);
   color: var(--gl-text);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 750;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;

@@ -138,8 +138,8 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn('gl-sc-dialog max-w-md', isMobile && 'is-mobile')}>
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogContent showOverlay={false} className={cn('gl-sc-dialog', isMobile && 'is-mobile')}>
         <DialogHeader className="gl-sc-dialog-head">
           <DialogTitle>
             {t('liveRoom.superChatDialog.title', { defaultValue: 'Send SuperChat' })}
@@ -155,16 +155,13 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
           </DialogDescription>
         </DialogHeader>
 
-        <div className="gl-sc-preview rounded-md p-3 text-white" style={{ background: spec.bg }}>
+        <div className="gl-sc-preview text-white" style={{ background: spec.bg }}>
           <div className="flex items-center justify-between">
             <span className="font-semibold">{userDisplayName(user)}</span>
             <span className="font-bold">{amountLabel}</span>
           </div>
           {canText && text.trim() && (
-            <div
-              className="mt-2 rounded-sm p-2 text-sm text-black"
-              style={{ background: spec.soft }}
-            >
+            <div className="gl-sc-preview-message text-black" style={{ background: spec.soft }}>
               {text}
             </div>
           )}
@@ -217,15 +214,12 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             onChange={(e) => setAmount(Number(e.target.value))}
             className="w-full accent-accent"
           />
-          <div className="gl-sc-quick-grid flex flex-wrap gap-1.5">
+          <div className="gl-sc-quick-grid">
             {QUICK_AMOUNTS.map((v) => (
               <button
                 key={v}
                 onClick={() => updateAmount(v)}
-                className={cn(
-                  'gl-sc-quick-btn rounded-full px-2.5 py-1 text-xs',
-                  amount === v ? 'bg-accent text-white' : 'bg-bg-hover text-text-secondary',
-                )}
+                className={cn('gl-sc-quick-btn', amount === v ? 'is-active' : '')}
               >
                 {formatSuperChatAmount(v, locale)}
               </button>
@@ -252,7 +246,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             }
             disabled={!canText}
             rows={3}
-            className="gl-sc-textarea w-full resize-none rounded-md border border-border bg-bg-primary p-2 text-sm outline-none focus:border-accent disabled:opacity-50"
+            className="gl-sc-textarea"
           />
           {canText && (
             <div className="mt-1 text-right text-xs text-text-secondary">
@@ -270,20 +264,14 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
           </div>
         )}
 
-        <div className="gl-sc-actions flex justify-end gap-2">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="gl-sc-cancel rounded-full px-4 py-2 text-sm text-text-secondary hover:bg-bg-hover"
-          >
+        <div className="gl-sc-actions">
+          <button onClick={() => onOpenChange(false)} className="gl-sc-cancel">
             {t('liveRoom.superChatDialog.cancel', { defaultValue: 'Cancel' })}
           </button>
           <button
             disabled={disabled}
             onClick={handleSend}
-            className={cn(
-              'gl-sc-send rounded-full px-5 py-2 text-sm font-semibold text-white transition',
-              disabled ? 'bg-accent/40' : 'bg-accent hover:bg-accent/90',
-            )}
+            className={cn('gl-sc-send', disabled ? 'is-disabled' : 'is-ready')}
           >
             {insufficient
               ? t('liveRoom.superChatDialog.topUp', { defaultValue: 'Top up' })

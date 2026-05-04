@@ -355,10 +355,16 @@ function PinnedSuperChatCard({
         </div>
         <ChevronDown className="gl-sc-pin-chevron" size={18} />
       </div>
-      {expanded && (
-        <div className="gl-sc-pin-body">{m.text || t('liveRoom.chatPanel.noSuperChatMessage')}</div>
-      )}
       <span className="gl-sc-pin-progress" aria-hidden="true" />
+      {expanded && (
+        <div className="gl-sc-pin-body" role="tooltip">
+          <div className="gl-sc-pin-body-head">
+            <strong>{m.user}</strong>
+            <span>{formatYenAmount(m.amount)}</span>
+          </div>
+          <p>{m.text || t('liveRoom.chatPanel.noSuperChatMessage')}</p>
+        </div>
+      )}
     </button>
   );
 }

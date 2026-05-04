@@ -269,8 +269,8 @@ export function useRoomRealtime(
         if (!alreadySeen && danmuOnRef.current) {
           appendBullet(roomId, {
             id: genId('b'),
-            text: `${parsed.user}: ${parsed.text}`,
-            color: parsed.color,
+            text: parsed.text,
+            color: '#ffffff',
             user: parsed.user,
             ts: msg.ts,
           });
@@ -395,10 +395,7 @@ export function useRoomRealtime(
           });
           queryClient.setQueryData<BetRoundView>(betQueryKey(roomId), nextBetView);
           if (parsed.round.roomId && parsed.round.roomId !== roomId) {
-            queryClient.setQueryData<BetRoundView>(
-              betQueryKey(parsed.round.roomId),
-              nextBetView,
-            );
+            queryClient.setQueryData<BetRoundView>(betQueryKey(parsed.round.roomId), nextBetView);
             void queryClient.invalidateQueries({ queryKey: betQueryKey(parsed.round.roomId) });
           }
         }
@@ -441,7 +438,16 @@ export function useRoomRealtime(
         break;
       }
     }
-  }, [lastMessage, roomId, appendMessage, appendBullet, setViewerCount, setViewers, currentUser, queryClient]);
+  }, [
+    lastMessage,
+    roomId,
+    appendMessage,
+    appendBullet,
+    setViewerCount,
+    setViewers,
+    currentUser,
+    queryClient,
+  ]);
 
   // On reconnect (retryCount reset to 0 after open), send resume with lastTs.
   const prevReadyStateRef = useRef<ReadyState>('closed');
@@ -483,8 +489,7 @@ export function useRoomRealtime(
     tier: SuperChatTier;
     text: string;
     userLevel?: number;
-  }) =>
-    sendMessage({ type: 'super_chat', roomId, ...payload, ts: Date.now() });
+  }) => sendMessage({ type: 'super_chat', roomId, ...payload, ts: Date.now() });
 
   const clearBullet = (id: string) => clearBulletFn(roomId, id);
 
