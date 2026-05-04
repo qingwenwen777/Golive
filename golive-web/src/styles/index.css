@@ -7025,6 +7025,11 @@ button.gl-fan-badge-empty {
   font-size: 12px;
   white-space: nowrap;
 }
+.gl-subscription-channel-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 10px 0 6px;
+}
 .gl-yt-you-head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

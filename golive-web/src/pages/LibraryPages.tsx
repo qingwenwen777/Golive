@@ -47,6 +47,7 @@ import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { PostCard } from '@/features/posts/PostCard';
+import { cn } from '@/lib/cn';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import { http } from '@/lib/axios';
 import { levelProgressRatio, normalizeLevelInfo } from '@/lib/userLevel';
@@ -174,7 +175,7 @@ export function SubscriptionsPage() {
           <div className="gl-yt-channel-rail" role="list">
             <button
               type="button"
-              className={`gl-yt-channel-chip gl-yt-channel-all${allSelected ? 'is-active' : ''}`}
+              className={cn('gl-yt-channel-chip gl-yt-channel-all', allSelected && 'is-active')}
               role="listitem"
               aria-pressed={allSelected}
               onClick={() => setSelectedChannelId('all')}
@@ -190,11 +191,10 @@ export function SubscriptionsPage() {
               <button
                 type="button"
                 key={channel.channelId}
-                className={`gl-yt-channel-chip${
-                  !allSelected && selectedChannel?.channelId === channel.channelId
-                    ? 'is-active'
-                    : ''
-                }`}
+                className={cn(
+                  'gl-yt-channel-chip',
+                  !allSelected && selectedChannel?.channelId === channel.channelId && 'is-active',
+                )}
                 role="listitem"
                 aria-pressed={!allSelected && selectedChannel?.channelId === channel.channelId}
                 onClick={() => setSelectedChannelId(channel.channelId)}
@@ -210,6 +210,15 @@ export function SubscriptionsPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {!allSelected && selectedChannelUrl && (
+        <div className="gl-subscription-channel-action-row">
+          <Link className="gl-secondary-btn gl-subscription-channel-action" to={selectedChannelUrl}>
+            {t('library.subscriptions.enterChannel')}
+            <ChevronRight size={14} />
+          </Link>
+        </div>
       )}
 
       <section className="gl-library-section">
@@ -253,15 +262,6 @@ export function SubscriptionsPage() {
                   })}
             </span>
           </div>
-          {!allSelected && selectedChannelUrl && (
-            <Link
-              className="gl-secondary-btn gl-subscription-channel-action"
-              to={selectedChannelUrl}
-            >
-              {t('library.subscriptions.enterChannel')}
-              <ChevronRight size={14} />
-            </Link>
-          )}
         </div>
         {isAuthed && visibleAppointments.isPending ? (
           <div className="gl-grid" aria-busy="true">
