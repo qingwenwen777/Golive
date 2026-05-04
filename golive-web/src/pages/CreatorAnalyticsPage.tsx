@@ -407,7 +407,7 @@ function LiveHistoryStudioRow({
 
 function HistoryCover({ record }: { record: LiveHistoryItem }) {
   return (
-    <div className={`gl-history-cover${record.cover ? 'has-image' : ''}`}>
+    <div className={`gl-history-cover${record.cover ? ' has-image' : ''}`}>
       <div className="gl-history-cover-fallback" aria-hidden>
         {(record.title || 'GL').slice(0, 2).toUpperCase()}
       </div>
