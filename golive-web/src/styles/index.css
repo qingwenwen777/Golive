@@ -2064,10 +2064,9 @@ input:focus-visible,
 .gl-home-rec-card {
   display: flex;
   min-width: 0;
-  min-height: 176px;
+  min-height: 158px;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid var(--gl-border);
   border-radius: 10px;
   background: var(--gl-bg-card);
@@ -2090,12 +2089,55 @@ input:focus-visible,
 .dark .gl-home-rec-card.is-loading::after {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
 }
+.gl-home-rec-top {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
 .gl-home-rec-main {
   display: flex;
   min-width: 0;
+  flex: 1;
   align-items: center;
   gap: 12px;
   color: inherit;
+}
+.gl-home-rec-follow {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gl-text);
+  border-radius: 999px;
+  background: var(--gl-text);
+  color: var(--gl-bg);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.gl-home-rec-follow:hover:not(:disabled) {
+  background: var(--gl-btn-primary-hover);
+  border-color: var(--gl-btn-primary-hover);
+  transform: translateY(-1px);
+}
+.gl-home-rec-follow.is-following {
+  border-color: var(--gl-border);
+  background: var(--gl-bg);
+  color: var(--gl-text);
+}
+.gl-home-rec-follow.is-following:hover:not(:disabled) {
+  border-color: var(--gl-text);
+  background: var(--gl-bg-hover);
+}
+.gl-home-rec-follow:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 .gl-home-rec-copy {
   min-width: 0;
@@ -2148,16 +2190,11 @@ input:focus-visible,
 }
 .gl-home-rec-card p {
   display: -webkit-box;
-  min-height: 34px;
+  min-height: 0;
   margin: 0;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-.gl-home-rec-card .gl-retry-btn,
-.gl-home-rec-card .gl-secondary-btn {
-  width: 100%;
-  margin-top: 0;
 }
 .gl-home-hot-replays {
   display: flex;

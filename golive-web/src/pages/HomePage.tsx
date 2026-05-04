@@ -460,20 +460,40 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
 
   return (
     <article className="gl-home-rec-card">
-      <Link className="gl-home-rec-main" to={channelPath}>
-        <Avatar name={creator.name} src={creator.avatar} size={54} />
-        <div className="gl-home-rec-copy">
-          <h3>
-            <span>{creator.name}</span>
-            {creator.verified && <CheckCircle2 size={15} />}
-          </h3>
-          <span>
-            {t('home.recommendations.followers', {
-              count: creator.subscriberCount,
-            })}
-          </span>
-        </div>
-      </Link>
+      <div className="gl-home-rec-top">
+        <Link className="gl-home-rec-main" to={channelPath}>
+          <Avatar name={creator.name} src={creator.avatar} size={54} />
+          <div className="gl-home-rec-copy">
+            <h3>
+              <span>{creator.name}</span>
+              {creator.verified && <CheckCircle2 size={15} />}
+            </h3>
+            <span>
+              {t('home.recommendations.followers', {
+                count: creator.subscriberCount,
+              })}
+            </span>
+          </div>
+        </Link>
+        <button
+          type="button"
+          className={cn('gl-home-rec-follow', creator.following && 'is-following')}
+          disabled={pending}
+          aria-label={
+            creator.following
+              ? t('home.recommendations.subscribed')
+              : t('home.recommendations.subscribe')
+          }
+          title={
+            creator.following
+              ? t('home.recommendations.subscribed')
+              : t('home.recommendations.subscribe')
+          }
+          onClick={toggleFollow}
+        >
+          {creator.following ? <Bell size={17} /> : <UserPlus size={17} />}
+        </button>
+      </div>
       <div className="gl-home-rec-meta">
         <Radio size={14} />
         <span>
@@ -485,17 +505,6 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
         </span>
       </div>
       {creator.lastTitle && <p>{creator.lastTitle}</p>}
-      <button
-        type="button"
-        className={creator.following ? 'gl-secondary-btn' : 'gl-retry-btn'}
-        disabled={pending}
-        onClick={toggleFollow}
-      >
-        {creator.following ? <Bell size={15} /> : <UserPlus size={15} />}
-        {creator.following
-          ? t('home.recommendations.subscribed')
-          : t('home.recommendations.subscribe')}
-      </button>
     </article>
   );
 }
