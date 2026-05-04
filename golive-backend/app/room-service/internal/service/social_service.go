@@ -116,6 +116,24 @@ type CreatorRecommendationsResp struct {
 	Items []CreatorRecommendation `json:"items"`
 }
 
+type CreatorSearchItem struct {
+	ID              string `json:"id"`
+	ChannelID       string `json:"channelId"`
+	Username        string `json:"username,omitempty"`
+	Name            string `json:"name"`
+	Avatar          string `json:"avatar"`
+	Cover           string `json:"cover,omitempty"`
+	Verified        bool   `json:"verified"`
+	SubscriberCount int64  `json:"subscriberCount"`
+	Live            bool   `json:"live"`
+	LiveRoomID      string `json:"liveRoomId,omitempty"`
+	LastLiveAt      string `json:"lastLiveAt,omitempty"`
+	LastTitle       string `json:"lastTitle,omitempty"`
+	Following       bool   `json:"following"`
+	Self            bool   `json:"self"`
+	Score           int    `json:"-"`
+}
+
 func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*SubscriptionsResp, error) {
 	channelIDs, err := s.social.Following(ctx, uid)
 	if err != nil {
@@ -270,6 +288,93 @@ func (s *SocialService) RecommendedCreators(ctx context.Context, uid string, lim
 		items = items[:limit]
 	}
 	return &CreatorRecommendationsResp{Items: items}, nil
+}
+
+func (s *SocialService) SearchCreators(ctx context.Context, uid, query string, limit int) ([]CreatorSearchItem, error) {
+	limit = normalizeSearchSize(limit, 8, 24)
+	if s.rooms == nil || s.social == nil {
+		return []CreatorSearchItem{}, nil
+	}
+	phrase := repo.NewSearchPhrase(query)
+	if phrase.Empty() {
+		return []CreatorSearchItem{}, nil
+	}
+	rows, err := s.rooms.SearchCreators(ctx, phrase, limit*6)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]CreatorSearchItem, 0, len(rows))
+	for _, row := range rows {
+		channelID := strings.TrimSpace(row.ChannelID)
+		if channelID == "" {
+			channelID = "ch-" + row.ID
+		}
+		name := creatorSearchName(row)
+		if name == "" {
+			name = fallbackChannelName(channelID)
+		}
+		count, err := s.social.FollowerCount(ctx, channelID)
+		if err != nil {
+			return nil, err
+		}
+		self := uid != "" && uid == row.ID
+		following := false
+		if uid != "" && !self {
+			following, err = s.social.IsFollowing(ctx, uid, channelID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		item := CreatorSearchItem{
+			ID:              row.ID,
+			ChannelID:       channelID,
+			Username:        strings.TrimSpace(row.Username),
+			Name:            name,
+			Avatar:          strings.TrimSpace(row.Avatar),
+			Cover:           strings.TrimSpace(row.Cover),
+			Verified:        row.Verified,
+			SubscriberCount: count,
+			Live:            row.LiveRoomID != "",
+			LiveRoomID:      row.LiveRoomID,
+			LastTitle:       strings.TrimSpace(row.LastTitle),
+			Following:       following,
+			Self:            self,
+		}
+		if item.Avatar == "" {
+			item.Avatar = generatedAvatar(name)
+		}
+		if row.LastLiveAt != nil && !row.LastLiveAt.IsZero() {
+			item.LastLiveAt = row.LastLiveAt.UTC().Format(time.RFC3339)
+		}
+		item.Score = searchScore(phrase, item.Name, item.Username, item.ChannelID, item.LastTitle)
+		if item.Live {
+			item.Score += 80
+		}
+		items = append(items, item)
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Score == items[j].Score {
+			if items[i].Live != items[j].Live {
+				return items[i].Live
+			}
+			return items[i].SubscriberCount > items[j].SubscriberCount
+		}
+		return items[i].Score > items[j].Score
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
+func creatorSearchName(row repo.CreatorSearchRow) string {
+	for _, value := range []string{row.Channel, row.DisplayName, row.Username} {
+		name := strings.TrimSpace(value)
+		if name != "" && !repo.IsUUIDLike(name) {
+			return name
+		}
+	}
+	return ""
 }
 
 func recommendedCreatorName(candidate repo.CreatorRecommendationCandidate) string {

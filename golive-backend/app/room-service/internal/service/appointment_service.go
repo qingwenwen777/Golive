@@ -313,6 +313,35 @@ func (s *AppointmentService) ListUpcoming(ctx context.Context, viewerID, rawCate
 	return s.listResp(ctx, items, viewerID, page, size, total)
 }
 
+func (s *AppointmentService) SearchUpcoming(ctx context.Context, viewerID, query string, limit int) ([]AppointmentDTO, error) {
+	limit = normalizeSearchSize(limit, 8, 24)
+	phrase := repo.NewSearchPhrase(query)
+	if phrase.Empty() {
+		return []AppointmentDTO{}, nil
+	}
+	if err := s.cleanupExpired(ctx); err != nil {
+		return nil, err
+	}
+	items, err := s.appointments.SearchPublicUpcoming(ctx, phrase, s.now(), limit*6)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.listResp(ctx, items, viewerID, 1, len(items), int64(len(items)))
+	if err != nil {
+		return nil, err
+	}
+	out := resp.Items
+	sortBySearchScore(out, func(item AppointmentDTO) int {
+		return searchScore(phrase, item.Title, item.Description, item.Channel, item.ChannelID, item.Category, item.CategoryJa)
+	}, func(a, b AppointmentDTO) bool {
+		return a.ScheduledAt < b.ScheduledAt
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (s *AppointmentService) ListReserved(ctx context.Context, viewerID string, page, size int) (*AppointmentListResp, error) {
 	if err := s.cleanupExpired(ctx); err != nil {
 		return nil, err

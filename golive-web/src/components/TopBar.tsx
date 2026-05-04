@@ -1,9 +1,15 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Coins, Plus, User as UserIcon } from 'lucide-react';
+import { Bell, CheckCircle2, Coins, Plus, User as UserIcon, X } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
-import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, type NotificationItem } from '@/api/room';
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+  type NotificationItem,
+} from '@/api/room';
+import { useSearchSuggestions } from '@/api/search';
 import { Avatar } from '@/components/Avatar';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
@@ -41,18 +47,70 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const me = useMe();
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('q') ?? '');
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const searchRef = useRef<HTMLFormElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const currentUser = me.data ?? user;
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
   const activeLiveId = useActiveCreatorLiveId(currentUser?.id);
+  const trimmedSearch = search.trim();
+  const suggestions = useSearchSuggestions(trimmedSearch, suggestionsOpen);
+  const suggestionItems = suggestions.data?.items ?? [];
 
   useEffect(() => {
     setSearch(new URLSearchParams(location.search).get('q') ?? '');
   }, [location.search]);
 
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Node && searchRef.current?.contains(target)) return;
+      setSuggestionsOpen(false);
+      setActiveSuggestion(-1);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    setActiveSuggestion(-1);
+  }, [trimmedSearch]);
+
+  const commitSearch = (value = search) => {
+    const q = value.trim();
+    setSuggestionsOpen(false);
+    setActiveSuggestion(-1);
+    navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/');
+  };
+
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const q = search.trim();
-    navigate(q ? `/?q=${encodeURIComponent(q)}` : '/');
+    commitSearch();
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown' && suggestionItems.length > 0) {
+      event.preventDefault();
+      setSuggestionsOpen(true);
+      setActiveSuggestion((current) => (current + 1) % suggestionItems.length);
+      return;
+    }
+    if (event.key === 'ArrowUp' && suggestionItems.length > 0) {
+      event.preventDefault();
+      setSuggestionsOpen(true);
+      setActiveSuggestion((current) => (current <= 0 ? suggestionItems.length - 1 : current - 1));
+      return;
+    }
+    if (event.key === 'Enter' && activeSuggestion >= 0 && suggestionItems[activeSuggestion]) {
+      event.preventDefault();
+      commitSearch(suggestionItems[activeSuggestion].value);
+      return;
+    }
+    if (event.key === 'Escape') {
+      setSuggestionsOpen(false);
+      setActiveSuggestion(-1);
+    }
   };
 
   return (
@@ -73,19 +131,93 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           </button>
         </div>
 
-        <form className="gl-topbar-search" onSubmit={handleSearchSubmit} role="search">
+        <form
+          ref={searchRef}
+          className="gl-topbar-search"
+          onSubmit={handleSearchSubmit}
+          role="search"
+        >
           <div className="gl-search-pill">
             <input
+              ref={inputRef}
               className="gl-search-input"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setSuggestionsOpen(true);
+              }}
+              onFocus={() => setSuggestionsOpen(true)}
+              onKeyDown={handleSearchKeyDown}
               placeholder={t('searchPlaceholder')}
               aria-label={t('search')}
+              aria-autocomplete="list"
+              aria-expanded={suggestionsOpen && trimmedSearch.length > 0}
+              aria-controls="gl-search-suggestions"
             />
+            {search && (
+              <button
+                type="button"
+                className="gl-search-clear"
+                aria-label={t('clear', { defaultValue: 'Clear' })}
+                onClick={() => {
+                  setSearch('');
+                  setSuggestionsOpen(false);
+                  setActiveSuggestion(-1);
+                  inputRef.current?.focus();
+                }}
+              >
+                <X size={22} />
+              </button>
+            )}
             <button type="submit" className="gl-search-btn" aria-label={t('search')}>
               <Icons.Search size={22} />
             </button>
           </div>
+          {suggestionsOpen && trimmedSearch && (
+            <div id="gl-search-suggestions" className="gl-search-suggest-popover" role="listbox">
+              {suggestions.isPending && suggestionItems.length === 0 ? (
+                <div className="gl-search-suggest-state">
+                  {t('loading', { defaultValue: 'Loading...' })}
+                </div>
+              ) : suggestionItems.length > 0 ? (
+                suggestionItems.map((item, index) => (
+                  <button
+                    key={`${item.type}:${item.value}:${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={activeSuggestion === index}
+                    className={activeSuggestion === index ? 'is-active' : undefined}
+                    onMouseEnter={() => setActiveSuggestion(index)}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      commitSearch(item.value);
+                    }}
+                  >
+                    <Icons.Search size={22} />
+                    <span>
+                      <strong>{item.value}</strong>
+                      {item.label && <small>{item.label}</small>}
+                    </span>
+                    <em>{suggestionTypeLabel(item.type)}</em>
+                  </button>
+                ))
+              ) : (
+                <button
+                  type="button"
+                  role="option"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    commitSearch(trimmedSearch);
+                  }}
+                >
+                  <Icons.Search size={22} />
+                  <span>
+                    <strong>{trimmedSearch}</strong>
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
         </form>
 
         <div className="gl-topbar-right">
@@ -122,7 +254,9 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
               <button
                 type="button"
                 className="gl-create-btn"
-                onClick={() => navigate(activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/prepare')}
+                onClick={() =>
+                  navigate(activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/prepare')
+                }
               >
                 {activeLiveId ? <Icons.Live size={22} /> : <Icons.Plus size={22} />}
                 <span className="gl-create-label">
@@ -219,6 +353,23 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 
 const LANG_OPTIONS: AppLang[] = ['zh', 'ja', 'en'];
 
+function suggestionTypeLabel(type: string): string {
+  switch (type) {
+    case 'creator':
+      return '主播';
+    case 'live':
+      return '直播';
+    case 'replay':
+      return '回放';
+    case 'appointment':
+      return '预告';
+    case 'post':
+      return '帖子';
+    default:
+      return '';
+  }
+}
+
 function NotificationBell() {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
@@ -236,7 +387,11 @@ function NotificationBell() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="gl-icon-btn gl-notification-btn" aria-label={t('notifications')}>
+        <button
+          type="button"
+          className="gl-icon-btn gl-notification-btn"
+          aria-label={t('notifications')}
+        >
           <Bell size={22} />
           {unread > 0 && <span className="gl-bell-dot" />}
         </button>
@@ -260,15 +415,19 @@ function NotificationBell() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {notifications.isPending ? (
-          <div className="gl-notification-state">{t('loading', { defaultValue: 'Loading...' })}</div>
+          <div className="gl-notification-state">
+            {t('loading', { defaultValue: 'Loading...' })}
+          </div>
         ) : items.length === 0 ? (
-          <div className="gl-notification-state">{t('notificationsEmpty', { defaultValue: 'No notifications yet' })}</div>
+          <div className="gl-notification-state">
+            {t('notificationsEmpty', { defaultValue: 'No notifications yet' })}
+          </div>
         ) : (
           <div className="gl-notification-list">
             {items.map((item) => (
               <DropdownMenuItem
                 key={item.id}
-                className={`gl-notification-item${item.readAt ? '' : ' is-unread'}`}
+                className={`gl-notification-item${item.readAt ? '' : 'is-unread'}`}
                 onClick={() => openNotification(item)}
               >
                 <span className="gl-notification-dot" aria-hidden="true" />
@@ -298,7 +457,10 @@ function NotificationBell() {
   );
 }
 
-function notificationTitle(item: NotificationItem, t: ReturnType<typeof useTranslation>['t']): string {
+function notificationTitle(
+  item: NotificationItem,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
   return t(`notificationTypes.${item.type}.title`, { defaultValue: item.title });
 }
 

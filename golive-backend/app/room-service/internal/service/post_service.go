@@ -261,6 +261,45 @@ func (s *PostService) ListSubscriptionLatest(ctx context.Context, viewerID strin
 	return &PostListResp{Items: items, Total: total, Page: 1, Size: size}, nil
 }
 
+func (s *PostService) Search(ctx context.Context, viewerID, query string, limit int) ([]ChannelPostDTO, error) {
+	limit = normalizeSearchSize(limit, 8, 24)
+	if s.posts == nil {
+		return []ChannelPostDTO{}, nil
+	}
+	phrase := repo.NewSearchPhrase(query)
+	if phrase.Empty() {
+		return []ChannelPostDTO{}, nil
+	}
+	candidates, err := s.posts.SearchVisible(ctx, phrase, limit*8)
+	if err != nil {
+		return nil, err
+	}
+	visible := make([]model.ChannelPost, 0, minInt(limit*2, len(candidates)))
+	for _, post := range candidates {
+		ok, err := s.canViewPost(ctx, viewerID, post)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		visible = append(visible, post)
+	}
+	items, err := s.postsToDTO(ctx, visible, viewerID)
+	if err != nil {
+		return nil, err
+	}
+	sortBySearchScore(items, func(item ChannelPostDTO) int {
+		return searchScore(phrase, item.Content, item.Author.Name, item.Author.Username, item.Author.DisplayName, item.ChannelID)
+	}, func(a, b ChannelPostDTO) bool {
+		return a.CreatedAt > b.CreatedAt
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
+}
+
 func (s *PostService) UpdatePostVisibility(ctx context.Context, ownerID, postID string, req UpdatePostVisibilityReq) (*ChannelPostDTO, error) {
 	if ownerID == "" {
 		return nil, errcode.ErrUnauthorized

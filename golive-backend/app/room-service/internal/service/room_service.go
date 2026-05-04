@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -88,6 +89,67 @@ func (s *RoomService) List(ctx context.Context, rawCategory string, page, size i
 	return &ListResp{Items: items, Total: total, Page: page, Size: size}, nil
 }
 
+func (s *RoomService) SearchLive(ctx context.Context, query string, limit int) ([]model.Stream, error) {
+	limit = normalizeSearchSize(limit, 8, 24)
+	phrase := repo.NewSearchPhrase(query)
+	if phrase.Empty() {
+		return []model.Stream{}, nil
+	}
+	rooms, err := s.rooms.SearchLiveRooms(ctx, phrase, limit*6)
+	if err != nil {
+		return nil, err
+	}
+	sortRoomsBySearch(rooms, phrase)
+	if len(rooms) > limit {
+		rooms = rooms[:limit]
+	}
+	now := s.now()
+	items := make([]model.Stream, 0, len(rooms))
+	for i := range rooms {
+		st := rooms[i].ToStream(now)
+		st.PlaybackURL = s.playbackURL(&rooms[i])
+		if err := s.addSubscriberCount(ctx, &st); err != nil {
+			return nil, err
+		}
+		items = append(items, st)
+	}
+	return items, nil
+}
+
+func (s *RoomService) SearchReplays(ctx context.Context, viewerID, query string, limit int) ([]model.Stream, error) {
+	limit = normalizeSearchSize(limit, 8, 24)
+	phrase := repo.NewSearchPhrase(query)
+	if phrase.Empty() || s.replay == nil {
+		return []model.Stream{}, nil
+	}
+	rooms, err := s.rooms.SearchReplayRooms(ctx, phrase, limit*8)
+	if err != nil {
+		return nil, err
+	}
+	sortRoomsBySearch(rooms, phrase)
+	now := s.now()
+	items := make([]model.Stream, 0, minInt(limit, len(rooms)))
+	for i := range rooms {
+		replay, err := s.replay.ReplayDTO(ctx, rooms[i], viewerID)
+		if err != nil {
+			return nil, err
+		}
+		if replay == nil || !replay.CanWatch {
+			continue
+		}
+		st := rooms[i].ToStream(now)
+		st.Replay = replay
+		if err := s.addSubscriberCount(ctx, &st); err != nil {
+			return nil, err
+		}
+		items = append(items, st)
+		if len(items) >= limit {
+			break
+		}
+	}
+	return items, nil
+}
+
 func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stream, error) {
 	r, err := s.rooms.GetByID(ctx, id)
 	if err != nil {
@@ -124,6 +186,24 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 		st.StreamKey = r.StreamKey
 	}
 	return &st, nil
+}
+
+func sortRoomsBySearch(rooms []model.Room, phrase repo.SearchPhrase) {
+	sort.SliceStable(rooms, func(i, j int) bool {
+		left := searchScore(phrase, rooms[i].Title, rooms[i].TitleJa, rooms[i].Description, rooms[i].Channel, rooms[i].ChannelID, rooms[i].Category, rooms[i].CategoryJa)
+		right := searchScore(phrase, rooms[j].Title, rooms[j].TitleJa, rooms[j].Description, rooms[j].Channel, rooms[j].ChannelID, rooms[j].Category, rooms[j].CategoryJa)
+		if left == right {
+			return rooms[i].StartedAt.After(rooms[j].StartedAt)
+		}
+		return left > right
+	})
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (s *RoomService) addSubscriberCount(ctx context.Context, st *model.Stream) error {

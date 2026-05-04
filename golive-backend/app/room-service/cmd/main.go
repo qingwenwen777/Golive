@@ -99,6 +99,7 @@ func main() {
 	}
 	defer permission.Close()
 	postSvc := service.NewPostService(postRepo, roomRepo, socialRepo, permission)
+	searchSvc := service.NewSearchService(roomSvc, socialSvc, postSvc, appointmentSvc)
 	if activeRooms, err := roomRepo.ActiveRooms(context.Background()); err != nil {
 		log.Warn("load active rooms for moderation cache", zap.Error(err))
 	} else if err := moderationRepo.SyncActiveRooms(context.Background(), activeRooms); err != nil {
@@ -120,6 +121,7 @@ func main() {
 		Posts:          postSvc,
 		Live:           liveSvc,
 		Replay:         replaySvc,
+		Search:         searchSvc,
 		Appointments:   appointmentSvc,
 		Moderation:     moderationSvc,
 		Permission:     permission,

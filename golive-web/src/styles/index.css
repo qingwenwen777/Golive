@@ -1096,6 +1096,7 @@ input:focus-visible,
   box-shadow: none;
 }
 .gl-topbar-search {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1585,6 +1586,20 @@ input:focus-visible,
   font-size: 16px;
   outline: none;
 }
+.gl-search-clear {
+  display: inline-flex;
+  width: 42px;
+  height: 100%;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--gl-text);
+}
+.gl-search-clear:hover {
+  background: color-mix(in srgb, var(--gl-bg-hover) 72%, transparent);
+}
 .gl-search-btn {
   width: 64px;
   height: 100%;
@@ -1608,6 +1623,80 @@ input:focus-visible,
 }
 .dark .gl-search-btn:hover {
   background: #303030;
+}
+.gl-search-suggest-popover {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  z-index: 70;
+  width: min(640px, calc(100vw - 24px));
+  max-height: min(72vh, 620px);
+  overflow-y: auto;
+  border: 1px solid var(--gl-border);
+  border-radius: 0 0 12px 12px;
+  background: var(--gl-bg);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  padding: 8px 0;
+}
+.dark .gl-search-suggest-popover {
+  background: #212121;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.46);
+}
+.gl-search-suggest-popover button,
+.gl-search-suggest-state {
+  display: grid;
+  width: 100%;
+  min-height: 46px;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--gl-text);
+  padding: 0 18px;
+  text-align: left;
+}
+.gl-search-suggest-popover button:hover,
+.gl-search-suggest-popover button.is-active {
+  background: var(--gl-bg-hover);
+}
+.gl-search-suggest-popover svg {
+  color: var(--gl-text);
+}
+.gl-search-suggest-popover span {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.gl-search-suggest-popover strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-search-suggest-popover small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-search-suggest-popover em {
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+.gl-search-suggest-state {
+  display: flex;
+  color: var(--gl-text-2);
+  font-weight: 700;
 }
 .gl-create-btn {
   display: inline-flex;
@@ -2057,6 +2146,19 @@ input:focus-visible,
   }
   .gl-home-level-gift-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gl-search-result-row {
+    grid-template-columns: minmax(190px, 300px) minmax(0, 1fr);
+  }
+  .gl-search-result-row.is-creator {
+    grid-template-columns: 132px minmax(0, 1fr);
+  }
+  .gl-search-result-row.is-creator .gl-search-follow-btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .gl-search-result-row.is-post {
+    grid-template-columns: 52px minmax(0, 1fr) 132px;
   }
 }
 
@@ -2569,6 +2671,307 @@ input:focus-visible,
   margin-top: 2px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.gl-search-page {
+  padding-top: 12px;
+}
+.gl-search-filterbar {
+  position: sticky;
+  top: 56px;
+  z-index: 8;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  background: var(--gl-bg);
+  padding: 4px 0 14px;
+  scrollbar-width: none;
+}
+.gl-search-filterbar::-webkit-scrollbar {
+  display: none;
+}
+.gl-search-filterbar button {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--gl-chip-bg);
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 14px;
+}
+.gl-search-filterbar button.is-active {
+  background: var(--gl-chip-bg-active);
+  color: var(--gl-chip-text-active);
+}
+.gl-search-filterbar span {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.78;
+}
+.gl-search-results {
+  width: min(1180px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.16s ease;
+}
+.gl-search-section {
+  border-bottom: 1px solid var(--gl-border);
+  padding: 4px 0 14px;
+}
+.gl-search-section:last-child {
+  border-bottom: 0;
+}
+.gl-search-section h2 {
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1.25;
+  margin: 4px 0 8px;
+}
+.gl-search-result-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 12px 0;
+}
+.gl-search-result-row.is-creator {
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 154px;
+}
+.gl-search-result-row.is-post {
+  grid-template-columns: 56px minmax(0, 1fr) 180px;
+}
+.gl-search-thumb {
+  position: relative;
+  display: grid;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  text-decoration: none;
+}
+.gl-search-thumb .gl-loadable-img,
+.gl-search-post-image .gl-loadable-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gl-search-thumb > span:first-child {
+  font-size: 34px;
+  font-weight: 850;
+}
+.gl-search-thumb-badge,
+.gl-search-duration {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.74);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 6px;
+}
+.gl-search-thumb-badge {
+  top: 8px;
+  left: 8px;
+}
+.gl-search-thumb-badge.is-live {
+  min-height: 0;
+  background: transparent;
+  padding: 0;
+}
+.gl-search-thumb-badge.is-appointment {
+  background: #1f6feb;
+}
+.gl-search-duration {
+  right: 8px;
+  bottom: 8px;
+}
+.gl-search-result-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gl-search-title {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--gl-text);
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.3;
+  text-decoration: none;
+}
+.gl-search-title:hover {
+  color: var(--gl-text);
+}
+.gl-search-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.gl-search-meta span {
+  min-width: 0;
+}
+.gl-search-meta .is-live-dot {
+  color: var(--gl-red);
+  font-weight: 850;
+}
+.gl-search-channel-line {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+.gl-search-channel-line span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-search-channel-line svg {
+  flex: 0 0 auto;
+}
+.gl-search-result-main p,
+.gl-search-post-content {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+  text-decoration: none;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.gl-search-creator-link {
+  display: inline-flex;
+  width: 124px;
+  height: 124px;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  color: inherit;
+  text-decoration: none;
+}
+.gl-search-follow-btn {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+.gl-search-follow-btn.is-following,
+.gl-search-follow-btn:disabled {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-search-post-author {
+  width: 44px;
+  height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+.gl-search-channel-line.is-post-author {
+  color: var(--gl-text);
+  font-weight: 800;
+}
+.gl-search-channel-line.is-post-author small {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.gl-search-post-actions {
+  display: flex;
+  gap: 16px;
+  color: var(--gl-text-2);
+  font-size: 13px;
+}
+.gl-search-post-actions span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gl-search-post-image {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+}
+.gl-search-soft-empty {
+  color: var(--gl-text-2);
+  padding: 20px 0;
+}
+.gl-search-empty {
+  min-height: 340px;
+}
+.gl-search-result-row.is-loading {
+  grid-template-columns: minmax(220px, 360px) minmax(0, 1fr);
+}
+.gl-search-result-row.is-loading > span {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+}
+.gl-search-result-row.is-loading > div {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+.gl-search-result-row.is-loading i {
+  display: block;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--gl-bg-hover);
+}
+.gl-search-result-row.is-loading i:nth-child(1) {
+  width: min(560px, 90%);
+}
+.gl-search-result-row.is-loading i:nth-child(2) {
+  width: min(360px, 70%);
+}
+.gl-search-result-row.is-loading i:nth-child(3) {
+  width: min(460px, 82%);
 }
 .gl-home-level-gifts {
   display: flex;
@@ -7353,6 +7756,41 @@ button.gl-fan-badge-empty {
   }
   .gl-page {
     padding: 12px 12px 40px;
+  }
+  .gl-search-filterbar {
+    top: 56px;
+    padding-bottom: 10px;
+  }
+  .gl-search-result-row,
+  .gl-search-result-row.is-creator,
+  .gl-search-result-row.is-post,
+  .gl-search-result-row.is-loading {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .gl-search-result-row.is-creator {
+    align-items: start;
+  }
+  .gl-search-result-row.is-creator .gl-search-follow-btn {
+    grid-column: auto;
+  }
+  .gl-search-creator-link {
+    width: 96px;
+    height: 96px;
+    justify-self: start;
+  }
+  .gl-search-result-row.is-creator .gl-avatar {
+    width: 96px !important;
+    height: 96px !important;
+  }
+  .gl-search-title {
+    font-size: 17px;
+  }
+  .gl-search-post-author {
+    display: none;
+  }
+  .gl-search-post-image {
+    width: min(220px, 60vw);
   }
   .gl-grid {
     grid-template-columns: 1fr;

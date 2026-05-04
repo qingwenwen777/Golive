@@ -19,6 +19,7 @@ type Deps struct {
 	Posts          *service.PostService
 	Live           *service.LiveService
 	Replay         *service.ReplayService
+	Search         *service.SearchService
 	Appointments   *service.AppointmentService
 	Moderation     *service.ModerationService
 	Permission     service.LivePermissionChecker
@@ -41,6 +42,7 @@ func NewRouter(d Deps) *gin.Engine {
 	postH := handler.NewPostHandler(d.Posts, d.Permission, d.PostImageDir, d.PostPublicURL)
 	liveH := handler.NewLiveHandler(d.Live, d.Permission)
 	replayH := handler.NewReplayHandler(d.Replay)
+	searchH := handler.NewSearchHandler(d.Search)
 	appointmentH := handler.NewAppointmentHandler(d.Appointments)
 	moderationH := handler.NewModerationHandler(d.Moderation)
 	srsH := handler.NewSRSHandler(d.Live)
@@ -67,6 +69,10 @@ func NewRouter(d Deps) *gin.Engine {
 	{
 		rooms.GET("", roomH.List)
 		rooms.GET("/recommended", optionalAuth, roomH.Recommended)
+		if d.Search != nil {
+			rooms.GET("/search", optionalAuth, searchH.Search)
+			rooms.GET("/search/suggestions", optionalAuth, searchH.Suggest)
+		}
 		rooms.GET("/appointments", auth, appointmentH.ListOwner)
 		rooms.POST("/appointments", auth, appointmentH.Create)
 		rooms.PATCH("/appointments/:id", auth, appointmentH.Update)

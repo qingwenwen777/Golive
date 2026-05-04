@@ -4,6 +4,7 @@ import App from '@/App';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 const HomePage = lazy(() => import('@/pages/HomePage'));
+const SearchPage = lazy(() => import('@/pages/SearchPage'));
 const LiveRoomPage = lazy(() => import('@/pages/LiveRoomPage'));
 const ChannelPage = lazy(() => import('@/pages/ChannelPage'));
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
     children: [
       { index: true, element: <HomePage /> },
+      { path: 'search', element: <SearchPage /> },
       { path: 'live-now', element: <Navigate to="/" replace /> },
       { path: 'live/:id', element: <LiveRoomPage /> },
       { path: 'channel/:name', element: <ChannelPage /> },
