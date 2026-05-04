@@ -32,6 +32,11 @@
       "viewAll": "查看全部",
       "empty": "还没有预约。"
     },
+    "upcoming": {
+      "title": "即将到来的直播",
+      "subtitle": "显示所有主播未来三天内的直播预约。",
+      "empty": "未来三天暂无预约直播。"
+    },
     "levelGifts": {
       "title": "等级礼物展示",
       "subtitle": "累计充值提升等级，解锁更有身份感的直播礼物。",
@@ -348,16 +353,34 @@
     },
     "subscriptions": {
       "title": "订阅",
+      "all": "全部",
       "signInTitle": "登录后查看订阅",
       "signInSub": "关注创作者后，他们的直播间会出现在这里。",
       "emptyAuthed": "还没有订阅创作者",
       "emptyGuest": "暂无可显示的订阅",
       "emptySub": "去直播目录逛逛，并在播放器页面关注喜欢的直播间。",
+      "enterChannel": "进入频道",
+      "latest": {
+        "channelTitle": "最新",
+        "channelSubtitle": "{{name}} 的直播状态和最近内容。"
+      },
       "appointments": {
         "title": "订阅主播的直播预约",
         "subtitle": "浏览你关注的主播即将开始的直播。",
+        "channelTitle": "直播预约",
+        "channelSubtitle": "{{name}} 即将开始的直播会显示在这里。",
         "empty": "你订阅的主播暂无直播预约。",
+        "channelEmpty": "这个主播暂无直播预约。",
         "signIn": "登录后查看直播预约。"
+      },
+      "posts": {
+        "title": "订阅主播的最新动态",
+        "channelTitle": "最新动态",
+        "subtitle": "每位已订阅主播最近发布的一条动态会显示在这里。",
+        "channelSubtitle": "查看 {{name}} 最近发布的动态。",
+        "empty": "你订阅的主播暂时还没有发布动态。",
+        "channelEmpty": "这个主播暂时还没有发布动态。",
+        "signIn": "登录后查看订阅主播的动态。"
       }
     },
     "you": {

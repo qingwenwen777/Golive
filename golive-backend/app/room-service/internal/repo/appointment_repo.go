@@ -160,6 +160,19 @@ func (r *AppointmentRepo) ListPublicByOwners(ctx context.Context, ownerIDs []str
 	return items, total, err
 }
 
+func (r *AppointmentRepo) ListPublicUpcoming(ctx context.Context, now, until time.Time, page, size int) ([]model.LiveAppointment, int64, error) {
+	page, size = normalizePageSize(page, size)
+	tx := publicAppointmentQuery(r.db.WithContext(ctx), now).Where("scheduled_at < ?", until)
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var items []model.LiveAppointment
+	err := tx.Order("scheduled_at ASC, created_at ASC").
+		Offset((page - 1) * size).Limit(size).Find(&items).Error
+	return items, total, err
+}
+
 func (r *AppointmentRepo) ListReservedByUser(ctx context.Context, userID string, now time.Time, page, size int) ([]model.LiveAppointment, int64, error) {
 	page, size = normalizePageSize(page, size)
 	tx := r.db.WithContext(ctx).Model(&model.LiveAppointment{}).

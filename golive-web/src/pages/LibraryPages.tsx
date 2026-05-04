@@ -35,6 +35,7 @@ import { useFanBadges } from '@/api/gift';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
 import {
   useChannelAppointments,
+  useReservedAppointments,
   useRooms,
   useSubscriptions,
   useSubscriptionAppointments,
@@ -173,7 +174,7 @@ export function SubscriptionsPage() {
           <div className="gl-yt-channel-rail" role="list">
             <button
               type="button"
-              className={`gl-yt-channel-chip gl-yt-channel-all${allSelected ? ' is-active' : ''}`}
+              className={`gl-yt-channel-chip gl-yt-channel-all${allSelected ? 'is-active' : ''}`}
               role="listitem"
               aria-pressed={allSelected}
               onClick={() => setSelectedChannelId('all')}
@@ -182,7 +183,7 @@ export function SubscriptionsPage() {
                 <UsersRound size={28} />
               </div>
               <div className="gl-yt-channel-name" title={t('library.subscriptions.all')}>
-                <span>{t('library.subscriptions.all', { defaultValue: '全部' })}</span>
+                <span>{t('library.subscriptions.all')}</span>
               </div>
             </button>
             {channels.map((channel) => (
@@ -190,7 +191,9 @@ export function SubscriptionsPage() {
                 type="button"
                 key={channel.channelId}
                 className={`gl-yt-channel-chip${
-                  !allSelected && selectedChannel?.channelId === channel.channelId ? ' is-active' : ''
+                  !allSelected && selectedChannel?.channelId === channel.channelId
+                    ? 'is-active'
+                    : ''
                 }`}
                 role="listitem"
                 aria-pressed={!allSelected && selectedChannel?.channelId === channel.channelId}
@@ -213,28 +216,49 @@ export function SubscriptionsPage() {
         <div className="gl-section-title-row">
           <div>
             <h2>
+              {allSelected ? t('library.latest') : t('library.subscriptions.latest.channelTitle')}
+            </h2>
+            {!allSelected && (
+              <span>
+                {t('library.subscriptions.latest.channelSubtitle', { name: selectedChannelName })}
+              </span>
+            )}
+          </div>
+        </div>
+        <StreamGrid
+          isPending={isAuthed && subscriptions.isPending}
+          streams={visibleStreams}
+          emptyTitle={
+            isAuthed
+              ? t('library.subscriptions.emptyAuthed')
+              : t('library.subscriptions.emptyGuest')
+          }
+          emptySub={t('library.subscriptions.emptySub')}
+        />
+      </section>
+
+      <section className="gl-library-section">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>
               {allSelected
-                ? t('library.subscriptions.appointments.title', {
-                    defaultValue: '订阅主播的直播预约',
-                  })
-                : t('library.subscriptions.appointments.channelTitle', {
-                    defaultValue: '直播预约',
-                  })}
+                ? t('library.subscriptions.appointments.title')
+                : t('library.subscriptions.appointments.channelTitle')}
             </h2>
             <span>
               {allSelected
-                ? t('library.subscriptions.appointments.subtitle', {
-                    defaultValue: '浏览你关注的主播即将开始的直播。',
-                  })
+                ? t('library.subscriptions.appointments.subtitle')
                 : t('library.subscriptions.appointments.channelSubtitle', {
                     name: selectedChannelName,
-                    defaultValue: '{{name}} 即将开始的直播会显示在这里。',
                   })}
             </span>
           </div>
           {!allSelected && selectedChannelUrl && (
-            <Link className="gl-secondary-btn gl-subscription-channel-action" to={selectedChannelUrl}>
-              {t('library.subscriptions.enterChannel', { defaultValue: '进入频道' })}
+            <Link
+              className="gl-secondary-btn gl-subscription-channel-action"
+              to={selectedChannelUrl}
+            >
+              {t('library.subscriptions.enterChannel')}
               <ChevronRight size={14} />
             </Link>
           )}
@@ -270,15 +294,9 @@ export function SubscriptionsPage() {
           <div className="gl-creator-empty-soft">
             {isAuthed
               ? allSelected
-                ? t('library.subscriptions.appointments.empty', {
-                    defaultValue: '你订阅的主播暂无直播预约。',
-                  })
-                : t('library.subscriptions.appointments.channelEmpty', {
-                    defaultValue: '这个主播暂无直播预约。',
-                  })
-              : t('library.subscriptions.appointments.signIn', {
-                  defaultValue: '登录后查看直播预约。',
-                })}
+                ? t('library.subscriptions.appointments.empty')
+                : t('library.subscriptions.appointments.channelEmpty')
+              : t('library.subscriptions.appointments.signIn')}
           </div>
         )}
       </section>
@@ -288,17 +306,14 @@ export function SubscriptionsPage() {
           <div>
             <h2>
               {allSelected
-                ? t('library.subscriptions.posts.title', { defaultValue: '订阅主播的最新动态' })
-                : t('library.subscriptions.posts.channelTitle', { defaultValue: '最新动态' })}
+                ? t('library.subscriptions.posts.title')
+                : t('library.subscriptions.posts.channelTitle')}
             </h2>
             <span>
               {allSelected
-                ? t('library.subscriptions.posts.subtitle', {
-                    defaultValue: '每位已订阅主播最近发布的一条动态会显示在这里。',
-                  })
+                ? t('library.subscriptions.posts.subtitle')
                 : t('library.subscriptions.posts.channelSubtitle', {
                     name: selectedChannelName,
-                    defaultValue: '查看 {{name}} 最近发布的动态。',
                   })}
             </span>
           </div>
@@ -320,47 +335,11 @@ export function SubscriptionsPage() {
           <div className="gl-creator-empty-soft">
             {isAuthed
               ? allSelected
-                ? t('library.subscriptions.posts.empty', {
-                    defaultValue: '你订阅的主播暂时还没有发布动态。',
-                  })
-                : t('library.subscriptions.posts.channelEmpty', {
-                    defaultValue: '这个主播暂时还没有发布动态。',
-                  })
-              : t('library.subscriptions.posts.signIn', {
-                  defaultValue: '登录后查看订阅主播的动态。',
-                })}
+                ? t('library.subscriptions.posts.empty')
+                : t('library.subscriptions.posts.channelEmpty')
+              : t('library.subscriptions.posts.signIn')}
           </div>
         )}
-      </section>
-
-      <section className="gl-library-section">
-        <div className="gl-section-title-row">
-          <div>
-            <h2>
-              {allSelected
-                ? t('library.latest')
-                : t('library.subscriptions.latest.channelTitle', { defaultValue: '最新' })}
-            </h2>
-            {!allSelected && (
-              <span>
-                {t('library.subscriptions.latest.channelSubtitle', {
-                  name: selectedChannelName,
-                  defaultValue: '{{name}} 的直播状态和最近内容。',
-                })}
-              </span>
-            )}
-          </div>
-        </div>
-        <StreamGrid
-          isPending={isAuthed && subscriptions.isPending}
-          streams={visibleStreams}
-          emptyTitle={
-            isAuthed
-              ? t('library.subscriptions.emptyAuthed')
-              : t('library.subscriptions.emptyGuest')
-          }
-          emptySub={t('library.subscriptions.emptySub')}
-        />
       </section>
     </div>
   );
@@ -450,13 +429,15 @@ export function YouPage() {
               <span className="gl-yt-coin-chip-add">{t('library.you.recharge')}</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
-              <Bookmark size={14} /> {t('library.you.watchLaterCount', { count: hydratedSaved.length })}
+              <Bookmark size={14} />{' '}
+              {t('library.you.watchLaterCount', { count: hydratedSaved.length })}
             </Link>
             <Link className="gl-yt-chip" to="/liked">
               <Heart size={14} /> {t('library.you.likedCount', { count: hydratedLiked.length })}
             </Link>
             <Link className="gl-yt-chip" to="/history">
-              <History size={14} /> {t('library.you.historyCount', { count: hydratedHistory.length })}
+              <History size={14} />{' '}
+              {t('library.you.historyCount', { count: hydratedHistory.length })}
             </Link>
             <Link className="gl-yt-chip" to="/settings">
               <Settings size={14} /> {t('library.you.settings')}
@@ -524,12 +505,17 @@ export function YouPage() {
         />
       </Shelf>
 
+      <MyAppointmentsShelf />
+
       <Shelf
         title={t('library.you.history')}
         actionLabel={t('library.you.viewAll')}
         actionTo="/history"
       >
-        <HorizontalShelf items={hydratedHistory.slice(0, 8)} emptyText={t('library.you.noHistory')} />
+        <HorizontalShelf
+          items={hydratedHistory.slice(0, 8)}
+          emptyText={t('library.you.noHistory')}
+        />
       </Shelf>
 
       <Shelf
@@ -537,7 +523,10 @@ export function YouPage() {
         actionLabel={t('library.you.seeAll')}
         actionTo="/watch-later"
       >
-        <HorizontalShelf items={hydratedSaved.slice(0, 8)} emptyText={t('library.you.noWatchLater')} />
+        <HorizontalShelf
+          items={hydratedSaved.slice(0, 8)}
+          emptyText={t('library.you.noWatchLater')}
+        />
       </Shelf>
 
       <Shelf
@@ -634,6 +623,49 @@ function FanBadgeShelf({
         </div>
       ))}
     </div>
+  );
+}
+
+function MyAppointmentsShelf() {
+  const { t } = useTranslation('pages');
+  const isAuthed = useIsAuthed();
+  const openLogin = useAuthModalStore((s) => s.openLogin);
+  const appointments = useReservedAppointments(isAuthed, 1, 6);
+  const items = appointments.data?.items ?? [];
+
+  return (
+    <Shelf title={t('home.myAppointments.title')}>
+      {!isAuthed ? (
+        <div className="gl-yt-banner">
+          <div>
+            <strong>{t('home.myAppointments.signInTitle')}</strong>
+            <span>{t('home.myAppointments.signInSub')}</span>
+          </div>
+          <button className="gl-secondary-btn" type="button" onClick={() => openLogin()}>
+            {t('library.signIn')}
+          </button>
+        </div>
+      ) : appointments.isPending ? (
+        <div className="gl-home-appointment-grid" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-[280px] animate-pulse rounded-card bg-bg-hover" />
+          ))}
+        </div>
+      ) : items.length > 0 ? (
+        <div className="gl-home-appointment-grid">
+          {items.map((item) => (
+            <AppointmentViewerCard
+              key={item.id}
+              appointment={item}
+              to={`/live/${encodeURIComponent(item.roomId)}`}
+              compact
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="gl-creator-empty-soft">{t('home.myAppointments.empty')}</div>
+      )}
+    </Shelf>
   );
 }
 
@@ -889,7 +921,7 @@ function SettingsNavButton({
   return (
     <button
       type="button"
-      className={`gl-settings-nav-item${active ? ' is-active' : ''}`}
+      className={`gl-settings-nav-item${active ? 'is-active' : ''}`}
       onClick={onClick}
     >
       <span className="gl-settings-nav-icon">{icon}</span>
@@ -1356,10 +1388,7 @@ function collectionThemeClass(storageKey: string): string {
 
 function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
   const lookupItems = useMemo(
-    () =>
-      items
-        .filter((item) => item.status === 'ended')
-        .slice(0, 60),
+    () => items.filter((item) => item.status === 'ended').slice(0, 60),
     [items],
   );
   const lookups = useQueries({

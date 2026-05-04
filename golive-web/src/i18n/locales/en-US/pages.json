@@ -32,6 +32,11 @@
       "viewAll": "View all",
       "empty": "No reservations yet."
     },
+    "upcoming": {
+      "title": "Upcoming live streams",
+      "subtitle": "Shows scheduled live streams from all creators in the next three days.",
+      "empty": "No scheduled live streams in the next three days."
+    },
     "levelGifts": {
       "title": "Level gift showcase",
       "subtitle": "Charge to level up and unlock premium gifts for live rooms.",
@@ -347,16 +352,34 @@
     },
     "subscriptions": {
       "title": "Subscriptions",
+      "all": "All",
       "signInTitle": "Sign in to see your subscriptions",
       "signInSub": "Follow creators to keep their live rooms in this feed.",
       "emptyAuthed": "No subscribed creators yet",
       "emptyGuest": "No subscriptions to show",
       "emptySub": "Explore the live directory and follow rooms from the player page.",
+      "enterChannel": "Enter channel",
+      "latest": {
+        "channelTitle": "Latest",
+        "channelSubtitle": "{{name}}'s live status and recent content."
+      },
       "appointments": {
         "title": "Appointments from subscriptions",
         "subtitle": "Browse upcoming live rooms from creators you follow.",
+        "channelTitle": "Live appointments",
+        "channelSubtitle": "{{name}}'s upcoming live streams appear here.",
         "empty": "No upcoming appointments from your subscriptions.",
+        "channelEmpty": "This creator has no live appointments.",
         "signIn": "Sign in to browse appointment schedules."
+      },
+      "posts": {
+        "title": "Latest posts from subscriptions",
+        "channelTitle": "Latest posts",
+        "subtitle": "The most recent post from each subscribed creator appears here.",
+        "channelSubtitle": "See recent posts from {{name}}.",
+        "empty": "Creators you subscribe to have not posted yet.",
+        "channelEmpty": "This creator has not posted yet.",
+        "signIn": "Sign in to see posts from subscribed creators."
       }
     },
     "you": {

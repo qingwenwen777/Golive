@@ -576,6 +576,22 @@ export function useReservedAppointments(enabled = true, page = 1, size = 8) {
   });
 }
 
+export function useUpcomingAppointments(page = 1, size = 100) {
+  return useQuery<AppointmentListResp, Error>({
+    queryKey: ['upcoming-appointments', page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AppointmentListResp>('/appointments/upcoming', {
+        params: { page, size },
+        signal,
+      });
+      return data;
+    },
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
 export function useSubscriptionAppointments(enabled = true, page = 1, size = 8) {
   return useQuery<AppointmentListResp, Error>({
     queryKey: ['subscription-appointments', page, size],
@@ -618,6 +634,7 @@ function useAppointmentMutation<T>(method: 'post' | 'patch' | 'delete', path: st
       void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
       void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
       void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['upcoming-appointments'] });
       void qc.invalidateQueries({ queryKey: ['appointments-my'] });
       void qc.invalidateQueries({ queryKey: ['notifications'] });
     },
@@ -656,6 +673,9 @@ export function useStartAppointment(id: string) {
       void qc.invalidateQueries({ queryKey: ['studio-appointments'] });
       void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
       void qc.invalidateQueries({ queryKey: ['subscriptions'] });
+      void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['upcoming-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
       void qc.invalidateQueries({ queryKey: ['rooms'] });
     },
   });
@@ -673,6 +693,7 @@ export function useReserveAppointment(id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
       void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['upcoming-appointments'] });
       void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
       void qc.invalidateQueries({ queryKey: ['appointments-my'] });
     },
@@ -691,6 +712,7 @@ export function useUnreserveAppointment(id: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
       void qc.invalidateQueries({ queryKey: ['subscription-appointments'] });
+      void qc.invalidateQueries({ queryKey: ['upcoming-appointments'] });
       void qc.invalidateQueries({ queryKey: ['reserved-appointments'] });
       void qc.invalidateQueries({ queryKey: ['appointments-my'] });
     },

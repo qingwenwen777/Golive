@@ -21,6 +21,7 @@ const (
 	maxActiveAppointments = 5
 	startLead             = 30 * time.Minute
 	startGrace            = 30 * time.Minute
+	upcomingWindow        = 72 * time.Hour
 )
 
 type AppointmentService struct {
@@ -271,6 +272,18 @@ func (s *AppointmentService) ListSubscriptionAppointments(ctx context.Context, v
 		}
 	}
 	items, total, err := s.appointments.ListPublicByOwners(ctx, ownerIDs, s.now(), page, size)
+	if err != nil {
+		return nil, err
+	}
+	return s.listResp(ctx, items, viewerID, page, size, total)
+}
+
+func (s *AppointmentService) ListUpcoming(ctx context.Context, viewerID string, page, size int) (*AppointmentListResp, error) {
+	if err := s.cleanupExpired(ctx); err != nil {
+		return nil, err
+	}
+	now := s.now()
+	items, total, err := s.appointments.ListPublicUpcoming(ctx, now, now.Add(upcomingWindow), page, size)
 	if err != nil {
 		return nil, err
 	}

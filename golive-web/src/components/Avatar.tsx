@@ -1,6 +1,6 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useState, type CSSProperties } from 'react';
 import { cn } from '@/lib/cn';
-import { LoadableImage } from '@/components/LoadableImage';
+import { isLoadableImageReady, LoadableImage } from '@/components/LoadableImage';
 
 export interface AvatarProps {
   name: string;
@@ -31,12 +31,12 @@ function computeInitials(name: string): string {
 
 export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
   const hue = hashHue(name);
   const initials = computeInitials(name);
   const bg1 = `hsl(${hue}, 65%, 55%)`;
   const bg2 = `hsl(${(hue + 40) % 360}, 70%, 45%)`;
   const imageSrc = normalizeAvatarSrc(src);
+  const [loaded, setLoaded] = useState(() => isLoadableImageReady(imageSrc));
   const style: CSSProperties = {
     width: size,
     height: size,
@@ -55,9 +55,9 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
     ...(ring ? { boxShadow: `0 0 0 2px ${ring}, 0 0 0 4px ${bg1}` } : null),
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setFailed(false);
-    setLoaded(false);
+    setLoaded(isLoadableImageReady(imageSrc));
   }, [imageSrc]);
 
   return (
@@ -71,7 +71,7 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
           src={imageSrc}
           alt=""
           className="gl-avatar-img"
-          onLoad={() => setLoaded(true)}
+          onReady={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
       ) : (

@@ -50,6 +50,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/subscriptions", auth, socialH.ListSubscriptions)
 	r.GET("/subscriptions/appointments", auth, appointmentH.ListSubscriptionAppointments)
 	r.GET("/subscriptions/posts", auth, postH.ListSubscriptionLatest)
+	r.GET("/appointments/upcoming", optionalAuth, appointmentH.ListUpcoming)
 	r.GET("/appointments/my", auth, appointmentH.ListReserved)
 	r.GET("/notifications", auth, appointmentH.Notifications)
 	r.PATCH("/notifications/read-all", auth, appointmentH.MarkAllNotificationsRead)

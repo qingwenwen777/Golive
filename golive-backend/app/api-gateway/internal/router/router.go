@@ -110,6 +110,7 @@ func publicRoutes() []middleware.PublicRoute {
 		{Method: http.MethodGet, Path: "/api/rooms/*action"},
 		{Method: http.MethodGet, Path: "/api/rooms/channels/:channel/posts"},
 		{Method: http.MethodGet, Path: "/api/rooms/posts/:postID/comments"},
+		{Method: http.MethodGet, Path: "/api/appointments/*action"},
 		// Gifts catalog is public.
 		{Method: http.MethodGet, Path: "/api/gifts"},
 		{Method: http.MethodGet, Path: "/api/bets/*action"},

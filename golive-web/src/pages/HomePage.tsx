@@ -22,8 +22,8 @@ import {
   useFollow,
   useRecommendedCreators,
   useRooms,
-  useReservedAppointments,
   useUnfollow,
+  useUpcomingAppointments,
   type RecommendedCreator,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -139,7 +139,7 @@ export default function HomePage() {
           </div>
         )}
 
-        <MyAppointmentsSection />
+        <UpcomingAppointmentsSection />
         <HomeRecommendationsSection />
         <HomeLevelGiftsSection />
       </div>
@@ -147,58 +147,17 @@ export default function HomePage() {
   );
 }
 
-function MyAppointmentsSection() {
+function UpcomingAppointmentsSection() {
   const { t } = useTranslation('pages');
-  const isAuthed = useIsAuthed();
-  const openLogin = useAuthModalStore((s) => s.openLogin);
-  const appointments = useReservedAppointments(isAuthed, 1, 6);
-
-  if (!isAuthed) {
-    return (
-      <section className="gl-home-my-appointments">
-        <div className="gl-section-title-row">
-          <div>
-            <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
-            <span>
-              {t('home.myAppointments.subtitle', {
-                defaultValue: 'Sign in to see your reserved live rooms.',
-              })}
-            </span>
-          </div>
-        </div>
-        <div className="gl-yt-banner">
-          <div>
-            <strong>
-              {t('home.myAppointments.signInTitle', {
-                defaultValue: 'Sign in to track reservations',
-              })}
-            </strong>
-            <span>
-              {t('home.myAppointments.signInSub', {
-                defaultValue: 'Keep an eye on upcoming live rooms from one place.',
-              })}
-            </span>
-          </div>
-          <button className="gl-secondary-btn" type="button" onClick={() => openLogin()}>
-            {t('library.signIn')}
-          </button>
-        </div>
-      </section>
-    );
-  }
-
+  const appointments = useUpcomingAppointments(1, 100);
   const items = appointments.data?.items ?? [];
 
   return (
     <section className="gl-home-my-appointments">
       <div className="gl-section-title-row">
         <div>
-          <h2>{t('home.myAppointments.title', { defaultValue: 'My appointments' })}</h2>
-          <span>
-            {t('home.myAppointments.subtitle', {
-              defaultValue: 'Your reserved live rooms appear here.',
-            })}
-          </span>
+          <h2>{t('home.upcoming.title')}</h2>
+          <span>{t('home.upcoming.subtitle')}</span>
         </div>
       </div>
       {appointments.isPending ? (
@@ -219,9 +178,7 @@ function MyAppointmentsSection() {
           ))}
         </div>
       ) : (
-        <div className="gl-creator-empty-soft">
-          {t('home.myAppointments.empty', { defaultValue: 'No reservations yet.' })}
-        </div>
+        <div className="gl-creator-empty-soft">{t('home.upcoming.empty')}</div>
       )}
     </section>
   );

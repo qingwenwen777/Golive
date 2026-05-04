@@ -126,6 +126,16 @@ func (h *AppointmentHandler) ListSubscriptionAppointments(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *AppointmentHandler) ListUpcoming(c *gin.Context) {
+	page, size := pageSize(c, 1, 100)
+	resp, err := h.svc.ListUpcoming(c.Request.Context(), UserIDFromCtx(c), page, size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *AppointmentHandler) ListReserved(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {
