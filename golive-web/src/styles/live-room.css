@@ -920,6 +920,9 @@
   border-bottom: 1px solid var(--gl-border);
   background: var(--gl-bg);
 }
+.gl-sc-pin-stack.has-overflow {
+  padding-inline: 34px;
+}
 .gl-sc-pin-row {
   display: flex;
   flex-wrap: nowrap;
@@ -930,8 +933,51 @@
   scroll-snap-type: x proximity;
   scrollbar-width: none;
 }
+.gl-sc-pin-stack.has-overflow .gl-sc-pin-row {
+  padding-inline: 0;
+}
 .gl-sc-pin-row::-webkit-scrollbar {
   display: none;
+}
+.gl-sc-pin-scroll {
+  position: absolute;
+  top: 50%;
+  z-index: 9;
+  display: none;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 1px solid color-mix(in srgb, var(--gl-text) 10%, transparent);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #6b7280;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+}
+.gl-sc-pin-stack.has-overflow .gl-sc-pin-scroll {
+  display: inline-flex;
+}
+.gl-sc-pin-scroll.is-left {
+  left: 6px;
+}
+.gl-sc-pin-scroll.is-right {
+  right: 6px;
+}
+.gl-sc-pin-scroll:hover:not(:disabled) {
+  color: #3f3f46;
+  background: #fff;
+  box-shadow: 0 7px 22px rgba(15, 23, 42, 0.22);
+}
+.gl-sc-pin-scroll:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+.dark .gl-sc-pin-scroll {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  color: #71717a;
 }
 .gl-sc-pin {
   position: relative;
@@ -948,7 +994,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 999px;
-  background: var(--sc-bg);
+  background: var(--sc-soft);
   color: #fff;
   cursor: pointer;
   font-family: inherit;
@@ -965,20 +1011,13 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  width: var(--sc-progress);
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--sc-soft) 48%, transparent),
-      color-mix(in srgb, #fff 18%, transparent)
-    ),
-    var(--sc-bg);
+  width: var(--sc-deep-progress);
+  background: var(--sc-bg);
   content: '';
   transition: width 1s linear;
 }
 .gl-sc-pin .gl-avatar,
-.gl-sc-pin-user,
-.gl-sc-pin-progress {
+.gl-sc-pin-user {
   position: relative;
   z-index: 1;
 }
@@ -991,6 +1030,7 @@
   min-width: 0;
   overflow: hidden;
   color: #fff;
+  text-shadow: 0 1px 1px color-mix(in srgb, var(--sc-bg) 58%, rgba(0, 0, 0, 0.28));
   font-size: 13px;
   font-weight: 850;
   line-height: 1;
@@ -1034,7 +1074,10 @@
   color: #fff;
   padding: 9px 11px;
 }
-.gl-sc-pin-popover-head > div {
+.gl-sc-pin-popover-avatar {
+  flex: 0 0 28px;
+}
+.gl-sc-pin-popover-meta {
   display: flex;
   min-width: 0;
   flex: 1;
@@ -1066,21 +1109,6 @@
   font-weight: 550;
   line-height: 1.45;
   overflow-wrap: anywhere;
-}
-.gl-sc-pin-progress {
-  position: absolute;
-  right: 9px;
-  bottom: 3px;
-  left: 36px;
-  height: 2.5px;
-  width: var(--sc-progress);
-  max-width: calc(100% - 45px);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sc-soft) 76%, #fff);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--sc-bg) 38%, transparent),
-    0 0 9px color-mix(in srgb, var(--sc-soft) 58%, transparent);
-  transition: width 1s linear;
 }
 @keyframes glScPinBubble {
   from {
@@ -1896,6 +1924,14 @@
   background: var(--gl-bg);
   padding: 18px;
   box-shadow: 0 18px 52px rgba(15, 23, 42, 0.22);
+  transform-origin: right bottom;
+  will-change: transform, opacity;
+}
+.gl-sc-dialog[data-state='open'] {
+  animation: glScDialogIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.gl-sc-dialog[data-state='closed'] {
+  animation: glScDialogOut 0.24s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 .gl-sc-dialog-head {
   padding-right: 34px;
@@ -2018,6 +2054,29 @@
 .gl-sc-send.is-disabled {
   background: var(--gl-bg-hover);
   color: var(--gl-text-2);
+}
+@keyframes glScDialogIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.965);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+@keyframes glScDialogOut {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.975);
+  }
 }
 
 @keyframes gl-gift-fly {
@@ -2259,6 +2318,7 @@
     border-radius: 18px 18px 0 0;
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
+    transform-origin: center bottom;
   }
 
   .gl-sc-dialog.is-mobile .gl-sc-dialog-head {

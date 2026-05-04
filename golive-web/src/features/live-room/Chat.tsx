@@ -5,11 +5,14 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type WheelEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Smile,
   CircleDollarSign,
   Send,
@@ -327,8 +330,12 @@ function PinnedSuperChatPill({
   const style = {
     '--sc-bg': spec.bg,
     '--sc-soft': spec.soft,
-    '--sc-progress': `${progress}%`,
-  } as CSSProperties & { '--sc-bg': string; '--sc-soft': string; '--sc-progress': string };
+    '--sc-deep-progress': `${progress}%`,
+  } as CSSProperties & {
+    '--sc-bg': string;
+    '--sc-soft': string;
+    '--sc-deep-progress': string;
+  };
 
   return (
     <button
@@ -345,7 +352,6 @@ function PinnedSuperChatPill({
     >
       <Avatar name={m.user} src={m.avatar} size={26} ring="rgba(255, 255, 255, 0.76)" />
       <span className="gl-sc-pin-user">{m.user}</span>
-      <span className="gl-sc-pin-progress" aria-hidden="true" />
     </button>
   );
 }
@@ -371,8 +377,14 @@ function PinnedSuperChatBubble({
   return (
     <div className="gl-sc-pin-popover" role="dialog" style={style}>
       <div className="gl-sc-pin-popover-head">
-        <Avatar name={m.user} src={m.avatar} size={28} ring="rgba(255, 255, 255, 0.8)" />
-        <div>
+        <Avatar
+          name={m.user}
+          src={m.avatar}
+          size={28}
+          ring="rgba(255, 255, 255, 0.8)"
+          className="gl-sc-pin-popover-avatar"
+        />
+        <div className="gl-sc-pin-popover-meta">
           <strong>{m.user}</strong>
           <span>{formatCoinAmount(m.amount, locale)}</span>
         </div>
@@ -535,6 +547,7 @@ export function Chat({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const emojiWrapRef = useRef<HTMLDivElement | null>(null);
   const pinStackRef = useRef<HTMLDivElement | null>(null);
+  const pinRowRef = useRef<HTMLDivElement | null>(null);
   const pinButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const inputValueRef = useRef('');
   const lastMessageCountRef = useRef(messages.length);
@@ -547,6 +560,11 @@ export function Chat({
   const [activeTab, setActiveTab] = useState<ChatPanelTab>('chat');
   const [expandedPinnedId, setExpandedPinnedId] = useState<string | null>(null);
   const [pinBubblePosition, setPinBubblePosition] = useState({ left: 10, arrowLeft: 28 });
+  const [pinnedScrollState, setPinnedScrollState] = useState({
+    hasOverflow: false,
+    canScrollLeft: false,
+    canScrollRight: false,
+  });
   const [newMessageCount, setNewMessageCount] = useState(0);
   // Track IME composition so Enter during candidate selection (CJK input
   // methods) does not submit a half-finished message.
@@ -637,17 +655,64 @@ export function Chat({
 
     const stackRect = stack.getBoundingClientRect();
     const buttonRect = button.getBoundingClientRect();
-    const bubbleWidth = Math.min(320, Math.max(0, stackRect.width - 20));
+    const bubbleWidth = Math.min(286, Math.max(0, stackRect.width - 24));
     const buttonCenter = buttonRect.left - stackRect.left + buttonRect.width / 2;
-    const maxLeft = Math.max(10, stackRect.width - bubbleWidth - 10);
-    const left = Math.max(10, Math.min(maxLeft, buttonCenter - bubbleWidth / 2));
+    const maxLeft = Math.max(12, stackRect.width - bubbleWidth - 12);
+    const left = Math.max(12, Math.min(maxLeft, buttonCenter - bubbleWidth / 2));
     const arrowLeft = Math.max(22, Math.min(bubbleWidth - 22, buttonCenter - left));
 
     setPinBubblePosition({ left, arrowLeft });
   }, []);
 
+  const updatePinnedScrollState = useCallback(() => {
+    const row = pinRowRef.current;
+    if (!row) {
+      setPinnedScrollState({
+        hasOverflow: false,
+        canScrollLeft: false,
+        canScrollRight: false,
+      });
+      return;
+    }
+
+    const maxScrollLeft = Math.max(0, row.scrollWidth - row.clientWidth);
+    setPinnedScrollState({
+      hasOverflow: maxScrollLeft > 2,
+      canScrollLeft: row.scrollLeft > 2,
+      canScrollRight: row.scrollLeft < maxScrollLeft - 2,
+    });
+  }, []);
+
   const handlePinnedRowScroll = () => {
+    updatePinnedScrollState();
     if (expandedPinnedId) updatePinnedBubblePosition(expandedPinnedId);
+  };
+
+  const handlePinnedWheel = (event: WheelEvent<HTMLDivElement>) => {
+    const row = pinRowRef.current;
+    if (!row || row.scrollWidth <= row.clientWidth) return;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+    event.preventDefault();
+    row.scrollLeft += event.deltaY;
+    updatePinnedScrollState();
+    if (expandedPinnedId) updatePinnedBubblePosition(expandedPinnedId);
+  };
+
+  const scrollPinnedRow = (direction: -1 | 1) => {
+    const row = pinRowRef.current;
+    if (!row) return;
+    const distance = Math.max(148, row.clientWidth * 0.66);
+    const left = direction * distance;
+
+    if (typeof row.scrollBy === 'function') {
+      row.scrollBy({ left, behavior: 'smooth' });
+    } else {
+      row.scrollLeft += left;
+    }
+
+    window.setTimeout(updatePinnedScrollState, 220);
+    if (expandedPinnedId) window.setTimeout(() => updatePinnedBubblePosition(expandedPinnedId), 220);
   };
 
   useLayoutEffect(() => {
@@ -712,6 +777,17 @@ export function Chat({
     })
     .filter((item) => item.remainingMs > 0)
     .sort((a, b) => b.message.ts - a.message.ts);
+
+  useLayoutEffect(() => {
+    updatePinnedScrollState();
+    const row = pinRowRef.current;
+    if (!row) return;
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => updatePinnedScrollState());
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [pinnedSuperChats.length, updatePinnedScrollState]);
 
   useEffect(() => {
     if (!hasSuperChats) return;
@@ -794,11 +870,27 @@ export function Chat({
       </div>
       {effectiveTab === 'chat' && pinnedSuperChats.length > 0 && (
         <div
-          className="gl-sc-pin-stack"
+          className={cn('gl-sc-pin-stack', pinnedScrollState.hasOverflow && 'has-overflow')}
           ref={pinStackRef}
           aria-label={t('liveRoom.chatPanel.pinnedSuperChats')}
         >
-          <div className="gl-sc-pin-row" onScroll={handlePinnedRowScroll}>
+          <button
+            type="button"
+            className="gl-sc-pin-scroll is-left"
+            aria-label={t('liveRoom.chatPanel.scrollSuperChatsLeft', {
+              defaultValue: 'Scroll SuperChats left',
+            })}
+            disabled={!pinnedScrollState.canScrollLeft}
+            onClick={() => scrollPinnedRow(-1)}
+          >
+            <ChevronLeft size={18} strokeWidth={2.6} />
+          </button>
+          <div
+            ref={pinRowRef}
+            className="gl-sc-pin-row"
+            onScroll={handlePinnedRowScroll}
+            onWheel={handlePinnedWheel}
+          >
             {pinnedSuperChats.map(({ message, remainingMs, durationMs }) => (
               <PinnedSuperChatPill
                 key={message.id}
@@ -823,6 +915,17 @@ export function Chat({
               />
             ))}
           </div>
+          <button
+            type="button"
+            className="gl-sc-pin-scroll is-right"
+            aria-label={t('liveRoom.chatPanel.scrollSuperChatsRight', {
+              defaultValue: 'Scroll SuperChats right',
+            })}
+            disabled={!pinnedScrollState.canScrollRight}
+            onClick={() => scrollPinnedRow(1)}
+          >
+            <ChevronRight size={18} strokeWidth={2.6} />
+          </button>
           {expandedPinnedId && (
             <PinnedSuperChatBubble
               m={

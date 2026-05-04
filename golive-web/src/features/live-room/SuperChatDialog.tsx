@@ -205,15 +205,6 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
               })}
             />
           </label>
-          <input
-            type="range"
-            min={MIN}
-            max={MAX}
-            step={100}
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
-            className="w-full accent-accent"
-          />
           <div className="gl-sc-quick-grid">
             {QUICK_AMOUNTS.map((v) => (
               <button
