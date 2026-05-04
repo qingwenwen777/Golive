@@ -1945,7 +1945,6 @@ function AppointmentStudioRow({
     <AppointmentCard
       appointment={item}
       to={item.status === 'scheduled' ? `/live/${encodeURIComponent(item.roomId)}` : undefined}
-      compact
       managementMode
       pending={pending}
       onStart={() => {

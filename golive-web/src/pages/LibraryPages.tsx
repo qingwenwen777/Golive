@@ -656,7 +656,6 @@ function MyAppointmentsShelf() {
               key={item.id}
               appointment={item}
               to={`/live/${encodeURIComponent(item.roomId)}`}
-              compact
             />
           ))}
         </div>

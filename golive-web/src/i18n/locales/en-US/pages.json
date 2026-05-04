@@ -45,7 +45,7 @@
     },
     "upcoming": {
       "title": "Upcoming live streams",
-      "subtitle": "Randomly shows up to four scheduled live streams in the next three days.",
+      "subtitle": "Randomly shows up to three scheduled live streams in the next three days.",
       "refresh": "Refresh",
       "empty": "No scheduled live streams in the next three days."
     },

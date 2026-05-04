@@ -37,7 +37,7 @@ import { cn } from '@/lib/cn';
 import { localizedGiftName } from '@/lib/gift';
 import { streamChannelName, type Stream } from '@/types/stream';
 
-const UPCOMING_APPOINTMENT_LIMIT = 4;
+const UPCOMING_APPOINTMENT_LIMIT = 3;
 
 export default function HomePage() {
   const { t } = useTranslation('pages');
@@ -210,7 +210,6 @@ function UpcomingAppointmentsSection() {
               key={item.id}
               appointment={item}
               to={`/live/${encodeURIComponent(item.roomId)}`}
-              compact
             />
           ))}
         </div>
