@@ -982,240 +982,240 @@
     }
   },
   "admin": {
-    "kicker": "????",
-    "title": "????",
-    "refresh": "??",
-    "fallbackCreator": "??",
+    "kicker": "管理后台",
+    "title": "管理后台",
+    "refresh": "刷新",
+    "fallbackCreator": "主播",
     "denied": {
-      "title": "??????",
-      "body": "???????????",
-      "action": "????"
+      "title": "无管理员权限",
+      "body": "此区域仅管理员可访问。",
+      "action": "返回首页"
     },
     "tabs": {
-      "label": "??????",
-      "permissions": "????",
-      "applications": "????",
-      "invites": "???"
+      "label": "主播管理分区",
+      "permissions": "权限用户",
+      "applications": "申请审核",
+      "invites": "邀请码"
     },
     "status": {
-      "pending": "???",
-      "approved": "???",
-      "rejected": "???",
-      "none": "???"
+      "pending": "待审核",
+      "approved": "已通过",
+      "rejected": "已拒绝",
+      "none": "无权限"
     },
     "permissions": {
-      "eyebrow": "????",
-      "title": "?????????",
-      "loading": "??????...",
-      "error": "?????????",
-      "empty": "???????????????",
-      "disable": "????",
-      "confirmDisable": "???? {{name}} ???????",
-      "disabled": "????????",
-      "disableFailed": "???????"
+      "eyebrow": "权限管理",
+      "title": "已获开播权限的主播",
+      "loading": "正在加载主播...",
+      "error": "无法加载主播列表。",
+      "empty": "当前没有已获得开播权限的主播。",
+      "disable": "禁用直播",
+      "confirmDisable": "确定禁用 {{name}} 的开播权限吗？",
+      "disabled": "已禁用直播权限。",
+      "disableFailed": "无法更新权限。"
     },
     "applications": {
-      "eyebrow": "????",
-      "title": "??????",
-      "loading": "??????...",
-      "error": "?????????",
-      "empty": "???????",
-      "reason": "????",
-      "noReason": "??????",
-      "rejectReason": "????",
-      "approve": "??",
-      "reject": "??",
-      "approved": "??????",
-      "rejected": "??????",
-      "reviewFailed": "?????",
-      "rejectReasonLabel": "????",
-      "rejectReasonPlaceholder": "???????????????",
-      "confirmReject": "????"
+      "eyebrow": "申请审核",
+      "title": "主播开播申请",
+      "loading": "正在加载申请...",
+      "error": "无法加载申请列表。",
+      "empty": "暂无主播申请。",
+      "reason": "开播理由",
+      "noReason": "未填写理由。",
+      "rejectReason": "拒绝理由",
+      "approve": "同意",
+      "reject": "拒绝",
+      "approved": "已同意申请。",
+      "rejected": "已拒绝申请。",
+      "reviewFailed": "审核失败。",
+      "rejectReasonLabel": "拒绝理由",
+      "rejectReasonPlaceholder": "告诉主播需要补充或改进的内容。",
+      "confirmReject": "确认拒绝"
     },
     "nav": {
-      "aria": "?????"
+      "aria": "管理员模块"
     },
     "brand": {
-      "controlCenter": "????"
+      "controlCenter": "控制中心"
     },
     "modules": {
       "dashboard": {
-        "label": "?????",
-        "subtitle": "????"
+        "label": "总览仪表盘",
+        "subtitle": "核心状态"
       },
       "users": {
-        "label": "????",
-        "subtitle": "??????"
+        "label": "用户管理",
+        "subtitle": "账号与邀请码"
       },
       "creators": {
-        "label": "??/?????",
-        "subtitle": "???????"
+        "label": "主播/创作者管理",
+        "subtitle": "审核与开播权限"
       },
       "content": {
-        "label": "????",
-        "subtitle": "?????"
+        "label": "内容审核",
+        "subtitle": "直播与动态"
       },
       "economy": {
-        "label": "??????",
-        "subtitle": "coins ???"
+        "label": "经济系统管理",
+        "subtitle": "coins 与收益"
       },
       "system": {
-        "label": "????",
-        "subtitle": "?????"
+        "label": "系统配置",
+        "subtitle": "策略与开关"
       },
       "logs": {
-        "label": "????",
-        "subtitle": "????"
+        "label": "操作日志",
+        "subtitle": "审计流水"
       }
     },
     "dashboard": {
-      "aria": "????",
+      "aria": "后台总览",
       "kpis": {
-        "pendingApplications": "??????",
-        "approvedCreators": "?????",
-        "availableInvites": "?????",
-        "pendingContent": "?????"
+        "pendingApplications": "待审开播申请",
+        "approvedCreators": "已授权主播",
+        "availableInvites": "可用邀请码",
+        "pendingContent": "待处理内容"
       },
       "modules": {
-        "eyebrow": "??",
-        "title": "?????"
+        "eyebrow": "模块",
+        "title": "管理台模块"
       },
       "focus": {
-        "eyebrow": "??",
-        "title": "????",
-        "applicationReview": "??????",
-        "applicationReviewValue": "{{pending}} ??? / {{total}} ???",
-        "permissionManagement": "??????",
-        "permissionManagementValue": "{{count}} ??????",
-        "inviteManagement": "?????",
-        "inviteManagementValue": "{{available}} ?? / {{total}} ??"
+        "eyebrow": "运营",
+        "title": "当前重点",
+        "applicationReview": "开播申请审核",
+        "applicationReviewValue": "{{pending}} 待处理 / {{total}} 总申请",
+        "permissionManagement": "开播权限管理",
+        "permissionManagementValue": "{{count}} 位主播可开播",
+        "inviteManagement": "邀请码管理",
+        "inviteManagementValue": "{{available}} 可用 / {{total}} 总数"
       }
     },
     "users": {
-      "aria": "??????",
+      "aria": "用户管理概览",
       "kpis": {
-        "availableInvites": "?????",
-        "usedInvites": "??????",
-        "accountDirectory": "????",
-        "admins": "???"
+        "availableInvites": "可用邀请码",
+        "usedInvites": "已使用邀请码",
+        "accountDirectory": "账号目录",
+        "admins": "管理员"
       },
       "framework": {
-        "eyebrow": "??",
-        "title": "??????",
-        "accounts": "????",
-        "accountsSub": "??????????",
-        "groups": "????",
-        "groupsSub": "????????",
-        "risk": "????",
-        "riskSub": "???????????"
+        "eyebrow": "用户",
+        "title": "用户管理框架",
+        "accounts": "账号列表",
+        "accountsSub": "用户资料、角色、状态",
+        "groups": "权限分组",
+        "groupsSub": "普通用户、管理员",
+        "risk": "风控状态",
+        "riskSub": "注册、登录、邀请码核销"
       }
     },
     "creators": {
-      "aria": "??????",
+      "aria": "主播管理概览",
       "kpis": {
-        "pendingApplications": "????",
-        "liveCreators": "?????",
-        "approvedApplications": "????",
-        "rejectedApplications": "????"
+        "pendingApplications": "待审申请",
+        "liveCreators": "可开播主播",
+        "approvedApplications": "通过申请",
+        "rejectedApplications": "拒绝申请"
       }
     },
     "invites": {
-      "eyebrow": "????",
-      "title": "?????",
-      "create": "?????",
-      "loading": "???????...",
-      "error": "????????",
-      "empty": "????????",
-      "used": "???",
-      "unused": "???",
-      "noUser": "????",
-      "available": "???????",
-      "usedAt": "??? {{time}}",
-      "createdAt": "??? {{time}}",
-      "copy": "??",
-      "copied": "???????",
-      "copyFailed": "????????",
-      "created": "??? {{code}} ????",
-      "createFailed": "????????"
+      "eyebrow": "注册准入",
+      "title": "邀请码管理",
+      "create": "创建邀请码",
+      "loading": "正在加载邀请码...",
+      "error": "无法加载邀请码。",
+      "empty": "尚未创建邀请码。",
+      "used": "已使用",
+      "unused": "未使用",
+      "noUser": "暂无账号",
+      "available": "可用于一次注册",
+      "usedAt": "使用于 {{time}}",
+      "createdAt": "创建于 {{time}}",
+      "copy": "复制",
+      "copied": "邀请码已复制。",
+      "copyFailed": "无法复制邀请码。",
+      "created": "邀请码 {{code}} 已创建。",
+      "createFailed": "无法创建邀请码。"
     },
     "scaffold": {
       "content": {
-        "eyebrow": "??",
-        "title": "??????",
+        "eyebrow": "内容",
+        "title": "内容审核框架",
         "stats": {
-          "liveRooms": "????",
-          "posts": "????",
-          "reports": "????",
-          "keywords": "?????"
+          "liveRooms": "待审直播",
+          "posts": "动态审核",
+          "reports": "举报队列",
+          "keywords": "关键词策略"
         },
         "rows": {
-          "liveRooms": "?????",
-          "liveRoomsSub": "?????????????",
-          "posts": "??????",
-          "postsSub": "????????",
-          "reports": "????",
-          "reportsSub": "?????????"
+          "liveRooms": "直播间审核",
+          "liveRoomsSub": "标题、封面、分类、直播状态",
+          "posts": "动态内容审核",
+          "postsSub": "帖子、图片、评论",
+          "reports": "举报处理",
+          "reportsSub": "用户举报、处置结果"
         }
       },
       "economy": {
-        "eyebrow": "??",
-        "title": "??????",
+        "eyebrow": "经济",
+        "title": "经济系统框架",
         "stats": {
-          "topup": "????",
-          "gifts": "????",
-          "superChat": "SC ??",
-          "withdrawals": "????"
+          "topup": "今日充值",
+          "gifts": "礼物流水",
+          "superChat": "SC 流水",
+          "withdrawals": "提现预留"
         },
         "rows": {
-          "accounts": "coins ??",
-          "accountsSub": "??????????",
-          "gifts": "??? SuperChat",
-          "giftsSub": "??????????",
-          "revenue": "????",
-          "revenueSub": "??????????"
+          "accounts": "coins 账户",
+          "accountsSub": "余额、充值、消费流水",
+          "gifts": "礼物与 SuperChat",
+          "giftsSub": "价格、等级、收益归集",
+          "revenue": "主播收益",
+          "revenueSub": "分成、提现、结算状态"
         }
       },
       "system": {
-        "eyebrow": "??",
-        "title": "??????",
+        "eyebrow": "系统",
+        "title": "系统配置框架",
         "stats": {
-          "registration": "????",
-          "liveReview": "????",
-          "contentPolicy": "????",
-          "serviceStatus": "????"
+          "registration": "注册策略",
+          "liveReview": "开播审核",
+          "contentPolicy": "内容策略",
+          "serviceStatus": "服务状态"
         },
         "values": {
-          "inviteOnly": "???",
-          "enabled": "??",
-          "standard": "??"
+          "inviteOnly": "邀请制",
+          "enabled": "启用",
+          "standard": "标准"
         },
         "rows": {
-          "site": "????",
-          "siteSub": "??????????",
-          "review": "????",
-          "reviewSub": "??????????????",
-          "services": "????",
-          "servicesSub": "RTMP????????"
+          "site": "站点配置",
+          "siteSub": "品牌、域名、基础开关",
+          "review": "审核策略",
+          "reviewSub": "开播申请、内容审核、举报规则",
+          "services": "服务配置",
+          "servicesSub": "RTMP、回放、上传限制"
         }
       }
     },
     "logs": {
-      "aria": "??????",
-      "eyebrow": "??",
-      "title": "??????",
+      "aria": "操作日志概览",
+      "eyebrow": "日志",
+      "title": "操作日志框架",
       "kpis": {
-        "today": "????",
-        "permissions": "????",
-        "reviews": "????",
-        "accounts": "????"
+        "today": "今日操作",
+        "permissions": "权限变更",
+        "reviews": "审核记录",
+        "accounts": "账号操作"
       },
       "rows": {
-        "reviews": "????",
-        "reviewsSub": "??????????????",
-        "permissions": "????",
-        "permissionsSub": "?????????????",
-        "system": "????",
-        "systemSub": "??????????????"
+        "reviews": "审核操作",
+        "reviewsSub": "开播申请、内容审核、举报处理",
+        "permissions": "权限操作",
+        "permissionsSub": "管理员、主播权限、封禁状态",
+        "system": "系统操作",
+        "systemSub": "配置变更、服务重启、策略调整"
       }
     }
   },

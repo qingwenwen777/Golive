@@ -8,15 +8,17 @@ import { LoginModal } from '@/features/auth/LoginModal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 export default function App() {
+  const location = useLocation();
   const isNarrow = useMediaQuery('(max-width: 767px)');
   const [userCollapsed, setUserCollapsed] = useState(false);
+  const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   const collapsed = isNarrow || userCollapsed;
 
   return (
     <div className="min-h-screen bg-bg text-text">
       <TopBar onMenuClick={() => setUserCollapsed((v) => !v)} />
       <div className="gl-layout">
-        <Sidebar collapsed={collapsed} />
+        {!isAdminRoute && <Sidebar collapsed={collapsed} />}
         <main className="gl-main">
           <RouteOutlet />
         </main>
