@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Bell, CloudOff, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
+import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
@@ -284,8 +285,13 @@ function HotReplayCard({ replay }: { replay: HotReplayItem }) {
     >
       <div className={cn('gl-home-replay-cover', replay.cover ? 'has-image' : 'is-placeholder')}>
         {replay.cover ? <LoadableImage src={replay.cover} alt="" loading="lazy" /> : null}
-        <div className="gl-home-replay-badge">
-          {t('liveRoom.replay.badge', { defaultValue: 'Replay' })}
+        <div className="gl-home-replay-top">
+          <div className="gl-home-replay-badge">
+            {t('liveRoom.replay.badge', { defaultValue: 'Replay' })}
+          </div>
+          {replay.fanClubOnly && (
+            <FanClubExclusiveBadge compact className="gl-home-replay-exclusive-badge" />
+          )}
         </div>
         <div className="gl-home-replay-duration">{replay.duration}</div>
       </div>

@@ -148,7 +148,12 @@ export default function LiveRoomPage() {
   const fanClubLocked = Boolean(stream?.fanClubOnly && !stream.fanClubMember && !ownsFetchedStream);
   const roomCanWatch = Boolean(stream && stream.status !== 'ended' && !fanClubLocked);
   const [replayTime, setReplayTime] = useState(0);
-  const replayHistory = useReplayMessages(roomId, stream?.startedAt, stream?.endedAt, roomIsReplay);
+  const replayHistory = useReplayMessages(
+    roomId,
+    stream?.startedAt,
+    stream?.endedAt,
+    roomIsReplay && !fanClubLocked,
+  );
   const replayMessages = useMemo(() => {
     if (!stream?.startedAt) return [];
     const startMs = new Date(stream.startedAt).getTime();
@@ -627,14 +632,22 @@ export default function LiveRoomPage() {
     return (
       <ReplayRoomView
         stream={stream}
-        messages={replayMessages}
-        loadingMessages={replayHistory.isPending}
+        messages={exclusiveLocked ? [] : replayMessages}
+        loadingMessages={!exclusiveLocked && replayHistory.isPending}
         replayTime={replayTime}
         onReplayTime={setReplayTime}
         isNarrow={isNarrow}
         isMobile={isMobile}
         sheetOpen={sheetOpen}
         onSheetOpenChange={setSheetOpen}
+        locked={exclusiveLocked}
+        lockedChatLabel={t('liveRoom.fanClubExclusive.replayChatLocked', {
+          defaultValue: 'Join the fan club to unlock replay chat.',
+        })}
+        authed={isAuthed}
+        pending={joinFanClub.isPending || fanBadges.isPending}
+        onJoin={handleJoinFanClub}
+        onLogin={() => openLogin(handleJoinFanClub)}
       />
     );
   }
@@ -1324,6 +1337,12 @@ function ReplayRoomView({
   isMobile,
   sheetOpen,
   onSheetOpenChange,
+  locked,
+  lockedChatLabel,
+  authed,
+  pending,
+  onJoin,
+  onLogin,
 }: {
   stream: Stream;
   messages: Message[];
@@ -1334,6 +1353,12 @@ function ReplayRoomView({
   isMobile: boolean;
   sheetOpen: boolean;
   onSheetOpenChange: (open: boolean) => void;
+  locked?: boolean;
+  lockedChatLabel?: string;
+  authed: boolean;
+  pending: boolean;
+  onJoin: () => void;
+  onLogin: () => void;
 }) {
   const { t } = useTranslation('pages');
   const chat = (
@@ -1344,11 +1369,13 @@ function ReplayRoomView({
       readOnly
       showViewersTab={false}
       readOnlyLabel={
-        loadingMessages
-          ? t('liveRoom.replay.loadingChat', { defaultValue: 'Loading replay chat...' })
-          : t('liveRoom.replay.chatReadOnly', {
-              defaultValue: 'Replay chat is read-only. Comments and SuperChat follow playback.',
-            })
+        locked
+          ? lockedChatLabel
+          : loadingMessages
+            ? t('liveRoom.replay.loadingChat', { defaultValue: 'Loading replay chat...' })
+            : t('liveRoom.replay.chatReadOnly', {
+                defaultValue: 'Replay chat is read-only. Comments and SuperChat follow playback.',
+              })
       }
     />
   );
@@ -1363,7 +1390,22 @@ function ReplayRoomView({
         }
       >
         <div className="min-w-0 flex-1 xl:pt-6">
-          <BunnyReplayPlayer stream={stream} currentTime={replayTime} onTimeChange={onReplayTime} />
+          {locked ? (
+            <FanClubLockedPlayer
+              stream={stream}
+              authed={authed}
+              pending={pending}
+              mode="replay"
+              onJoin={onJoin}
+              onLogin={onLogin}
+            />
+          ) : (
+            <BunnyReplayPlayer
+              stream={stream}
+              currentTime={replayTime}
+              onTimeChange={onReplayTime}
+            />
+          )}
           <ReplayInfoBlock stream={stream} />
           {isMobile && <div className="gl-mobile-chat">{chat}</div>}
         </div>
@@ -1582,7 +1624,8 @@ function FanClubLockedPlayer({
   appointment,
   authed,
   pending,
-  scheduled,
+  scheduled = false,
+  mode,
   onJoin,
   onLogin,
 }: {
@@ -1590,11 +1633,13 @@ function FanClubLockedPlayer({
   appointment?: AppointmentItem | null;
   authed: boolean;
   pending: boolean;
-  scheduled: boolean;
+  scheduled?: boolean;
+  mode?: 'live' | 'scheduled' | 'replay';
   onJoin: () => void;
   onLogin: () => void;
 }) {
   const { t, i18n } = useTranslation('pages');
+  const variant = mode ?? (scheduled ? 'scheduled' : 'live');
   const scheduledAt = appointment?.scheduledAt || stream.startedAt;
   const scheduledLabel = scheduledAt
     ? new Intl.DateTimeFormat(i18n.language, {
@@ -1616,31 +1661,42 @@ function FanClubLockedPlayer({
           <div className="gl-fan-exclusive-player-badges">
             <span className="gl-scheduled-player-badge">
               <ShieldCheck size={14} />
-              {scheduled
+              {variant === 'scheduled'
                 ? t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' })
-                : t('liveRoom.liveBadge', { defaultValue: 'Live' })}
+                : variant === 'replay'
+                  ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
+                  : t('liveRoom.liveBadge', { defaultValue: 'Live' })}
             </span>
             <FanClubExclusiveBadge className="gl-scheduled-exclusive" />
           </div>
           <h2>
-            {scheduled
+            {variant === 'scheduled'
               ? t('liveRoom.fanClubExclusive.scheduledTitle', {
                   defaultValue: 'Fan club members see this appointment first',
                 })
-              : t('liveRoom.fanClubExclusive.liveTitle', {
-                  defaultValue: 'Fan club members only',
-                })}
+              : variant === 'replay'
+                ? t('liveRoom.fanClubExclusive.replayTitle', {
+                    defaultValue: 'Fan club members only replay',
+                  })
+                : t('liveRoom.fanClubExclusive.liveTitle', {
+                    defaultValue: 'Fan club members only',
+                  })}
           </h2>
           <p>
-            {scheduled
+            {variant === 'scheduled'
               ? t('liveRoom.fanClubExclusive.scheduledBody', {
                   defaultValue:
                     'Join the fan club to unlock the appointment room, reservations, and countdown.',
                 })
-              : t('liveRoom.fanClubExclusive.body', {
-                  defaultValue:
-                    'This live is exclusive to the creator fan club. Join to unlock playback and live chat.',
-                })}
+              : variant === 'replay'
+                ? t('liveRoom.fanClubExclusive.replayBody', {
+                    defaultValue:
+                      'This replay is exclusive to the creator fan club. Join to unlock playback and replay chat.',
+                  })
+                : t('liveRoom.fanClubExclusive.body', {
+                    defaultValue:
+                      'This live is exclusive to the creator fan club. Join to unlock playback and live chat.',
+                  })}
           </p>
           <div className="gl-scheduled-player-meta">
             {scheduledLabel && <span>{scheduledLabel}</span>}

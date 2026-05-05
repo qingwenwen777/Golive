@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Clock3,
   Coins,
+  Crown,
   FileText,
   ImagePlus,
   MoreHorizontal,
@@ -56,9 +57,11 @@ import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadD
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
 import { PostCard } from '@/features/posts/PostCard';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
+import { cn } from '@/lib/cn';
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import type { FanClubMember } from '@/types/gift';
 import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
@@ -921,6 +924,14 @@ function FanClubBanner({
             defaultValue: '感谢每一位点亮粉丝灯牌的观众。',
           })}
         </p>
+        {!pending && memberCount > 0 && (
+          <span className="gl-fan-club-copy-count">
+            {t('channel.fanClub.memberCount', {
+              count: memberCount,
+              defaultValue: '{{count}} fans joined',
+            })}
+          </span>
+        )}
       </div>
       <div className="gl-fan-club-side">
         <div className="gl-fan-club-preview">
@@ -936,7 +947,17 @@ function FanClubBanner({
               preview.map((fan) => (
                 <div className="gl-fan-club-avatar-wrap" key={fan.id} title={fan.name}>
                   <Avatar name={fan.name} src={fan.avatar ?? ''} size={42} />
-                  {fan.level && <span>Lv.{fan.level}</span>}
+                  {fan.level && (
+                    <span
+                      className={cn(
+                        'gl-fan-badge-level gl-fan-club-level',
+                        fanBadgeToneClass(fan.level),
+                      )}
+                    >
+                      <Crown size={11} strokeWidth={2.4} />
+                      <span>#{fan.level}</span>
+                    </span>
+                  )}
                 </div>
               ))
             ) : (
@@ -945,14 +966,6 @@ function FanClubBanner({
               </span>
             )}
           </div>
-          {!pending && memberCount > 0 && (
-            <span className="gl-fan-club-member-count">
-              {t('channel.fanClub.memberCount', {
-                count: memberCount,
-                defaultValue: '{{count}} fans joined',
-              })}
-            </span>
-          )}
         </div>
         {!isOwner && (
           <button

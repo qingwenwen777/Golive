@@ -3155,10 +3155,26 @@ input:focus-visible,
   object-fit: cover;
   object-position: center center;
 }
-.gl-home-replay-cover > span {
+.gl-home-replay-cover > span:not(.gl-fan-exclusive-badge) {
   color: var(--gl-text-2);
   font-size: 34px;
   font-weight: 850;
+}
+.gl-home-replay-top {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  max-width: calc(100% - 16px);
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 .gl-home-replay-badge,
 .gl-home-replay-duration {
@@ -3175,6 +3191,12 @@ input:focus-visible,
   line-height: 1;
   padding: 0 6px;
 }
+.gl-home-replay-top .gl-home-replay-badge,
+.gl-home-replay-top .gl-home-replay-exclusive-badge {
+  position: static;
+  opacity: 1;
+  transform: none;
+}
 .gl-home-replay-badge {
   top: 8px;
   left: 8px;
@@ -3187,6 +3209,11 @@ input:focus-visible,
 }
 .gl-home-replay-card:hover .gl-home-replay-badge,
 .gl-home-replay-card:focus-within .gl-home-replay-badge {
+  opacity: 1;
+  transform: translateY(0);
+}
+.gl-home-replay-card:hover .gl-home-replay-top,
+.gl-home-replay-card:focus-within .gl-home-replay-top {
   opacity: 1;
   transform: translateY(0);
 }
@@ -8559,6 +8586,14 @@ button.gl-fan-badge-empty {
   font-size: 13px;
   line-height: 1.45;
 }
+.gl-fan-club-copy-count {
+  display: inline-flex;
+  margin-top: 8px;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.2;
+}
 .gl-fan-club-side {
   display: flex;
   align-items: center;
@@ -8569,6 +8604,7 @@ button.gl-fan-badge-empty {
   min-width: 0;
   justify-items: end;
   gap: 4px;
+  transform: translateY(8px);
 }
 .gl-fan-club-avatars {
   display: flex;
@@ -8596,33 +8632,44 @@ button.gl-fan-badge-empty {
   border: 2px solid var(--gl-bg-card);
   border-radius: 999px;
 }
-.gl-fan-club-avatar-wrap span {
+.gl-fan-club-avatar-wrap .gl-fan-club-level {
   position: absolute;
-  bottom: -7px;
+  bottom: -9px;
   left: 50%;
-  min-width: 34px;
+  display: inline-flex;
+  min-width: 36px;
+  height: 19px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   transform: translateX(-50%);
   border-radius: 999px;
-  background: var(--gl-text);
-  color: var(--gl-bg);
+  border: 1px solid var(--fan-badge-border);
+  background: var(--fan-badge-bg);
+  color: var(--fan-badge-color);
   font-size: 10px;
   font-weight: 900;
   line-height: 1;
-  padding: 3px 5px;
+  padding: 0 6px;
   text-align: center;
   white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.1);
+}
+.gl-fan-club-avatar-wrap .gl-fan-club-level svg {
+  color: var(--fan-badge-icon);
+}
+.dark .gl-fan-club-avatar-wrap .gl-fan-club-level {
+  border-color: var(--fan-badge-dark-border);
+  background: var(--fan-badge-dark-bg);
+  color: var(--fan-badge-dark-color);
+}
+.dark .gl-fan-club-avatar-wrap .gl-fan-club-level svg {
+  color: var(--fan-badge-dark-icon);
 }
 .gl-fan-club-empty-avatars {
   color: var(--gl-text-3);
   font-size: 12px;
   font-weight: 800;
-}
-.gl-fan-club-member-count {
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.2;
-  white-space: nowrap;
 }
 .gl-fan-club-join {
   position: relative;
@@ -13589,7 +13636,7 @@ button.gl-fan-badge-empty {
   object-position: center center;
 }
 
-.gl-appointment-cover > span {
+.gl-appointment-cover > span:not(.gl-fan-exclusive-badge) {
   color: var(--gl-text-2);
   font-size: 34px;
   font-weight: 850;
@@ -13618,6 +13665,22 @@ button.gl-fan-badge-empty {
   left: 8px;
   bottom: 8px;
   z-index: 3;
+  border-color: rgba(255, 255, 255, 0.38);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 79, 163, 0.98),
+      rgba(109, 93, 252, 0.98) 48%,
+      rgba(37, 214, 162, 0.98)
+    ),
+    #6d5dfc;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.12);
   pointer-events: none;
 }
 
