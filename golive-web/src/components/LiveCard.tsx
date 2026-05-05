@@ -22,27 +22,12 @@ import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
-import { streamChannelName, type Stream } from '@/types/stream';
+import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 
 export interface LiveCardProps {
   stream: Stream;
   onClick?: (stream: Stream) => void;
   priority?: boolean;
-}
-
-function initialsOf(name: string): string {
-  const trimmed = (name ?? '').trim();
-  if (!trimmed) return '?';
-  const parts = trimmed.split(/\s+/).slice(0, 2);
-  return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || trimmed[0].toUpperCase();
-}
-
-function gradientFor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const a = h % 360;
-  const b = (a + 60) % 360;
-  return `linear-gradient(135deg, hsl(${a} 70% 45%), hsl(${b} 70% 35%))`;
 }
 
 export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
@@ -55,13 +40,17 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const title = lang === 'ja' ? (stream.titleJa ?? stream.title) : stream.title;
   const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
   const channelName = streamChannelName(stream);
+  const hasChannelName = !isPlaceholderChannelName(channelName);
   const isLive = stream.isLive === true || stream.status === 'live';
   const hasReplay = stream.status === 'ended' && Boolean(stream.replay?.canWatch);
   const isScheduled = stream.status === 'scheduled' || stream.status === 'publishing';
   const canOpen = isLive || hasReplay || isScheduled;
   const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
-  const hoverStyle = useCoverHoverStyle(stream.cover, channelName || title || stream.id);
+  const hoverStyle = useCoverHoverStyle(
+    stream.cover,
+    (hasChannelName ? channelName : title) || stream.id,
+  );
 
   useEffect(() => {
     setSaved(isInLibrary(WATCH_LATER_KEY, stream.id));
@@ -146,19 +135,11 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         }}
       >
         <div
-          className={`gl-card-cover relative overflow-hidden rounded-card${stream.cover ? 'has-image' : ''}`}
+          className={cn(
+            'gl-card-cover relative overflow-hidden rounded-card',
+            stream.cover ? 'has-image' : 'is-placeholder',
+          )}
         >
-          <div
-            aria-hidden
-            className="absolute inset-0 flex items-center justify-center"
-            style={{
-              background: gradientFor(channelName || stream.title || stream.id),
-            }}
-          >
-            <span className="text-3xl font-bold text-white/90 drop-shadow">
-              {initialsOf(channelName || stream.title)}
-            </span>
-          </div>
           {stream.cover ? (
             <LoadableImage
               src={stream.cover}
@@ -184,13 +165,17 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
           </div>
         </div>
         <div className="gl-card-meta">
-          <Avatar name={channelName} src={stream.avatar} size={44} />
+          <Avatar name={hasChannelName ? channelName : title} src={stream.avatar} size={44} />
           <div className="gl-card-text">
             <div className="gl-card-title" title={title}>
               {title}
             </div>
             <div className="gl-card-chan">
-              <span className="truncate">{channelName}</span>
+              {hasChannelName ? (
+                <span className="truncate">{channelName}</span>
+              ) : (
+                <span className="gl-card-chan-skeleton" aria-hidden="true" />
+              )}
               {stream.verified && (
                 <Icons.BadgeCheck size={14} className="shrink-0 text-text-secondary" />
               )}

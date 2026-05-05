@@ -16,8 +16,8 @@ export function LiveCardSkeleton() {
       <div className="gl-skel-meta">
         <div className="gl-skel-avatar" />
         <div className="flex-1">
-          <div className="gl-skel-line" style={{ width: '85%' }} />
-          <div className="gl-skel-line" style={{ width: '55%', marginTop: 6 }} />
+          <div className="gl-skel-line is-title" style={{ width: '85%' }} />
+          <div className="gl-skel-line" style={{ width: '55%', marginTop: 8 }} />
         </div>
       </div>
     </div>

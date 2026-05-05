@@ -12,7 +12,7 @@ import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import type { AppointmentItem } from '@/api/room';
-import type { Stream } from '@/types/stream';
+import { isPlaceholderChannelName, type Stream } from '@/types/stream';
 
 export interface AppointmentCardProps {
   appointment: AppointmentItem;
@@ -68,6 +68,7 @@ export function AppointmentCard({
     defaultValue: category,
   });
   const channelName = appointment.channel || `Creator ${appointment.ownerId.slice(0, 8)}`;
+  const hasChannelName = !isPlaceholderChannelName(channelName);
   const appointmentLabel = t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' });
   const hoverStyle = useCoverHoverStyle(
     appointment.cover,
@@ -159,12 +160,10 @@ export function AppointmentCard({
 
   const main = (
     <>
-      <div className={cn('gl-appointment-cover', appointment.cover && 'has-image')}>
-        {appointment.cover ? (
-          <LoadableImage src={appointment.cover} alt="" loading="lazy" />
-        ) : (
-          <span>{channelName.slice(0, 1).toUpperCase()}</span>
-        )}
+      <div
+        className={cn('gl-appointment-cover', appointment.cover ? 'has-image' : 'is-placeholder')}
+      >
+        {appointment.cover ? <LoadableImage src={appointment.cover} alt="" loading="lazy" /> : null}
         {!managementMode && (
           <div className="gl-appointment-starting-badge">
             <Clock3 size={12} />
@@ -179,13 +178,27 @@ export function AppointmentCard({
         )}
       </div>
       <div className="gl-appointment-body">
-        {showChannel && <Avatar name={channelName} src={appointment.avatar} size={44} />}
+        {showChannel && (
+          <Avatar
+            name={hasChannelName ? channelName : appointment.title}
+            src={appointment.avatar}
+            size={44}
+          />
+        )}
         <div className="gl-appointment-copy">
           <div className="gl-appointment-head">
             <h3>{appointment.title}</h3>
             {appointment.verified && <CheckCircle2 size={15} />}
           </div>
-          {showChannel && <div className="gl-appointment-channel">{channelName}</div>}
+          {showChannel && (
+            <div className="gl-appointment-channel">
+              {hasChannelName ? (
+                channelName
+              ) : (
+                <span className="gl-card-chan-skeleton" aria-hidden="true" />
+              )}
+            </div>
+          )}
           <div className="gl-appointment-meta">
             {managementMode ? (
               <>

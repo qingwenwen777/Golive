@@ -10,33 +10,11 @@ export interface AvatarProps {
   className?: string;
 }
 
-function hashHue(name: string): number {
-  let x = 0;
-  for (let i = 0; i < name.length; i++) {
-    x = (x * 31 + name.charCodeAt(i)) & 0xffff;
-  }
-  return x % 360;
-}
-
-function computeInitials(name: string): string {
-  return name
-    .replace(/[^a-zA-Z぀-ヿ一-鿿 ]/g, '')
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter((c): c is string => Boolean(c))
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
 export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
   const [failed, setFailed] = useState(false);
-  const hue = hashHue(name);
-  const initials = computeInitials(name);
-  const bg1 = `hsl(${hue}, 65%, 55%)`;
-  const bg2 = `hsl(${(hue + 40) % 360}, 70%, 45%)`;
   const imageSrc = normalizeAvatarSrc(src);
   const [loaded, setLoaded] = useState(() => isLoadableImageReady(imageSrc));
+  const showImage = Boolean(imageSrc && !failed);
   const style: CSSProperties = {
     width: size,
     height: size,
@@ -50,9 +28,9 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
     fontWeight: 600,
     fontSize: size * 0.42,
     letterSpacing: 0,
-    background: `linear-gradient(135deg, ${bg1}, ${bg2})`,
+    background: 'var(--gl-avatar-placeholder)',
     flexShrink: 0,
-    ...(ring ? { boxShadow: `0 0 0 2px ${ring}, 0 0 0 4px ${bg1}` } : null),
+    ...(ring ? { boxShadow: `0 0 0 2px ${ring}, 0 0 0 4px var(--gl-avatar-placeholder)` } : null),
   };
 
   useLayoutEffect(() => {
@@ -62,11 +40,16 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
 
   return (
     <div
-      className={cn('gl-avatar', imageSrc && !failed && !loaded && 'is-loading', className)}
+      className={cn(
+        'gl-avatar',
+        showImage && !loaded && 'is-loading',
+        !showImage && 'is-empty',
+        className,
+      )}
       style={style}
       aria-label={name}
     >
-      {imageSrc && !failed ? (
+      {showImage ? (
         <LoadableImage
           src={imageSrc}
           alt=""
@@ -74,9 +57,7 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
           onReady={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
-      ) : (
-        initials
-      )}
+      ) : null}
     </div>
   );
 }

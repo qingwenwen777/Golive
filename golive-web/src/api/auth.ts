@@ -55,6 +55,7 @@ export function useLoginMutation() {
     onSuccess: (data) => {
       login(data);
       void qc.invalidateQueries({ queryKey: ['me'] });
+      scheduleAuthPageRefresh();
     },
   });
 }
@@ -71,6 +72,7 @@ export function useRegisterMutation() {
     onSuccess: (data) => {
       login(data);
       void qc.invalidateQueries({ queryKey: ['me'] });
+      scheduleAuthPageRefresh();
     },
   });
 }
@@ -220,5 +222,13 @@ export async function logout(): Promise<void> {
     await http.post('/auth/logout').catch(() => undefined);
   } finally {
     useAuthStore.getState().logout();
+    scheduleAuthPageRefresh();
   }
+}
+
+function scheduleAuthPageRefresh(): void {
+  if (typeof window === 'undefined') return;
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 0);
 }

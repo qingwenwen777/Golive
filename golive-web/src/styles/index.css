@@ -51,6 +51,10 @@
   --gl-chip-bg-active: #0f0f0f;
   --gl-chip-text-active: #ffffff;
   --gl-red: #ff3d5c;
+  --gl-progress: #ff0033;
+  --gl-skeleton-base: #e5e5e5;
+  --gl-skeleton-shine: rgba(255, 255, 255, 0.64);
+  --gl-avatar-placeholder: #e5e5e5;
   --gl-analytics-accent: #2f6f4e;
   --gl-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   --gl-sc-body-tint: rgba(255, 255, 255, 0.3);
@@ -1070,6 +1074,10 @@
   --gl-chip-bg-active: #ffffff;
   --gl-chip-text-active: #0f0f0f;
   --gl-red: #ff3d5c;
+  --gl-progress: #ff3d5c;
+  --gl-skeleton-base: #3f3f3f;
+  --gl-skeleton-shine: rgba(255, 255, 255, 0.12);
+  --gl-avatar-placeholder: #3f3f3f;
   --gl-analytics-accent: #78b88d;
   --gl-shadow: 0 0 0 rgba(0, 0, 0, 0);
 }
@@ -2073,6 +2081,32 @@ input:focus-visible,
 .gl-page {
   padding: 10px 40px 40px;
 }
+.gl-top-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.gl-top-progress.is-visible {
+  opacity: 1;
+}
+.gl-top-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 50%;
+  background: var(--gl-progress);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--gl-progress) 70%, transparent);
+  transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+}
+.gl-top-progress.is-settling span {
+  transition-duration: 0.14s;
+}
 .gl-route-page {
   min-width: 0;
   backface-visibility: hidden;
@@ -2120,7 +2154,10 @@ input:focus-visible,
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .gl-top-progress,
+  .gl-top-progress span,
   .gl-route-page.is-entering {
+    transition: none;
     animation: none;
   }
 }
@@ -2137,15 +2174,20 @@ input:focus-visible,
 .gl-avatar {
   position: relative;
 }
+.gl-avatar.is-loading,
+.gl-avatar.is-empty {
+  background: var(--gl-avatar-placeholder) !important;
+}
 .gl-avatar.is-loading::after {
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 2;
   background: linear-gradient(
     110deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.32) 45%,
-    transparent 70%
+    var(--gl-avatar-placeholder) 0%,
+    var(--gl-skeleton-shine) 45%,
+    var(--gl-avatar-placeholder) 70%
   );
   background-size: 220% 100%;
   animation: glImageBuffer 1.1s ease-in-out infinite;
@@ -2158,33 +2200,45 @@ input:focus-visible,
   object-fit: cover;
 }
 .gl-card-cover.has-image::before,
+.gl-card-cover.is-placeholder::before,
 .gl-channel-cover.has-cover::before,
+.gl-channel-cover.is-loading::before,
 .gl-history-thumb.has-image::before,
 .gl-history-cover.has-image::before,
-.gl-creator-latest-cover.has-image::before {
+.gl-creator-latest-cover.has-image::before,
+.gl-home-replay-cover.has-image::before,
+.gl-home-replay-cover.is-placeholder::before,
+.gl-appointment-cover.has-image::before,
+.gl-appointment-cover.is-placeholder::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: 0;
   background: linear-gradient(
     110deg,
-    var(--gl-bg-hover) 0%,
-    rgba(255, 255, 255, 0.55) 45%,
-    var(--gl-bg-hover) 70%
+    var(--gl-skeleton-base) 0%,
+    var(--gl-skeleton-shine) 45%,
+    var(--gl-skeleton-base) 70%
   );
   background-size: 220% 100%;
   animation: glImageBuffer 1.1s ease-in-out infinite;
 }
 .dark .gl-card-cover.has-image::before,
+.dark .gl-card-cover.is-placeholder::before,
 .dark .gl-channel-cover.has-cover::before,
+.dark .gl-channel-cover.is-loading::before,
 .dark .gl-history-thumb.has-image::before,
 .dark .gl-history-cover.has-image::before,
-.dark .gl-creator-latest-cover.has-image::before {
+.dark .gl-creator-latest-cover.has-image::before,
+.dark .gl-home-replay-cover.has-image::before,
+.dark .gl-home-replay-cover.is-placeholder::before,
+.dark .gl-appointment-cover.has-image::before,
+.dark .gl-appointment-cover.is-placeholder::before {
   background: linear-gradient(
     110deg,
-    var(--gl-bg-hover) 0%,
-    rgba(255, 255, 255, 0.12) 45%,
-    var(--gl-bg-hover) 70%
+    var(--gl-skeleton-base) 0%,
+    var(--gl-skeleton-shine) 45%,
+    var(--gl-skeleton-base) 70%
   );
   background-size: 220% 100%;
 }
@@ -2193,10 +2247,21 @@ input:focus-visible,
   .gl-channel-cover.has-cover:has(.gl-loadable-img.is-loaded)::before,
   .gl-history-thumb.has-image:has(.gl-loadable-img.is-loaded)::before,
   .gl-history-cover.has-image:has(.gl-loadable-img.is-loaded)::before,
-  .gl-creator-latest-cover.has-image:has(.gl-loadable-img.is-loaded)::before {
+  .gl-creator-latest-cover.has-image:has(.gl-loadable-img.is-loaded)::before,
+  .gl-home-replay-cover.has-image:has(.gl-loadable-img.is-loaded)::before,
+  .gl-appointment-cover.has-image:has(.gl-loadable-img.is-loaded)::before {
     opacity: 0;
     animation: none;
   }
+}
+.gl-card-cover.is-placeholder,
+.gl-home-replay-cover.is-placeholder,
+.gl-appointment-cover.is-placeholder,
+.gl-channel-cover.is-loading {
+  background: var(--gl-skeleton-base);
+}
+.gl-card-cover.is-placeholder .gl-card-gloss {
+  display: none;
 }
 .gl-card-cover .gl-loadable-img {
   position: absolute;
@@ -2206,6 +2271,11 @@ input:focus-visible,
   height: 100%;
   object-fit: cover;
   object-position: center center;
+}
+.gl-home-replay-cover .gl-loadable-img,
+.gl-appointment-cover .gl-loadable-img {
+  position: relative;
+  z-index: 1;
 }
 .gl-history-thumb .gl-loadable-img,
 .gl-history-cover .gl-loadable-img,
@@ -2399,6 +2469,24 @@ input:focus-visible,
 .gl-card-sub {
   margin-top: 2px;
 }
+.gl-card-chan-skeleton {
+  display: inline-flex;
+  width: min(160px, 70%);
+  height: 14px;
+  min-width: 72px;
+  border-radius: 4px;
+  background: var(--gl-skeleton-base);
+  position: relative;
+  overflow: hidden;
+}
+.gl-card-chan-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--gl-skeleton-shine), transparent);
+  transform: translateX(-100%);
+  animation: glShimmer 1.4s linear infinite;
+}
 .gl-card-more {
   flex: 0 0 auto;
   width: 30px;
@@ -2538,7 +2626,7 @@ input:focus-visible,
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 12px;
-  background: var(--gl-bg-hover);
+  background: var(--gl-skeleton-base);
   position: relative;
   overflow: hidden;
 }
@@ -2551,20 +2639,23 @@ input:focus-visible,
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--gl-bg-hover);
+  background: var(--gl-skeleton-base);
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
 }
 .gl-skel-line {
-  height: 10px;
+  height: 12px;
   border-radius: 4px;
-  background: var(--gl-bg-hover);
+  background: var(--gl-skeleton-base);
   position: relative;
   overflow: hidden;
 }
+.gl-skel-line.is-title {
+  height: 24px;
+}
 .gl-skel-block {
-  background: var(--gl-bg-hover);
+  background: var(--gl-skeleton-base);
   position: relative;
   overflow: hidden;
   border-radius: 4px;
@@ -2576,7 +2667,7 @@ input:focus-visible,
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06), transparent);
+  background: linear-gradient(90deg, transparent, var(--gl-skeleton-shine), transparent);
   transform: translateX(-100%);
   animation: glShimmer 1.4s linear infinite;
 }
@@ -2584,7 +2675,7 @@ input:focus-visible,
 .dark .gl-skel-line::after,
 .dark .gl-skel-avatar::after,
 .dark .gl-skel-block::after {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  background: linear-gradient(90deg, transparent, var(--gl-skeleton-shine), transparent);
 }
 @keyframes glShimmer {
   100% {
@@ -7034,6 +7125,11 @@ button.gl-fan-badge-empty {
 .gl-info-chan-name .gl-user-level-badge {
   flex: 0 0 auto;
 }
+.gl-channel-name-skeleton {
+  width: min(360px, 62vw);
+  height: 38px;
+  border-radius: 8px;
+}
 .gl-channel-handle {
   display: flex;
   flex-wrap: wrap;
@@ -7041,6 +7137,14 @@ button.gl-fan-badge-empty {
   margin-top: 10px;
   color: var(--gl-text-2);
   font-size: 13px;
+}
+.gl-channel-handle-skeleton {
+  width: 148px;
+  height: 16px;
+  border-radius: 4px;
+}
+.gl-channel-handle-skeleton.is-short {
+  width: 96px;
 }
 .gl-channel-handle span + span::before {
   content: none;

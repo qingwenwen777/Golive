@@ -84,3 +84,11 @@ export function streamChannelName(
   if (fallback) return `Creator ${fallback.slice(0, 8)}`;
   return 'Creator';
 }
+
+export function isPlaceholderChannelName(name: string | null | undefined): boolean {
+  const trimmed = name?.trim() ?? '';
+  if (!trimmed) return true;
+  if (isUuidLike(trimmed)) return true;
+  if (trimmed.toLowerCase() === 'creator') return true;
+  return /^Creator\s+[0-9a-f-]{6,}$/i.test(trimmed);
+}

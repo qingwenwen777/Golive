@@ -43,7 +43,7 @@ import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
-import { LiveCardSkeleton } from '@/components/Skeleton';
+import { LiveCardSkeleton, Skeleton } from '@/components/Skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
@@ -59,7 +59,7 @@ import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/Repor
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
-import { streamChannelName, type Stream } from '@/types/stream';
+import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
 const HISTORY_PAGE_SIZE = 4;
@@ -106,9 +106,17 @@ export default function ChannelPage() {
     [channelKey, profile, streams],
   );
   const primary = channelStreams[0];
-  const channelName = resolveChannelName(profile, primary, channelKey, t);
-  const channelAvatar = profile?.avatar || primary?.avatar || '';
-  const channelCover = resolveChannelCover(profile);
+  const resolvedChannelName = resolveChannelName(profile, primary, channelKey, t);
+  const channelIdentityPending = shouldHoldChannelIdentity({
+    channelKey,
+    profile,
+    stream: primary,
+    profilePending: publicUser.isPending,
+    roomsPending: rooms.isPending,
+  });
+  const channelName = resolvedChannelName;
+  const channelAvatar = channelIdentityPending ? '' : profile?.avatar || primary?.avatar || '';
+  const channelCover = channelIdentityPending ? '' : resolveChannelCover(profile);
   const channelId =
     primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
@@ -297,7 +305,11 @@ export default function ChannelPage() {
     <div className="gl-page gl-channel-page">
       <section className="gl-channel-hero-v2">
         <div
-          className={['gl-channel-cover', channelCover ? 'has-cover' : '']
+          className={[
+            'gl-channel-cover',
+            channelCover ? 'has-cover' : '',
+            channelIdentityPending ? 'is-loading' : '',
+          ]
             .filter(Boolean)
             .join(' ')}
         >
@@ -317,15 +329,31 @@ export default function ChannelPage() {
         </div>
 
         <div className="gl-channel-profile-v2">
-          <Avatar name={channelName} src={channelAvatar} size={128} className="gl-channel-avatar" />
+          <Avatar
+            name={resolvedChannelName}
+            src={channelAvatar}
+            size={128}
+            className="gl-channel-avatar"
+          />
           <div className="gl-channel-profile-main">
             <h1>
-              <span>{channelName}</span>
-              {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
-              {profile?.levelInfo && <UserLevelBadge levelInfo={profile.levelInfo} />}
+              {channelIdentityPending ? (
+                <Skeleton className="gl-channel-name-skeleton" />
+              ) : (
+                <>
+                  <span>{channelName}</span>
+                  {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
+                  {profile?.levelInfo && <UserLevelBadge levelInfo={profile.levelInfo} />}
+                </>
+              )}
             </h1>
             <div className="gl-channel-handle">
-              {profile?.username ? (
+              {channelIdentityPending ? (
+                <>
+                  <Skeleton className="gl-channel-handle-skeleton is-short" />
+                  <Skeleton className="gl-channel-handle-skeleton" />
+                </>
+              ) : profile?.username ? (
                 <span>@{profile.username}</span>
               ) : (
                 <span>{formatChannelKey(channelKey, t)}</span>
@@ -1075,6 +1103,26 @@ function resolveChannelName(
   if (stream) return streamChannelName(stream);
   if (key && !isUuidLike(key)) return key;
   return t('channel.creatorFallback');
+}
+
+function shouldHoldChannelIdentity({
+  channelKey,
+  profile,
+  stream,
+  profilePending,
+  roomsPending,
+}: {
+  channelKey: string;
+  profile: User | null;
+  stream: Stream | undefined;
+  profilePending: boolean;
+  roomsPending: boolean;
+}): boolean {
+  if (profile || (!profilePending && !roomsPending)) return false;
+  const key = channelKey.startsWith('ch-') ? channelKey.slice(3) : channelKey;
+  if (!key || isUuidLike(key)) return true;
+  if (isPlaceholderChannelName(key)) return true;
+  return Boolean(stream && isPlaceholderChannelName(streamChannelName(stream)));
 }
 
 export function resolveChannelCover(profile: User | null): string {

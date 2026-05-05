@@ -3,6 +3,7 @@ import { useLocation, useOutlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { TopBar } from '@/components/TopBar';
 import { Sidebar } from '@/components/Sidebar';
+import { TopProgressBar } from '@/components/TopProgressBar';
 import { Toaster } from '@/components/ui/sonner';
 import { LoginModal } from '@/features/auth/LoginModal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -16,6 +17,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg text-text">
+      <TopProgressBar />
       <TopBar onMenuClick={() => setUserCollapsed((v) => !v)} />
       <div className="gl-layout">
         {!isAdminRoute && <Sidebar collapsed={collapsed} />}

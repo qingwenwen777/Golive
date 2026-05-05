@@ -23,7 +23,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
-import { streamChannelName, type Stream } from '@/types/stream';
+import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 
 const UPCOMING_APPOINTMENT_LIMIT = 3;
 const RECOMMENDED_LIVE_LIMIT = 12;
@@ -269,6 +269,7 @@ function HomeHotReplaysSection({ category }: { category?: string }) {
 function HotReplayCard({ replay }: { replay: HotReplayItem }) {
   const { t, i18n } = useTranslation('pages');
   const channelName = streamChannelName(replay);
+  const hasChannelName = !isPlaceholderChannelName(channelName);
   const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
   const category =
     i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;
@@ -280,24 +281,26 @@ function HotReplayCard({ replay }: { replay: HotReplayItem }) {
       style={hoverStyle}
       to={`/live/${encodeURIComponent(replay.id)}`}
     >
-      <div className={cn('gl-home-replay-cover', replay.cover && 'has-image')}>
-        {replay.cover ? (
-          <LoadableImage src={replay.cover} alt="" loading="lazy" />
-        ) : (
-          <span>{channelName.slice(0, 1).toUpperCase()}</span>
-        )}
+      <div className={cn('gl-home-replay-cover', replay.cover ? 'has-image' : 'is-placeholder')}>
+        {replay.cover ? <LoadableImage src={replay.cover} alt="" loading="lazy" /> : null}
         <div className="gl-home-replay-badge">
           {t('liveRoom.replay.badge', { defaultValue: 'Replay' })}
         </div>
         <div className="gl-home-replay-duration">{replay.duration}</div>
       </div>
       <div className="gl-home-replay-body">
-        <Avatar name={channelName} src={replay.avatar} size={44} />
+        <Avatar name={hasChannelName ? channelName : title} src={replay.avatar} size={44} />
         <div className="gl-home-replay-copy">
           <div className="gl-home-replay-title" title={title}>
             {title}
           </div>
-          <div className="gl-home-replay-channel">{channelName}</div>
+          <div className="gl-home-replay-channel">
+            {hasChannelName ? (
+              channelName
+            ) : (
+              <span className="gl-card-chan-skeleton" aria-hidden="true" />
+            )}
+          </div>
           <div className="gl-home-replay-meta">
             {t('liveRoom.replay.badge', { defaultValue: 'Replay' })} · {category}
           </div>
