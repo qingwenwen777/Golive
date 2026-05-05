@@ -166,9 +166,6 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Lo
 	if err := s.clearLoginFailures(ctx, username); err != nil {
 		return nil, err
 	}
-	if u.Banned {
-		return nil, ErrUserBanned
-	}
 
 	access, err := s.signAccess(u.ID)
 	if err != nil {
@@ -398,9 +395,6 @@ func (s *AuthService) Me(ctx context.Context, accessToken string) (*model.Public
 	u, err := s.users.FindByID(ctx, uid)
 	if err != nil {
 		return nil, ErrUnauthorized
-	}
-	if u.Banned {
-		return nil, ErrUserBanned
 	}
 	pu := u.Public()
 	return &pu, nil

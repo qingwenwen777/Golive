@@ -6206,7 +6206,7 @@ input:focus-visible,
 }
 .gl-admin-user-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -6272,6 +6272,10 @@ input:focus-visible,
 .gl-admin-user-detail-head em.is-banned {
   background: rgba(255, 61, 92, 0.12);
   color: var(--gl-red);
+}
+.gl-admin-user-state.is-appeal {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
 }
 .gl-admin-user-detail {
   display: flex;
@@ -6452,6 +6456,95 @@ input:focus-visible,
   color: var(--gl-text-2);
   font-size: 12px;
   font-weight: 750;
+}
+.gl-admin-appeal-list {
+  gap: 0;
+}
+.gl-admin-appeal-record {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+.gl-admin-appeal-record-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gl-admin-appeal-record-head strong {
+  width: fit-content;
+  border-radius: 999px;
+  background: rgba(28, 98, 185, 0.1);
+  color: #1c62b9;
+  padding: 5px 9px;
+}
+.gl-admin-appeal-record p,
+.gl-admin-appeal-record small {
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gl-admin-appeal-record p {
+  color: var(--gl-text);
+  font-size: 13px;
+}
+.gl-admin-appeal-review {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.gl-admin-appeal-review textarea {
+  min-height: 76px;
+  resize: vertical;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+  padding: 10px 12px;
+  outline: none;
+}
+.gl-admin-appeal-review textarea:focus {
+  border-color: rgba(28, 98, 185, 0.45);
+  box-shadow: 0 0 0 3px rgba(28, 98, 185, 0.1);
+}
+.gl-admin-appeal-review > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gl-admin-appeal-review button {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 11px;
+}
+.gl-admin-appeal-review button:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-admin-appeal-review button.is-danger {
+  color: var(--gl-red);
+}
+.gl-admin-appeal-review button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .gl-admin-pagination {
   display: flex;
@@ -11052,6 +11145,146 @@ button.gl-fan-badge-empty {
 .gl-settings-button:disabled {
   cursor: default;
   opacity: 0.55;
+}
+
+.gl-banned-page {
+  display: grid;
+  min-height: calc(100dvh - 64px);
+  place-items: center;
+  padding: 32px 20px;
+}
+
+.gl-banned-panel {
+  width: min(100%, 620px);
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+  padding: 28px;
+}
+
+.gl-banned-icon {
+  display: inline-flex;
+  width: 58px;
+  height: 58px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(255, 61, 92, 0.12);
+  color: var(--gl-red);
+}
+
+.gl-banned-head {
+  margin-top: 18px;
+}
+
+.gl-banned-head h1 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.gl-banned-head p {
+  margin: 10px 0 0;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.gl-banned-user,
+.gl-banned-reason,
+.gl-banned-appeal {
+  margin-top: 18px;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg);
+  padding: 14px;
+}
+
+.gl-banned-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gl-banned-user div {
+  min-width: 0;
+}
+
+.gl-banned-user strong,
+.gl-banned-user span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-banned-user strong {
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.gl-banned-user span,
+.gl-banned-reason span,
+.gl-banned-appeal label span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.gl-banned-reason p {
+  margin: 7px 0 0;
+  color: var(--gl-text);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.gl-banned-appeal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gl-banned-appeal label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.gl-banned-appeal textarea {
+  min-height: 142px;
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+  font-size: 14px;
+  line-height: 1.55;
+  outline: none;
+  padding: 12px;
+}
+
+.gl-banned-appeal textarea:focus {
+  border-color: var(--gl-text);
+}
+
+.gl-banned-appeal small {
+  align-self: flex-end;
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.gl-banned-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .gl-settings-provider-state {

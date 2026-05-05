@@ -74,6 +74,17 @@ func expectFindByUsername(mock sqlmock.Sqlmock, username, hash string) {
 		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(int64(0)))
 }
 
+func expectFindBannedByUsername(mock sqlmock.Sqlmock, username, hash string) {
+	rows := sqlmock.NewRows([]string{"id", "username", "display_name", "password_hash", "avatar", "coin_balance", "banned", "ban_reason", "verified", "created_at", "updated_at"}).
+		AddRow("u-1", username, username, hash, "", int64(100), true, "appeal test", true, time.Now(), time.Now())
+	mock.ExpectQuery(`SELECT \* FROM .users. WHERE username = \? LIMIT \?`).
+		WithArgs(username, 1).
+		WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM .coin_transactions. WHERE user_id = \? AND type = \? AND amount > 0`).
+		WithArgs("u-1", "topup").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(int64(0)))
+}
+
 func expectFindByUsernameNotFound(mock sqlmock.Sqlmock, username string) {
 	mock.ExpectQuery(`SELECT \* FROM .users. WHERE username = \? LIMIT \?`).
 		WithArgs(username, 1).
@@ -101,6 +112,21 @@ func TestLogin_Success(t *testing.T) {
 	require.Equal(t, "demo", resp.User.Username)
 
 	// refresh token persisted in redis
+	require.True(t, mr.Exists("refresh:"+resp.RefreshToken))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestLogin_BannedUserReceivesRestrictedSession(t *testing.T) {
+	svc, mock, mr := newSvc(t)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("demo"), bcrypt.MinCost)
+	expectFindBannedByUsername(mock, "demo", string(hash))
+
+	resp, err := svc.Login(context.Background(), "demo", "demo")
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Token)
+	require.NotEmpty(t, resp.RefreshToken)
+	require.True(t, resp.User.Banned)
+	require.Equal(t, "appeal test", resp.User.BanReason)
 	require.True(t, mr.Exists("refresh:"+resp.RefreshToken))
 	require.NoError(t, mock.ExpectationsWereMet())
 }

@@ -4,8 +4,15 @@ import type { User } from '@/types/user';
 import type { AdminAuditLog } from '@/api/contentModeration';
 
 export type AdminUserRole = 'user' | 'admin' | 'moderator';
-export type AdminUserStatus = 'all' | 'active' | 'banned' | 'frozen' | 'live_approved';
+export type AdminUserStatus =
+  | 'all'
+  | 'active'
+  | 'banned'
+  | 'appeal_pending'
+  | 'frozen'
+  | 'live_approved';
 export type CoinAdjustAction = 'add' | 'deduct' | 'freeze' | 'unfreeze';
+export type AdminUnbanAppealStatus = 'pending' | 'reviewing' | 'approved' | 'rejected';
 
 export interface AdminHealthItem {
   key: string;
@@ -28,6 +35,7 @@ export interface AdminUserListItem extends User {
   frozenCoins: number;
   banned?: boolean;
   banReason?: string;
+  pendingAppeals?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +46,7 @@ export interface AdminUserStats {
   banned: number;
   admins: number;
   moderators: number;
+  pendingAppeals: number;
 }
 
 export interface AdminUserListResp {
@@ -84,11 +93,25 @@ export interface AdminReportRecord {
   resolvedAt?: string;
 }
 
+export interface AdminUnbanAppealRecord {
+  id: string;
+  userId: string;
+  reason: string;
+  status: AdminUnbanAppealStatus;
+  reviewerId?: string;
+  reviewer?: string;
+  reviewNote?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminUserDetail {
   user: AdminUserListItem;
   coinTransactions: CoinTransaction[];
   liveRecords: AdminLiveRecord[];
   reportRecords: AdminReportRecord[];
+  appealRecords: AdminUnbanAppealRecord[];
 }
 
 export function useAdminOverview(enabled = true) {
@@ -180,6 +203,18 @@ export function useAdminSetUserBan(id: string) {
     const { data } = await http.patch(`/admin/users/${encodeURIComponent(id)}/ban`, payload);
     return data;
   });
+}
+
+export function useAdminReviewUnbanAppeal(id: string, appealId: string) {
+  return useAdminUserMutation<{ status: 'reviewing' | 'approved' | 'rejected'; note?: string }>(
+    async (payload) => {
+      const { data } = await http.patch(
+        `/admin/users/${encodeURIComponent(id)}/unban-appeals/${encodeURIComponent(appealId)}`,
+        payload,
+      );
+      return data;
+    },
+  );
 }
 
 export function useAdminAdjustUserCoins(id: string) {

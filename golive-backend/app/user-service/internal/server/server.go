@@ -84,6 +84,7 @@ func NewRouter(d Deps) *gin.Engine {
 		admin.PATCH("/users/:id/profile", adminH.UpdateUserProfile)
 		admin.PATCH("/users/:id/role", adminH.UpdateUserRole)
 		admin.PATCH("/users/:id/ban", adminH.SetUserBan)
+		admin.PATCH("/users/:id/unban-appeals/:appealID", adminH.ReviewUnbanAppeal)
 		admin.POST("/users/:id/coins", adminH.AdjustUserCoins)
 		admin.GET("/live-creators", adminH.ListLiveCreators)
 		admin.POST("/users/:id/live-permission", adminH.UpdateLivePermission)

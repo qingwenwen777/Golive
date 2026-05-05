@@ -326,6 +326,37 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
 }
 
+type adminReviewUnbanAppealReq struct {
+	Status string `json:"status" binding:"required"`
+	Note   string `json:"note"`
+}
+
+func (h *AdminHandler) ReviewUnbanAppeal(c *gin.Context) {
+	var req adminReviewUnbanAppealReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	status := strings.ToLower(strings.TrimSpace(req.Status))
+	if status != model.UnbanAppealApproved && status != model.UnbanAppealRejected && status != model.UnbanAppealReviewing {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid appeal status").WithReason("invalid_appeal_status"))
+		return
+	}
+	appeal, u, err := h.users.AdminReviewUnbanAppeal(c.Request.Context(), c.Param("id"), c.Param("appealID"), UserIDFromCtx(c), status, req.Note)
+	if errors.Is(err, repo.ErrUnbanAppealNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "appeal not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	action := "unban_appeal_" + status
+	note := strings.TrimSpace(req.Note)
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, action, "unban_appeal", appeal.ID, u.DisplayName, u.ID, u.DisplayName, note)
+	c.JSON(http.StatusOK, gin.H{"appeal": appeal, "user": u.Public()})
+}
+
 type adminAdjustCoinsReq struct {
 	Action string `json:"action" binding:"required"`
 	Amount int64  `json:"amount" binding:"required"`

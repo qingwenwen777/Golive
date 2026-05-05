@@ -54,7 +54,8 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const currentUser = me.data ?? user;
   const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
-  const activeLiveId = useActiveCreatorLiveId(currentUser?.id);
+  const isBanned = Boolean(currentUser?.banned);
+  const activeLiveId = useActiveCreatorLiveId(isBanned ? undefined : currentUser?.id);
   const trimmedSearch = search.trim();
   const suggestions = useSearchSuggestions(trimmedSearch, suggestionsOpen);
   const suggestionItems = suggestions.data?.items ?? [];
@@ -260,19 +261,25 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 
           {isAuthed ? (
             <>
-              <NotificationBell />
-              <button
-                type="button"
-                className="gl-create-btn"
-                onClick={() =>
-                  navigate(activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/prepare')
-                }
-              >
-                {activeLiveId ? <Icons.Live size={22} /> : <Icons.Plus size={22} />}
-                <span className="gl-create-label">
-                  {activeLiveId ? t('nav.liveNow') : t('goLive', { defaultValue: t('create') })}
-                </span>
-              </button>
+              {!isBanned && (
+                <>
+                  <NotificationBell />
+                  <button
+                    type="button"
+                    className="gl-create-btn"
+                    onClick={() =>
+                      navigate(activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/prepare')
+                    }
+                  >
+                    {activeLiveId ? <Icons.Live size={22} /> : <Icons.Plus size={22} />}
+                    <span className="gl-create-label">
+                      {activeLiveId
+                        ? t('nav.liveNow')
+                        : t('goLive', { defaultValue: t('create') })}
+                    </span>
+                  </button>
+                </>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -291,38 +298,48 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                   <DropdownMenuLabel className="truncate">
                     {currentUser?.username ?? t('account.you')}
                   </DropdownMenuLabel>
-                  <DropdownMenuItem className="flex items-center gap-2">
-                    <Coins size={14} />
-                    <span>{t('account.coins', { amount: balance.toLocaleString() })}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="flex items-center gap-2"
-                    onClick={() => navigate('/coins?focus=recharge')}
-                  >
-                    <Plus size={14} />
-                    <span>{t('account.rechargeCoins')}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {(currentUser?.role === 'admin' || currentUser?.role === 'moderator') && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        navigate(
-                          currentUser?.role === 'moderator' ? '/admin/content' : '/admin/dashboard',
-                        )
-                      }
-                    >
-                      {t('account.adminDashboard')}
+                  {isBanned ? (
+                    <DropdownMenuItem onClick={() => navigate('/account-banned')}>
+                      {t('account.bannedAppeal', { defaultValue: 'Restriction appeal' })}
                     </DropdownMenuItem>
+                  ) : (
+                    <>
+                      <DropdownMenuItem className="flex items-center gap-2">
+                        <Coins size={14} />
+                        <span>{t('account.coins', { amount: balance.toLocaleString() })}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="flex items-center gap-2"
+                        onClick={() => navigate('/coins?focus=recharge')}
+                      >
+                        <Plus size={14} />
+                        <span>{t('account.rechargeCoins')}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {(currentUser?.role === 'admin' || currentUser?.role === 'moderator') && (
+                        <DropdownMenuItem
+                          onClick={() =>
+                            navigate(
+                              currentUser?.role === 'moderator'
+                                ? '/admin/content'
+                                : '/admin/dashboard',
+                            )
+                          }
+                        >
+                          {t('account.adminDashboard')}
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => navigate(`/channel/${user?.id ?? ''}`)}>
+                        {t('account.yourChannel')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setAvatarOpen(true)}>
+                        {t('account.changeAvatar')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate('/settings')}>
+                        {t('account.settings')}
+                      </DropdownMenuItem>
+                    </>
                   )}
-                  <DropdownMenuItem onClick={() => navigate(`/channel/${user?.id ?? ''}`)}>
-                    {t('account.yourChannel')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setAvatarOpen(true)}>
-                    {t('account.changeAvatar')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    {t('account.settings')}
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={toggleTheme}>
                     {t('account.appearance', {
                       mode: isDark ? t('account.dark') : t('account.light'),

@@ -17,7 +17,6 @@ import {
   Moon,
   PencilLine,
   Radio,
-  ShieldAlert,
   ShieldCheck,
   Settings,
   Sparkles,
@@ -36,7 +35,6 @@ import {
   useUpdateProfile,
 } from '@/api/auth';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { useCreateUnbanAppeal } from '@/api/contentModeration';
 import { useFanBadges } from '@/api/gift';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
 import {
@@ -739,7 +737,6 @@ export function SettingsPage() {
   const changePassword = useChangePassword();
   const bindGoogle = useBindGoogleAccount();
   const unbindGoogle = useUnbindGoogleAccount();
-  const createUnbanAppeal = useCreateUnbanAppeal();
   const [tab, setTab] = useState<SettingsTab>('profile');
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [googleUnbindOpen, setGoogleUnbindOpen] = useState(false);
@@ -749,7 +746,6 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [googleUnbindPassword, setGoogleUnbindPassword] = useState('');
-  const [unbanReason, setUnbanReason] = useState('');
   const currentUser = me.data ?? user;
   const displayName = userDisplayName(currentUser);
   const usernameAvailableAt = parseDate(currentUser?.usernameChangeAvailableAt);
@@ -830,29 +826,6 @@ export function SettingsPage() {
           toast.success(t('library.settings.security.updated'));
         },
         onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
-      },
-    );
-  };
-
-  const submitUnbanAppeal = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!isAuthed) {
-      openLogin();
-      return;
-    }
-    const reason = unbanReason.trim();
-    if (reason.length < 10) {
-      toast.error(t('library.settings.security.appealReasonRequired'));
-      return;
-    }
-    createUnbanAppeal.mutate(
-      { reason },
-      {
-        onSuccess: () => {
-          setUnbanReason('');
-          toast.success(t('library.settings.security.appealSubmitted'));
-        },
-        onError: (err) => toast.error(err.message || t('library.settings.security.appealFailed')),
       },
     );
   };
@@ -968,12 +941,9 @@ export function SettingsPage() {
               googlePending={bindGoogle.isPending}
               googleUnlinkPending={unbindGoogle.isPending}
               usernameAvailableAt={usernameAvailableAt}
-              unbanReason={unbanReason}
-              appealPending={createUnbanAppeal.isPending}
               onCurrentPasswordChange={setCurrentPassword}
               onNewPasswordChange={setNewPassword}
               onConfirmPasswordChange={setConfirmPassword}
-              onUnbanReasonChange={setUnbanReason}
               onSubmit={submitPassword}
               onGoogleCredential={handleGoogleBind}
               onGoogleUnlinkClick={() => setGoogleUnbindOpen(true)}
@@ -984,7 +954,6 @@ export function SettingsPage() {
                   }),
                 )
               }
-              onAppealSubmit={submitUnbanAppeal}
             />
           ) : (
             <PreferencesSettings
@@ -1205,17 +1174,13 @@ function SecuritySettings({
   googlePending,
   googleUnlinkPending,
   usernameAvailableAt,
-  unbanReason,
-  appealPending,
   onCurrentPasswordChange,
   onNewPasswordChange,
   onConfirmPasswordChange,
-  onUnbanReasonChange,
   onSubmit,
   onGoogleCredential,
   onGoogleUnlinkClick,
   onGoogleUnavailable,
-  onAppealSubmit,
 }: {
   currentPassword: string;
   newPassword: string;
@@ -1225,17 +1190,13 @@ function SecuritySettings({
   googlePending: boolean;
   googleUnlinkPending: boolean;
   usernameAvailableAt: Date | null;
-  unbanReason: string;
-  appealPending: boolean;
   onCurrentPasswordChange: (value: string) => void;
   onNewPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
-  onUnbanReasonChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onGoogleCredential: (credential: string) => void;
   onGoogleUnlinkClick: () => void;
   onGoogleUnavailable: () => void;
-  onAppealSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t, i18n } = useTranslation('pages');
   return (
@@ -1360,39 +1321,6 @@ function SecuritySettings({
         </div>
       </section>
 
-      <form className="gl-settings-card gl-settings-form" onSubmit={onAppealSubmit}>
-        <div className="gl-settings-card-head">
-          <span className="gl-settings-card-icon">
-            <ShieldAlert size={18} />
-          </span>
-          <div>
-            <h2>{t('library.settings.security.appealTitle')}</h2>
-            <p>{t('library.settings.security.appealSub')}</p>
-          </div>
-        </div>
-        <label className="gl-settings-field">
-          <span>{t('library.settings.security.appealReason')}</span>
-          <textarea
-            value={unbanReason}
-            onChange={(event) => onUnbanReasonChange(event.target.value)}
-            maxLength={300}
-            className="gl-settings-input gl-settings-textarea"
-            placeholder={t('library.settings.security.appealPlaceholder')}
-          />
-          <small>{unbanReason.length}/300</small>
-        </label>
-        <div className="gl-settings-actions">
-          <button
-            className="gl-settings-button"
-            type="submit"
-            disabled={appealPending || unbanReason.trim().length < 10}
-          >
-            {appealPending
-              ? t('library.settings.security.appealSending')
-              : t('library.settings.security.appealSubmit')}
-          </button>
-        </div>
-      </form>
     </>
   );
 }

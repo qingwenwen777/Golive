@@ -947,6 +947,10 @@ func (s *ModerationService) CreateUnbanAppeal(ctx context.Context, userID string
 	if userID == "" {
 		return errcode.ErrUnauthorized
 	}
+	reason := trimRunes(strings.TrimSpace(req.Reason), 1000)
+	if len([]rune(reason)) < 10 {
+		return errcode.New(http.StatusBadRequest, "appeal reason is required").WithReason("appeal_reason_required")
+	}
 	restriction, err := s.moderation.UserRestriction(ctx, userID, s.now())
 	if err != nil {
 		return err
@@ -958,7 +962,7 @@ func (s *ModerationService) CreateUnbanAppeal(ctx context.Context, userID string
 	return s.moderation.CreateUnbanAppeal(ctx, &model.UnbanAppeal{
 		ID:        uuid.NewString(),
 		UserID:    userID,
-		Reason:    trimRunes(strings.TrimSpace(req.Reason), 1000),
+		Reason:    reason,
 		Status:    model.UnbanAppealPending,
 		CreatedAt: now,
 		UpdatedAt: now,

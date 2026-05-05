@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v9"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
+	"github.com/qingwenwen777/golive/pkg/contentpolicy"
 )
 
 var ErrUserNotFound = errors.New("user not found")
@@ -30,6 +32,7 @@ var ErrPlatformApplicationNotFound = errors.New("platform application not found"
 var ErrPlatformApplicationAlreadyReviewed = errors.New("platform application already reviewed")
 var ErrLivePermissionRequired = errors.New("approved live permission is required")
 var ErrInsufficientCoins = errors.New("insufficient available coins")
+var ErrUnbanAppealNotFound = errors.New("unban appeal not found")
 
 type UsernameCooldownError struct {
 	AvailableAt time.Time
@@ -38,14 +41,20 @@ type UsernameCooldownError struct {
 func (e *UsernameCooldownError) Error() string { return ErrUsernameCooldown.Error() }
 
 type UserRepo struct {
-	db *gorm.DB
+	db  *gorm.DB
+	rdb *redis.Client
 }
 
 func NewUserRepo(db *gorm.DB) *UserRepo { return &UserRepo{db: db} }
 
+func (r *UserRepo) WithRedis(rdb *redis.Client) *UserRepo {
+	r.rdb = rdb
+	return r
+}
+
 // AutoMigrate creates / updates the users table.
 func (r *UserRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{}, &model.AdminAuditLog{})
+	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{}, &model.AdminAuditLog{}, &model.UserModerationState{}, &model.UnbanAppeal{})
 }
 
 func (r *UserRepo) CreateAdminAuditLog(ctx context.Context, log *model.AdminAuditLog) error {
@@ -1068,11 +1077,12 @@ type AdminUserListFilter struct {
 }
 
 type AdminUserStats struct {
-	Total      int64 `json:"total"`
-	Active     int64 `json:"active"`
-	Banned     int64 `json:"banned"`
-	Admins     int64 `json:"admins"`
-	Moderators int64 `json:"moderators"`
+	Total          int64 `json:"total"`
+	Active         int64 `json:"active"`
+	Banned         int64 `json:"banned"`
+	Admins         int64 `json:"admins"`
+	Moderators     int64 `json:"moderators"`
+	PendingAppeals int64 `json:"pendingAppeals"`
 }
 
 type AdminUserView struct {
@@ -1086,6 +1096,7 @@ type AdminUserView struct {
 	FrozenCoins                      int64     `json:"frozenCoins"`
 	Banned                           bool      `json:"banned"`
 	BanReason                        string    `json:"banReason,omitempty"`
+	PendingAppeals                   int64     `json:"pendingAppeals"`
 	Verified                         bool      `json:"verified"`
 	Role                             string    `json:"role"`
 	LivePermissionStatus             string    `json:"livePermissionStatus"`
@@ -1121,11 +1132,25 @@ type AdminReportRecord struct {
 	ResolvedAt       *time.Time `json:"resolvedAt,omitempty"`
 }
 
+type AdminUnbanAppealRecord struct {
+	ID         string     `json:"id"`
+	UserID     string     `json:"userId"`
+	Reason     string     `json:"reason"`
+	Status     string     `json:"status"`
+	ReviewerID string     `json:"reviewerId,omitempty"`
+	Reviewer   string     `json:"reviewer,omitempty"`
+	ReviewNote string     `json:"reviewNote,omitempty"`
+	ReviewedAt *time.Time `json:"reviewedAt,omitempty"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
+}
+
 type AdminUserDetail struct {
-	User             AdminUserView           `json:"user"`
-	CoinTransactions []model.CoinTransaction `json:"coinTransactions"`
-	LiveRecords      []AdminLiveRecord       `json:"liveRecords"`
-	ReportRecords    []AdminReportRecord     `json:"reportRecords"`
+	User             AdminUserView            `json:"user"`
+	CoinTransactions []model.CoinTransaction  `json:"coinTransactions"`
+	LiveRecords      []AdminLiveRecord        `json:"liveRecords"`
+	ReportRecords    []AdminReportRecord      `json:"reportRecords"`
+	AppealRecords    []AdminUnbanAppealRecord `json:"appealRecords"`
 }
 
 func normalizeAdminPage(page, size int) (int, int) {
@@ -1158,6 +1183,8 @@ func (r *UserRepo) AdminListUsers(ctx context.Context, filter AdminUserListFilte
 		q = q.Where("COALESCE(banned, false) = ?", false)
 	case "banned":
 		q = q.Where("COALESCE(banned, false) = ?", true)
+	case "appeal_pending":
+		q = q.Where("EXISTS (SELECT 1 FROM unban_appeals ua WHERE ua.user_id = users.id AND ua.status IN (?, ?))", model.UnbanAppealPending, model.UnbanAppealReviewing)
 	case "frozen":
 		q = q.Where("COALESCE(frozen_coins, 0) > 0")
 	case "live_approved":
@@ -1207,6 +1234,9 @@ func (r *UserRepo) AdminUserStats(ctx context.Context) (AdminUserStats, error) {
 	if stats.Moderators, err = count("role = ?", model.RoleModerator); err != nil {
 		return stats, err
 	}
+	if stats.PendingAppeals, err = count("EXISTS (SELECT 1 FROM unban_appeals ua WHERE ua.user_id = users.id AND ua.status IN (?, ?))", model.UnbanAppealPending, model.UnbanAppealReviewing); err != nil {
+		return stats, err
+	}
 	return stats, nil
 }
 
@@ -1235,11 +1265,16 @@ func (r *UserRepo) AdminUserDetail(ctx context.Context, userID string) (*AdminUs
 	if err != nil {
 		return nil, err
 	}
+	appealRows, err := r.adminUnbanAppealRecords(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 	return &AdminUserDetail{
 		User:             user,
 		CoinTransactions: coinRows,
 		LiveRecords:      liveRows,
 		ReportRecords:    reportRows,
+		AppealRecords:    appealRows,
 	}, nil
 }
 
@@ -1315,18 +1350,41 @@ func (r *UserRepo) AdminUpdateRole(ctx context.Context, userID, role string) (*m
 
 func (r *UserRepo) AdminSetUserBan(ctx context.Context, userID string, banned bool, reason string) (*model.User, error) {
 	var u model.User
+	now := time.Now().UTC()
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("id = ?", userID).Take(&u).Error; err != nil {
 			return err
 		}
+		cleanReason := strings.TrimSpace(reason)
 		updates := map[string]any{
 			"banned":     banned,
 			"ban_reason": "",
 		}
 		if banned {
-			updates["ban_reason"] = strings.TrimSpace(reason)
+			updates["ban_reason"] = cleanReason
 		}
 		if err := tx.Model(&u).Updates(updates).Error; err != nil {
+			return err
+		}
+		stateUpdates := map[string]any{
+			"banned":     banned,
+			"ban_reason": "",
+			"updated_at": now,
+		}
+		state := model.UserModerationState{
+			UserID:    userID,
+			Banned:    banned,
+			UpdatedAt: now,
+			CreatedAt: now,
+		}
+		if banned {
+			state.BanReason = cleanReason
+			stateUpdates["ban_reason"] = cleanReason
+		}
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}},
+			DoUpdates: clause.Assignments(stateUpdates),
+		}).Create(&state).Error; err != nil {
 			return err
 		}
 		return tx.Where("id = ?", userID).Take(&u).Error
@@ -1340,7 +1398,7 @@ func (r *UserRepo) AdminSetUserBan(ctx context.Context, userID string, banned bo
 	if err := r.hydrateUserLevel(ctx, &u); err != nil {
 		return nil, err
 	}
-	return &u, nil
+	return &u, r.syncUserBanCache(ctx, userID, banned)
 }
 
 func (r *UserRepo) AdminAdjustCoins(ctx context.Context, userID, action string, amount int64, note, operatorID string) (*model.User, *model.CoinTransaction, error) {
@@ -1458,12 +1516,118 @@ func (r *UserRepo) adminReportRecords(ctx context.Context, userID string) ([]Adm
 	return rows, err
 }
 
+func (r *UserRepo) adminUnbanAppealRecords(ctx context.Context, userID string) ([]AdminUnbanAppealRecord, error) {
+	rows := make([]AdminUnbanAppealRecord, 0)
+	err := r.db.WithContext(ctx).
+		Table("unban_appeals AS ua").
+		Select(`ua.id, ua.user_id, ua.reason, ua.status, ua.reviewer_id,
+			COALESCE(NULLIF(reviewer.display_name, ''), NULLIF(reviewer.username, ''), ua.reviewer_id) AS reviewer,
+			ua.review_note, ua.reviewed_at, ua.created_at, ua.updated_at`).
+		Joins("LEFT JOIN users AS reviewer ON reviewer.id = ua.reviewer_id").
+		Where("ua.user_id = ?", userID).
+		Order("CASE ua.status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 ELSE 2 END, ua.created_at DESC").
+		Limit(30).
+		Scan(&rows).Error
+	if isMissingRelation(err) {
+		return rows, nil
+	}
+	return rows, err
+}
+
+func (r *UserRepo) AdminReviewUnbanAppeal(ctx context.Context, userID, appealID, reviewerID, status, note string) (*model.UnbanAppeal, *model.User, error) {
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status != model.UnbanAppealApproved && status != model.UnbanAppealRejected && status != model.UnbanAppealReviewing {
+		status = model.UnbanAppealReviewing
+	}
+	var appeal model.UnbanAppeal
+	var u model.User
+	now := time.Now().UTC()
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND user_id = ?", strings.TrimSpace(appealID), strings.TrimSpace(userID)).Take(&appeal).Error; err != nil {
+			return err
+		}
+		updates := map[string]any{
+			"status":      status,
+			"reviewer_id": strings.TrimSpace(reviewerID),
+			"review_note": strings.TrimSpace(note),
+			"updated_at":  now,
+		}
+		if status == model.UnbanAppealApproved || status == model.UnbanAppealRejected {
+			updates["reviewed_at"] = now
+		} else {
+			updates["reviewed_at"] = nil
+		}
+		if err := tx.Model(&model.UnbanAppeal{}).Where("id = ?", appeal.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+		if status == model.UnbanAppealApproved {
+			if err := tx.Model(&model.User{}).
+				Where("id = ?", userID).
+				Updates(map[string]any{"banned": false, "ban_reason": ""}).Error; err != nil {
+				return err
+			}
+			state := model.UserModerationState{
+				UserID:    userID,
+				Banned:    false,
+				UpdatedBy: strings.TrimSpace(reviewerID),
+				UpdatedAt: now,
+				CreatedAt: now,
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "user_id"}},
+				DoUpdates: clause.Assignments(map[string]any{
+					"banned":      false,
+					"ban_reason":  "",
+					"muted_until": nil,
+					"mute_reason": "",
+					"updated_by":  strings.TrimSpace(reviewerID),
+					"updated_at":  now,
+				}),
+			}).Create(&state).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("id = ?", appeal.ID).Take(&appeal).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", userID).Take(&u).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, ErrUnbanAppealNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, nil, err
+	}
+	if status == model.UnbanAppealApproved {
+		if err := r.syncUserBanCache(ctx, userID, false); err != nil {
+			return nil, nil, err
+		}
+	}
+	return &appeal, &u, nil
+}
+
 func adminUserSelectSQL() string {
 	return `id, username, email, display_name, avatar, cover, coin_balance, COALESCE(frozen_coins, 0) AS frozen_coins,
-		COALESCE(banned, false) AS banned, COALESCE(ban_reason, '') AS ban_reason, verified, role,
+		COALESCE(banned, false) AS banned, COALESCE(ban_reason, '') AS ban_reason,
+		(SELECT COUNT(1) FROM unban_appeals ua WHERE ua.user_id = users.id AND ua.status IN ('pending', 'reviewing')) AS pending_appeals,
+		verified, role,
 		live_permission_status, live_permission_reject_reason,
 		platform_verification_status, platform_verification_reject_reason,
 		created_at, updated_at`
+}
+
+func (r *UserRepo) syncUserBanCache(ctx context.Context, userID string, banned bool) error {
+	if r.rdb == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	key := contentpolicy.RedisSiteBanPrefix + strings.TrimSpace(userID)
+	if banned {
+		return r.rdb.Set(ctx, key, "1", 0).Err()
+	}
+	return r.rdb.Del(ctx, key).Err()
 }
 
 func isMissingRelation(err error) bool {

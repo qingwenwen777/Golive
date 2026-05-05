@@ -1001,6 +1001,9 @@ func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, ta
 			state.BanReason = note
 			updates["banned"] = true
 			updates["ban_reason"] = note
+			if err := updateUserBanColumns(tx, targetUserID, true, note); err != nil {
+				return err
+			}
 		case model.UserSanctionUnban:
 			state.Banned = false
 			state.MutedUntil = nil
@@ -1008,6 +1011,9 @@ func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, ta
 			updates["ban_reason"] = ""
 			updates["muted_until"] = nil
 			updates["mute_reason"] = ""
+			if err := updateUserBanColumns(tx, targetUserID, false, ""); err != nil {
+				return err
+			}
 		case model.UserSanctionSiteMute:
 			state.MutedUntil = expiresAt
 			state.MuteReason = note
@@ -1039,6 +1045,19 @@ func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, ta
 		return err
 	}
 	return r.syncUserRestriction(ctx, targetUserID, now)
+}
+
+func updateUserBanColumns(tx *gorm.DB, userID string, banned bool, reason string) error {
+	err := tx.Table("users").
+		Where("id = ?", userID).
+		Updates(map[string]any{
+			"banned":     banned,
+			"ban_reason": reason,
+		}).Error
+	if isMissingTableName(err) || isMissingColumn(err) {
+		return nil
+	}
+	return err
 }
 
 func (r *ModerationRepo) UserRestriction(ctx context.Context, userID string, now time.Time) (UserRestriction, error) {

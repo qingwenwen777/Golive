@@ -283,9 +283,6 @@ func (s *AuthService) linkGoogle(ctx context.Context, userID, googleSub, googleE
 }
 
 func (s *AuthService) loginResponseForUser(ctx context.Context, u *model.User) (*LoginResp, error) {
-	if u != nil && u.Banned {
-		return nil, ErrUserBanned
-	}
 	access, err := s.signAccess(u.ID)
 	if err != nil {
 		return nil, fmt.Errorf("sign access: %w", err)

@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { useLocation, useOutlet } from 'react-router-dom';
+import { useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { TopBar } from '@/components/TopBar';
 import { Sidebar } from '@/components/Sidebar';
@@ -7,20 +7,34 @@ import { TopProgressBar } from '@/components/TopProgressBar';
 import { Toaster } from '@/components/ui/sonner';
 import { LoginModal } from '@/features/auth/LoginModal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useAuthHydrated, useAuthStore } from '@/stores/useAuthStore';
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isNarrow = useMediaQuery('(max-width: 767px)');
   const [userCollapsed, setUserCollapsed] = useState(false);
+  const authHydrated = useAuthHydrated();
+  const user = useAuthStore((s) => s.user);
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+  const isBannedRoute = location.pathname === '/account-banned';
   const collapsed = isNarrow || userCollapsed;
+
+  useEffect(() => {
+    if (!authHydrated) return;
+    if (user?.banned && !isBannedRoute) {
+      navigate('/account-banned', { replace: true });
+    } else if (!user?.banned && isBannedRoute) {
+      navigate('/', { replace: true });
+    }
+  }, [authHydrated, isBannedRoute, navigate, user?.banned]);
 
   return (
     <div className="min-h-screen bg-bg text-text">
       <TopProgressBar />
       <TopBar onMenuClick={() => setUserCollapsed((v) => !v)} />
       <div className="gl-layout">
-        {!isAdminRoute && <Sidebar collapsed={collapsed} />}
+        {!isAdminRoute && !isBannedRoute && <Sidebar collapsed={collapsed} />}
         <main className="gl-main">
           <RouteOutlet />
         </main>

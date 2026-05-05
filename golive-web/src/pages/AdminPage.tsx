@@ -71,11 +71,13 @@ import {
   useAdminAdjustUserCoins,
   useAdminOverview,
   useAdminSetUserBan,
+  useAdminReviewUnbanAppeal,
   useAdminUpdateUserProfile,
   useAdminUpdateUserRole,
   useAdminUserDetail,
   useAdminUsers,
   type AdminOverview,
+  type AdminUnbanAppealRecord,
   type AdminUserRole,
   type AdminUserStatus,
   type CoinAdjustAction,
@@ -742,6 +744,7 @@ function UsersPage({
     banned: 0,
     admins: 0,
     moderators: 0,
+    pendingAppeals: 0,
   };
   const totalPages = Math.max(1, Math.ceil((users.data?.total ?? 0) / pageSize));
   const activeUserId = selectedUserId || userItems[0]?.id || '';
@@ -776,6 +779,12 @@ function UsersPage({
           icon={UserCog}
           label={t('admin.users.kpis.maintainers', { defaultValue: 'Admins / moderators' })}
           value={users.isLoading ? '-' : `${stats.admins}/${stats.moderators}`}
+        />
+        <AdminKpi
+          icon={FileCheck2}
+          label={t('admin.users.kpis.pendingAppeals', { defaultValue: 'Pending appeals' })}
+          value={users.isLoading ? '-' : stats.pendingAppeals}
+          tone={stats.pendingAppeals > 0 ? 'red' : undefined}
         />
       </section>
 
@@ -812,10 +821,12 @@ function UsersPage({
           <AdminFilterSelect
             label={t('admin.users.filters.status', { defaultValue: 'Status' })}
             value={status}
-            options={['all', 'active', 'banned', 'frozen', 'live_approved'].map((value) => ({
-              value,
-              label: userStatusLabel(value, t),
-            }))}
+            options={['all', 'active', 'banned', 'appeal_pending', 'frozen', 'live_approved'].map(
+              (value) => ({
+                value,
+                label: userStatusLabel(value, t),
+              }),
+            )}
             onChange={(value) => setFilter(() => setStatus(value as AdminUserStatus))}
           />
         </div>
@@ -853,6 +864,14 @@ function UsersPage({
                       ? userStatusLabel('banned', t)
                       : userStatusLabel('active', t)}
                   </em>
+                  {(item.pendingAppeals ?? 0) > 0 && (
+                    <em className="gl-admin-user-state is-appeal">
+                      {t('admin.users.detail.appealBadge', {
+                        count: item.pendingAppeals,
+                        defaultValue: '{{count}} appeal',
+                      })}
+                    </em>
+                  )}
                 </button>
               ))
             )}
@@ -896,13 +915,16 @@ function UsersPage({
 
 function AdminUserDetailPanel({ userId }: { userId: string }) {
   const { t } = useTranslation('pages');
-  const [tab, setTab] = useState<'profile' | 'coins' | 'lives' | 'reports'>('profile');
+  const [tab, setTab] = useState<'profile' | 'coins' | 'lives' | 'reports' | 'appeals'>(
+    'profile',
+  );
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [banReason, setBanReason] = useState('');
   const [coinAction, setCoinAction] = useState<CoinAdjustAction>('add');
   const [coinAmount, setCoinAmount] = useState('100');
   const [coinNote, setCoinNote] = useState('');
+  const [appealNote, setAppealNote] = useState('');
   const detail = useAdminUserDetail(userId, Boolean(userId));
   const updateProfile = useAdminUpdateUserProfile(userId);
   const updateRole = useAdminUpdateUserRole(userId);
@@ -915,6 +937,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
     setUsername(user.username);
     setDisplayName(user.displayName || user.username);
     setBanReason(user.banReason || '');
+    setAppealNote('');
     setTab('profile');
   }, [user?.id]);
 
@@ -1009,7 +1032,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
         </em>
       </div>
       <div className="gl-admin-user-detail-tabs">
-        {(['profile', 'coins', 'lives', 'reports'] as const).map((item) => (
+        {(['profile', 'coins', 'lives', 'reports', 'appeals'] as const).map((item) => (
           <button
             type="button"
             key={item}
@@ -1184,7 +1207,113 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
           )}
         </div>
       )}
+
+      {tab === 'appeals' && (
+        <div className="gl-admin-mini-list gl-admin-appeal-list">
+          {(detail.data?.appealRecords ?? []).length === 0 ? (
+            <AdminEmptyState
+              label={t('admin.users.detail.noAppeals', { defaultValue: 'No appeal records.' })}
+            />
+          ) : (
+            detail.data?.appealRecords.map((record) => (
+              <AdminAppealRecord
+                key={record.id}
+                userId={userId}
+                record={record}
+                note={appealNote}
+                onNoteChange={setAppealNote}
+              />
+            ))
+          )}
+        </div>
+      )}
     </aside>
+  );
+}
+
+function AdminAppealRecord({
+  userId,
+  record,
+  note,
+  onNoteChange,
+}: {
+  userId: string;
+  record: AdminUnbanAppealRecord;
+  note: string;
+  onNoteChange: (value: string) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const review = useAdminReviewUnbanAppeal(userId, record.id);
+  const canReview = record.status === 'pending' || record.status === 'reviewing';
+  const submit = (status: 'reviewing' | 'approved' | 'rejected') => {
+    review.mutate(
+      { status, note: note.trim() },
+      {
+        onSuccess: () => {
+          if (status !== 'reviewing') onNoteChange('');
+          toast.success(
+            status === 'approved'
+              ? t('admin.users.detail.appealApproved', { defaultValue: 'Appeal approved.' })
+              : status === 'rejected'
+                ? t('admin.users.detail.appealRejected', { defaultValue: 'Appeal rejected.' })
+                : t('admin.users.detail.appealReviewing', {
+                    defaultValue: 'Appeal marked as reviewing.',
+                  }),
+          );
+        },
+        onError: (err) => toast.error(apiErrorMessage(err)),
+      },
+    );
+  };
+
+  return (
+    <div className="gl-admin-appeal-record">
+      <div className="gl-admin-appeal-record-head">
+        <strong>{appealStatusLabel(record.status, t)}</strong>
+        <span>{formatDate(record.createdAt)}</span>
+      </div>
+      <p>{record.reason}</p>
+      {record.reviewNote && (
+        <small>
+          {t('admin.users.detail.appealReviewNote', { defaultValue: 'Review note' })}:{' '}
+          {record.reviewNote}
+        </small>
+      )}
+      {record.reviewer && (
+        <small>
+          {t('admin.users.detail.appealReviewer', { defaultValue: 'Reviewer' })}: {record.reviewer}
+        </small>
+      )}
+      {canReview && (
+        <div className="gl-admin-appeal-review">
+          <textarea
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder={t('admin.users.detail.appealNotePlaceholder', {
+              defaultValue: 'Optional review note',
+            })}
+          />
+          <div>
+            <button type="button" disabled={review.isPending} onClick={() => submit('reviewing')}>
+              {t('admin.users.detail.markReviewing', { defaultValue: 'Reviewing' })}
+            </button>
+            <button type="button" disabled={review.isPending} onClick={() => submit('approved')}>
+              <Check size={14} />
+              {t('admin.users.detail.approveAppeal', { defaultValue: 'Approve' })}
+            </button>
+            <button
+              type="button"
+              className="is-danger"
+              disabled={review.isPending}
+              onClick={() => submit('rejected')}
+            >
+              <X size={14} />
+              {t('admin.users.detail.rejectAppeal', { defaultValue: 'Reject' })}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2100,6 +2229,7 @@ function userStatusLabel(value: string, t: Translate) {
     all: t('admin.users.status.all', { defaultValue: 'All statuses' }),
     active: t('admin.users.status.active', { defaultValue: 'Active' }),
     banned: t('admin.users.status.banned', { defaultValue: 'Banned' }),
+    appeal_pending: t('admin.users.status.appealPending', { defaultValue: 'Pending appeals' }),
     frozen: t('admin.users.status.frozen', { defaultValue: 'Frozen coins' }),
     live_approved: t('admin.users.status.liveApproved', { defaultValue: 'Live approved' }),
   };
@@ -2112,6 +2242,17 @@ function userDetailTabLabel(value: string, t: Translate) {
     coins: t('admin.users.detail.tabs.coins', { defaultValue: 'Coins' }),
     lives: t('admin.users.detail.tabs.lives', { defaultValue: 'Live records' }),
     reports: t('admin.users.detail.tabs.reports', { defaultValue: 'Reports' }),
+    appeals: t('admin.users.detail.tabs.appeals', { defaultValue: 'Appeals' }),
+  };
+  return map[value] ?? value;
+}
+
+function appealStatusLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    pending: t('admin.users.detail.appealStatus.pending', { defaultValue: 'Pending' }),
+    reviewing: t('admin.users.detail.appealStatus.reviewing', { defaultValue: 'Reviewing' }),
+    approved: t('admin.users.detail.appealStatus.approved', { defaultValue: 'Approved' }),
+    rejected: t('admin.users.detail.appealStatus.rejected', { defaultValue: 'Rejected' }),
   };
   return map[value] ?? value;
 }

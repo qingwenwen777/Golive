@@ -43,10 +43,6 @@ func (h *UserHandler) Me(c *gin.Context) {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	if u.Banned {
-		errcode.Respond(c, service.ErrUserBanned)
-		return
-	}
 	c.JSON(http.StatusOK, u.Public())
 }
 

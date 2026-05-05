@@ -8,6 +8,7 @@ const SearchPage = lazy(() => import('@/pages/SearchPage'));
 const LiveRoomPage = lazy(() => import('@/pages/LiveRoomPage'));
 const ChannelPage = lazy(() => import('@/pages/ChannelPage'));
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const BannedAccountPage = lazy(() => import('@/pages/BannedAccountPage'));
 const PrivacyPage = lazy(() =>
   import('@/pages/LegalPages').then((module) => ({
     default: module.PrivacyPage,
@@ -145,6 +146,7 @@ export const router = createBrowserRouter([
       { path: 'watch-later', element: <WatchLaterPage /> },
       { path: 'liked', element: <LikedPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'account-banned', element: <BannedAccountPage /> },
       { path: 'privacy', element: <PrivacyPage /> },
       { path: 'terms', element: <TermsPage /> },
       { path: 'admin', element: <Navigate to="/admin/dashboard" replace /> },

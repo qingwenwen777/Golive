@@ -60,7 +60,7 @@ func main() {
 		log.Fatal("open redis", zap.Error(err))
 	}
 
-	userRepo := repo.NewUserRepo(db)
+	userRepo := repo.NewUserRepo(db).WithRedis(rdb)
 	if err := userRepo.AutoMigrate(); err != nil {
 		log.Fatal("auto migrate", zap.Error(err))
 	}

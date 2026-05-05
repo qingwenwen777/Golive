@@ -7,8 +7,10 @@ import {
 } from '@/components/ui/dialog';
 import { AuthPanel } from '@/features/auth/AuthPanel';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
+import { useNavigate } from 'react-router-dom';
 
 export function LoginModal() {
+  const navigate = useNavigate();
   const open = useAuthModalStore((s) => s.open);
   const close = useAuthModalStore((s) => s.close);
   const consumeAfterLogin = useAuthModalStore((s) => s.consumeAfterLogin);
@@ -21,9 +23,13 @@ export function LoginModal() {
           <DialogDescription>Sign in or register for a GoLive account.</DialogDescription>
         </DialogHeader>
         <AuthPanel
-          onAuthenticated={() => {
+          onAuthenticated={(resp) => {
             close();
-            consumeAfterLogin();
+            if (resp.user.banned) {
+              navigate('/account-banned', { replace: true });
+            } else {
+              consumeAfterLogin();
+            }
           }}
         />
       </DialogContent>
