@@ -7426,21 +7426,34 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-gift-main {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
-  gap: 11px;
+  gap: 14px;
 }
 .gl-admin-gift-icon {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
+  display: inline-flex;
+  width: 64px;
+  height: 64px;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   background: var(--gl-bg-hover);
-  font-size: 22px;
+  overflow: hidden;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 36px;
+  line-height: 1;
+  text-align: center;
 }
-.gl-admin-gift-main strong,
-.gl-admin-gift-main span,
+.gl-admin-gift-icon > span {
+  display: inline-flex;
+  width: 1.15em;
+  height: 1.15em;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.gl-admin-gift-main > div > strong,
+.gl-admin-gift-main > div > span,
 .gl-admin-ledger-main strong,
 .gl-admin-ledger-main span,
 .gl-admin-ledger-user strong,
@@ -7455,7 +7468,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.gl-admin-gift-main strong,
+.gl-admin-gift-main > div > strong,
 .gl-admin-ledger-main strong,
 .gl-admin-bet-main strong,
 .gl-admin-bet-pool strong {
@@ -7463,7 +7476,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   font-size: 14px;
   font-weight: 950;
 }
-.gl-admin-gift-main span,
+.gl-admin-gift-main > div > span,
 .gl-admin-ledger-main span,
 .gl-admin-ledger-user span,
 .gl-admin-bet-main span,
@@ -7630,13 +7643,14 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 @container (max-width: 620px) {
   .gl-admin-gift-main {
-    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 12px;
   }
 
   .gl-admin-gift-icon {
-    width: 38px;
-    height: 38px;
-    font-size: 19px;
+    width: 56px;
+    height: 56px;
+    font-size: 32px;
   }
 
   .gl-admin-gift-controls {

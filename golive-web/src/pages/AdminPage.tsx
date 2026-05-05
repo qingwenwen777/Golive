@@ -2711,7 +2711,9 @@ function EconomyGiftsPanel() {
             return (
               <article className="gl-admin-gift-row" key={item.id}>
                 <div className="gl-admin-gift-main">
-                  <span className="gl-admin-gift-icon">{item.icon}</span>
+                  <span className="gl-admin-gift-icon" aria-hidden="true">
+                    <span>{item.icon}</span>
+                  </span>
                   <div>
                     <strong>{item.name}</strong>
                     <span>
