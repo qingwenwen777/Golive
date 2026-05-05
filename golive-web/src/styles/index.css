@@ -51,8 +51,8 @@
   --gl-chip-bg-active: #0f0f0f;
   --gl-chip-text-active: #ffffff;
   --gl-red: #ff3d5c;
-  --gl-progress: rgba(255, 0, 51, 0.18);
-  --gl-progress-glow: rgba(255, 0, 51, 0.08);
+  --gl-progress: rgba(255, 0, 48, 0.28);
+  --gl-progress-glow: rgba(255, 0, 48, 0.12);
   --gl-skeleton-base: #e5e5e5;
   --gl-skeleton-shine: rgba(255, 255, 255, 0.64);
   --gl-avatar-placeholder: #e5e5e5;
@@ -1075,8 +1075,8 @@
   --gl-chip-bg-active: #ffffff;
   --gl-chip-text-active: #0f0f0f;
   --gl-red: #ff3d5c;
-  --gl-progress: rgba(255, 112, 136, 0.22);
-  --gl-progress-glow: rgba(255, 112, 136, 0.1);
+  --gl-progress: rgba(255, 82, 112, 0.32);
+  --gl-progress-glow: rgba(255, 82, 112, 0.14);
   --gl-skeleton-base: #3f3f3f;
   --gl-skeleton-shine: rgba(255, 255, 255, 0.12);
   --gl-avatar-placeholder: #3f3f3f;
