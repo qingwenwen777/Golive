@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -39,6 +40,9 @@ func (r *ModerationRepo) AutoMigrate() error {
 		&model.RoomMute{},
 		&model.ModeratorActionLog{},
 		&model.ContentReport{},
+		&model.UserModerationState{},
+		&model.UserSanctionLog{},
+		&model.UnbanAppeal{},
 		&model.BlockedWord{},
 	)
 }
@@ -83,6 +87,41 @@ type ReportStats struct {
 	Reviewing int64
 	Today     int64
 	Total     int64
+}
+
+type ReportGroupRow struct {
+	ID               string
+	TargetType       string
+	TargetID         string
+	TargetURL        string
+	RoomID           string
+	ChannelID        string
+	TargetOwnerID    string
+	TargetOwnerName  string
+	TargetUserID     string
+	TargetUserName   string
+	TargetTitle      string
+	TargetText       string
+	Reason           string
+	Status           string
+	ReviewerID       string
+	ResolutionAction string
+	ResolutionNote   string
+	DurationMinutes  int
+	ResolvedAt       *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ReportCount      int64
+	RecentCount      int64
+}
+
+type UserRestriction struct {
+	Banned        bool
+	Muted         bool
+	MuteRemaining time.Duration
+	MuteExpiresAt *time.Time
+	BanReason     string
+	MuteReason    string
 }
 
 func (r *ModerationRepo) ListFollowers(ctx context.Context, ownerID, query string, page, size int, followerIDs []string) ([]ModerationUser, int64, error) {
@@ -432,6 +471,116 @@ OR LOWER(COALESCE(target_id, '')) LIKE ?
 	return rows, total, err
 }
 
+func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter ReportListFilter) ([]ReportGroupRow, int64, ReportStats, error) {
+	q := r.db.WithContext(ctx).Model(&model.ContentReport{})
+	q = applyReportFilters(q, filter)
+
+	var rows []model.ContentReport
+	if err := q.Order("created_at DESC").Limit(2000).Find(&rows).Error; err != nil {
+		return nil, 0, ReportStats{}, err
+	}
+
+	recentAfter := time.Now().Add(-time.Hour)
+	groups := make([]ReportGroupRow, 0, len(rows))
+	byKey := make(map[string]int, len(rows))
+	for _, row := range rows {
+		key := reportGroupKey(row.TargetType, row.TargetID)
+		idx, ok := byKey[key]
+		if !ok {
+			byKey[key] = len(groups)
+			groups = append(groups, ReportGroupRow{
+				ID:               row.ID,
+				TargetType:       row.TargetType,
+				TargetID:         row.TargetID,
+				TargetURL:        row.TargetURL,
+				RoomID:           row.RoomID,
+				ChannelID:        row.ChannelID,
+				TargetOwnerID:    row.TargetOwnerID,
+				TargetOwnerName:  row.TargetOwnerName,
+				TargetUserID:     row.TargetUserID,
+				TargetUserName:   row.TargetUserName,
+				TargetTitle:      row.TargetTitle,
+				TargetText:       row.TargetText,
+				Reason:           row.Reason,
+				Status:           row.Status,
+				ReviewerID:       row.ReviewerID,
+				ResolutionAction: row.ResolutionAction,
+				ResolutionNote:   row.ResolutionNote,
+				DurationMinutes:  row.DurationMinutes,
+				ResolvedAt:       row.ResolvedAt,
+				CreatedAt:        row.CreatedAt,
+				UpdatedAt:        row.UpdatedAt,
+				ReportCount:      0,
+				RecentCount:      0,
+			})
+			idx = len(groups) - 1
+		}
+		group := &groups[idx]
+		group.ReportCount++
+		if row.CreatedAt.After(recentAfter) {
+			group.RecentCount++
+		}
+		group.Status = mergeReportGroupStatus(group.Status, row.Status)
+		if row.CreatedAt.After(group.CreatedAt) {
+			group.ID = row.ID
+			group.TargetURL = firstNonEmpty(row.TargetURL, group.TargetURL)
+			group.RoomID = firstNonEmpty(row.RoomID, group.RoomID)
+			group.ChannelID = firstNonEmpty(row.ChannelID, group.ChannelID)
+			group.TargetOwnerID = firstNonEmpty(row.TargetOwnerID, group.TargetOwnerID)
+			group.TargetOwnerName = firstNonEmpty(row.TargetOwnerName, group.TargetOwnerName)
+			group.TargetUserID = firstNonEmpty(row.TargetUserID, group.TargetUserID)
+			group.TargetUserName = firstNonEmpty(row.TargetUserName, group.TargetUserName)
+			group.TargetTitle = firstNonEmpty(row.TargetTitle, group.TargetTitle)
+			group.TargetText = firstNonEmpty(row.TargetText, group.TargetText)
+			group.Reason = firstNonEmpty(row.Reason, group.Reason)
+			group.ReviewerID = firstNonEmpty(row.ReviewerID, group.ReviewerID)
+			group.ResolutionAction = firstNonEmpty(row.ResolutionAction, group.ResolutionAction)
+			group.ResolutionNote = firstNonEmpty(row.ResolutionNote, group.ResolutionNote)
+			group.DurationMinutes = row.DurationMinutes
+			group.ResolvedAt = row.ResolvedAt
+			group.CreatedAt = row.CreatedAt
+		}
+		if row.UpdatedAt.After(group.UpdatedAt) {
+			group.UpdatedAt = row.UpdatedAt
+		}
+	}
+
+	stats := ReportStats{}
+	for _, group := range groups {
+		switch group.Status {
+		case model.ReportStatusPending:
+			stats.Pending++
+		case model.ReportStatusReviewing:
+			stats.Reviewing++
+		}
+		if sameDay(group.CreatedAt, time.Now()) {
+			stats.Today++
+		}
+	}
+	stats.Total = int64(len(groups))
+
+	page, size := normalizeModerationPage(filter.Page, filter.Size)
+	total := int64(len(groups))
+	start := (page - 1) * size
+	if start >= len(groups) {
+		return []ReportGroupRow{}, total, stats, nil
+	}
+	end := start + size
+	if end > len(groups) {
+		end = len(groups)
+	}
+	return groups[start:end], total, stats, nil
+}
+
+func (r *ModerationRepo) ContentReportsForTarget(ctx context.Context, targetType, targetID string) ([]model.ContentReport, error) {
+	var rows []model.ContentReport
+	err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("target_type = ? AND target_id = ?", targetType, targetID).
+		Order("created_at DESC").
+		Find(&rows).Error
+	return rows, err
+}
+
 func (r *ModerationRepo) ContentReportStats(ctx context.Context, now time.Time) (ReportStats, error) {
 	var stats ReportStats
 	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
@@ -466,11 +615,21 @@ func (r *ModerationRepo) GetContentReport(ctx context.Context, id string) (*mode
 }
 
 func (r *ModerationRepo) UpdateContentReport(ctx context.Context, id, status, reviewerID, note string, now time.Time) (*model.ContentReport, error) {
+	return r.UpdateContentReportGroup(ctx, id, status, "", reviewerID, note, 0, now)
+}
+
+func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, status, action, reviewerID, note string, durationMinutes int, now time.Time) (*model.ContentReport, error) {
+	report, err := r.GetContentReport(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	updates := map[string]any{
-		"status":          status,
-		"reviewer_id":     reviewerID,
-		"resolution_note": note,
-		"updated_at":      now,
+		"status":            status,
+		"reviewer_id":       reviewerID,
+		"resolution_action": action,
+		"duration_minutes":  durationMinutes,
+		"resolution_note":   note,
+		"updated_at":        now,
 	}
 	if status == model.ReportStatusResolved || status == model.ReportStatusDismissed {
 		updates["resolved_at"] = now
@@ -478,11 +637,302 @@ func (r *ModerationRepo) UpdateContentReport(ctx context.Context, id, status, re
 		updates["resolved_at"] = nil
 	}
 	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
-		Where("id = ?", id).
+		Where("target_type = ? AND target_id = ?", report.TargetType, report.TargetID).
 		Updates(updates).Error; err != nil {
 		return nil, err
 	}
 	return r.GetContentReport(ctx, id)
+}
+
+func applyReportFilters(q *gorm.DB, filter ReportListFilter) *gorm.DB {
+	if status := strings.TrimSpace(filter.Status); status != "" && status != "all" {
+		q = q.Where("status = ?", status)
+	}
+	if targetType := strings.TrimSpace(filter.TargetType); targetType != "" && targetType != "all" {
+		q = q.Where("target_type = ?", targetType)
+	}
+	if reason := strings.TrimSpace(filter.Reason); reason != "" && reason != "all" {
+		q = q.Where("reason = ?", reason)
+	}
+	if query := strings.ToLower(strings.TrimSpace(filter.Query)); query != "" {
+		like := "%" + query + "%"
+		q = q.Where(`
+LOWER(COALESCE(reporter_name, '')) LIKE ?
+OR LOWER(COALESCE(target_owner_name, '')) LIKE ?
+OR LOWER(COALESCE(target_user_name, '')) LIKE ?
+OR LOWER(COALESCE(target_title, '')) LIKE ?
+OR LOWER(COALESCE(target_text, '')) LIKE ?
+OR LOWER(COALESCE(description, '')) LIKE ?
+OR LOWER(COALESCE(target_id, '')) LIKE ?
+`, like, like, like, like, like, like, like)
+	}
+	return q
+}
+
+func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, targetID, roomID string, now time.Time) error {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return nil
+	}
+	switch targetType {
+	case model.ReportTargetPost:
+		return r.deletePostAny(ctx, targetID)
+	case model.ReportTargetPostComment:
+		return r.deletePostCommentAny(ctx, targetID)
+	case model.ReportTargetDanmu:
+		return r.hideDanmu(ctx, strings.TrimSpace(roomID), targetID, now)
+	case model.ReportTargetSuperChat:
+		return r.db.WithContext(ctx).
+			Table("super_chat_orders").
+			Where("order_id = ? AND status = ?", targetID, "success").
+			Updates(map[string]any{"status": "failed", "fail_reason": "moderated"}).Error
+	default:
+		return nil
+	}
+}
+
+func (r *ModerationRepo) deletePostAny(ctx context.Context, postID string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var post model.ChannelPost
+		if err := tx.Where("id = ?", postID).Take(&post).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		var commentIDs []string
+		if err := tx.Model(&model.PostComment{}).Where("post_id = ?", postID).Pluck("id", &commentIDs).Error; err != nil {
+			return err
+		}
+		if len(commentIDs) > 0 {
+			if err := tx.Where("comment_id IN ?", commentIDs).Delete(&model.PostCommentLike{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", commentIDs).Delete(&model.PostComment{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("post_id = ?", postID).Delete(&model.PostLike{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&post).Error
+	})
+}
+
+func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var target model.PostComment
+		if err := tx.Where("id = ?", commentID).Take(&target).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		var comments []model.PostComment
+		if err := tx.Where("post_id = ?", target.PostID).Find(&comments).Error; err != nil {
+			return err
+		}
+		children := make(map[string][]string, len(comments))
+		for _, comment := range comments {
+			if comment.ParentID != "" {
+				children[comment.ParentID] = append(children[comment.ParentID], comment.ID)
+			}
+		}
+		ids := make([]string, 0, 3)
+		var walk func(string)
+		walk = func(id string) {
+			ids = append(ids, id)
+			for _, childID := range children[id] {
+				walk(childID)
+			}
+		}
+		walk(target.ID)
+		if len(ids) == 0 {
+			return nil
+		}
+		if err := tx.Where("comment_id IN ?", ids).Delete(&model.PostCommentLike{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id IN ?", ids).Delete(&model.PostComment{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.ChannelPost{}).
+			Where("id = ?", target.PostID).
+			Update("comment_count", gorm.Expr("CASE WHEN comment_count >= ? THEN comment_count - ? ELSE 0 END", len(ids), len(ids))).Error; err != nil {
+			return err
+		}
+		if target.ParentID != "" {
+			if err := tx.Model(&model.PostComment{}).
+				Where("id = ?", target.ParentID).
+				Update("reply_count", gorm.Expr("CASE WHEN reply_count > 0 THEN reply_count - 1 ELSE 0 END")).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *ModerationRepo) hideDanmu(ctx context.Context, roomID, danmuID string, now time.Time) error {
+	if roomID == "" {
+		return nil
+	}
+	for i := 0; i < 8; i++ {
+		table := fmt.Sprintf("danmus_%d", i)
+		err := r.db.WithContext(ctx).Table(table).
+			Where("room_id = ? AND id = ?", roomID, danmuID).
+			Update("deleted_at", now).Error
+		if err != nil && !isMissingTableName(err) && !isMissingColumn(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ModerationRepo) CreateNotification(ctx context.Context, n model.Notification) error {
+	if strings.TrimSpace(n.UserID) == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&n).Error
+}
+
+func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, targetName, operatorID, action, sourceReportID, note string, durationMinutes int, now time.Time) error {
+	targetUserID = strings.TrimSpace(targetUserID)
+	if targetUserID == "" {
+		return nil
+	}
+	if profile, err := r.UserProfile(ctx, targetUserID); err == nil && strings.TrimSpace(targetName) == "" {
+		targetName = profile.Name
+	}
+	var expiresAt *time.Time
+	if action == model.UserSanctionSiteMute && durationMinutes > 0 {
+		expires := now.Add(time.Duration(durationMinutes) * time.Minute)
+		expiresAt = &expires
+	}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		updates := map[string]any{
+			"updated_by": operatorID,
+			"updated_at": now,
+		}
+		state := model.UserModerationState{
+			UserID:    targetUserID,
+			UpdatedBy: operatorID,
+			UpdatedAt: now,
+			CreatedAt: now,
+		}
+		switch action {
+		case model.UserSanctionBan:
+			state.Banned = true
+			state.BanReason = note
+			updates["banned"] = true
+			updates["ban_reason"] = note
+		case model.UserSanctionUnban:
+			state.Banned = false
+			state.MutedUntil = nil
+			updates["banned"] = false
+			updates["ban_reason"] = ""
+			updates["muted_until"] = nil
+			updates["mute_reason"] = ""
+		case model.UserSanctionSiteMute:
+			state.MutedUntil = expiresAt
+			state.MuteReason = note
+			updates["muted_until"] = expiresAt
+			updates["mute_reason"] = note
+		}
+		if action == model.UserSanctionBan || action == model.UserSanctionUnban || action == model.UserSanctionSiteMute {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "user_id"}},
+				DoUpdates: clause.Assignments(updates),
+			}).Create(&state).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Create(&model.UserSanctionLog{
+			ID:              uuid.NewString(),
+			TargetUserID:    targetUserID,
+			TargetUserName:  trimForDB(targetName, 128),
+			Action:          action,
+			OperatorID:      operatorID,
+			SourceReportID:  sourceReportID,
+			Note:            note,
+			DurationMinutes: durationMinutes,
+			ExpiresAt:       expiresAt,
+			CreatedAt:       now,
+		}).Error
+	})
+	if err != nil {
+		return err
+	}
+	return r.syncUserRestriction(ctx, targetUserID, now)
+}
+
+func (r *ModerationRepo) UserRestriction(ctx context.Context, userID string, now time.Time) (UserRestriction, error) {
+	var state model.UserModerationState
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Take(&state).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return UserRestriction{}, nil
+	}
+	if err != nil {
+		return UserRestriction{}, err
+	}
+	restriction := UserRestriction{
+		Banned:     state.Banned,
+		BanReason:  state.BanReason,
+		MuteReason: state.MuteReason,
+	}
+	if state.MutedUntil != nil && state.MutedUntil.After(now) {
+		restriction.Muted = true
+		restriction.MuteExpiresAt = state.MutedUntil
+		restriction.MuteRemaining = state.MutedUntil.Sub(now)
+	}
+	return restriction, nil
+}
+
+func (r *ModerationRepo) SyncUserRestrictions(ctx context.Context, now time.Time) error {
+	if r.rdb == nil {
+		return nil
+	}
+	var states []model.UserModerationState
+	if err := r.db.WithContext(ctx).
+		Where("banned = ? OR muted_until > ?", true, now).
+		Find(&states).Error; err != nil {
+		return err
+	}
+	for _, state := range states {
+		if err := r.syncUserRestriction(ctx, state.UserID, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ModerationRepo) syncUserRestriction(ctx context.Context, userID string, now time.Time) error {
+	if r.rdb == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	restriction, err := r.UserRestriction(ctx, userID, now)
+	if err != nil {
+		return err
+	}
+	pipe := r.rdb.Pipeline()
+	if restriction.Banned {
+		pipe.Set(ctx, contentpolicy.RedisSiteBanPrefix+userID, "1", 0)
+	} else {
+		pipe.Del(ctx, contentpolicy.RedisSiteBanPrefix+userID)
+	}
+	if restriction.Muted && restriction.MuteRemaining > 0 {
+		pipe.Set(ctx, contentpolicy.RedisSiteMutePrefix+userID, restriction.MuteExpiresAt.UTC().Format(time.RFC3339), restriction.MuteRemaining)
+	} else {
+		pipe.Del(ctx, contentpolicy.RedisSiteMutePrefix+userID)
+	}
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+func (r *ModerationRepo) CreateUnbanAppeal(ctx context.Context, appeal *model.UnbanAppeal) error {
+	if appeal == nil {
+		return nil
+	}
+	return r.db.WithContext(ctx).Create(appeal).Error
 }
 
 func (r *ModerationRepo) ListBlockedWords(ctx context.Context, page, size int) ([]model.BlockedWord, int64, error) {
@@ -713,6 +1163,72 @@ func normalizeModerationPage(page, size int) (int, int) {
 		size = 100
 	}
 	return page, size
+}
+
+func reportGroupKey(targetType, targetID string) string {
+	return strings.TrimSpace(targetType) + "\x00" + strings.TrimSpace(targetID)
+}
+
+func mergeReportGroupStatus(current, next string) string {
+	rank := func(status string) int {
+		switch status {
+		case model.ReportStatusPending:
+			return 0
+		case model.ReportStatusReviewing:
+			return 1
+		case model.ReportStatusResolved:
+			return 2
+		default:
+			return 3
+		}
+	}
+	if current == "" || rank(next) < rank(current) {
+		return next
+	}
+	return current
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}
+
+func trimForDB(value string, max int) string {
+	value = strings.TrimSpace(value)
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max])
+}
+
+func isMissingTableName(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
+}
+
+func isMissingColumn(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unknown column") || strings.Contains(msg, "no such column")
 }
 
 func roomModeratorsKey(roomID string) string { return "room:moderators:" + roomID }

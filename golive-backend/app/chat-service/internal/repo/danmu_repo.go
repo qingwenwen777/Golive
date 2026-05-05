@@ -89,7 +89,7 @@ func (r *DanmuRepo) History(ctx context.Context, roomID string, before int64, li
 		limit = 50
 	}
 	q := r.db.WithContext(ctx).Table(r.TableFor(roomID)).
-		Where("room_id = ?", roomID)
+		Where("room_id = ? AND deleted_at IS NULL", roomID)
 	if before > 0 {
 		q = q.Where("ts < ?", before)
 	}

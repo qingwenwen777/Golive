@@ -47,6 +47,7 @@ func AmountToTier(amount int64) int {
 // chats are not allowed (the frontend won't send them but we double-check).
 var ErrInvalidAmount = errors.New("amount below minimum tier")
 var ErrContentBlocked = errors.New("content contains blocked word")
+var ErrUserRestricted = errors.New("user is restricted from interactions")
 
 type SuperChatService struct {
 	orders *repo.OrderRepo
@@ -65,6 +66,11 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 	tier := AmountToTier(req.Amount)
 	if tier == 0 {
 		return nil, false, ErrInvalidAmount
+	}
+	if restricted, err := s.userRestricted(ctx, req.UserID); err != nil {
+		return nil, false, err
+	} else if restricted {
+		return nil, false, ErrUserRestricted
 	}
 	if blocked, err := s.containsBlockedWord(ctx, req.Text); err != nil {
 		return nil, false, err
@@ -124,6 +130,21 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 		return nil, false, fmt.Errorf("persist sc failure: %w", perr)
 	}
 	return persisted, false, ErrInsufficientCoin
+}
+
+func (s *SuperChatService) userRestricted(ctx context.Context, userID string) (bool, error) {
+	if s == nil || s.rdb == nil || strings.TrimSpace(userID) == "" {
+		return false, nil
+	}
+	pipe := s.rdb.Pipeline()
+	banCmd := pipe.Exists(ctx, contentpolicy.RedisSiteBanPrefix+userID)
+	muteCmd := pipe.TTL(ctx, contentpolicy.RedisSiteMutePrefix+userID)
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		return false, err
+	}
+	banned, _ := banCmd.Result()
+	mutedTTL, _ := muteCmd.Result()
+	return banned > 0 || mutedTTL > 0, nil
 }
 
 func (s *SuperChatService) containsBlockedWord(ctx context.Context, text string) (bool, error) {

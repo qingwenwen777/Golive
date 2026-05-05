@@ -19,6 +19,7 @@ import {
   Moon,
   PencilLine,
   Radio,
+  ShieldAlert,
   ShieldCheck,
   Settings,
   Sparkles,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
+import { useCreateUnbanAppeal } from '@/api/contentModeration';
 import { useFanBadges } from '@/api/gift';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
 import {
@@ -727,6 +729,7 @@ export function SettingsPage() {
   const me = useMe();
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const createUnbanAppeal = useCreateUnbanAppeal();
   const [tab, setTab] = useState<SettingsTab>('profile');
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [profileUsername, setProfileUsername] = useState('');
@@ -734,6 +737,7 @@ export function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [unbanReason, setUnbanReason] = useState('');
   const currentUser = me.data ?? user;
   const displayName = userDisplayName(currentUser);
   const usernameAvailableAt = parseDate(currentUser?.usernameChangeAvailableAt);
@@ -818,6 +822,29 @@ export function SettingsPage() {
     );
   };
 
+  const submitUnbanAppeal = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    const reason = unbanReason.trim();
+    if (reason.length < 10) {
+      toast.error(t('library.settings.security.appealReasonRequired'));
+      return;
+    }
+    createUnbanAppeal.mutate(
+      { reason },
+      {
+        onSuccess: () => {
+          setUnbanReason('');
+          toast.success(t('library.settings.security.appealSubmitted'));
+        },
+        onError: (err) => toast.error(err.message || t('library.settings.security.appealFailed')),
+      },
+    );
+  };
+
   return (
     <div className="gl-page gl-library-page gl-settings-page">
       <header className="gl-settings-hero">
@@ -880,10 +907,14 @@ export function SettingsPage() {
               confirmPassword={confirmPassword}
               pending={changePassword.isPending}
               usernameAvailableAt={usernameAvailableAt}
+              unbanReason={unbanReason}
+              appealPending={createUnbanAppeal.isPending}
               onCurrentPasswordChange={setCurrentPassword}
               onNewPasswordChange={setNewPassword}
               onConfirmPasswordChange={setConfirmPassword}
+              onUnbanReasonChange={setUnbanReason}
               onSubmit={submitPassword}
+              onAppealSubmit={submitUnbanAppeal}
             />
           ) : (
             <PreferencesSettings
@@ -1042,20 +1073,28 @@ function SecuritySettings({
   confirmPassword,
   pending,
   usernameAvailableAt,
+  unbanReason,
+  appealPending,
   onCurrentPasswordChange,
   onNewPasswordChange,
   onConfirmPasswordChange,
+  onUnbanReasonChange,
   onSubmit,
+  onAppealSubmit,
 }: {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
   pending: boolean;
   usernameAvailableAt: Date | null;
+  unbanReason: string;
+  appealPending: boolean;
   onCurrentPasswordChange: (value: string) => void;
   onNewPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
+  onUnbanReasonChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onAppealSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t, i18n } = useTranslation('pages');
   return (
@@ -1130,6 +1169,40 @@ function SecuritySettings({
           </p>
         </div>
       </section>
+
+      <form className="gl-settings-card gl-settings-form" onSubmit={onAppealSubmit}>
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <ShieldAlert size={18} />
+          </span>
+          <div>
+            <h2>{t('library.settings.security.appealTitle')}</h2>
+            <p>{t('library.settings.security.appealSub')}</p>
+          </div>
+        </div>
+        <label className="gl-settings-field">
+          <span>{t('library.settings.security.appealReason')}</span>
+          <textarea
+            value={unbanReason}
+            onChange={(event) => onUnbanReasonChange(event.target.value)}
+            maxLength={300}
+            className="gl-settings-input gl-settings-textarea"
+            placeholder={t('library.settings.security.appealPlaceholder')}
+          />
+          <small>{unbanReason.length}/300</small>
+        </label>
+        <div className="gl-settings-actions">
+          <button
+            className="gl-settings-button"
+            type="submit"
+            disabled={appealPending || unbanReason.trim().length < 10}
+          >
+            {appealPending
+              ? t('library.settings.security.appealSending')
+              : t('library.settings.security.appealSubmit')}
+          </button>
+        </div>
+      </form>
     </>
   );
 }

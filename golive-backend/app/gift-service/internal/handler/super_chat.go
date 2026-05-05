@@ -77,6 +77,10 @@ func (h *SuperChatHandler) Send(c *gin.Context) {
 		errcode.Respond(c, errcode.New(400, "Content contains blocked word").WithReason("blocked_word"))
 		return
 	}
+	if errors.Is(sErr, service.ErrUserRestricted) {
+		errcode.Respond(c, errcode.New(403, "User is restricted").WithReason("user_restricted"))
+		return
+	}
 
 	switch {
 	case sErr == nil:

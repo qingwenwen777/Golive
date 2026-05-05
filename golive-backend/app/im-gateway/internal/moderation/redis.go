@@ -12,6 +12,9 @@ import (
 type State struct {
 	Muted       bool
 	MuteTTL     time.Duration
+	SiteBanned  bool
+	SiteMuted   bool
+	SiteMuteTTL time.Duration
 	IsModerator bool
 }
 
@@ -45,15 +48,22 @@ func (c *RedisChecker) State(ctx context.Context, roomID, userID string) (State,
 	}
 	pipe := c.rdb.Pipeline()
 	ttlCmd := pipe.TTL(ctx, roomMuteKey(roomID, userID))
+	banCmd := pipe.Exists(ctx, contentpolicy.RedisSiteBanPrefix+userID)
+	siteMuteCmd := pipe.TTL(ctx, contentpolicy.RedisSiteMutePrefix+userID)
 	modCmd := pipe.SIsMember(ctx, roomModeratorsKey(roomID), userID)
 	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
 		return State{}, err
 	}
 	ttl, _ := ttlCmd.Result()
+	banned, _ := banCmd.Result()
+	siteMuteTTL, _ := siteMuteCmd.Result()
 	isMod, _ := modCmd.Result()
 	return State{
 		Muted:       ttl > 0,
 		MuteTTL:     ttl,
+		SiteBanned:  banned > 0,
+		SiteMuted:   siteMuteTTL > 0,
+		SiteMuteTTL: siteMuteTTL,
 		IsModerator: isMod,
 	}, nil
 }

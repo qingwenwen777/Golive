@@ -557,7 +557,16 @@
         "updated": "Password updated.",
         "usernameProtectionTitle": "Username protection",
         "usernameProtection": "Usernames are unique. After a successful change, a 7-day cooldown starts.",
-        "usernameProtectionWithDate": "Usernames are unique. After a successful change, a 7-day cooldown starts. You can change it again at {{date}}."
+        "usernameProtectionWithDate": "Usernames are unique. After a successful change, a 7-day cooldown starts. You can change it again at {{date}}.",
+        "appealTitle": "Restriction appeal",
+        "appealSub": "If your account was banned by mistake, submit the context for admin review.",
+        "appealReason": "Appeal reason",
+        "appealPlaceholder": "Explain what happened and why the restriction should be reviewed.",
+        "appealSubmit": "Submit appeal",
+        "appealSending": "Submitting...",
+        "appealSubmitted": "Appeal submitted. We will review it as soon as possible.",
+        "appealFailed": "Could not submit appeal.",
+        "appealReasonRequired": "Please enter at least 10 characters."
       },
       "preferences": {
         "displayTitle": "Display preferences",
@@ -1284,10 +1293,28 @@
         "noTitle": "No title",
         "noSnapshot": "No text snapshot.",
         "openTarget": "Open target",
+        "openDetail": "Review details",
         "note": "Resolution note",
         "notePlaceholder": "Record action notes for audit.",
+        "reportCount": "{{count}} reports",
+        "recentCount": "{{count}} in 1h",
+        "reporters": "Report records",
+        "result": "Result",
+        "action": "Action",
+        "muteDuration": "Mute duration",
+        "confirmAction": "Confirm action",
         "updated": "Report status updated.",
         "updateFailed": "Could not update report."
+      },
+      "actions": {
+        "review": "Mark reviewing",
+        "dismiss": "Dismiss",
+        "deleteContent": "Delete content",
+        "warnUser": "Warn user",
+        "warnRoom": "Warn live room",
+        "siteMute": "Site mute",
+        "banUser": "Ban user",
+        "forceEndLive": "Force end live"
       },
       "words": {
         "eyebrow": "Policy",
@@ -1528,6 +1555,7 @@
     }
   },
   "contentPolicy": {
-    "blockedWord": "Content contains blocked words and cannot be sent."
+    "blockedWord": "Content contains blocked words and cannot be sent.",
+    "userRestricted": "Your account is restricted from sending interactive content."
   }
 }

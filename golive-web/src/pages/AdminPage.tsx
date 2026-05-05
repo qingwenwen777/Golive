@@ -43,16 +43,19 @@ import {
 } from '@/api/creator';
 import {
   useAdminBlockedWords,
+  useAdminReportDetail,
   useAdminReports,
   useCreateBlockedWord,
   useDeleteBlockedWord,
   useUpdateAdminReport,
   useUpdateBlockedWord,
   type BlockedWord,
+  type ReportAction,
   type ReportStatus,
 } from '@/api/contentModeration';
 import { Avatar } from '@/components/Avatar';
 import { GoLiveLogo } from '@/components/Logo';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 type AdminModule = 'dashboard' | 'users' | 'creators' | 'content' | 'economy' | 'system' | 'logs';
@@ -697,6 +700,9 @@ function ContentPage() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<ReportAction>('delete_content');
+  const [muteDuration, setMuteDuration] = useState(1440);
   const [word, setWord] = useState('');
   const [wordNote, setWordNote] = useState('');
   const [editingWord, setEditingWord] = useState<BlockedWord | null>(null);
@@ -717,12 +723,42 @@ function ContentPage() {
 
   const items = reports.data?.items ?? [];
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+  const reportDetail = useAdminReportDetail(selectedId, detailOpen && Boolean(selectedId));
+  const detail = reportDetail.data ?? selected;
   const stats = reports.data?.stats ?? { pending: 0, reviewing: 0, today: 0, total: 0 };
 
   const submitReportStatus = (nextStatus: ReportStatus) => {
     if (!selected) return;
     updateReport.mutate(
       { id: selected.id, status: nextStatus, note: resolutionNote },
+      {
+        onSuccess: (updated) => {
+          setSelectedId(updated.id);
+          setResolutionNote(updated.resolutionNote ?? '');
+          toast.success(
+            t('admin.content.reports.updated', { defaultValue: 'Report status updated.' }),
+          );
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('admin.content.reports.updateFailed', {
+                defaultValue: 'Could not update report.',
+              }),
+          ),
+      },
+    );
+  };
+
+  const submitReportAction = (nextAction = selectedAction) => {
+    if (!detail) return;
+    updateReport.mutate(
+      {
+        id: detail.id,
+        action: nextAction,
+        note: resolutionNote,
+        durationMinutes: nextAction === 'site_mute' ? muteDuration : undefined,
+      },
       {
         onSuccess: (updated) => {
           setSelectedId(updated.id);
@@ -915,6 +951,8 @@ function ContentPage() {
                   onClick={() => {
                     setSelectedId(item.id);
                     setResolutionNote(item.resolutionNote ?? '');
+                    setSelectedAction(reportActionsForTarget(item.targetType)[0]);
+                    setDetailOpen(true);
                   }}
                 >
                   <div className="gl-admin-report-card-head">
@@ -929,8 +967,24 @@ function ContentPage() {
                   </p>
                   <div className="gl-admin-report-card-meta">
                     <span>{reportTargetLabel(item.targetType, t)}</span>
-                    <span>{item.reporterName}</span>
+                    <span>
+                      {t('admin.content.reports.reportCount', {
+                        count: item.reportCount ?? 1,
+                        defaultValue: '{{count}} reports',
+                      })}
+                    </span>
+                    {Boolean(item.recentCount) && (
+                      <span>
+                        {t('admin.content.reports.recentCount', {
+                          count: item.recentCount,
+                          defaultValue: '{{count}} in 1h',
+                        })}
+                      </span>
+                    )}
                     {item.targetUserName && <span>{item.targetUserName}</span>}
+                    {item.resolutionAction && (
+                      <span>{reportActionLabel(item.resolutionAction, t)}</span>
+                    )}
                   </div>
                 </button>
               ))
@@ -1008,19 +1062,24 @@ function ContentPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => submitReportStatus('resolved')}
+                    onClick={() => {
+                      setSelectedId(selected.id);
+                      setResolutionNote(selected.resolutionNote ?? '');
+                      setSelectedAction(reportActionsForTarget(selected.targetType)[0]);
+                      setDetailOpen(true);
+                    }}
                     disabled={updateReport.isPending}
                   >
-                    <Check size={15} />
-                    {reportStatusLabel('resolved', t)}
+                    <Eye size={15} />
+                    {t('admin.content.reports.openDetail', { defaultValue: 'Review details' })}
                   </button>
                   <button
                     type="button"
-                    onClick={() => submitReportStatus('dismissed')}
+                    onClick={() => submitReportAction('dismiss')}
                     disabled={updateReport.isPending}
                   >
                     <X size={15} />
-                    {reportStatusLabel('dismissed', t)}
+                    {reportActionLabel('dismiss', t)}
                   </button>
                 </div>
               </>
@@ -1034,6 +1093,171 @@ function ContentPage() {
           </aside>
         </div>
       </section>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="gl-admin-report-dialog p-0 sm:max-w-[920px]">
+          {detail ? (
+            <div className="gl-admin-report-modal">
+              <div className="gl-admin-report-modal-head">
+                <div>
+                  <span>{reportTargetLabel(detail.targetType, t)}</span>
+                  <DialogTitle>
+                    {detail.targetTitle ||
+                      detail.targetText ||
+                      t('admin.content.reports.title', { defaultValue: 'Report management' })}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t('admin.content.reports.reportCount', {
+                      count: detail.reportCount ?? detail.reports?.length ?? 1,
+                      defaultValue: '{{count}} reports',
+                    })}
+                    {detail.recentCount
+                      ? ` · ${t('admin.content.reports.recentCount', {
+                          count: detail.recentCount,
+                          defaultValue: '{{count}} in 1h',
+                        })}`
+                      : ''}
+                  </DialogDescription>
+                </div>
+                <span className={`gl-admin-report-severity ${detail.status}`}>
+                  {reportStatusLabel(detail.status, t)}
+                </span>
+              </div>
+
+              <div className="gl-admin-report-modal-grid">
+                <div className="gl-admin-report-modal-main">
+                  <div className="gl-admin-report-snapshot is-modal">
+                    <span>
+                      {t('admin.content.reports.snapshot', { defaultValue: 'Content snapshot' })}
+                    </span>
+                    <h3>
+                      {detail.targetTitle ||
+                        t('admin.content.reports.noTitle', { defaultValue: 'No title' })}
+                    </h3>
+                    <p>
+                      {detail.targetText ||
+                        t('admin.content.reports.noSnapshot', {
+                          defaultValue: 'No text snapshot.',
+                        })}
+                    </p>
+                    {detail.targetUrl && (
+                      <a href={detail.targetUrl} target="_blank" rel="noreferrer">
+                        <Eye size={15} />
+                        {t('admin.content.reports.openTarget', { defaultValue: 'Open target' })}
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="gl-admin-reporters">
+                    <strong>
+                      {t('admin.content.reports.reporters', { defaultValue: 'Report records' })}
+                    </strong>
+                    {(detail.reports ?? [detail]).map((entry) => (
+                      <div className="gl-admin-reporter-row" key={entry.id}>
+                        <Avatar name={entry.reporterName} src={entry.reporterAvatar} size={30} />
+                        <div>
+                          <b>{entry.reporterName}</b>
+                          <span>
+                            {reportReasonLabel(entry.reason, t)} · {formatDate(entry.createdAt)}
+                          </span>
+                          {entry.description && <p>{entry.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <aside className="gl-admin-report-modal-side">
+                  <AdminDetailRow
+                    label={t('admin.content.reports.reportedUser', {
+                      defaultValue: 'Reported user',
+                    })}
+                    value={detail.targetUserName || detail.targetOwnerName || '-'}
+                  />
+                  <AdminDetailRow
+                    label={t('admin.content.reports.status', { defaultValue: 'Status' })}
+                    value={reportStatusLabel(detail.status, t)}
+                  />
+                  <AdminDetailRow
+                    label={t('admin.content.reports.result', { defaultValue: 'Result' })}
+                    value={
+                      detail.resolutionAction ? reportActionLabel(detail.resolutionAction, t) : '-'
+                    }
+                  />
+                  <label className="gl-admin-resolution-note">
+                    <span>
+                      {t('admin.content.reports.note', { defaultValue: 'Resolution note' })}
+                    </span>
+                    <textarea
+                      value={resolutionNote}
+                      onChange={(event) => setResolutionNote(event.target.value)}
+                      placeholder={t('admin.content.reports.notePlaceholder', {
+                        defaultValue: 'Record action notes for audit.',
+                      })}
+                    />
+                  </label>
+                  <label className="gl-admin-action-select">
+                    <span>{t('admin.content.reports.action', { defaultValue: 'Action' })}</span>
+                    <select
+                      value={selectedAction}
+                      onChange={(event) => setSelectedAction(event.target.value as ReportAction)}
+                    >
+                      {reportActionsForTarget(detail.targetType).map((action) => (
+                        <option value={action} key={action}>
+                          {reportActionLabel(action, t)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedAction === 'site_mute' && (
+                    <label className="gl-admin-action-select">
+                      <span>
+                        {t('admin.content.reports.muteDuration', {
+                          defaultValue: 'Mute duration',
+                        })}
+                      </span>
+                      <select
+                        value={muteDuration}
+                        onChange={(event) => setMuteDuration(Number(event.target.value))}
+                      >
+                        {[30, 120, 1440, 10080].map((value) => (
+                          <option value={value} key={value}>
+                            {formatMuteDuration(value)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <div className="gl-admin-report-actions-bar is-modal">
+                    <button
+                      type="button"
+                      onClick={() => submitReportAction()}
+                      disabled={updateReport.isPending}
+                    >
+                      <Check size={15} />
+                      {t('admin.content.reports.confirmAction', {
+                        defaultValue: 'Confirm action',
+                      })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitReportAction('dismiss')}
+                      disabled={updateReport.isPending}
+                    >
+                      <X size={15} />
+                      {reportActionLabel('dismiss', t)}
+                    </button>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          ) : (
+            <AdminEmptyState
+              label={t('admin.content.reports.loading', { defaultValue: 'Loading reports...' })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <section className="gl-admin-panel gl-admin-words-panel">
         <div className="gl-admin-panel-head">
@@ -1220,6 +1444,38 @@ function reportReasonLabel(value: string, t: Translate) {
     other: t('report.reasons.other', { defaultValue: 'Other' }),
   };
   return map[value] ?? value;
+}
+
+function reportActionLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    review: t('admin.content.actions.review', { defaultValue: 'Mark reviewing' }),
+    dismiss: t('admin.content.actions.dismiss', { defaultValue: 'Dismiss' }),
+    delete_content: t('admin.content.actions.deleteContent', { defaultValue: 'Delete content' }),
+    warn_user: t('admin.content.actions.warnUser', { defaultValue: 'Warn user' }),
+    warn_room: t('admin.content.actions.warnRoom', { defaultValue: 'Warn live room' }),
+    site_mute: t('admin.content.actions.siteMute', { defaultValue: 'Site mute' }),
+    ban_user: t('admin.content.actions.banUser', { defaultValue: 'Ban user' }),
+    force_end_live: t('admin.content.actions.forceEndLive', {
+      defaultValue: 'Force end live',
+    }),
+  };
+  return map[value] ?? value;
+}
+
+function reportActionsForTarget(targetType: string): ReportAction[] {
+  if (targetType === 'room') {
+    return ['warn_room', 'force_end_live', 'warn_user', 'site_mute', 'ban_user', 'dismiss'];
+  }
+  if (targetType === 'channel') {
+    return ['warn_user', 'site_mute', 'ban_user', 'dismiss'];
+  }
+  return ['delete_content', 'warn_user', 'site_mute', 'ban_user', 'dismiss'];
+}
+
+function formatMuteDuration(minutes: number) {
+  if (minutes >= 1440) return `${Math.round(minutes / 1440)}d`;
+  if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
+  return `${minutes}m`;
 }
 
 function ScaffoldModulePage({

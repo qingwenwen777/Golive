@@ -56,10 +56,29 @@ var allowedReportStatuses = map[string]struct{}{
 	model.ReportStatusDismissed: {},
 }
 
+var allowedReportActions = map[string]struct{}{
+	model.ReportActionReview:        {},
+	model.ReportActionDismiss:       {},
+	model.ReportActionDeleteContent: {},
+	model.ReportActionWarnUser:      {},
+	model.ReportActionWarnRoom:      {},
+	model.ReportActionSiteMute:      {},
+	model.ReportActionBanUser:       {},
+	model.ReportActionForceEndLive:  {},
+}
+
+var allowedSiteMuteDurations = map[int]struct{}{
+	30:    {},
+	120:   {},
+	1440:  {},
+	10080: {},
+}
+
 type ModerationService struct {
 	moderation *repo.ModerationRepo
 	rooms      *repo.RoomRepo
 	social     *repo.SocialRepo
+	live       *LiveService
 	now        func() time.Time
 }
 
@@ -70,6 +89,10 @@ func NewModerationService(moderation *repo.ModerationRepo, rooms *repo.RoomRepo,
 		social:     social,
 		now:        time.Now,
 	}
+}
+
+func (s *ModerationService) SetLiveService(live *LiveService) {
+	s.live = live
 }
 
 type ModerationUserDTO struct {
@@ -164,34 +187,41 @@ type CreateReportReq struct {
 }
 
 type UpdateReportReq struct {
-	Status string `json:"status"`
-	Note   string `json:"note"`
+	Status          string `json:"status"`
+	Action          string `json:"action"`
+	Note            string `json:"note"`
+	DurationMinutes int    `json:"durationMinutes"`
 }
 
 type ContentReportDTO struct {
-	ID              string `json:"id"`
-	ReporterID      string `json:"reporterId"`
-	ReporterName    string `json:"reporterName"`
-	ReporterAvatar  string `json:"reporterAvatar,omitempty"`
-	TargetType      string `json:"targetType"`
-	TargetID        string `json:"targetId"`
-	TargetURL       string `json:"targetUrl,omitempty"`
-	RoomID          string `json:"roomId,omitempty"`
-	ChannelID       string `json:"channelId,omitempty"`
-	TargetOwnerID   string `json:"targetOwnerId,omitempty"`
-	TargetOwnerName string `json:"targetOwnerName,omitempty"`
-	TargetUserID    string `json:"targetUserId,omitempty"`
-	TargetUserName  string `json:"targetUserName,omitempty"`
-	TargetTitle     string `json:"targetTitle,omitempty"`
-	TargetText      string `json:"targetText,omitempty"`
-	Reason          string `json:"reason"`
-	Description     string `json:"description,omitempty"`
-	Status          string `json:"status"`
-	ReviewerID      string `json:"reviewerId,omitempty"`
-	ResolutionNote  string `json:"resolutionNote,omitempty"`
-	ResolvedAt      string `json:"resolvedAt,omitempty"`
-	CreatedAt       string `json:"createdAt"`
-	UpdatedAt       string `json:"updatedAt"`
+	ID               string             `json:"id"`
+	ReporterID       string             `json:"reporterId"`
+	ReporterName     string             `json:"reporterName"`
+	ReporterAvatar   string             `json:"reporterAvatar,omitempty"`
+	TargetType       string             `json:"targetType"`
+	TargetID         string             `json:"targetId"`
+	TargetURL        string             `json:"targetUrl,omitempty"`
+	RoomID           string             `json:"roomId,omitempty"`
+	ChannelID        string             `json:"channelId,omitempty"`
+	TargetOwnerID    string             `json:"targetOwnerId,omitempty"`
+	TargetOwnerName  string             `json:"targetOwnerName,omitempty"`
+	TargetUserID     string             `json:"targetUserId,omitempty"`
+	TargetUserName   string             `json:"targetUserName,omitempty"`
+	TargetTitle      string             `json:"targetTitle,omitempty"`
+	TargetText       string             `json:"targetText,omitempty"`
+	Reason           string             `json:"reason"`
+	Description      string             `json:"description,omitempty"`
+	Status           string             `json:"status"`
+	ReviewerID       string             `json:"reviewerId,omitempty"`
+	ResolutionAction string             `json:"resolutionAction,omitempty"`
+	DurationMinutes  int                `json:"durationMinutes,omitempty"`
+	ResolutionNote   string             `json:"resolutionNote,omitempty"`
+	ResolvedAt       string             `json:"resolvedAt,omitempty"`
+	CreatedAt        string             `json:"createdAt"`
+	UpdatedAt        string             `json:"updatedAt"`
+	ReportCount      int64              `json:"reportCount,omitempty"`
+	RecentCount      int64              `json:"recentCount,omitempty"`
+	Reports          []ContentReportDTO `json:"reports,omitempty"`
 }
 
 type ContentReportListResp struct {
@@ -237,6 +267,10 @@ type BlockedWordListResp struct {
 	Total int64            `json:"total"`
 	Page  int              `json:"page"`
 	Size  int              `json:"size"`
+}
+
+type CreateUnbanAppealReq struct {
+	Reason string `json:"reason"`
 }
 
 func (s *ModerationService) ListFollowers(ctx context.Context, ownerID, query string, page, size int) (*ModerationUserListResp, error) {
@@ -402,16 +436,12 @@ func (s *ModerationService) ListReports(ctx context.Context, adminID string, fil
 	}
 	filter.Page = normalizePage(filter.Page)
 	filter.Size = normalizeSize(filter.Size)
-	rows, total, err := s.moderation.ListContentReports(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	stats, err := s.moderation.ContentReportStats(ctx, s.now())
+	rows, total, stats, err := s.moderation.ListContentReportGroups(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	return &ContentReportListResp{
-		Items: contentReportDTOs(rows),
+		Items: contentReportGroupDTOs(rows),
 		Total: total,
 		Page:  filter.Page,
 		Size:  filter.Size,
@@ -435,7 +465,14 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 	if err != nil {
 		return nil, err
 	}
+	children, err := s.moderation.ContentReportsForTarget(ctx, report.TargetType, report.TargetID)
+	if err != nil {
+		return nil, err
+	}
 	dto := contentReportDTO(*report)
+	dto.ReportCount = int64(len(children))
+	dto.RecentCount = recentReportCount(children, s.now().Add(-time.Hour))
+	dto.Reports = contentReportDTOs(children)
 	return &dto, nil
 }
 
@@ -443,18 +480,37 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if err := s.requireAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
-	status := strings.ToLower(strings.TrimSpace(req.Status))
-	if _, ok := allowedReportStatuses[status]; !ok {
-		return nil, errcode.New(http.StatusBadRequest, "invalid report status").WithReason("invalid_status")
+	base, err := s.moderation.GetContentReport(ctx, strings.TrimSpace(id))
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errcode.New(http.StatusNotFound, "report not found")
 	}
-	report, err := s.moderation.UpdateContentReport(
-		ctx,
-		strings.TrimSpace(id),
-		status,
-		adminID,
-		trimRunes(strings.TrimSpace(req.Note), 1000),
-		s.now(),
-	)
+	if err != nil {
+		return nil, err
+	}
+	action := strings.ToLower(strings.TrimSpace(req.Action))
+	status := strings.ToLower(strings.TrimSpace(req.Status))
+	if action != "" {
+		if _, ok := allowedReportActions[action]; !ok {
+			return nil, errcode.New(http.StatusBadRequest, "invalid report action").WithReason("invalid_action")
+		}
+		status = statusForReportAction(action)
+	} else {
+		if _, ok := allowedReportStatuses[status]; !ok {
+			return nil, errcode.New(http.StatusBadRequest, "invalid report status").WithReason("invalid_status")
+		}
+		if status == model.ReportStatusReviewing {
+			action = model.ReportActionReview
+		} else if status == model.ReportStatusDismissed {
+			action = model.ReportActionDismiss
+		}
+	}
+	duration := normalizeSanctionDuration(action, req.DurationMinutes)
+	note := trimRunes(strings.TrimSpace(req.Note), 1000)
+	if err := s.applyReportAction(ctx, adminID, base, action, note, duration); err != nil {
+		return nil, err
+	}
+	now := s.now()
+	report, err := s.moderation.UpdateContentReportGroup(ctx, strings.TrimSpace(id), status, action, adminID, note, duration, now)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
 	}
@@ -463,6 +519,59 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	}
 	dto := contentReportDTO(*report)
 	return &dto, nil
+}
+
+func (s *ModerationService) applyReportAction(ctx context.Context, adminID string, report *model.ContentReport, action, note string, durationMinutes int) error {
+	if report == nil || action == "" || action == model.ReportActionReview || action == model.ReportActionDismiss {
+		return nil
+	}
+	now := s.now()
+	targetUserID := firstNonEmptyString(report.TargetUserID, report.TargetOwnerID)
+	targetUserName := firstNonEmptyString(report.TargetUserName, report.TargetOwnerName)
+	targetLink := firstNonEmptyString(report.TargetURL, reportLink(report))
+	switch action {
+	case model.ReportActionDeleteContent:
+		if err := s.moderation.DeleteReportedContent(ctx, report.TargetType, report.TargetID, report.RoomID, now); err != nil {
+			return err
+		}
+		if targetUserID != "" {
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_content_deleted", "内容已被删除", moderationDeletedBody(report), targetLink, adminID, now)
+		}
+	case model.ReportActionWarnUser:
+		if targetUserID != "" {
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_warning", "你收到一条平台警告", moderationWarnBody(note), targetLink, adminID, now)
+			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionWarn, report.ID, note, 0, now)
+		}
+	case model.ReportActionWarnRoom:
+		roomID := firstNonEmptyString(report.RoomID, report.TargetID)
+		if s.live != nil && roomID != "" {
+			_ = s.live.PublishSystemNotice(ctx, roomID, moderationRoomWarnBody(note))
+		}
+		if report.TargetOwnerID != "" {
+			_ = s.notifyModeration(ctx, report.TargetOwnerID, "moderation_room_warning", "直播间收到平台警告", moderationRoomWarnBody(note), targetLink, adminID, now)
+		}
+	case model.ReportActionSiteMute:
+		if targetUserID != "" {
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_site_mute", "你已被全站禁言", moderationMuteBody(durationMinutes, note), targetLink, adminID, now)
+			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionSiteMute, report.ID, note, durationMinutes, now)
+		}
+	case model.ReportActionBanUser:
+		if targetUserID != "" {
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
+			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now)
+		}
+	case model.ReportActionForceEndLive:
+		roomID := firstNonEmptyString(report.RoomID, report.TargetID)
+		if s.live != nil && roomID != "" {
+			if err := s.live.ForceStopRoom(ctx, roomID); err != nil {
+				return err
+			}
+		}
+		if report.TargetOwnerID != "" {
+			_ = s.notifyModeration(ctx, report.TargetOwnerID, "moderation_live_ended", "直播已被管理员结束", moderationForceEndBody(note), targetLink, adminID, now)
+		}
+	}
+	return nil
 }
 
 func (s *ModerationService) ListBlockedWords(ctx context.Context, adminID string, page, size int) (*BlockedWordListResp, error) {
@@ -578,6 +687,45 @@ func (s *ModerationService) EnsureTextAllowed(ctx context.Context, texts ...stri
 		return errcode.New(http.StatusBadRequest, "content contains blocked word").WithReason("blocked_word")
 	}
 	return nil
+}
+
+func (s *ModerationService) EnsureUserCanInteract(ctx context.Context, userID string) error {
+	if s == nil || s.moderation == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	restriction, err := s.moderation.UserRestriction(ctx, userID, s.now())
+	if err != nil {
+		return err
+	}
+	if restriction.Banned {
+		return errcode.New(http.StatusForbidden, "user is banned").WithReason("user_banned")
+	}
+	if restriction.Muted {
+		return errcode.New(http.StatusForbidden, "user is muted").WithReason("site_muted")
+	}
+	return nil
+}
+
+func (s *ModerationService) CreateUnbanAppeal(ctx context.Context, userID string, req CreateUnbanAppealReq) error {
+	if userID == "" {
+		return errcode.ErrUnauthorized
+	}
+	restriction, err := s.moderation.UserRestriction(ctx, userID, s.now())
+	if err != nil {
+		return err
+	}
+	if !restriction.Banned {
+		return errcode.New(http.StatusConflict, "user is not banned").WithReason("not_banned")
+	}
+	now := s.now()
+	return s.moderation.CreateUnbanAppeal(ctx, &model.UnbanAppeal{
+		ID:        uuid.NewString(),
+		UserID:    userID,
+		Reason:    trimRunes(strings.TrimSpace(req.Reason), 1000),
+		Status:    model.UnbanAppealPending,
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
 }
 
 func (s *ModerationService) RoomState(ctx context.Context, roomID, userID string) (*RoomModerationState, error) {
@@ -837,30 +985,66 @@ func contentReportDTOs(rows []model.ContentReport) []ContentReportDTO {
 	return out
 }
 
+func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
+	out := make([]ContentReportDTO, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, ContentReportDTO{
+			ID:               row.ID,
+			TargetType:       row.TargetType,
+			TargetID:         row.TargetID,
+			TargetURL:        row.TargetURL,
+			RoomID:           row.RoomID,
+			ChannelID:        row.ChannelID,
+			TargetOwnerID:    row.TargetOwnerID,
+			TargetOwnerName:  row.TargetOwnerName,
+			TargetUserID:     row.TargetUserID,
+			TargetUserName:   row.TargetUserName,
+			TargetTitle:      row.TargetTitle,
+			TargetText:       row.TargetText,
+			Reason:           row.Reason,
+			Status:           row.Status,
+			ReviewerID:       row.ReviewerID,
+			ResolutionAction: row.ResolutionAction,
+			DurationMinutes:  row.DurationMinutes,
+			ResolutionNote:   row.ResolutionNote,
+			CreatedAt:        row.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:        row.UpdatedAt.UTC().Format(time.RFC3339),
+			ReportCount:      row.ReportCount,
+			RecentCount:      row.RecentCount,
+		})
+		if row.ResolvedAt != nil && !row.ResolvedAt.IsZero() {
+			out[len(out)-1].ResolvedAt = row.ResolvedAt.UTC().Format(time.RFC3339)
+		}
+	}
+	return out
+}
+
 func contentReportDTO(row model.ContentReport) ContentReportDTO {
 	dto := ContentReportDTO{
-		ID:              row.ID,
-		ReporterID:      row.ReporterID,
-		ReporterName:    row.ReporterName,
-		ReporterAvatar:  row.ReporterAvatar,
-		TargetType:      row.TargetType,
-		TargetID:        row.TargetID,
-		TargetURL:       row.TargetURL,
-		RoomID:          row.RoomID,
-		ChannelID:       row.ChannelID,
-		TargetOwnerID:   row.TargetOwnerID,
-		TargetOwnerName: row.TargetOwnerName,
-		TargetUserID:    row.TargetUserID,
-		TargetUserName:  row.TargetUserName,
-		TargetTitle:     row.TargetTitle,
-		TargetText:      row.TargetText,
-		Reason:          row.Reason,
-		Description:     row.Description,
-		Status:          row.Status,
-		ReviewerID:      row.ReviewerID,
-		ResolutionNote:  row.ResolutionNote,
-		CreatedAt:       row.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:       row.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:               row.ID,
+		ReporterID:       row.ReporterID,
+		ReporterName:     row.ReporterName,
+		ReporterAvatar:   row.ReporterAvatar,
+		TargetType:       row.TargetType,
+		TargetID:         row.TargetID,
+		TargetURL:        row.TargetURL,
+		RoomID:           row.RoomID,
+		ChannelID:        row.ChannelID,
+		TargetOwnerID:    row.TargetOwnerID,
+		TargetOwnerName:  row.TargetOwnerName,
+		TargetUserID:     row.TargetUserID,
+		TargetUserName:   row.TargetUserName,
+		TargetTitle:      row.TargetTitle,
+		TargetText:       row.TargetText,
+		Reason:           row.Reason,
+		Description:      row.Description,
+		Status:           row.Status,
+		ReviewerID:       row.ReviewerID,
+		ResolutionAction: row.ResolutionAction,
+		DurationMinutes:  row.DurationMinutes,
+		ResolutionNote:   row.ResolutionNote,
+		CreatedAt:        row.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:        row.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	if row.ResolvedAt != nil && !row.ResolvedAt.IsZero() {
 		dto.ResolvedAt = row.ResolvedAt.UTC().Format(time.RFC3339)
@@ -904,4 +1088,132 @@ func normalizeSize(size int) int {
 		return 100
 	}
 	return size
+}
+
+func statusForReportAction(action string) string {
+	switch action {
+	case model.ReportActionReview:
+		return model.ReportStatusReviewing
+	case model.ReportActionDismiss:
+		return model.ReportStatusDismissed
+	default:
+		return model.ReportStatusResolved
+	}
+}
+
+func normalizeSanctionDuration(action string, minutes int) int {
+	if action != model.ReportActionSiteMute {
+		return 0
+	}
+	if _, ok := allowedSiteMuteDurations[minutes]; ok {
+		return minutes
+	}
+	return 1440
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func recentReportCount(rows []model.ContentReport, after time.Time) int64 {
+	var count int64
+	for _, row := range rows {
+		if row.CreatedAt.After(after) {
+			count++
+		}
+	}
+	return count
+}
+
+func reportLink(report *model.ContentReport) string {
+	if report == nil {
+		return ""
+	}
+	switch report.TargetType {
+	case model.ReportTargetRoom, model.ReportTargetDanmu, model.ReportTargetSuperChat:
+		if report.RoomID != "" {
+			return "/live/" + report.RoomID
+		}
+	case model.ReportTargetChannel, model.ReportTargetPost, model.ReportTargetPostComment:
+		if report.ChannelID != "" {
+			return "/channel/" + strings.TrimPrefix(report.ChannelID, "ch-")
+		}
+		if report.TargetOwnerID != "" {
+			return "/channel/" + report.TargetOwnerID
+		}
+	}
+	return ""
+}
+
+func (s *ModerationService) notifyModeration(ctx context.Context, userID, kind, title, body, link, adminID string, now time.Time) error {
+	return s.moderation.CreateNotification(ctx, model.Notification{
+		ID:        "mod-" + uuid.NewString(),
+		UserID:    userID,
+		Type:      kind,
+		Title:     title,
+		Body:      body,
+		Link:      link,
+		ActorID:   adminID,
+		ActorName: "GoLive Admin",
+		CreatedAt: now,
+	})
+}
+
+func moderationDeletedBody(report *model.ContentReport) string {
+	switch report.TargetType {
+	case model.ReportTargetPost:
+		return "你的帖子因违反社区规范已被删除。"
+	case model.ReportTargetPostComment:
+		return "你的评论因违反社区规范已被删除。"
+	case model.ReportTargetDanmu:
+		return "你的弹幕因违反社区规范已被删除，回放中也不会继续显示。"
+	case model.ReportTargetSuperChat:
+		return "你的 SuperChat 因违反社区规范已被删除，回放中也不会继续显示。"
+	default:
+		return "你的内容因违反社区规范已被删除。"
+	}
+}
+
+func moderationWarnBody(note string) string {
+	if strings.TrimSpace(note) != "" {
+		return "请注意平台社区规范。处理备注：" + strings.TrimSpace(note)
+	}
+	return "请注意平台社区规范，避免再次发布违规内容。"
+}
+
+func moderationRoomWarnBody(note string) string {
+	if strings.TrimSpace(note) != "" {
+		return "你的直播间收到平台警告。处理备注：" + strings.TrimSpace(note)
+	}
+	return "你的直播间收到平台警告，请及时调整直播内容。"
+}
+
+func moderationMuteBody(minutes int, note string) string {
+	body := "你已被全站禁言，禁言期间无法发送弹幕、评论和 SuperChat。"
+	if minutes > 0 {
+		body = body + " 时长：" + (time.Duration(minutes) * time.Minute).String()
+	}
+	if strings.TrimSpace(note) != "" {
+		body = body + " 处理备注：" + strings.TrimSpace(note)
+	}
+	return body
+}
+
+func moderationBanBody(note string) string {
+	if strings.TrimSpace(note) != "" {
+		return "你的账号已被封禁，可提交解封申请。处理备注：" + strings.TrimSpace(note)
+	}
+	return "你的账号已被封禁，可提交解封申请。"
+}
+
+func moderationForceEndBody(note string) string {
+	if strings.TrimSpace(note) != "" {
+		return "直播因违反社区规范已被管理员强制结束。处理备注：" + strings.TrimSpace(note)
+	}
+	return "直播因违反社区规范已被管理员强制结束。"
 }

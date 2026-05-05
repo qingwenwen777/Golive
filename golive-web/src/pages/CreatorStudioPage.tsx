@@ -82,6 +82,7 @@ import { Avatar } from '@/components/Avatar';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
+import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { Player } from '@/features/live-room/Player';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
@@ -3395,6 +3396,7 @@ function StudioInteractionRail({
   const { t } = useTranslation('pages');
   const [giftPage, setGiftPage] = useState(0);
   const [superChatPage, setSuperChatPage] = useState(0);
+  const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const gifts = summarizeGifts(messages);
   const superChats = messages
     .filter((item): item is Extract<Message, { kind: 'super_chat' }> => item.kind === 'super_chat')
@@ -3447,11 +3449,13 @@ function StudioInteractionRail({
           messages={messages}
           viewers={viewers}
           viewerTotal={viewerCount}
+          roomId={stream.id}
           ownerId={stream.ownerId}
           ownerName={stream.channel}
           onSendChat={onSendChat}
           canModerate={canModerate}
           onOpenModeration={onOpenModeration}
+          onReportMessage={setReportTarget}
           reconnecting={reconnecting}
           reconnectingLabel={reconnectingLabel}
         />
@@ -3531,6 +3535,13 @@ function StudioInteractionRail({
           />
         )}
       </section>
+      <ReportDialog
+        open={Boolean(reportTarget)}
+        target={reportTarget}
+        onOpenChange={(open) => {
+          if (!open) setReportTarget(null);
+        }}
+      />
     </aside>
   );
 }

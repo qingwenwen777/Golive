@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Danmu is the persisted form. The table name is computed at runtime from
 // shard-of(roomId), so we DO NOT set TableName() — callers always pass the
@@ -19,6 +23,7 @@ type Danmu struct {
 	UserLevel         int
 	Ts                int64 `gorm:"not null;index"` // ms epoch
 	CreatedAt         time.Time
+	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
 // Public is the wire-shape served via GET /rooms/:id/danmus and Redis pub/sub.

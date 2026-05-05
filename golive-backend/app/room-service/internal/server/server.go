@@ -86,6 +86,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.POST("/moderation/moderators/:userID", auth, moderationH.AddModerator)
 		rooms.DELETE("/moderation/moderators/:userID", auth, moderationH.RemoveModerator)
 		rooms.GET("/moderation/logs", auth, moderationH.Logs)
+		rooms.POST("/moderation/unban-appeals", auth, moderationH.CreateUnbanAppeal)
 		rooms.POST("/reports", auth, moderationH.CreateReport)
 		rooms.GET("/admin/reports", auth, moderationH.ListReports)
 		rooms.GET("/admin/reports/:id", auth, moderationH.ReportDetail)

@@ -45,7 +45,13 @@ export function useFanBadges(enabled = true, userId?: string) {
 }
 
 export interface GiftError {
-  reason: 'insufficient_coin' | 'gift_level_locked' | 'blocked_word' | 'network' | 'unknown';
+  reason:
+    | 'insufficient_coin'
+    | 'gift_level_locked'
+    | 'blocked_word'
+    | 'user_restricted'
+    | 'network'
+    | 'unknown';
   message: string;
   requiredLevel?: number;
   userLevel?: number;
@@ -68,6 +74,9 @@ function toGiftError(err: unknown): GiftError {
     }
     if (data?.reason === 'blocked_word') {
       return { reason: 'blocked_word', message: data.message ?? 'Content contains blocked word' };
+    }
+    if (data?.reason === 'user_restricted') {
+      return { reason: 'user_restricted', message: data.message ?? 'User is restricted' };
     }
     if (!err.response) return { reason: 'network', message: 'Network error' };
     return { reason: 'unknown', message: data?.message ?? err.message };

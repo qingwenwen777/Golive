@@ -558,7 +558,16 @@
         "updated": "密码已更新。",
         "usernameProtectionTitle": "用户名保护",
         "usernameProtection": "用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期。",
-        "usernameProtectionWithDate": "用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期，下一次可修改时间为 {{date}}。"
+        "usernameProtectionWithDate": "用户名全站唯一。成功修改用户名后，系统会开启 7 天冷却期，下一次可修改时间为 {{date}}。",
+        "appealTitle": "账号限制申诉",
+        "appealSub": "如果你认为账号被误封，可以提交说明让管理员复核。",
+        "appealReason": "申诉理由",
+        "appealPlaceholder": "请说明发生了什么，以及为什么需要重新审核限制。",
+        "appealSubmit": "提交申诉",
+        "appealSending": "提交中...",
+        "appealSubmitted": "申诉已提交，我们会尽快复核。",
+        "appealFailed": "无法提交申诉。",
+        "appealReasonRequired": "请至少输入 10 个字。"
       },
       "preferences": {
         "displayTitle": "显示偏好",
@@ -1285,10 +1294,28 @@
         "noTitle": "无标题",
         "noSnapshot": "暂无文本快照。",
         "openTarget": "打开目标",
+        "openDetail": "查看详情",
         "note": "处理备注",
         "notePlaceholder": "记录处理说明，便于审计。",
+        "reportCount": "{{count}} 条举报",
+        "recentCount": "近 1 小时 {{count}} 条",
+        "reporters": "举报记录",
+        "result": "处理结果",
+        "action": "处置动作",
+        "muteDuration": "禁言时长",
+        "confirmAction": "确认处置",
         "updated": "举报状态已更新。",
         "updateFailed": "无法更新举报。"
+      },
+      "actions": {
+        "review": "标记处理中",
+        "dismiss": "驳回举报",
+        "deleteContent": "删除内容",
+        "warnUser": "警告用户",
+        "warnRoom": "警告直播间",
+        "siteMute": "全站禁言",
+        "banUser": "封禁用户",
+        "forceEndLive": "强制结束直播"
       },
       "words": {
         "eyebrow": "策略",
@@ -1529,6 +1556,7 @@
     }
   },
   "contentPolicy": {
-    "blockedWord": "内容包含屏蔽词，无法发送。"
+    "blockedWord": "内容包含屏蔽词，无法发送。",
+    "userRestricted": "你的账号已被限制，暂时无法发送互动内容。"
   }
 }

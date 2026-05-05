@@ -20,6 +20,15 @@ export type ReportReason =
   | 'other';
 
 export type ReportStatus = 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+export type ReportAction =
+  | 'review'
+  | 'dismiss'
+  | 'delete_content'
+  | 'warn_user'
+  | 'warn_room'
+  | 'site_mute'
+  | 'ban_user'
+  | 'force_end_live';
 
 export interface CreateReportPayload {
   targetType: ReportTargetType;
@@ -57,10 +66,15 @@ export interface ContentReport {
   description?: string;
   status: ReportStatus | string;
   reviewerId?: string;
+  resolutionAction?: ReportAction | string;
+  durationMinutes?: number;
   resolutionNote?: string;
   resolvedAt?: string;
   createdAt: string;
   updatedAt: string;
+  reportCount?: number;
+  recentCount?: number;
+  reports?: ContentReport[];
 }
 
 export interface ReportStats {
@@ -136,17 +150,44 @@ export function useAdminReports(
 
 export function useUpdateAdminReport() {
   const qc = useQueryClient();
-  return useMutation<ContentReport, Error, { id: string; status: ReportStatus; note?: string }>({
-    mutationFn: async ({ id, status, note }) => {
+  return useMutation<
+    ContentReport,
+    Error,
+    {
+      id: string;
+      status?: ReportStatus;
+      action?: ReportAction;
+      note?: string;
+      durationMinutes?: number;
+    }
+  >({
+    mutationFn: async ({ id, status, action, note, durationMinutes }) => {
       const { data } = await http.patch<ContentReport>(
         `/rooms/admin/reports/${encodeURIComponent(id)}`,
-        { status, note },
+        { status, action, note, durationMinutes },
       );
       return data;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-reports'] });
+      void qc.invalidateQueries({ queryKey: ['admin-report-detail'] });
     },
+  });
+}
+
+export function useAdminReportDetail(id: string, enabled = true) {
+  return useQuery<ContentReport, Error>({
+    queryKey: ['admin-report-detail', id],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<ContentReport>(
+        `/rooms/admin/reports/${encodeURIComponent(id)}`,
+        { signal },
+      );
+      return data;
+    },
+    enabled: enabled && !!id,
+    staleTime: 5_000,
+    retry: 1,
   });
 }
 
@@ -211,6 +252,15 @@ export function useDeleteBlockedWord() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-blocked-words'] });
+    },
+  });
+}
+
+export function useCreateUnbanAppeal() {
+  return useMutation<{ ok: boolean }, Error, { reason: string }>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<{ ok: boolean }>('/rooms/moderation/unban-appeals', payload);
+      return data;
     },
   });
 }

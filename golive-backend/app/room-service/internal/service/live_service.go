@@ -295,6 +295,63 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 	return nil
 }
 
+func (s *LiveService) ForceStopRoom(ctx context.Context, roomID string) error {
+	roomID = strings.TrimSpace(roomID)
+	if roomID == "" {
+		return nil
+	}
+	room, err := s.rooms.GetByID(ctx, roomID)
+	if err != nil {
+		if errors.Is(err, repo.ErrRoomNotFound) {
+			return nil
+		}
+		return err
+	}
+	if room.Status != model.StatusPublishing && room.Status != model.StatusLive && room.Status != model.StatusEnding {
+		return nil
+	}
+	endedAt := s.now()
+	if err := s.endRoom(ctx, room, endedAt); err != nil {
+		return err
+	}
+	if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
+		return err
+	}
+	if s.replay != nil {
+		s.replay.EnqueueUpload(ctx, *room)
+	}
+	if room.StreamKey != "" {
+		if err := s.live.Delete(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+			return err
+		}
+		if err := s.live.DeletePublishSession(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *LiveService) PublishSystemNotice(ctx context.Context, roomID, text string) error {
+	roomID = strings.TrimSpace(roomID)
+	text = strings.TrimSpace(text)
+	if roomID == "" || text == "" {
+		return nil
+	}
+	payload, err := json.Marshal(struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+		Ts   int64  `json:"ts"`
+	}{
+		Type: "system",
+		Text: text,
+		Ts:   s.now().UnixMilli(),
+	})
+	if err != nil {
+		return err
+	}
+	return s.live.PublishRoomEvent(ctx, roomID, payload)
+}
+
 // SRSPublishReq is the JSON SRS posts to on_publish / on_unpublish.
 type SRSPublishReq struct {
 	Action   string `json:"action"`

@@ -557,7 +557,16 @@
         "updated": "パスワードを更新しました。",
         "usernameProtectionTitle": "ユーザー名の保護",
         "usernameProtection": "ユーザー名は全体で一意です。変更後は 7 日間のクールダウンが始まります。",
-        "usernameProtectionWithDate": "ユーザー名は全体で一意です。変更後は 7 日間のクールダウンが始まります。次回変更可能日時は {{date}} です。"
+        "usernameProtectionWithDate": "ユーザー名は全体で一意です。変更後は 7 日間のクールダウンが始まります。次回変更可能日時は {{date}} です。",
+        "appealTitle": "アカウント制限の申し立て",
+        "appealSub": "誤って停止されたと思う場合は、管理者確認用の説明を送信できます。",
+        "appealReason": "申し立て理由",
+        "appealPlaceholder": "何が起きたか、制限を再確認すべき理由を記入してください。",
+        "appealSubmit": "申し立てを送信",
+        "appealSending": "送信中...",
+        "appealSubmitted": "申し立てを送信しました。できるだけ早く確認します。",
+        "appealFailed": "申し立てを送信できませんでした。",
+        "appealReasonRequired": "10 文字以上入力してください。"
       },
       "preferences": {
         "displayTitle": "表示設定",
@@ -1284,10 +1293,28 @@
         "noTitle": "タイトルなし",
         "noSnapshot": "テキストのスナップショットはありません。",
         "openTarget": "対象を開く",
+        "openDetail": "詳細を確認",
         "note": "対応メモ",
         "notePlaceholder": "対応内容を監査用に記録します。",
+        "reportCount": "{{count}} 件の通報",
+        "recentCount": "直近 1 時間 {{count}} 件",
+        "reporters": "通報記録",
+        "result": "対応結果",
+        "action": "対応アクション",
+        "muteDuration": "ミュート時間",
+        "confirmAction": "対応を確定",
         "updated": "通報ステータスを更新しました。",
         "updateFailed": "通報を更新できませんでした。"
+      },
+      "actions": {
+        "review": "対応中にする",
+        "dismiss": "却下",
+        "deleteContent": "コンテンツ削除",
+        "warnUser": "ユーザーに警告",
+        "warnRoom": "配信ルームに警告",
+        "siteMute": "全サイトミュート",
+        "banUser": "ユーザーを停止",
+        "forceEndLive": "配信を強制終了"
       },
       "words": {
         "eyebrow": "ポリシー",
@@ -1528,6 +1555,7 @@
     }
   },
   "contentPolicy": {
-    "blockedWord": "ブロックワードが含まれているため送信できません。"
+    "blockedWord": "ブロックワードが含まれているため送信できません。",
+    "userRestricted": "アカウントが制限されているため、インタラクションを送信できません。"
   }
 }

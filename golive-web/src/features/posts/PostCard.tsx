@@ -4,10 +4,12 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCircle2,
+  Flag,
   Globe2,
   Heart,
   LockKeyhole,
   MessageCircle,
+  MoreVertical,
   Reply,
   Send,
   Trash2,
@@ -28,17 +30,26 @@ import {
 } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
+import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 
-export function PostCard({ post, context = 'channel' }: { post: ChannelPost; context?: 'channel' | 'studio' }) {
+export function PostCard({
+  post,
+  context = 'channel',
+}: {
+  post: ChannelPost;
+  context?: 'channel' | 'studio';
+}) {
   const { t, i18n } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [replyTarget, setReplyTarget] = useState<PostComment | null>(null);
+  const [postMenuOpen, setPostMenuOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const [collapsedReplies, setCollapsedReplies] = useState<Record<string, boolean>>({});
   const comments = usePostComments(post.id, commentsOpen);
   const createComment = useCreatePostComment(post.id);
@@ -46,9 +57,13 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
   const toggleLike = useTogglePostLike(post.id);
   const updateVisibility = useUpdatePostVisibility();
   const meta = visibilityMeta(post, t);
-  const CommentMetaIcon = post.commentsEnabled && post.commentMode === 'followers' ? Users : MessageCircle;
+  const CommentMetaIcon =
+    post.commentsEnabled && post.commentMode === 'followers' ? Users : MessageCircle;
   const hasPostBody = Boolean(post.content.trim() || post.images.length > 0);
-  const commentTree = useMemo(() => buildCommentTree(comments.data?.items ?? []), [comments.data?.items]);
+  const commentTree = useMemo(
+    () => buildCommentTree(comments.data?.items ?? []),
+    [comments.data?.items],
+  );
 
   const submitComment = (event: FormEvent) => {
     event.preventDefault();
@@ -74,7 +89,10 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
           setCommentsOpen(true);
           toast.success(t('posts.comments.sent', { defaultValue: '评论已发布。' }));
         },
-        onError: (err) => toast.error(err.message || t('posts.comments.failed', { defaultValue: '评论发布失败。' })),
+        onError: (err) =>
+          toast.error(
+            err.message || t('posts.comments.failed', { defaultValue: '评论发布失败。' }),
+          ),
       },
     );
   };
@@ -91,7 +109,8 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
     if (!window.confirm(t('posts.confirmDelete', { defaultValue: '确定删除这条帖子吗？' }))) return;
     deletePost.mutate(post.id, {
       onSuccess: () => toast.success(t('posts.deleted', { defaultValue: '帖子已删除。' })),
-      onError: (err) => toast.error(err.message || t('posts.deleteFailed', { defaultValue: '无法删除帖子。' })),
+      onError: (err) =>
+        toast.error(err.message || t('posts.deleteFailed', { defaultValue: '无法删除帖子。' })),
     });
   };
 
@@ -100,8 +119,13 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
     updateVisibility.mutate(
       { postId: post.id, visibility },
       {
-        onSuccess: () => toast.success(t('posts.visibility.updated', { defaultValue: '可见范围已更新。' })),
-        onError: (err) => toast.error(err.message || t('posts.visibility.updateFailed', { defaultValue: '可见范围更新失败。' })),
+        onSuccess: () =>
+          toast.success(t('posts.visibility.updated', { defaultValue: '可见范围已更新。' })),
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('posts.visibility.updateFailed', { defaultValue: '可见范围更新失败。' }),
+          ),
       },
     );
   };
@@ -120,8 +144,52 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
     setCollapsedReplies((current) => ({ ...current, [commentId]: !current[commentId] }));
   };
 
+  const openReport = (target: ReportTargetDraft) => {
+    if (!isAuthed) {
+      openLogin(() => setReportTarget(target));
+      return;
+    }
+    setReportTarget(target);
+  };
+
+  const reportPost = () => {
+    setPostMenuOpen(false);
+    openReport({
+      targetType: 'post',
+      targetId: post.id,
+      targetUrl:
+        typeof window !== 'undefined' ? `${window.location.href}#post-${post.id}` : undefined,
+      channelId: post.channelId,
+      targetOwnerId: post.ownerId,
+      targetOwnerName: post.author.name,
+      targetUserId: post.ownerId,
+      targetUserName: post.author.name,
+      targetTitle: post.author.name,
+      targetText: post.content,
+    });
+  };
+
+  const reportComment = (comment: PostComment) => {
+    openReport({
+      targetType: 'post_comment',
+      targetId: comment.id,
+      targetUrl:
+        typeof window !== 'undefined' ? `${window.location.href}#comment-${comment.id}` : undefined,
+      channelId: post.channelId,
+      targetOwnerId: post.ownerId,
+      targetOwnerName: post.author.name,
+      targetUserId: comment.userId,
+      targetUserName: comment.author.name,
+      targetTitle: post.author.name,
+      targetText: comment.content,
+    });
+  };
+
   return (
-    <article className={cn('gl-post-card', context === 'studio' && 'is-studio')}>
+    <article
+      className={cn('gl-post-card', context === 'studio' && 'is-studio')}
+      id={`post-${post.id}`}
+    >
       <header className="gl-post-head">
         <Avatar name={post.author.name} src={post.author.avatar} size={42} />
         <div className="gl-post-author">
@@ -156,12 +224,33 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
             <Trash2 size={16} />
           </button>
         )}
+        <div className="gl-post-menu-wrap">
+          <button
+            type="button"
+            className="gl-post-icon-button"
+            aria-label={t('report.moreActions')}
+            onClick={() => setPostMenuOpen((open) => !open)}
+          >
+            <MoreVertical size={17} />
+          </button>
+          {postMenuOpen && (
+            <div className="gl-post-menu">
+              <button type="button" onClick={reportPost}>
+                <Flag size={14} />
+                {t('report.action')}
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {post.canDelete && (
         <div className="gl-post-owner-tools">
           <span>{t('posts.visibility.editLabel', { defaultValue: '可见范围' })}</span>
-          <div className="gl-post-visibility-edit" aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}>
+          <div
+            className="gl-post-visibility-edit"
+            aria-label={t('posts.editor.visibility', { defaultValue: '可见范围' })}
+          >
             {postVisibilityOptions(t).map((option) => (
               <button
                 key={option.value}
@@ -183,9 +272,20 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
           {post.content.trim() && <p className="gl-post-content">{post.content}</p>}
 
           {post.images.length > 0 && (
-            <div className={cn('gl-post-images', post.images.length === 1 && 'is-single', post.images.length > 2 && 'is-collage')}>
+            <div
+              className={cn(
+                'gl-post-images',
+                post.images.length === 1 && 'is-single',
+                post.images.length > 2 && 'is-collage',
+              )}
+            >
               {post.images.map((image) => (
-                <button type="button" className="gl-post-image" key={image} onClick={() => window.open(image, '_blank', 'noopener,noreferrer')}>
+                <button
+                  type="button"
+                  className="gl-post-image"
+                  key={image}
+                  onClick={() => window.open(image, '_blank', 'noopener,noreferrer')}
+                >
                   <LoadableImage src={image} alt="" />
                 </button>
               ))}
@@ -195,11 +295,20 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
       )}
 
       <footer className="gl-post-actions">
-        <button type="button" className={cn(post.liked && 'is-active')} disabled={toggleLike.isPending} onClick={handleLike}>
+        <button
+          type="button"
+          className={cn(post.liked && 'is-active')}
+          disabled={toggleLike.isPending}
+          onClick={handleLike}
+        >
           <Heart size={17} fill={post.liked ? 'currentColor' : 'none'} />
           {post.likeCount.toLocaleString()}
         </button>
-        <button type="button" className={commentsOpen ? 'is-active' : undefined} onClick={() => setCommentsOpen((open) => !open)}>
+        <button
+          type="button"
+          className={commentsOpen ? 'is-active' : undefined}
+          onClick={() => setCommentsOpen((open) => !open)}
+        >
           <MessageCircle size={17} />
           {post.commentCount.toLocaleString()}
         </button>
@@ -208,7 +317,9 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
       {commentsOpen && (
         <section className="gl-post-comments">
           {comments.isPending ? (
-            <div className="gl-post-comment-empty">{t('posts.comments.loading', { defaultValue: '评论加载中...' })}</div>
+            <div className="gl-post-comment-empty">
+              {t('posts.comments.loading', { defaultValue: '评论加载中...' })}
+            </div>
           ) : commentTree.length ? (
             <div className="gl-post-comment-list">
               {commentTree.map((comment) => (
@@ -220,11 +331,14 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
                   isCollapsed={(commentId) => Boolean(collapsedReplies[commentId])}
                   onToggleReplies={toggleReplies}
                   onReply={openReply}
+                  onReport={reportComment}
                 />
               ))}
             </div>
           ) : (
-            <div className="gl-post-comment-empty">{t('posts.comments.empty', { defaultValue: '还没有评论。' })}</div>
+            <div className="gl-post-comment-empty">
+              {t('posts.comments.empty', { defaultValue: '还没有评论。' })}
+            </div>
           )}
 
           {post.commentsEnabled ? (
@@ -232,7 +346,12 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
               <form className="gl-post-comment-form" onSubmit={submitComment}>
                 {replyTarget && (
                   <div className="gl-post-reply-target">
-                    <span>{t('posts.comments.replyingTo', { name: replyTarget.author.name, defaultValue: '回复 {{name}}' })}</span>
+                    <span>
+                      {t('posts.comments.replyingTo', {
+                        name: replyTarget.author.name,
+                        defaultValue: '回复 {{name}}',
+                      })}
+                    </span>
                     <button type="button" onClick={() => setReplyTarget(null)}>
                       {t('posts.comments.cancelReply', { defaultValue: '取消' })}
                     </button>
@@ -246,7 +365,11 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
                     placeholder={t('posts.comments.placeholder', { defaultValue: '写一条评论...' })}
                     onChange={(event) => setCommentText(event.target.value)}
                   />
-                  <button type="submit" disabled={createComment.isPending || !commentText.trim()} aria-label={t('posts.comments.send', { defaultValue: '发送评论' })}>
+                  <button
+                    type="submit"
+                    disabled={createComment.isPending || !commentText.trim()}
+                    aria-label={t('posts.comments.send', { defaultValue: '发送评论' })}
+                  >
                     <Send size={16} />
                   </button>
                 </div>
@@ -259,10 +382,19 @@ export function PostCard({ post, context = 'channel' }: { post: ChannelPost; con
               </div>
             )
           ) : (
-            <div className="gl-post-comment-empty">{t('posts.comments.closed', { defaultValue: '评论区已关闭。' })}</div>
+            <div className="gl-post-comment-empty">
+              {t('posts.comments.closed', { defaultValue: '评论区已关闭。' })}
+            </div>
           )}
         </section>
       )}
+      <ReportDialog
+        open={Boolean(reportTarget)}
+        target={reportTarget}
+        onOpenChange={(open) => {
+          if (!open) setReportTarget(null);
+        }}
+      />
     </article>
   );
 }
@@ -274,6 +406,7 @@ function PostCommentRow({
   isCollapsed,
   onToggleReplies,
   onReply,
+  onReport,
 }: {
   comment: PostCommentNode;
   postId: string;
@@ -281,6 +414,7 @@ function PostCommentRow({
   isCollapsed: (commentId: string) => boolean;
   onToggleReplies: (commentId: string) => void;
   onReply: (comment: PostComment) => void;
+  onReport: (comment: PostComment) => void;
 }) {
   const { t, i18n } = useTranslation('pages');
   const isAuthed = useIsAuthed();
@@ -289,6 +423,7 @@ function PostCommentRow({
   const deleteComment = useDeletePostComment(postId);
   const nestedCount = countNestedComments(comment.children);
   const collapsed = isCollapsed(comment.id);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLike = () => {
     if (!isAuthed) {
@@ -299,15 +434,24 @@ function PostCommentRow({
   };
 
   const handleDelete = () => {
-    if (!window.confirm(t('posts.comments.confirmDelete', { defaultValue: '确定删除这条评论吗？' }))) return;
+    if (
+      !window.confirm(t('posts.comments.confirmDelete', { defaultValue: '确定删除这条评论吗？' }))
+    )
+      return;
     deleteComment.mutate(comment.id, {
       onSuccess: () => toast.success(t('posts.comments.deleted', { defaultValue: '评论已删除。' })),
-      onError: (err) => toast.error(err.message || t('posts.comments.deleteFailed', { defaultValue: '无法删除评论。' })),
+      onError: (err) =>
+        toast.error(
+          err.message || t('posts.comments.deleteFailed', { defaultValue: '无法删除评论。' }),
+        ),
     });
   };
 
   return (
-    <div className={cn('gl-post-comment', `is-depth-${Math.min(comment.depth, 2)}`)}>
+    <div
+      className={cn('gl-post-comment', `is-depth-${Math.min(comment.depth, 2)}`)}
+      id={`comment-${comment.id}`}
+    >
       <Avatar name={comment.author.name} src={comment.author.avatar} size={30} />
       <div className="gl-post-comment-main">
         <div className="gl-post-comment-bubble">
@@ -318,7 +462,12 @@ function PostCommentRow({
           <p>{comment.content}</p>
         </div>
         <div className="gl-post-comment-actions">
-          <button type="button" className={comment.liked ? 'is-active' : undefined} disabled={toggleLike.isPending} onClick={handleLike}>
+          <button
+            type="button"
+            className={comment.liked ? 'is-active' : undefined}
+            disabled={toggleLike.isPending}
+            onClick={handleLike}
+          >
             <Heart size={14} fill={comment.liked ? 'currentColor' : 'none'} />
             {comment.likeCount.toLocaleString()}
           </button>
@@ -329,17 +478,55 @@ function PostCommentRow({
             </button>
           )}
           {comment.canDelete && (
-            <button type="button" className="is-danger" disabled={deleteComment.isPending} onClick={handleDelete}>
+            <button
+              type="button"
+              className="is-danger"
+              disabled={deleteComment.isPending}
+              onClick={handleDelete}
+            >
               <Trash2 size={14} />
               {t('posts.comments.delete', { defaultValue: '删除' })}
             </button>
           )}
+          <span className="gl-post-comment-more">
+            <button
+              type="button"
+              aria-label={t('report.moreActions')}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <MoreVertical size={14} />
+            </button>
+            {menuOpen && (
+              <span className="gl-post-comment-menu">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onReport(comment);
+                  }}
+                >
+                  <Flag size={13} />
+                  {t('report.action')}
+                </button>
+              </span>
+            )}
+          </span>
           {comment.children.length > 0 && (
-            <button type="button" className="gl-post-comment-collapse" onClick={() => onToggleReplies(comment.id)}>
+            <button
+              type="button"
+              className="gl-post-comment-collapse"
+              onClick={() => onToggleReplies(comment.id)}
+            >
               {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               {collapsed
-                ? t('posts.comments.expandReplies', { count: nestedCount, defaultValue: '展开 {{count}} 条回复' })
-                : t('posts.comments.collapseReplies', { count: nestedCount, defaultValue: '收起 {{count}} 条回复' })}
+                ? t('posts.comments.expandReplies', {
+                    count: nestedCount,
+                    defaultValue: '展开 {{count}} 条回复',
+                  })
+                : t('posts.comments.collapseReplies', {
+                    count: nestedCount,
+                    defaultValue: '收起 {{count}} 条回复',
+                  })}
             </button>
           )}
         </div>
@@ -354,6 +541,7 @@ function PostCommentRow({
                 isCollapsed={isCollapsed}
                 onToggleReplies={onToggleReplies}
                 onReply={onReply}
+                onReport={onReport}
               />
             ))}
           </div>
@@ -407,9 +595,21 @@ function postVisibilityOptions(t: ReturnType<typeof useTranslation>['t']): Array
   Icon: typeof Globe2;
 }> {
   return [
-    { value: 'public', label: t('posts.visibility.public', { defaultValue: '公开' }), Icon: Globe2 },
-    { value: 'followers', label: t('posts.visibility.followers', { defaultValue: '粉丝' }), Icon: Users },
-    { value: 'private', label: t('posts.visibility.private', { defaultValue: '仅自己' }), Icon: LockKeyhole },
+    {
+      value: 'public',
+      label: t('posts.visibility.public', { defaultValue: '公开' }),
+      Icon: Globe2,
+    },
+    {
+      value: 'followers',
+      label: t('posts.visibility.followers', { defaultValue: '粉丝' }),
+      Icon: Users,
+    },
+    {
+      value: 'private',
+      label: t('posts.visibility.private', { defaultValue: '仅自己' }),
+      Icon: LockKeyhole,
+    },
   ];
 }
 

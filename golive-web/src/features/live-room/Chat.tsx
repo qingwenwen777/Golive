@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Flag,
   Ban,
+  MoreVertical,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
@@ -354,8 +355,16 @@ function ChatRow({
   );
 }
 
-function SuperChatCard({ m }: { m: SuperChatMessage }) {
+function SuperChatCard({
+  m,
+  onReport,
+}: {
+  m: SuperChatMessage;
+  onReport?: (message: SuperChatMessage) => void;
+}) {
   const spec = tierSpec(m.tier);
+  const { t } = useTranslation('pages');
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
       className={cn('gl-sc', m.pending && 'opacity-50 saturate-50')}
@@ -368,6 +377,29 @@ function SuperChatCard({ m }: { m: SuperChatMessage }) {
           <UserLevelBadge level={m.userLevel} size="compact" className="gl-sc-level" />
         )}
         <span className="gl-sc-amt">{formatYenAmount(m.amount)}</span>
+        <span className="gl-sc-menu-wrap">
+          <button
+            type="button"
+            aria-label={t('report.moreActions')}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MoreVertical size={15} />
+          </button>
+          {menuOpen && (
+            <span className="gl-sc-menu">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onReport?.(m);
+                }}
+              >
+                <Flag size={13} />
+                {t('report.action')}
+              </button>
+            </span>
+          )}
+        </span>
       </div>
       {m.text && (
         <div className="gl-sc-body" style={{ background: spec.soft, color: '#0f0f0f' }}>
@@ -963,7 +995,29 @@ export function Chat({
           {messages.map((m) => {
             if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
             if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
-            if (m.kind === 'super_chat') return <SuperChatCard key={m.id} m={m} />;
+            if (m.kind === 'super_chat') {
+              return (
+                <SuperChatCard
+                  key={m.id}
+                  m={m}
+                  onReport={(target) =>
+                    onReportMessage?.({
+                      targetType: 'super_chat',
+                      targetId: target.id,
+                      targetUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+                      roomId,
+                      channelId: ownerId ? `ch-${ownerId}` : undefined,
+                      targetOwnerId: ownerId,
+                      targetOwnerName: ownerName,
+                      targetUserId: target.userId,
+                      targetUserName: target.user,
+                      targetTitle: ownerName,
+                      targetText: target.text,
+                    })
+                  }
+                />
+              );
+            }
             const chat = m as ChatMessage;
             const isOwner = isOwnerMessage(chat, ownerId, ownerName);
             const isFan =

@@ -5,7 +5,11 @@ import (
 	"unicode"
 )
 
-const RedisBlockedWordsKey = "content:blocked_words"
+const (
+	RedisBlockedWordsKey = "content:blocked_words"
+	RedisSiteBanPrefix   = "site:ban:"
+	RedisSiteMutePrefix  = "site:mute:"
+)
 
 func NormalizeWord(word string) string {
 	return strings.ToLower(strings.TrimSpace(word))

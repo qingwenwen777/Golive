@@ -94,6 +94,7 @@ func main() {
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
+	moderationSvc.SetLiveService(liveSvc)
 	liveSvc.SetTextPolicy(moderationSvc)
 	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL)
 	if err != nil {
@@ -113,6 +114,9 @@ func main() {
 	}
 	if err := moderationRepo.SyncBlockedWords(context.Background()); err != nil {
 		log.Warn("sync blocked words", zap.Error(err))
+	}
+	if err := moderationRepo.SyncUserRestrictions(context.Background(), time.Now()); err != nil {
+		log.Warn("sync user restrictions", zap.Error(err))
 	}
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {

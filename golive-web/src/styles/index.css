@@ -492,7 +492,7 @@
 .gl-post-head {
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -548,6 +548,53 @@
   font-size: 12px;
   font-weight: 850;
   padding: 0 9px;
+}
+
+.gl-post-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.gl-post-menu,
+.gl-post-comment-menu {
+  position: absolute;
+  z-index: 30;
+  min-width: 154px;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+  padding: 6px;
+}
+
+.gl-post-menu {
+  top: calc(100% + 8px);
+  right: 0;
+}
+
+.gl-post-menu button,
+.gl-post-comment-menu button {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.gl-post-menu button:hover,
+.gl-post-comment-menu button:hover {
+  background: var(--gl-bg-hover);
 }
 
 .gl-post-owner-tools {
@@ -748,6 +795,21 @@
 
 .gl-post-comment-actions .gl-post-comment-collapse {
   color: var(--gl-text);
+}
+
+.gl-post-comment-more {
+  position: relative;
+  display: inline-flex;
+}
+
+.gl-post-comment-more > button {
+  width: 32px;
+  padding: 0;
+}
+
+.gl-post-comment-menu {
+  top: calc(100% + 6px);
+  left: 0;
 }
 
 .gl-post-comment-children {
@@ -5105,10 +5167,9 @@ input:focus-visible,
 }
 .gl-admin-invite-row {
   display: grid;
-  grid-template-columns: minmax(160px, 0.85fr) 96px minmax(220px, 1.15fr) minmax(
-      132px,
-      auto
-    ) auto auto;
+  grid-template-columns:
+    minmax(160px, 0.85fr) 96px minmax(220px, 1.15fr) minmax(132px, auto)
+    auto auto;
   gap: 12px;
   align-items: center;
   padding: 14px 18px;
@@ -5771,6 +5832,172 @@ input:focus-visible,
 .gl-admin-word-form button:hover {
   background: var(--gl-bg-hover);
 }
+.gl-admin-report-dialog {
+  overflow: hidden;
+  border-radius: 14px;
+}
+.gl-admin-report-modal {
+  display: flex;
+  max-height: min(86vh, 760px);
+  flex-direction: column;
+  background: var(--gl-bg-card);
+}
+.gl-admin-report-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 20px 22px;
+}
+.gl-admin-report-modal-head > div {
+  min-width: 0;
+}
+.gl-admin-report-modal-head span:not(.gl-admin-report-severity) {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-admin-report-modal-head h2 {
+  max-width: 680px;
+  margin: 4px 0 5px;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 22px;
+  font-weight: 950;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-report-modal-head p {
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 750;
+}
+.gl-admin-report-modal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  min-height: 0;
+  overflow: hidden;
+}
+.gl-admin-report-modal-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 18px 22px 22px;
+}
+.gl-admin-report-modal-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 1px solid var(--gl-border);
+  background: var(--gl-bg);
+  padding: 18px;
+}
+.gl-admin-report-snapshot.is-modal {
+  background: var(--gl-bg-card);
+}
+.gl-admin-reporters {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+}
+.gl-admin-reporters > strong {
+  border-bottom: 1px solid var(--gl-border);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 12px 14px;
+}
+.gl-admin-reporter-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  border-top: 1px solid var(--gl-border);
+  padding: 12px 14px;
+}
+.gl-admin-reporter-row:first-of-type {
+  border-top: 0;
+}
+.gl-admin-reporter-row div {
+  min-width: 0;
+}
+.gl-admin-reporter-row b,
+.gl-admin-reporter-row span,
+.gl-admin-reporter-row p {
+  display: block;
+  min-width: 0;
+}
+.gl-admin-reporter-row b {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-reporter-row span {
+  margin-top: 2px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+.gl-admin-reporter-row p {
+  margin: 7px 0 0;
+  color: var(--gl-text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.gl-admin-action-select {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.gl-admin-action-select span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-admin-action-select select {
+  height: 38px;
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 800;
+  outline: none;
+  padding: 0 11px;
+}
+.gl-admin-action-select select:focus {
+  border-color: var(--gl-text);
+}
+.gl-admin-report-actions-bar.is-modal {
+  margin-top: auto;
+}
+.gl-admin-report-actions-bar.is-modal button:first-child {
+  border-color: var(--gl-text);
+  background: var(--gl-text);
+  color: var(--gl-bg-card);
+}
+.gl-admin-report-actions-bar.is-modal button:first-child:hover {
+  opacity: 0.9;
+}
+.gl-admin-report-severity.dismissed {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+}
 .gl-admin-word-actions button {
   width: 36px;
   padding: 0;
@@ -5839,6 +6066,44 @@ input:focus-visible,
 .gl-admin-word-status.is-on {
   background: rgba(22, 163, 74, 0.1);
   color: #15803d;
+}
+@media (max-width: 980px) {
+  .gl-admin-content-filters,
+  .gl-admin-content-grid,
+  .gl-admin-report-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-admin-report-list {
+    max-height: 360px;
+    border-right: 0;
+  }
+
+  .gl-admin-report-detail,
+  .gl-admin-report-modal-side {
+    border-top: 1px solid var(--gl-border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .gl-admin-report-dialog {
+    width: calc(100vw - 20px);
+  }
+
+  .gl-admin-report-modal-head {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .gl-admin-report-modal-head h2 {
+    white-space: normal;
+  }
+
+  .gl-admin-report-modal-main,
+  .gl-admin-report-modal-side {
+    padding: 16px;
+  }
 }
 .gl-admin-empty-state {
   display: grid;
@@ -9716,6 +9981,13 @@ button.gl-fan-badge-empty {
   border-color: #1c62b9;
   outline: 0;
   box-shadow: 0 0 0 3px rgba(28, 98, 185, 0.14);
+}
+
+.gl-settings-textarea {
+  min-height: 108px;
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.5;
 }
 
 .gl-settings-toggle-row {

@@ -232,6 +232,16 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		if err != nil {
 			logger.L().Warn("load moderation state", zap.String("room", c.roomID), zap.Error(err))
 		} else {
+			if state.SiteBanned {
+				_ = c.Send(hub.EncodeSystem("Your account is banned from chat interactions."))
+				metrics.MessagesDropped.WithLabelValues("site_banned").Inc()
+				return
+			}
+			if state.SiteMuted {
+				_ = c.Send(hub.EncodeSystem("You are site-muted for " + formatMuteTTL(state.SiteMuteTTL) + "."))
+				metrics.MessagesDropped.WithLabelValues("site_muted").Inc()
+				return
+			}
 			if state.Muted {
 				_ = c.Send(hub.EncodeSystem("You are muted for " + formatMuteTTL(state.MuteTTL) + "."))
 				metrics.MessagesDropped.WithLabelValues("muted").Inc()

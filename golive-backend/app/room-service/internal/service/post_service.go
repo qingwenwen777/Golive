@@ -36,6 +36,7 @@ func NewPostService(posts *repo.PostRepo, rooms *repo.RoomRepo, social *repo.Soc
 
 type TextPolicy interface {
 	EnsureTextAllowed(ctx context.Context, texts ...string) error
+	EnsureUserCanInteract(ctx context.Context, userID string) error
 }
 
 func (s *PostService) SetTextPolicy(policy TextPolicy) {
@@ -369,6 +370,11 @@ func (s *PostService) CreateComment(ctx context.Context, userID, postID string, 
 	if userID == "" {
 		return nil, errcode.ErrUnauthorized
 	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, userID); err != nil {
+			return nil, err
+		}
+	}
 	post, err := s.visiblePost(ctx, userID, postID)
 	if err != nil {
 		return nil, err
@@ -451,6 +457,11 @@ func (s *PostService) LikePost(ctx context.Context, userID, postID string) (*Pos
 	if userID == "" {
 		return nil, errcode.ErrUnauthorized
 	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, userID); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := s.visiblePost(ctx, userID, postID); err != nil {
 		return nil, err
 	}
@@ -465,6 +476,11 @@ func (s *PostService) UnlikePost(ctx context.Context, userID, postID string) (*P
 	if userID == "" {
 		return nil, errcode.ErrUnauthorized
 	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, userID); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := s.visiblePost(ctx, userID, postID); err != nil {
 		return nil, err
 	}
@@ -478,6 +494,11 @@ func (s *PostService) UnlikePost(ctx context.Context, userID, postID string) (*P
 func (s *PostService) LikeComment(ctx context.Context, userID, postID, commentID string) (*CommentLikeState, error) {
 	if userID == "" {
 		return nil, errcode.ErrUnauthorized
+	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, userID); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := s.visiblePost(ctx, userID, postID); err != nil {
 		return nil, err
@@ -495,6 +516,11 @@ func (s *PostService) LikeComment(ctx context.Context, userID, postID, commentID
 func (s *PostService) UnlikeComment(ctx context.Context, userID, postID, commentID string) (*CommentLikeState, error) {
 	if userID == "" {
 		return nil, errcode.ErrUnauthorized
+	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, userID); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := s.visiblePost(ctx, userID, postID); err != nil {
 		return nil, err

@@ -84,6 +84,19 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *ModerationHandler) CreateUnbanAppeal(c *gin.Context) {
+	var req service.CreateUnbanAppealReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	if err := h.svc.CreateUnbanAppeal(c.Request.Context(), UserIDFromCtx(c), req); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func (h *ModerationHandler) ListReports(c *gin.Context) {
 	page, size := pageSize(c, 1, 20)
 	resp, err := h.svc.ListReports(c.Request.Context(), UserIDFromCtx(c), repo.ReportListFilter{

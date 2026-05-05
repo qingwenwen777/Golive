@@ -132,6 +132,12 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
                 defaultValue: 'Content contains blocked words and cannot be sent.',
               }),
             );
+          } else if (err.reason === 'user_restricted') {
+            toast.error(
+              t('contentPolicy.userRestricted', {
+                defaultValue: 'Your account is restricted from sending interactive content.',
+              }),
+            );
           } else {
             toast.error(
               err.message ||

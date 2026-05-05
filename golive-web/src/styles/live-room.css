@@ -1810,6 +1810,56 @@
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
+.gl-sc-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.gl-sc-menu-wrap > button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+}
+.gl-sc-menu-wrap > button:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+.gl-sc-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 35;
+  min-width: 148px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+  padding: 6px;
+}
+.gl-sc-menu button {
+  display: flex;
+  width: 100%;
+  height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 10px;
+}
+.gl-sc-menu button:hover {
+  background: var(--gl-bg-hover);
+}
 .gl-sc-body {
   padding: 12px 14px;
   font-size: 14px;
