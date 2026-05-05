@@ -1106,6 +1106,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[data-sonner-toaster].gl-toaster {
+  font-family: var(--gl-font-ui);
+}
+
+[data-sonner-toaster].gl-toaster[data-sonner-theme='light'],
+[data-sonner-toaster].gl-toaster[data-sonner-theme='dark'] {
+  --success-bg: var(--gl-bg-card);
+  --success-border: var(--gl-border);
+  --success-text: var(--gl-text);
+}
+
 button {
   font-family: inherit;
   color: inherit;

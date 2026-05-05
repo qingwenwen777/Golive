@@ -1577,7 +1577,6 @@ export function CreatorPostsPage() {
                   <h2>{t('posts.editor.title', { defaultValue: '发布帖子' })}</h2>
                 </DialogTitle>
               </div>
-              <FileText size={22} />
             </div>
 
             <div className="gl-post-dialog-body">
