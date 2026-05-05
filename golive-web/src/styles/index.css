@@ -2453,7 +2453,6 @@ input:focus-visible,
   min-height: 158px;
   flex-direction: column;
   gap: 12px;
-  overflow: hidden;
   border: 1px solid var(--gl-border);
   border-radius: 10px;
   background: var(--gl-bg-card);
@@ -2464,26 +2463,6 @@ input:focus-visible,
     border-color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
-}
-.gl-home-rec-card::before {
-  position: absolute;
-  top: 14px;
-  bottom: 14px;
-  left: 0;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--gl-red);
-  content: '';
-  opacity: 0;
-  pointer-events: none;
-  transform: scaleY(0.38);
-  transform-origin: center;
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
-}
-.gl-home-rec-card > * {
-  position: relative;
 }
 .gl-home-rec-card:not(.is-loading):hover,
 .gl-home-rec-card:not(.is-loading):focus-within {
@@ -2501,11 +2480,6 @@ input:focus-visible,
   box-shadow:
     0 14px 30px rgba(0, 0, 0, 0.36),
     0 1px 0 color-mix(in srgb, var(--gl-bg-card) 70%, var(--gl-text-3));
-}
-.gl-home-rec-card:not(.is-loading):hover::before,
-.gl-home-rec-card:not(.is-loading):focus-within::before {
-  opacity: 1;
-  transform: scaleY(1);
 }
 .gl-home-rec-card.is-loading {
   position: relative;
@@ -2578,6 +2552,18 @@ input:focus-visible,
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
   transform: translateY(-1px);
 }
+.gl-home-rec-follow:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.gl-home-rec-follow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
 .gl-home-rec-follow.is-following {
   border-color: var(--gl-border);
   background: var(--gl-bg);
@@ -2589,7 +2575,44 @@ input:focus-visible,
 }
 .gl-home-rec-follow:disabled {
   cursor: default;
+}
+.gl-home-rec-follow:disabled:not(.is-transitioning) {
   opacity: 0.55;
+}
+.gl-home-rec-follow.is-transitioning {
+  opacity: 1;
+  animation: glHomeRecFollowButton 0.42s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+.gl-home-rec-follow.is-transitioning .gl-home-rec-follow-icon {
+  animation: glHomeRecFollowIcon 0.42s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+@keyframes glHomeRecFollowButton {
+  0% {
+    transform: scale(1);
+  }
+  36% {
+    transform: scale(0.88);
+  }
+  68% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes glHomeRecFollowIcon {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.72) rotate(-12deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.16) rotate(7deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
 }
 .gl-home-rec-copy {
   min-width: 0;
@@ -2660,16 +2683,19 @@ input:focus-visible,
 }
 @media (prefers-reduced-motion: reduce) {
   .gl-home-rec-card,
-  .gl-home-rec-card::before,
   .gl-home-rec-main .gl-avatar,
+  .gl-home-rec-follow,
+  .gl-home-rec-follow-icon,
   .gl-home-rec-copy h3,
   .gl-home-rec-meta svg {
     transition: none;
+    animation: none;
   }
   .gl-home-rec-card:not(.is-loading):hover,
   .gl-home-rec-card:not(.is-loading):focus-within,
   .gl-home-rec-card:not(.is-loading):hover .gl-home-rec-main .gl-avatar,
-  .gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-main .gl-avatar {
+  .gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-main .gl-avatar,
+  .gl-home-rec-follow:active:not(:disabled) {
     transform: none;
   }
 }

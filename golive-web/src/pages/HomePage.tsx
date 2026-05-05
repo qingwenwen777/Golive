@@ -405,16 +405,49 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
   const { t, i18n } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
+  const [followAnimating, setFollowAnimating] = useState(false);
+  const followAnimationFrame = useRef<number | null>(null);
+  const followAnimationTimer = useRef<number | null>(null);
   const follow = useFollow(creator.channelId);
   const unfollow = useUnfollow(creator.channelId);
   const pending = follow.isPending || unfollow.isPending;
   const channelPath = `/channel/${encodeURIComponent(creator.channelId)}`;
+
+  const runFollowAnimation = () => {
+    if (followAnimationFrame.current !== null) {
+      window.cancelAnimationFrame(followAnimationFrame.current);
+    }
+    if (followAnimationTimer.current !== null) {
+      window.clearTimeout(followAnimationTimer.current);
+    }
+    setFollowAnimating(false);
+    followAnimationFrame.current = window.requestAnimationFrame(() => {
+      setFollowAnimating(true);
+      followAnimationFrame.current = null;
+    });
+    followAnimationTimer.current = window.setTimeout(() => {
+      setFollowAnimating(false);
+      followAnimationTimer.current = null;
+    }, 460);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (followAnimationFrame.current !== null) {
+        window.cancelAnimationFrame(followAnimationFrame.current);
+      }
+      if (followAnimationTimer.current !== null) {
+        window.clearTimeout(followAnimationTimer.current);
+      }
+    };
+  }, []);
 
   const toggleFollow = () => {
     if (!isAuthed) {
       openLogin();
       return;
     }
+    runFollowAnimation();
     if (creator.following) unfollow.mutate();
     else follow.mutate();
   };
@@ -438,7 +471,11 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
         </Link>
         <button
           type="button"
-          className={cn('gl-home-rec-follow', creator.following && 'is-following')}
+          className={cn(
+            'gl-home-rec-follow',
+            creator.following && 'is-following',
+            followAnimating && 'is-transitioning',
+          )}
           disabled={pending}
           aria-label={
             creator.following
@@ -452,7 +489,9 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
           }
           onClick={toggleFollow}
         >
-          {creator.following ? <Bell size={17} /> : <UserPlus size={17} />}
+          <span className="gl-home-rec-follow-icon" aria-hidden="true">
+            {creator.following ? <Bell size={17} /> : <UserPlus size={17} />}
+          </span>
         </button>
       </div>
       <div className="gl-home-rec-meta">
