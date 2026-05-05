@@ -3,15 +3,7 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import {
-  ThumbsUp,
-  ThumbsDown,
-  Share2,
-  Bell,
-  Gift,
-  MoreHorizontal,
-  Flag,
-} from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Share2, Bell, Gift, MoreHorizontal, Flag } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { Icons } from '@/components/Icons';
@@ -43,6 +35,8 @@ export interface InfoBlockProps {
   stream: Stream;
   viewerCount?: number;
   onOpenGifts?: () => void;
+  interactionsLocked?: boolean;
+  lockedInteractionLabel?: string;
 }
 
 function timeAgo(startedAt: string, t: ReturnType<typeof useTranslation>['t']): string {
@@ -53,7 +47,13 @@ function timeAgo(startedAt: string, t: ReturnType<typeof useTranslation>['t']): 
   return t('liveRoom.timeAgo.minutes', { minutes: Math.max(0, m) });
 }
 
-export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) {
+export function InfoBlock({
+  stream,
+  viewerCount,
+  onOpenGifts,
+  interactionsLocked,
+  lockedInteractionLabel,
+}: InfoBlockProps) {
   const { t } = useTranslation('pages');
   const lang = useLangStore((s) => s.lang);
   const isAuthed = useIsAuthed();
@@ -147,6 +147,15 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   };
 
   const handleGiftClick = () => {
+    if (interactionsLocked) {
+      toast.info(
+        lockedInteractionLabel ??
+          t('liveRoom.fanClubExclusive.giftLocked', {
+            defaultValue: 'Join the fan club to send gifts in this room.',
+          }),
+      );
+      return;
+    }
     if (!isAuthed) {
       openLogin(() => onOpenGifts?.());
       return;
@@ -254,8 +263,9 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             </button>
           </div>
           <button
-            className="gl-pg-solo"
+            className={cn('gl-pg-solo', interactionsLocked && 'is-disabled')}
             aria-label={t('liveRoom.gift', { defaultValue: 'Gift' })}
+            aria-disabled={interactionsLocked}
             onClick={handleGiftClick}
           >
             <Gift size={18} />

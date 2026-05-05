@@ -1031,6 +1031,9 @@ func (r *UserRepo) UpdateAvatar(ctx context.Context, id, avatar string) (*model.
 		if err := tx.Model(&u).Update("avatar", avatar).Error; err != nil {
 			return err
 		}
+		if err := r.updateCreatorAvatarReferences(ctx, tx, id, avatar); err != nil {
+			return err
+		}
 		return tx.Where("id = ?", id).Take(&u).Error
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1043,6 +1046,26 @@ func (r *UserRepo) UpdateAvatar(ctx context.Context, id, avatar string) (*model.
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (r *UserRepo) updateCreatorAvatarReferences(ctx context.Context, tx *gorm.DB, id, avatar string) error {
+	avatar = strings.TrimSpace(avatar)
+	if strings.TrimSpace(id) == "" {
+		return nil
+	}
+	if err := tx.WithContext(ctx).
+		Table("rooms").
+		Where("owner_id = ?", id).
+		Update("avatar", avatar).Error; err != nil && !isMissingRelation(err) {
+		return err
+	}
+	if err := tx.WithContext(ctx).
+		Table("fan_badges").
+		Where("creator_id = ?", id).
+		Update("creator_avatar", avatar).Error; err != nil && !isMissingRelation(err) {
+		return err
+	}
+	return nil
 }
 
 func (r *UserRepo) UpdateCover(ctx context.Context, id, cover string) (*model.User, error) {

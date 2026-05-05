@@ -41,7 +41,9 @@ export function useFanBadges(enabled = true, userId?: string) {
       return data;
     },
     enabled: enabled && !!userId,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 }
 

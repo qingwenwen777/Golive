@@ -282,6 +282,12 @@ export function useUploadAvatar() {
     onSuccess: ({ user }) => {
       qc.setQueryData(['me'], user);
       useAuthStore.getState().setUser(user);
+      void qc.invalidateQueries({ queryKey: ['public-user', user.id] });
+      void qc.invalidateQueries({ queryKey: ['public-user', user.username] });
+      void qc.invalidateQueries({ queryKey: ['room'] });
+      void qc.invalidateQueries({ queryKey: ['rooms'] });
+      void qc.invalidateQueries({ queryKey: ['fan-badges'] });
+      void qc.invalidateQueries({ queryKey: ['channel-appointments'] });
     },
   });
 }

@@ -14245,6 +14245,33 @@ button.gl-fan-badge-empty {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.72));
 }
 
+.gl-fan-exclusive-player {
+  border-color: rgba(124, 77, 255, 0.26);
+}
+
+.gl-fan-exclusive-player .gl-scheduled-player-cover::after {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 99, 132, 0.32), transparent 28%),
+    radial-gradient(circle at 82% 18%, rgba(124, 77, 255, 0.3), transparent 30%),
+    radial-gradient(circle at 70% 80%, rgba(26, 188, 156, 0.24), transparent 32%);
+  content: '';
+  pointer-events: none;
+}
+
+.gl-fan-exclusive-player .gl-scheduled-player-overlay {
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.76));
+}
+
+.gl-fan-exclusive-player-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .gl-scheduled-player-badge,
 .gl-scheduled-player-meta span {
   display: inline-flex;

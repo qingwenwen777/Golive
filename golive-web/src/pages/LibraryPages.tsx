@@ -75,7 +75,7 @@ import { APP_LANGS, useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
 import type { FanBadge } from '@/types/gift';
 import type { Stream } from '@/types/stream';
-import { userDisplayName } from '@/types/user';
+import { userDisplayName, type User } from '@/types/user';
 
 export function SubscriptionsPage() {
   const { t } = useTranslation('pages');
@@ -361,6 +361,7 @@ export function YouPage() {
   const me = useMe();
   const rooms = useRooms({ size: 100 });
   const fanBadges = useFanBadges(isAuthed, user?.id);
+  const hydratedFanBadges = useHydratedFanBadges(fanBadges.data ?? []);
   const liveStreams = rooms.data?.items;
   const history = useMemo(
     () =>
@@ -505,7 +506,7 @@ export function YouPage() {
 
       <Shelf title={t('library.you.fanBadges')}>
         <FanBadgeShelf
-          badges={fanBadges.data ?? []}
+          badges={hydratedFanBadges}
           isPending={fanBadges.isPending && isAuthed}
           isAuthed={isAuthed}
           onLogin={openLogin}
@@ -570,6 +571,49 @@ export function YouPage() {
       </Shelf>
     </div>
   );
+}
+
+function useHydratedFanBadges(badges: FanBadge[]): FanBadge[] {
+  const creatorIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          badges
+            .map((badge) => badge.creatorId)
+            .filter((creatorId): creatorId is string => Boolean(creatorId)),
+        ),
+      ).slice(0, 60),
+    [badges],
+  );
+  const profileLookups = useQueries({
+    queries: creatorIds.map((creatorId) => ({
+      queryKey: ['public-user', creatorId],
+      queryFn: async ({ signal }): Promise<User> => {
+        const { data } = await http.get<User>(`/users/profile/${encodeURIComponent(creatorId)}`, {
+          signal,
+        });
+        return data;
+      },
+      staleTime: 0,
+      refetchOnMount: 'always' as const,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    })),
+  });
+  const profiles = new Map<string, User>();
+  profileLookups.forEach((query, index) => {
+    if (query.data) profiles.set(creatorIds[index], query.data);
+  });
+  if (profiles.size === 0) return badges;
+  return badges.map((badge) => {
+    const profile = profiles.get(badge.creatorId);
+    if (!profile) return badge;
+    return {
+      ...badge,
+      creatorName: userDisplayName(profile),
+      creatorAvatar: profile.avatar || badge.creatorAvatar,
+    };
+  });
 }
 
 function FanBadgeShelf({
@@ -1627,6 +1671,17 @@ function collectionThemeClass(storageKey: string): string {
 
 function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
   const lookupItems = useMemo(() => items.filter((item) => Boolean(item.id)).slice(0, 60), [items]);
+  const creatorIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          lookupItems
+            .map((item) => item.ownerId)
+            .filter((ownerId): ownerId is string => Boolean(ownerId)),
+        ),
+      ).slice(0, 60),
+    [lookupItems],
+  );
   const lookups = useQueries({
     queries: lookupItems.map((item) => ({
       queryKey: ['room', item.id],
@@ -1643,6 +1698,22 @@ function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
       retry: false,
     })),
   });
+  const profileLookups = useQueries({
+    queries: creatorIds.map((creatorId) => ({
+      queryKey: ['public-user', creatorId],
+      queryFn: async ({ signal }): Promise<User> => {
+        const { data } = await http.get<User>(`/users/profile/${encodeURIComponent(creatorId)}`, {
+          signal,
+        });
+        return data;
+      },
+      enabled: Boolean(creatorId),
+      staleTime: 0,
+      refetchOnMount: 'always' as const,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    })),
+  });
 
   const replayRooms = new Map<string, Stream>();
   lookups.forEach((query, index) => {
@@ -1650,23 +1721,44 @@ function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
       replayRooms.set(lookupItems[index].id, query.data);
     }
   });
+  const creatorProfiles = new Map<string, User>();
+  profileLookups.forEach((query, index) => {
+    if (query.data) creatorProfiles.set(creatorIds[index], query.data);
+  });
 
   if (lookupItems.length === 0) return items;
   const lookupIds = new Set(lookupItems.map((item) => item.id));
   return items.map((item) => {
-    if (!lookupIds.has(item.id)) return item;
+    if (!lookupIds.has(item.id)) return hydrateStreamCreatorProfile(item, creatorProfiles);
     const replayRoom = replayRooms.get(item.id);
     if (!replayRoom) {
-      return item.status === 'ended'
-        ? { ...item, replay: undefined, isLive: false, status: 'ended' }
-        : item;
+      const fallback =
+        item.status === 'ended'
+          ? { ...item, replay: undefined, isLive: false, status: 'ended' }
+          : item;
+      return hydrateStreamCreatorProfile(fallback, creatorProfiles);
     }
-    return {
-      ...item,
-      ...replayRoom,
-      replay: replayRoom.replay,
-    };
+    return hydrateStreamCreatorProfile(
+      {
+        ...item,
+        ...replayRoom,
+        replay: replayRoom.replay,
+      },
+      creatorProfiles,
+    );
   });
+}
+
+function hydrateStreamCreatorProfile<T extends Stream>(stream: T, profiles: Map<string, User>): T {
+  if (!stream.ownerId) return stream;
+  const profile = profiles.get(stream.ownerId);
+  if (!profile) return stream;
+  return {
+    ...stream,
+    channel: userDisplayName(profile),
+    avatar: profile.avatar || stream.avatar,
+    verified: profile.verified ?? stream.verified,
+  };
 }
 
 function Shelf({

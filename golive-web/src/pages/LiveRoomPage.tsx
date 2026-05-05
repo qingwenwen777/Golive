@@ -444,8 +444,12 @@ export default function LiveRoomPage() {
       : t('liveRoom.connection.reconnecting', { count: retryCount });
 
   const ownsStream = Boolean(currentUser?.id && displayStream.ownerId === currentUser.id);
+  const exclusiveLocked = Boolean(
+    displayStream.fanClubOnly && !displayStream.fanClubMember && !ownsStream,
+  );
   const activeBetRound =
     !liveEnding &&
+    !exclusiveLocked &&
     !ownsStream &&
     latestBet.data?.round &&
     latestBet.data.round.status !== 'settled' &&
@@ -462,6 +466,14 @@ export default function LiveRoomPage() {
   const canShowPublisherPanel = ownsStream && effectivePublisherSession;
   const ownerName = streamChannelName(displayStream, currentUser);
   const openSuperChat = () => {
+    if (exclusiveLocked) {
+      toast.info(
+        t('liveRoom.fanClubExclusive.chatLocked', {
+          defaultValue: 'Join the fan club to unlock chat, SuperChat, and gifts.',
+        }),
+      );
+      return;
+    }
     if (!isAuthed) {
       openLogin(() => setSuperChatOpen(true));
       return;
@@ -522,6 +534,7 @@ export default function LiveRoomPage() {
           updateLocalFanBadge(order.totalCoin || 1000, true);
           void queryClient.invalidateQueries({ queryKey: ['room', roomId] });
           void queryClient.invalidateQueries({ queryKey: ['channel-appointments'] });
+          void queryClient.invalidateQueries({ queryKey: ['fan-badges'] });
           void refetch();
           toast.success(
             t('liveRoom.fanClubExclusive.joined', {
@@ -582,26 +595,36 @@ export default function LiveRoomPage() {
       }}
     />
   );
-  const exclusiveLocked = Boolean(
-    displayStream.fanClubOnly && !displayStream.fanClubMember && !ownsStream,
-  );
-
-  if (!liveEnding && exclusiveLocked) {
-    return (
-      <>
-        <FanClubExclusiveRoomGate
-          stream={displayStream}
-          appointment={appointment}
-          pending={joinFanClub.isPending || fanBadges.isPending}
-          authed={isAuthed}
-          scheduled={isScheduledRoom || roomIsStarting}
-          onJoin={handleJoinFanClub}
-          onLogin={() => openLogin(handleJoinFanClub)}
-        />
-        {reportDialog}
-      </>
-    );
-  }
+  const lockedInteractionLabel = t('liveRoom.fanClubExclusive.giftLocked', {
+    defaultValue: 'Join the fan club to send gifts in this room.',
+  });
+  const openGifts = () => {
+    if (exclusiveLocked) {
+      toast.info(lockedInteractionLabel);
+      return;
+    }
+    if (!isAuthed) {
+      openLogin(() => setGiftOpen(true));
+      return;
+    }
+    setGiftOpen(true);
+  };
+  const visibleMessages = exclusiveLocked ? [] : messages;
+  const visibleViewers = exclusiveLocked ? [] : viewers;
+  const chatLockedProps = exclusiveLocked
+    ? {
+        ...chatModerationProps,
+        canModerate: false,
+        readOnly: true,
+        readOnlyLabel: t('liveRoom.fanClubExclusive.chatLocked', {
+          defaultValue: 'Join the fan club to unlock chat, SuperChat, and gifts.',
+        }),
+        onOpenModeration: undefined,
+        onReportMessage: undefined,
+      }
+    : chatModerationProps;
+  const chatReconnectLabel = exclusiveLocked ? undefined : reconnectingLabel;
+  const chatReconnecting = exclusiveLocked ? false : reconnecting;
 
   if (!liveEnding && roomIsReplay && stream?.replay?.embedUrl) {
     return (
@@ -677,28 +700,24 @@ export default function LiveRoomPage() {
             <InfoBlock
               stream={stream}
               viewerCount={effectiveViewers}
-              onOpenGifts={() => {
-                if (!isAuthed) {
-                  openLogin(() => setGiftOpen(true));
-                  return;
-                }
-                setGiftOpen(true);
-              }}
+              onOpenGifts={openGifts}
+              interactionsLocked={exclusiveLocked}
+              lockedInteractionLabel={lockedInteractionLabel}
             />
             {isMobile && (
               <div className="gl-mobile-chat">
                 <Chat
-                  messages={messages}
+                  messages={visibleMessages}
                   roomId={roomId}
-                  viewers={viewers}
+                  viewers={visibleViewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
                   onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
-                  reconnecting={reconnecting}
-                  reconnectingLabel={reconnectingLabel}
-                  {...chatModerationProps}
+                  reconnecting={chatReconnecting}
+                  reconnectingLabel={chatReconnectLabel}
+                  {...chatLockedProps}
                   onComposerFocusChange={setMobileComposerFocused}
                 />
               </div>
@@ -708,17 +727,17 @@ export default function LiveRoomPage() {
           {!isNarrow && (
             <div className="gl-side-rail sticky top-20 self-start">
               <Chat
-                messages={messages}
+                messages={visibleMessages}
                 roomId={roomId}
-                viewers={viewers}
+                viewers={visibleViewers}
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
                 ownerName={ownerName}
                 onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}
-                reconnecting={reconnecting}
-                reconnectingLabel={reconnectingLabel}
-                {...chatModerationProps}
+                reconnecting={chatReconnecting}
+                reconnectingLabel={chatReconnectLabel}
+                {...chatLockedProps}
               />
             </div>
           )}
@@ -739,17 +758,17 @@ export default function LiveRoomPage() {
                   <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
                 </SheetHeader>
                 <Chat
-                  messages={messages}
+                  messages={visibleMessages}
                   roomId={roomId}
-                  viewers={viewers}
+                  viewers={visibleViewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
                   onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
-                  reconnecting={reconnecting}
-                  reconnectingLabel={reconnectingLabel}
-                  {...chatModerationProps}
+                  reconnecting={chatReconnecting}
+                  reconnectingLabel={chatReconnectLabel}
+                  {...chatLockedProps}
                   sheetMode
                 />
               </SheetContent>
@@ -776,81 +795,95 @@ export default function LiveRoomPage() {
             .join(' ')}
         >
           <div className="min-w-0 flex-1 xl:pt-6">
-            <ScheduledRoomPlayer
-              stream={stream}
-              appointment={appointment}
-              owner={ownsStream}
-              canStart={Boolean(appointment?.canStart)}
-              pending={startAppointment.isPending}
-              onReserve={() => {
-                if (!isAuthed) {
-                  openLogin(() => reserveAppointment.mutate(undefined));
-                  return;
-                }
-                reserveAppointment.mutate(undefined, {
-                  onSuccess: () =>
-                    toast.success(
-                      t('liveRoom.appointmentReserved', { defaultValue: 'Appointment reserved.' }),
-                    ),
-                  onError: (err) =>
-                    toast.error(
-                      err.message ||
-                        t('liveRoom.appointmentReserveFailed', {
-                          defaultValue: 'Could not reserve this appointment.',
+            {exclusiveLocked ? (
+              <FanClubLockedPlayer
+                stream={stream}
+                appointment={appointment}
+                authed={isAuthed}
+                pending={joinFanClub.isPending || fanBadges.isPending}
+                scheduled
+                onJoin={handleJoinFanClub}
+                onLogin={() => openLogin(handleJoinFanClub)}
+              />
+            ) : (
+              <ScheduledRoomPlayer
+                stream={stream}
+                appointment={appointment}
+                owner={ownsStream}
+                canStart={Boolean(appointment?.canStart)}
+                pending={startAppointment.isPending}
+                onReserve={() => {
+                  if (!isAuthed) {
+                    openLogin(() => reserveAppointment.mutate(undefined));
+                    return;
+                  }
+                  reserveAppointment.mutate(undefined, {
+                    onSuccess: () =>
+                      toast.success(
+                        t('liveRoom.appointmentReserved', {
+                          defaultValue: 'Appointment reserved.',
                         }),
-                    ),
-                });
-              }}
-              onUnreserve={() => {
-                unreserveAppointment.mutate(undefined, {
-                  onSuccess: () =>
-                    toast.success(
-                      t('liveRoom.appointmentUnreserved', { defaultValue: 'Reservation removed.' }),
-                    ),
-                  onError: (err) =>
-                    toast.error(
-                      err.message ||
-                        t('liveRoom.appointmentReserveFailed', {
-                          defaultValue: 'Could not update reservation.',
+                      ),
+                    onError: (err) =>
+                      toast.error(
+                        err.message ||
+                          t('liveRoom.appointmentReserveFailed', {
+                            defaultValue: 'Could not reserve this appointment.',
+                          }),
+                      ),
+                  });
+                }}
+                onUnreserve={() => {
+                  unreserveAppointment.mutate(undefined, {
+                    onSuccess: () =>
+                      toast.success(
+                        t('liveRoom.appointmentUnreserved', {
+                          defaultValue: 'Reservation removed.',
                         }),
-                    ),
-                });
-              }}
-              onStart={() => {
-                startAppointment.mutate(undefined, {
-                  onSuccess: (next) => {
-                    savePublisherSession(next);
-                    toast.success(
-                      t('liveRoom.appointmentStartSuccess', {
-                        defaultValue: 'Appointment live started.',
-                      }),
-                    );
-                    navigate(`/studio/live/${encodeURIComponent(next.id)}`);
-                  },
-                  onError: (err) =>
-                    toast.error(
-                      err.message ||
-                        t('liveRoom.appointmentStartFailed', {
-                          defaultValue: 'Could not start this appointment.',
+                      ),
+                    onError: (err) =>
+                      toast.error(
+                        err.message ||
+                          t('liveRoom.appointmentReserveFailed', {
+                            defaultValue: 'Could not update reservation.',
+                          }),
+                      ),
+                  });
+                }}
+                onStart={() => {
+                  startAppointment.mutate(undefined, {
+                    onSuccess: (next) => {
+                      savePublisherSession(next);
+                      toast.success(
+                        t('liveRoom.appointmentStartSuccess', {
+                          defaultValue: 'Appointment live started.',
                         }),
-                    ),
-                });
-              }}
-            />
+                      );
+                      navigate(`/studio/live/${encodeURIComponent(next.id)}`);
+                    },
+                    onError: (err) =>
+                      toast.error(
+                        err.message ||
+                          t('liveRoom.appointmentStartFailed', {
+                            defaultValue: 'Could not start this appointment.',
+                          }),
+                      ),
+                  });
+                }}
+              />
+            )}
             <InfoBlock
               stream={stream}
               viewerCount={effectiveViewers}
-              onOpenGifts={() => {
-                if (!isAuthed) {
-                  openLogin(() => setGiftOpen(true));
-                  return;
-                }
-                setGiftOpen(true);
-              }}
+              onOpenGifts={openGifts}
+              interactionsLocked={exclusiveLocked}
+              lockedInteractionLabel={lockedInteractionLabel}
             />
-            <div ref={betAnchorRef}>
-              <BettingPanel roomId={roomId} ownsStream={ownsStream} />
-            </div>
+            {!exclusiveLocked && (
+              <div ref={betAnchorRef}>
+                <BettingPanel roomId={roomId} ownsStream={ownsStream} />
+              </div>
+            )}
             {ownsStream && (
               <div className="gl-owner-live-actions">
                 <div>
@@ -900,17 +933,17 @@ export default function LiveRoomPage() {
             {isMobile && (
               <div className="gl-mobile-chat">
                 <Chat
-                  messages={messages}
+                  messages={visibleMessages}
                   roomId={roomId}
-                  viewers={viewers}
+                  viewers={visibleViewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
                   onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
-                  reconnecting={reconnecting}
-                  reconnectingLabel={reconnectingLabel}
-                  {...chatModerationProps}
+                  reconnecting={chatReconnecting}
+                  reconnectingLabel={chatReconnectLabel}
+                  {...chatLockedProps}
                   onComposerFocusChange={setMobileComposerFocused}
                 />
               </div>
@@ -920,17 +953,17 @@ export default function LiveRoomPage() {
           {!isNarrow && (
             <div className="gl-side-rail sticky top-20 self-start">
               <Chat
-                messages={messages}
+                messages={visibleMessages}
                 roomId={roomId}
-                viewers={viewers}
+                viewers={visibleViewers}
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
                 ownerName={ownerName}
                 onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}
-                reconnecting={reconnecting}
-                reconnectingLabel={reconnectingLabel}
-                {...chatModerationProps}
+                reconnecting={chatReconnecting}
+                reconnectingLabel={chatReconnectLabel}
+                {...chatLockedProps}
               />
             </div>
           )}
@@ -951,17 +984,17 @@ export default function LiveRoomPage() {
                   <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
                 </SheetHeader>
                 <Chat
-                  messages={messages}
+                  messages={visibleMessages}
                   roomId={roomId}
-                  viewers={viewers}
+                  viewers={visibleViewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
                   ownerName={ownerName}
                   onSendChat={guardedSendChat}
                   onSendSuperChat={openSuperChat}
-                  reconnecting={reconnecting}
-                  reconnectingLabel={reconnectingLabel}
-                  {...chatModerationProps}
+                  reconnecting={chatReconnecting}
+                  reconnectingLabel={chatReconnectLabel}
+                  {...chatLockedProps}
                   sheetMode
                 />
               </SheetContent>
@@ -1032,27 +1065,37 @@ export default function LiveRoomPage() {
 
   const Left = (
     <div className="min-w-0 flex-1 xl:pt-6">
-      <Player
-        stream={displayStream}
-        viewerCount={effectiveViewers}
-        bullets={bullets}
-        onBulletEnd={clearBullet}
-        liveEnding={liveEnding}
-      />
+      {exclusiveLocked ? (
+        <FanClubLockedPlayer
+          stream={displayStream}
+          appointment={appointment}
+          authed={isAuthed}
+          pending={joinFanClub.isPending || fanBadges.isPending}
+          scheduled={isScheduledRoom || roomIsStarting}
+          onJoin={handleJoinFanClub}
+          onLogin={() => openLogin(handleJoinFanClub)}
+        />
+      ) : (
+        <Player
+          stream={displayStream}
+          viewerCount={effectiveViewers}
+          bullets={bullets}
+          onBulletEnd={clearBullet}
+          liveEnding={liveEnding}
+        />
+      )}
       <InfoBlock
         stream={displayStream}
         viewerCount={effectiveViewers}
-        onOpenGifts={() => {
-          if (!isAuthed) {
-            openLogin(() => setGiftOpen(true));
-            return;
-          }
-          setGiftOpen(true);
-        }}
+        onOpenGifts={openGifts}
+        interactionsLocked={exclusiveLocked}
+        lockedInteractionLabel={lockedInteractionLabel}
       />
-      <div ref={betAnchorRef}>
-        <BettingPanel roomId={roomId} ownsStream={ownsStream} />
-      </div>
+      {!exclusiveLocked && (
+        <div ref={betAnchorRef}>
+          <BettingPanel roomId={roomId} ownsStream={ownsStream} />
+        </div>
+      )}
       {ownsStream && (
         <div className="gl-owner-live-actions">
           <div>
@@ -1084,17 +1127,17 @@ export default function LiveRoomPage() {
             <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
           )}
           <Chat
-            messages={messages}
+            messages={visibleMessages}
             roomId={roomId}
-            viewers={viewers}
+            viewers={visibleViewers}
             viewerTotal={effectiveViewers}
             ownerId={displayStream.ownerId}
             ownerName={ownerName}
             onSendChat={guardedSendChat}
             onSendSuperChat={openSuperChat}
-            reconnecting={reconnecting}
-            reconnectingLabel={reconnectingLabel}
-            {...chatModerationProps}
+            reconnecting={chatReconnecting}
+            reconnectingLabel={chatReconnectLabel}
+            {...chatLockedProps}
             onComposerFocusChange={setMobileComposerFocused}
           />
         </div>
@@ -1121,17 +1164,17 @@ export default function LiveRoomPage() {
               <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
             )}
             <Chat
-              messages={messages}
+              messages={visibleMessages}
               roomId={roomId}
-              viewers={viewers}
+              viewers={visibleViewers}
               viewerTotal={effectiveViewers}
               ownerId={displayStream.ownerId}
               ownerName={ownerName}
               onSendChat={guardedSendChat}
               onSendSuperChat={openSuperChat}
-              reconnecting={reconnecting}
-              reconnectingLabel={reconnectingLabel}
-              {...chatModerationProps}
+              reconnecting={chatReconnecting}
+              reconnectingLabel={chatReconnectLabel}
+              {...chatLockedProps}
             />
           </div>
         )}
@@ -1155,17 +1198,17 @@ export default function LiveRoomPage() {
                 <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
               )}
               <Chat
-                messages={messages}
+                messages={visibleMessages}
                 roomId={roomId}
-                viewers={viewers}
+                viewers={visibleViewers}
                 viewerTotal={effectiveViewers}
                 ownerId={displayStream.ownerId}
                 ownerName={ownerName}
                 onSendChat={guardedSendChat}
                 onSendSuperChat={openSuperChat}
-                reconnecting={reconnecting}
-                reconnectingLabel={reconnectingLabel}
-                {...chatModerationProps}
+                reconnecting={chatReconnecting}
+                reconnectingLabel={chatReconnectLabel}
+                {...chatLockedProps}
                 sheetMode
               />
             </SheetContent>
@@ -1537,7 +1580,7 @@ function formatReplayClock(seconds: number): string {
     : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function FanClubExclusiveRoomGate({
+function FanClubLockedPlayer({
   stream,
   appointment,
   authed,
@@ -1565,38 +1608,53 @@ function FanClubExclusiveRoomGate({
       }).format(new Date(scheduledAt))
     : '';
   return (
-    <div className="gl-fan-exclusive-room">
-      <section className="gl-fan-exclusive-hero">
-        <div className="gl-fan-exclusive-cover">
-          {stream.cover ? (
-            <LoadableImage src={stream.cover} alt="" />
-          ) : (
-            <div className="gl-scheduled-player-fallback" />
-          )}
-          <div className="gl-fan-exclusive-cover-glow" aria-hidden="true" />
-          <div className="gl-fan-exclusive-overlay">
-            <FanClubExclusiveBadge />
-            <h1>
+    <section className="gl-scheduled-player gl-fan-exclusive-player">
+      <div className="gl-scheduled-player-cover">
+        {stream.cover ? (
+          <LoadableImage src={stream.cover} alt="" />
+        ) : (
+          <div className="gl-scheduled-player-fallback" />
+        )}
+        <div className="gl-scheduled-player-overlay">
+          <div className="gl-fan-exclusive-player-badges">
+            <span className="gl-scheduled-player-badge">
+              <ShieldCheck size={14} />
               {scheduled
-                ? t('liveRoom.fanClubExclusive.scheduledTitle', {
-                    defaultValue: 'Fan club members see this appointment first',
-                  })
-                : t('liveRoom.fanClubExclusive.liveTitle', {
-                    defaultValue: 'Fan club members only',
-                  })}
-            </h1>
-            <p>
-              {scheduled
-                ? t('liveRoom.fanClubExclusive.scheduledBody', {
-                    defaultValue:
-                      'Join the fan club to unlock the appointment room, reservations, and countdown.',
-                  })
-                : t('liveRoom.fanClubExclusive.body', {
-                    defaultValue:
-                      'This live is exclusive to the creator fan club. Join to unlock playback and live chat.',
-                  })}
-            </p>
-            {scheduledLabel && <span className="gl-fan-exclusive-time">{scheduledLabel}</span>}
+                ? t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' })
+                : t('liveRoom.liveBadge', { defaultValue: 'Live' })}
+            </span>
+            <FanClubExclusiveBadge className="gl-scheduled-exclusive" />
+          </div>
+          <h2>
+            {scheduled
+              ? t('liveRoom.fanClubExclusive.scheduledTitle', {
+                  defaultValue: 'Fan club members see this appointment first',
+                })
+              : t('liveRoom.fanClubExclusive.liveTitle', {
+                  defaultValue: 'Fan club members only',
+                })}
+          </h2>
+          <p>
+            {scheduled
+              ? t('liveRoom.fanClubExclusive.scheduledBody', {
+                  defaultValue:
+                    'Join the fan club to unlock the appointment room, reservations, and countdown.',
+                })
+              : t('liveRoom.fanClubExclusive.body', {
+                  defaultValue:
+                    'This live is exclusive to the creator fan club. Join to unlock playback and live chat.',
+                })}
+          </p>
+          <div className="gl-scheduled-player-meta">
+            {scheduledLabel && <span>{scheduledLabel}</span>}
+            <span>
+              <CheckCircle2 size={14} />
+              {t('liveRoom.fanClubExclusive.unlockHint', {
+                defaultValue: 'Join to unlock watching and chat',
+              })}
+            </span>
+          </div>
+          <div className="gl-scheduled-player-actions">
             <button
               type="button"
               className="gl-fan-exclusive-join"
@@ -1612,16 +1670,8 @@ function FanClubExclusiveRoomGate({
             </button>
           </div>
         </div>
-      </section>
-      <section className="gl-fan-exclusive-info">
-        <Avatar name={stream.channel || stream.title} src={stream.avatar} size={52} />
-        <div>
-          {stream.fanClubOnly && <FanClubExclusiveBadge className="gl-scheduled-exclusive" />}
-          <h2>{stream.title}</h2>
-          <span>{stream.channel}</span>
-        </div>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }
 
