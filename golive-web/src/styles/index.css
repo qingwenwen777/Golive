@@ -2469,7 +2469,7 @@ input:focus-visible,
   align-items: center;
   gap: 5px;
   border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 4px;
+  border-radius: 999px;
   background:
     linear-gradient(
       135deg,
@@ -8623,7 +8623,7 @@ button.gl-fan-badge-empty {
   position: relative;
   display: inline-flex;
   width: 42px;
-  height: 48px;
+  height: 54px;
   align-items: flex-start;
   justify-content: center;
   flex: 0 0 auto;
@@ -8634,7 +8634,7 @@ button.gl-fan-badge-empty {
 }
 .gl-fan-club-avatar-wrap .gl-fan-club-level {
   position: absolute;
-  bottom: -9px;
+  bottom: -13px;
   left: 50%;
   display: inline-flex;
   min-width: 36px;
