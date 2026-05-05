@@ -435,7 +435,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       })
     : isSigningUp
       ? t('auth.signUpSub')
-      : t('auth.signInSub');
+      : '';
 
   return (
     <section
@@ -459,7 +459,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
 
       <div className="gl-auth-copy">
         <h1>{title}</h1>
-        <p>{sub}</p>
+        {sub && <p>{sub}</p>}
       </div>
 
       {!isResetting && (
@@ -627,8 +627,8 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   autoComplete={isSigningUp ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSigningUp ? PASSWORD_RULE_TEXT : t('auth.passwordPlaceholder')}
-                  minLength={isSigningUp ? 8 : 3}
+                  placeholder={isSigningUp ? PASSWORD_RULE_TEXT : undefined}
+                  minLength={isSigningUp ? 8 : undefined}
                   pattern={isSigningUp ? PASSWORD_PATTERN : undefined}
                   title={isSigningUp ? PASSWORD_RULE_TEXT : undefined}
                   required

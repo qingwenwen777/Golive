@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"html"
 	"math/big"
 	"net/http"
 	"strings"
@@ -125,16 +124,15 @@ func renderCaptchaSVG(code string) (string, error) {
 		opacity := rng.rangeInt(32, 62)
 		fmt.Fprintf(&svg, `<path d="M%d %d C%d %d,%d %d,%d %d" fill="none" stroke="%s" stroke-width="%d" stroke-linecap="round" opacity="0.%02d"/>`, x1, y1, c1x, c1y, c2x, c2y, x2, y2, rng.choice(captchaStrokeColors), strokeWidth, opacity)
 	}
-	svg.WriteString(`<g filter="url(#warp)" font-family="Arial, Helvetica, sans-serif" font-weight="900">`)
 	runes := []rune(code)
 	for i, ch := range runes {
-		x := 15 + i*20 + rng.rangeInt(-2, 2)
-		y := 29 + rng.rangeInt(-3, 3)
+		x := 4 + i*21 + rng.rangeInt(-1, 1)
+		y := 8 + rng.rangeInt(-1, 1)
 		rotate := rng.rangeInt(-18, 18)
-		fontSize := rng.rangeInt(22, 25)
-		fmt.Fprintf(&svg, `<text x="%d" y="%d" font-size="%d" fill="%s" text-anchor="middle" transform="rotate(%d %d %d)">%s</text>`, x, y, fontSize, rng.choice(captchaTextColors), rotate, x, y, html.EscapeString(string(ch)))
+		fmt.Fprintf(&svg, `<g filter="url(#warp)" transform="rotate(%d %d %d)">`, rotate, x+9, y+14)
+		writeCaptchaGlyph(&svg, rng, ch, x, y)
+		svg.WriteString(`</g>`)
 	}
-	svg.WriteString(`</g>`)
 	for i := 0; i < 2; i++ {
 		x := rng.rangeInt(0, width-20)
 		y := rng.rangeInt(10, height-12)
@@ -152,6 +150,59 @@ var captchaTextColors = []string{"#111827", "#1f2937", "#172554", "#3b0764", "#7
 var captchaNoiseColors = []string{"#9ca3af", "#93c5fd", "#f59e0b", "#a78bfa", "#6ee7b7"}
 
 var captchaStrokeColors = []string{"#93c5fd", "#f59e0b", "#a78bfa", "#94a3b8", "#60a5fa"}
+
+var captchaGlyphs = map[rune][7]string{
+	'2': {"11110", "00001", "00001", "01110", "10000", "10000", "11111"},
+	'3': {"11110", "00001", "00001", "01110", "00001", "00001", "11110"},
+	'4': {"10010", "10010", "10010", "11111", "00010", "00010", "00010"},
+	'5': {"11111", "10000", "10000", "11110", "00001", "00001", "11110"},
+	'6': {"01111", "10000", "10000", "11110", "10001", "10001", "01110"},
+	'7': {"11111", "00001", "00010", "00100", "01000", "01000", "01000"},
+	'8': {"01110", "10001", "10001", "01110", "10001", "10001", "01110"},
+	'9': {"01110", "10001", "10001", "01111", "00001", "00001", "11110"},
+	'A': {"01110", "10001", "10001", "11111", "10001", "10001", "10001"},
+	'B': {"11110", "10001", "10001", "11110", "10001", "10001", "11110"},
+	'C': {"01111", "10000", "10000", "10000", "10000", "10000", "01111"},
+	'D': {"11110", "10001", "10001", "10001", "10001", "10001", "11110"},
+	'E': {"11111", "10000", "10000", "11110", "10000", "10000", "11111"},
+	'F': {"11111", "10000", "10000", "11110", "10000", "10000", "10000"},
+	'G': {"01111", "10000", "10000", "10111", "10001", "10001", "01111"},
+	'H': {"10001", "10001", "10001", "11111", "10001", "10001", "10001"},
+	'J': {"00111", "00010", "00010", "00010", "10010", "10010", "01100"},
+	'K': {"10001", "10010", "10100", "11000", "10100", "10010", "10001"},
+	'L': {"10000", "10000", "10000", "10000", "10000", "10000", "11111"},
+	'M': {"10001", "11011", "10101", "10101", "10001", "10001", "10001"},
+	'N': {"10001", "11001", "10101", "10011", "10001", "10001", "10001"},
+	'P': {"11110", "10001", "10001", "11110", "10000", "10000", "10000"},
+	'Q': {"01110", "10001", "10001", "10001", "10101", "10010", "01101"},
+	'R': {"11110", "10001", "10001", "11110", "10100", "10010", "10001"},
+	'S': {"01111", "10000", "10000", "01110", "00001", "00001", "11110"},
+	'T': {"11111", "00100", "00100", "00100", "00100", "00100", "00100"},
+	'U': {"10001", "10001", "10001", "10001", "10001", "10001", "01110"},
+	'V': {"10001", "10001", "10001", "10001", "01010", "01010", "00100"},
+	'W': {"10001", "10001", "10001", "10101", "10101", "11011", "10001"},
+	'X': {"10001", "01010", "00100", "00100", "00100", "01010", "10001"},
+	'Y': {"10001", "01010", "00100", "00100", "00100", "00100", "00100"},
+	'Z': {"11111", "00001", "00010", "00100", "01000", "10000", "11111"},
+}
+
+func writeCaptchaGlyph(svg *strings.Builder, rng *captchaRNG, ch rune, originX, originY int) {
+	pattern, ok := captchaGlyphs[ch]
+	if !ok {
+		return
+	}
+	for row, line := range pattern {
+		for col, bit := range line {
+			if bit != '1' {
+				continue
+			}
+			x := originX + col*4 + rng.rangeInt(-1, 1)
+			y := originY + row*4 + rng.rangeInt(-1, 1)
+			rotate := rng.rangeInt(-9, 9)
+			fmt.Fprintf(svg, `<rect x="%d" y="%d" width="3.2" height="3.6" rx="0.8" fill="%s" transform="rotate(%d %d %d)"/>`, x, y, rng.choice(captchaTextColors), rotate, x+2, y+2)
+		}
+	}
+}
 
 type captchaRNG struct {
 	err error
