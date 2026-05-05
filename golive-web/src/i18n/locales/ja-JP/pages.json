@@ -1132,6 +1132,11 @@
     "brand": {
       "controlCenter": "コントロールセンター"
     },
+    "pagination": {
+      "prev": "前へ",
+      "next": "次へ",
+      "page": "{{page}} / {{pages}} ページ"
+    },
     "modules": {
       "dashboard": {
         "label": "総合ダッシュボード",
@@ -1325,6 +1330,129 @@
       "deleted": "招待コードを削除しました。",
       "deleteFailed": "招待コードを削除できませんでした。",
       "deleteUsedHint": "使用済みの招待コードは削除できません。"
+    },
+    "economy": {
+      "aria": "経済管理の概要",
+      "eyebrow": "経済運用",
+      "title": "売上、台帳、精算",
+      "subtitle": "ギフト一覧、注文台帳、Coin の動き、投注の精算、売上照合を管理します。",
+      "kpis": {
+        "todayGiftRevenue": "本日のギフト売上",
+        "todaySuperChatRevenue": "本日の SuperChat 売上",
+        "todayTopupCoins": "本日のチャージ",
+        "frozenCoins": "凍結 Coin",
+        "unsettledBets": "未精算の投注回"
+      },
+      "tabs": {
+        "gifts": "ギフト管理",
+        "orders": "注文台帳",
+        "coins": "Coin 台帳",
+        "bets": "投注管理",
+        "reports": "照合レポート"
+      },
+      "gifts": {
+        "invalidPrice": "価格は 0 より大きい値にしてください。",
+        "priceSaved": "ギフト価格を保存しました。",
+        "total": "ギフト総数",
+        "enabled": "公開中",
+        "disabled": "非公開",
+        "catalogValue": "カタログ総額",
+        "loading": "ギフトを読み込み中...",
+        "empty": "ギフト設定がありません。",
+        "price": "価格",
+        "onShelf": "公開中",
+        "offShelf": "非公開",
+        "save": "保存",
+        "disable": "非公開",
+        "enable": "公開",
+        "disabledDone": "ギフトを非公開にしました。",
+        "enabledDone": "ギフトを公開しました。"
+      },
+      "orders": {
+        "type": "注文タイプ",
+        "allTypes": "すべて",
+        "gift": "ギフト",
+        "superChat": "SuperChat",
+        "bet": "投注",
+        "status": "ステータス",
+        "allStatus": "すべて",
+        "search": "検索",
+        "searchPlaceholder": "注文、ユーザー、ルーム、項目",
+        "loading": "注文を読み込み中...",
+        "loadFailed": "注文記録を読み込めませんでした。もう一度お試しください。",
+        "empty": "条件に一致する注文はありません。"
+      },
+      "status": {
+        "open": "受付中",
+        "closed": "締切",
+        "settled": "精算済み",
+        "cancelled": "キャンセル済み",
+        "success": "成功",
+        "failed": "失敗",
+        "locked": "ロック中",
+        "won": "勝ち",
+        "lost": "負け",
+        "refunded": "返金済み"
+      },
+      "coins": {
+        "totalTopup": "累計チャージ",
+        "totalSpend": "累計消費",
+        "balance": "全体残高",
+        "frozen": "凍結",
+        "type": "流水タイプ",
+        "allTypes": "すべて",
+        "topup": "チャージ",
+        "dailyTask": "デイリータスク",
+        "giftSpend": "ギフト消費",
+        "scSpend": "SuperChat 消費",
+        "betWager": "投注",
+        "betPayout": "投注配当",
+        "betRefund": "投注返金",
+        "giftIncome": "ギフト収入",
+        "scIncome": "SuperChat 収入",
+        "adminAdjust": "管理者調整",
+        "adminFreeze": "管理者凍結",
+        "adminUnfreeze": "管理者凍結解除",
+        "search": "検索",
+        "searchPlaceholder": "ユーザー、取引、ソース、メモ",
+        "loading": "Coin 台帳を読み込み中...",
+        "empty": "条件に一致する Coin 記録はありません。",
+        "balanceAfter": "残高"
+      },
+      "bets": {
+        "settled": "投注回を精算しました。",
+        "total": "総回数",
+        "open": "受付中",
+        "settledCount": "精算済み",
+        "lockedCoins": "ロック中 Coin",
+        "status": "投注回ステータス",
+        "allStatus": "すべて",
+        "openStatus": "受付中",
+        "closedStatus": "締切",
+        "settledStatus": "精算済み",
+        "cancelledStatus": "キャンセル済み",
+        "search": "検索",
+        "searchPlaceholder": "回、ルーム、配信者、質問",
+        "loading": "投注回を読み込み中...",
+        "empty": "条件に一致する投注回はありません。",
+        "winOption": "勝ち",
+        "loseOption": "負け",
+        "cancel": "キャンセル",
+        "cancelled": "投注回をキャンセルし、返金しました。"
+      },
+      "reports": {
+        "topup": "期間内チャージ",
+        "revenue": "ギフト + SuperChat",
+        "betTurnover": "投注取扱高",
+        "netBet": "投注純変動",
+        "loading": "レポートを読み込み中...",
+        "topupShort": "チャージ",
+        "giftShort": "ギフト",
+        "betShort": "投注",
+        "day": "日次",
+        "week": "週次",
+        "month": "月次"
+      }
     },
     "scaffold": {
       "content": {

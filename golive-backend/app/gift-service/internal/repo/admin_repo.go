@@ -66,7 +66,7 @@ type AdminOrderRecord struct {
 	Amount     int64     `gorm:"column:amount" json:"amount"`
 	Status     string    `gorm:"column:status" json:"status"`
 	FailReason string    `gorm:"column:fail_reason" json:"failReason,omitempty"`
-	Option     string    `gorm:"column:option" json:"option,omitempty"`
+	Option     string    `gorm:"column:bet_option" json:"option,omitempty"`
 	Result     string    `gorm:"column:result" json:"result,omitempty"`
 	CreatedAt  time.Time `gorm:"column:created_at" json:"createdAt"`
 }
@@ -459,7 +459,7 @@ SELECT
   go.total_coin AS amount,
   go.status,
   go.fail_reason,
-  '' AS option,
+  '' AS bet_option,
   '' AS result,
   go.created_at
 FROM gift_orders go
@@ -482,7 +482,7 @@ SELECT
   so.amount AS amount,
   so.status,
   so.fail_reason,
-  '' AS option,
+  '' AS bet_option,
   '' AS result,
   so.created_at
 FROM super_chat_orders so
@@ -504,7 +504,7 @@ SELECT
   bw.amount AS amount,
   bw.status,
   '' AS fail_reason,
-  bw.option,
+  bw.`+"`option`"+` AS bet_option,
   br.winning_option AS result,
   bw.created_at
 FROM bet_wagers bw

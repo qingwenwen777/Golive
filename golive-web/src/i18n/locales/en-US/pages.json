@@ -1132,6 +1132,11 @@
     "brand": {
       "controlCenter": "Control Center"
     },
+    "pagination": {
+      "prev": "Previous",
+      "next": "Next",
+      "page": "Page {{page}} / {{pages}}"
+    },
     "modules": {
       "dashboard": {
         "label": "Dashboard",
@@ -1325,6 +1330,129 @@
       "deleted": "Invite code deleted.",
       "deleteFailed": "Could not delete invite code.",
       "deleteUsedHint": "Used invite codes cannot be deleted."
+    },
+    "economy": {
+      "aria": "Economy overview",
+      "eyebrow": "Economy operations",
+      "title": "Revenue, ledger, and settlement",
+      "subtitle": "Manage the gift catalog, review order ledgers, audit Coin movement, settle bets, and reconcile revenue.",
+      "kpis": {
+        "todayGiftRevenue": "Today gift revenue",
+        "todaySuperChatRevenue": "Today SuperChat revenue",
+        "todayTopupCoins": "Today recharge",
+        "frozenCoins": "Frozen Coins",
+        "unsettledBets": "Unsettled bet rounds"
+      },
+      "tabs": {
+        "gifts": "Gifts",
+        "orders": "Orders",
+        "coins": "Coin ledger",
+        "bets": "Bets",
+        "reports": "Reports"
+      },
+      "gifts": {
+        "invalidPrice": "Price must be positive.",
+        "priceSaved": "Gift price saved.",
+        "total": "Total gifts",
+        "enabled": "On shelf",
+        "disabled": "Off shelf",
+        "catalogValue": "Catalog value",
+        "loading": "Loading gifts...",
+        "empty": "No gifts configured.",
+        "price": "Price",
+        "onShelf": "On shelf",
+        "offShelf": "Off shelf",
+        "save": "Save",
+        "disable": "Off shelf",
+        "enable": "On shelf",
+        "disabledDone": "Gift removed from shelf.",
+        "enabledDone": "Gift put on shelf."
+      },
+      "orders": {
+        "type": "Order type",
+        "allTypes": "All",
+        "gift": "Gift",
+        "superChat": "SuperChat",
+        "bet": "Bet",
+        "status": "Status",
+        "allStatus": "All",
+        "search": "Search",
+        "searchPlaceholder": "Order, user, room, or item",
+        "loading": "Loading orders...",
+        "loadFailed": "Order records failed to load. Please try again.",
+        "empty": "No orders matched."
+      },
+      "status": {
+        "open": "Open",
+        "closed": "Closed",
+        "settled": "Settled",
+        "cancelled": "Cancelled",
+        "success": "Success",
+        "failed": "Failed",
+        "locked": "Locked",
+        "won": "Won",
+        "lost": "Lost",
+        "refunded": "Refunded"
+      },
+      "coins": {
+        "totalTopup": "Total top-up",
+        "totalSpend": "Total spend",
+        "balance": "Balances",
+        "frozen": "Frozen",
+        "type": "Flow type",
+        "allTypes": "All",
+        "topup": "Top-up",
+        "dailyTask": "Daily task",
+        "giftSpend": "Gift spend",
+        "scSpend": "SuperChat spend",
+        "betWager": "Bet wager",
+        "betPayout": "Bet payout",
+        "betRefund": "Bet refund",
+        "giftIncome": "Gift income",
+        "scIncome": "SuperChat income",
+        "adminAdjust": "Admin adjust",
+        "adminFreeze": "Admin freeze",
+        "adminUnfreeze": "Admin unfreeze",
+        "search": "Search",
+        "searchPlaceholder": "User, transaction, source, or note",
+        "loading": "Loading Coin ledger...",
+        "empty": "No Coin records matched.",
+        "balanceAfter": "Balance"
+      },
+      "bets": {
+        "settled": "Bet round settled.",
+        "total": "Total rounds",
+        "open": "Open",
+        "settledCount": "Settled",
+        "lockedCoins": "Locked Coins",
+        "status": "Round status",
+        "allStatus": "All",
+        "openStatus": "Open",
+        "closedStatus": "Closed",
+        "settledStatus": "Settled",
+        "cancelledStatus": "Cancelled",
+        "search": "Search",
+        "searchPlaceholder": "Round, room, owner, or question",
+        "loading": "Loading bet rounds...",
+        "empty": "No bet rounds matched.",
+        "winOption": "Win",
+        "loseOption": "Lose",
+        "cancel": "Cancel",
+        "cancelled": "Bet round cancelled and refunded."
+      },
+      "reports": {
+        "topup": "Top-up in period",
+        "revenue": "Gift + SuperChat",
+        "betTurnover": "Bet turnover",
+        "netBet": "Bet net delta",
+        "loading": "Loading reports...",
+        "topupShort": "Top-up",
+        "giftShort": "Gifts",
+        "betShort": "Bets",
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly"
+      }
     },
     "scaffold": {
       "content": {

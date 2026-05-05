@@ -1133,6 +1133,11 @@
     "brand": {
       "controlCenter": "控制中心"
     },
+    "pagination": {
+      "prev": "上一页",
+      "next": "下一页",
+      "page": "第 {{page}} / {{pages}} 页"
+    },
     "modules": {
       "dashboard": {
         "label": "总览仪表盘",
@@ -1326,6 +1331,129 @@
       "deleted": "邀请码已删除。",
       "deleteFailed": "无法删除邀请码。",
       "deleteUsedHint": "已使用的邀请码不能删除。"
+    },
+    "economy": {
+      "aria": "经济管理概览",
+      "eyebrow": "经济运营",
+      "title": "营收、流水与结算",
+      "subtitle": "管理礼物目录、查看订单流水、审计 Coin 变动、结算投注并核对营收。",
+      "kpis": {
+        "todayGiftRevenue": "今日礼物营收",
+        "todaySuperChatRevenue": "今日 SuperChat 营收",
+        "todayTopupCoins": "今日充值",
+        "frozenCoins": "冻结 Coin",
+        "unsettledBets": "待结算投注场次"
+      },
+      "tabs": {
+        "gifts": "礼物管理",
+        "orders": "订单流水",
+        "coins": "Coin 流水",
+        "bets": "投注管理",
+        "reports": "对账报表"
+      },
+      "gifts": {
+        "invalidPrice": "价格必须大于 0。",
+        "priceSaved": "礼物价格已保存。",
+        "total": "礼物总数",
+        "enabled": "已上架",
+        "disabled": "已下架",
+        "catalogValue": "目录总值",
+        "loading": "正在加载礼物...",
+        "empty": "暂无礼物配置。",
+        "price": "价格",
+        "onShelf": "已上架",
+        "offShelf": "已下架",
+        "save": "保存",
+        "disable": "下架",
+        "enable": "上架",
+        "disabledDone": "礼物已下架。",
+        "enabledDone": "礼物已上架。"
+      },
+      "orders": {
+        "type": "订单类型",
+        "allTypes": "全部",
+        "gift": "礼物",
+        "superChat": "SuperChat",
+        "bet": "投注",
+        "status": "状态",
+        "allStatus": "全部",
+        "search": "搜索",
+        "searchPlaceholder": "订单、用户、房间或项目",
+        "loading": "正在加载订单...",
+        "loadFailed": "订单记录加载失败，请稍后重试。",
+        "empty": "没有符合条件的订单。"
+      },
+      "status": {
+        "open": "进行中",
+        "closed": "已封盘",
+        "settled": "已结算",
+        "cancelled": "已取消",
+        "success": "成功",
+        "failed": "失败",
+        "locked": "已锁定",
+        "won": "已赢",
+        "lost": "已输",
+        "refunded": "已退款"
+      },
+      "coins": {
+        "totalTopup": "总充值",
+        "totalSpend": "总消费",
+        "balance": "全站余额",
+        "frozen": "冻结",
+        "type": "流水类型",
+        "allTypes": "全部",
+        "topup": "充值",
+        "dailyTask": "每日任务",
+        "giftSpend": "礼物消费",
+        "scSpend": "SuperChat 消费",
+        "betWager": "投注下注",
+        "betPayout": "投注派奖",
+        "betRefund": "投注退款",
+        "giftIncome": "礼物收入",
+        "scIncome": "SuperChat 收入",
+        "adminAdjust": "后台调整",
+        "adminFreeze": "后台冻结",
+        "adminUnfreeze": "后台解冻",
+        "search": "搜索",
+        "searchPlaceholder": "用户、流水、来源或备注",
+        "loading": "正在加载 Coin 流水...",
+        "empty": "没有符合条件的 Coin 记录。",
+        "balanceAfter": "余额"
+      },
+      "bets": {
+        "settled": "投注场次已结算。",
+        "total": "场次总数",
+        "open": "进行中",
+        "settledCount": "已结算",
+        "lockedCoins": "锁定 Coin",
+        "status": "场次状态",
+        "allStatus": "全部",
+        "openStatus": "进行中",
+        "closedStatus": "已封盘",
+        "settledStatus": "已结算",
+        "cancelledStatus": "已取消",
+        "search": "搜索",
+        "searchPlaceholder": "场次、房间、主播或问题",
+        "loading": "正在加载投注场次...",
+        "empty": "没有符合条件的投注场次。",
+        "winOption": "胜",
+        "loseOption": "负",
+        "cancel": "取消",
+        "cancelled": "投注场次已取消并退款。"
+      },
+      "reports": {
+        "topup": "周期充值",
+        "revenue": "礼物 + SuperChat",
+        "betTurnover": "投注流水",
+        "netBet": "投注净变动",
+        "loading": "正在加载报表...",
+        "topupShort": "充值",
+        "giftShort": "礼物",
+        "betShort": "投注",
+        "day": "日",
+        "week": "周",
+        "month": "月"
+      }
     },
     "scaffold": {
       "content": {

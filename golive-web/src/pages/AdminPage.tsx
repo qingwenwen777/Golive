@@ -2563,7 +2563,7 @@ function EconomyPage() {
           label={t('admin.economy.kpis.todayGiftRevenue', {
             defaultValue: 'Today gift revenue',
           })}
-          value={summary.isLoading ? '-' : formatCoins(data?.todayGiftRevenue)}
+          value={summary.isLoading ? '-' : formatKpiCoins(data?.todayGiftRevenue)}
           tone="red"
         />
         <AdminKpi
@@ -2571,17 +2571,17 @@ function EconomyPage() {
           label={t('admin.economy.kpis.todaySuperChatRevenue', {
             defaultValue: 'Today SuperChat revenue',
           })}
-          value={summary.isLoading ? '-' : formatCoins(data?.todaySuperChatRevenue)}
+          value={summary.isLoading ? '-' : formatKpiCoins(data?.todaySuperChatRevenue)}
         />
         <AdminKpi
           icon={Wallet}
-          label={t('admin.economy.kpis.coinBalance', { defaultValue: 'Total Coin balance' })}
-          value={summary.isLoading ? '-' : formatCoins(data?.totalCoinBalance)}
+          label={t('admin.economy.kpis.todayTopupCoins', { defaultValue: 'Today recharge' })}
+          value={summary.isLoading ? '-' : formatKpiCoins(data?.todayTopupCoins)}
         />
         <AdminKpi
           icon={Coins}
           label={t('admin.economy.kpis.frozenCoins', { defaultValue: 'Frozen Coins' })}
-          value={summary.isLoading ? '-' : formatCoins(data?.totalFrozenCoins)}
+          value={summary.isLoading ? '-' : formatKpiCoins(data?.totalFrozenCoins)}
         />
         <AdminKpi
           icon={Trophy}
@@ -2719,62 +2719,64 @@ function EconomyGiftsPanel() {
                     </span>
                   </div>
                 </div>
-                <label className="gl-admin-price-edit">
-                  <span>{t('admin.economy.gifts.price', { defaultValue: 'Price' })}</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={priceValue(item.id, item.priceCoin)}
-                    onChange={(event) =>
-                      setDraft((prev) => ({ ...prev, [item.id]: event.target.value }))
-                    }
-                  />
-                </label>
-                <span className={`gl-admin-status is-${enabled ? 'approved' : 'rejected'}`}>
-                  {enabled
-                    ? t('admin.economy.gifts.onShelf', { defaultValue: 'On shelf' })
-                    : t('admin.economy.gifts.offShelf', { defaultValue: 'Off shelf' })}
-                </span>
-                <div className="gl-admin-economy-actions">
-                  <button
-                    type="button"
-                    className="gl-admin-action-text"
-                    disabled={!changed || updateGift.isPending}
-                    onClick={() => savePrice(item.id, item.priceCoin)}
-                  >
-                    <Save size={15} />
-                    {t('admin.economy.gifts.save', { defaultValue: 'Save' })}
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      enabled ? 'gl-admin-action-text reject' : 'gl-admin-action-text approve'
-                    }
-                    disabled={updateGift.isPending}
-                    onClick={() =>
-                      updateGift.mutate(
-                        { id: item.id, enabled: !enabled },
-                        {
-                          onSuccess: () =>
-                            toast.success(
-                              enabled
-                                ? t('admin.economy.gifts.disabledDone', {
-                                    defaultValue: 'Gift removed from shelf.',
-                                  })
-                                : t('admin.economy.gifts.enabledDone', {
-                                    defaultValue: 'Gift put on shelf.',
-                                  }),
-                            ),
-                          onError: (err) => toast.error(err.message),
-                        },
-                      )
-                    }
-                  >
-                    {enabled ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
+                <div className="gl-admin-gift-controls">
+                  <label className="gl-admin-price-edit">
+                    <span>{t('admin.economy.gifts.price', { defaultValue: 'Price' })}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={priceValue(item.id, item.priceCoin)}
+                      onChange={(event) =>
+                        setDraft((prev) => ({ ...prev, [item.id]: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <span className={`gl-admin-status is-${enabled ? 'approved' : 'rejected'}`}>
                     {enabled
-                      ? t('admin.economy.gifts.disable', { defaultValue: 'Off shelf' })
-                      : t('admin.economy.gifts.enable', { defaultValue: 'On shelf' })}
-                  </button>
+                      ? t('admin.economy.gifts.onShelf', { defaultValue: 'On shelf' })
+                      : t('admin.economy.gifts.offShelf', { defaultValue: 'Off shelf' })}
+                  </span>
+                  <div className="gl-admin-economy-actions">
+                    <button
+                      type="button"
+                      className="gl-admin-action-text"
+                      disabled={!changed || updateGift.isPending}
+                      onClick={() => savePrice(item.id, item.priceCoin)}
+                    >
+                      <Save size={15} />
+                      {t('admin.economy.gifts.save', { defaultValue: 'Save' })}
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        enabled ? 'gl-admin-action-text reject' : 'gl-admin-action-text approve'
+                      }
+                      disabled={updateGift.isPending}
+                      onClick={() =>
+                        updateGift.mutate(
+                          { id: item.id, enabled: !enabled },
+                          {
+                            onSuccess: () =>
+                              toast.success(
+                                enabled
+                                  ? t('admin.economy.gifts.disabledDone', {
+                                      defaultValue: 'Gift removed from shelf.',
+                                    })
+                                  : t('admin.economy.gifts.enabledDone', {
+                                      defaultValue: 'Gift put on shelf.',
+                                    }),
+                              ),
+                            onError: (err) => toast.error(err.message),
+                          },
+                        )
+                      }
+                    >
+                      {enabled ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
+                      {enabled
+                        ? t('admin.economy.gifts.disable', { defaultValue: 'Off shelf' })
+                        : t('admin.economy.gifts.enable', { defaultValue: 'On shelf' })}
+                    </button>
+                  </div>
                 </div>
               </article>
             );
@@ -2869,6 +2871,12 @@ function EconomyOrdersPanel() {
         {orders.isLoading ? (
           <AdminEmptyState
             label={t('admin.economy.orders.loading', { defaultValue: 'Loading orders...' })}
+          />
+        ) : orders.isError ? (
+          <AdminEmptyState
+            label={t('admin.economy.orders.loadFailed', {
+              defaultValue: 'Order records failed to load. Please try again.',
+            })}
           />
         ) : items.length === 0 ? (
           <AdminEmptyState
@@ -3191,13 +3199,15 @@ function EconomyBetsPanel() {
                 <div className="gl-admin-bet-pool">
                   <strong>{formatCoins(item.totalPool)} Coins</strong>
                   <span>
-                    Win {item.winCount} ({formatCoins(item.winPool)}) / Lose {item.loseCount} (
-                    {formatCoins(item.losePool)})
+                    {t('admin.economy.bets.winOption', { defaultValue: 'Win' })} {item.winCount} (
+                    {formatCoins(item.winPool)}) /{' '}
+                    {t('admin.economy.bets.loseOption', { defaultValue: 'Lose' })}{' '}
+                    {item.loseCount} ({formatCoins(item.losePool)})
                   </span>
                 </div>
                 <span className={`gl-admin-status is-${statusTone(item.status)}`}>
                   {economyStatusLabel(item.status, t)}
-                  {item.winningOption ? ` / ${item.winningOption}` : ''}
+                  {item.winningOption ? ` / ${betOptionLabel(item.winningOption, t)}` : ''}
                 </span>
                 <div className="gl-admin-economy-actions">
                   <button
@@ -3207,7 +3217,7 @@ function EconomyBetsPanel() {
                     onClick={() => settleRound(item, 'win')}
                   >
                     <Check size={15} />
-                    Win
+                    {t('admin.economy.bets.winOption', { defaultValue: 'Win' })}
                   </button>
                   <button
                     type="button"
@@ -3216,7 +3226,7 @@ function EconomyBetsPanel() {
                     onClick={() => settleRound(item, 'lose')}
                   >
                     <Check size={15} />
-                    Lose
+                    {t('admin.economy.bets.loseOption', { defaultValue: 'Lose' })}
                   </button>
                   <button
                     type="button"
@@ -3391,7 +3401,11 @@ function AdminPager({
         {t('admin.pagination.prev', { defaultValue: 'Previous' })}
       </button>
       <span>
-        {page} / {maxPage} · {total}
+        {t('admin.pagination.page', {
+          defaultValue: 'Page {{page}} / {{pages}}',
+          page,
+          pages: maxPage,
+        })} / {total}
       </span>
       <button type="button" disabled={page >= maxPage} onClick={() => onPage(page + 1)}>
         {t('admin.pagination.next', { defaultValue: 'Next' })}
@@ -3403,6 +3417,17 @@ function AdminPager({
 function formatCoins(value?: number) {
   if (value === undefined || value === null) return '-';
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatKpiCoins(value?: number) {
+  if (value === undefined || value === null) return '-';
+  if (Math.abs(value) >= 1_000_000) {
+    return new Intl.NumberFormat(undefined, {
+      maximumFractionDigits: 1,
+      notation: 'compact',
+    }).format(value);
+  }
+  return formatCoins(value);
 }
 
 function signedCoins(value: number) {
@@ -3431,6 +3456,14 @@ function economyStatusLabel(value: string, t: Translate) {
     won: t('admin.economy.status.won', { defaultValue: 'Won' }),
     lost: t('admin.economy.status.lost', { defaultValue: 'Lost' }),
     refunded: t('admin.economy.status.refunded', { defaultValue: 'Refunded' }),
+  };
+  return map[value] ?? value;
+}
+
+function betOptionLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    win: t('admin.economy.bets.winOption', { defaultValue: 'Win' }),
+    lose: t('admin.economy.bets.loseOption', { defaultValue: 'Lose' }),
   };
   return map[value] ?? value;
 }
