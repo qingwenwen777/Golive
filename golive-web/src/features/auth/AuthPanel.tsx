@@ -19,6 +19,7 @@ import {
   decodeGoogleCredentialEmail,
   isGoogleConfigured,
 } from '@/lib/googleIdentity';
+import { GoogleIcon } from '@/components/GoogleIcon';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { LoginResp } from '@/types/user';
 
@@ -790,9 +791,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
             disabled={isPending}
             onClick={openGoogleRegisterDialog}
           >
-            <span className="gl-google-letter-mark" aria-hidden="true">
-              G
-            </span>
+            <GoogleIcon className="gl-google-letter-mark" />
             <span>{t('auth.googleRegisterCta', { defaultValue: 'Sign up with Google' })}</span>
           </button>
         ) : (
@@ -817,9 +816,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       >
         <DialogContent className="gl-google-register-dialog p-0 sm:max-w-[380px]">
           <div className="gl-google-register-body">
-            <span className="gl-google-provider-icon is-large" aria-hidden="true">
-              G
-            </span>
+            <GoogleIcon size="large" />
             <DialogTitle>
               {t('auth.googleRegisterDialogTitle', {
                 defaultValue: 'Register with Google',

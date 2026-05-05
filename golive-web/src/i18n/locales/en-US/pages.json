@@ -712,27 +712,25 @@
     },
     "permission": {
       "reviewTime": "Estimated review time: within 1 business day.",
-      "notice": "Keep your channel name, avatar, and cover ready for review.",
-      "platformFee": "Certified creators pay 25% withdrawal fees instead of 35%.",
-      "platformProtection": "Certified creators receive stronger platform protection and recommendations.",
+      "notice": "Keep your channel name, avatar, and cover ready for live access review.",
       "progress": "Progress: submitted -> manual review -> result.",
-      "reasonLabel": "Why do you want to join the platform?",
-      "reasonPlaceholder": "Tell admins your creator plan and why this channel should become platform certified.",
+      "reasonLabel": "Why do you want live access?",
+      "reasonPlaceholder": "Tell admins your live content plan, schedule, and channel readiness.",
       "pending": {
-        "title": "Application under review",
+        "title": "Live access application under review",
         "body": "We are checking your channel and account status.",
         "action": "Submitted"
       },
       "rejected": {
-        "title": "Application was rejected",
+        "title": "Live access application was rejected",
         "body": "Reason: your channel information needs another review before live access can be enabled.",
         "action": "Apply again",
         "reason": "Rejected reason: {{reason}}",
-        "reasonFallback": "Channel readiness did not meet the current creator policy."
+        "reasonFallback": "Channel readiness did not meet the current live access policy."
       },
       "none": {
-        "title": "Apply to join the platform",
-        "body": "Platform certification lights the creator badge and unlocks certified creator benefits.",
+        "title": "Apply for live access",
+        "body": "After live access is approved, you can use Creator Studio and apply separately for platform certification.",
         "action": "Submit application"
       }
     },
@@ -763,30 +761,33 @@
       "channel": "View channel",
       "channelSub": "Check how viewers see your creator page.",
       "platform": "Join the platform",
-      "platformSub": "Apply for certification, recommendation, and stronger protection.",
-      "platformPending": "Application pending",
-      "platformPendingSub": "Admins are reviewing your platform creator application.",
+      "platformSub": "Apply for signing certification, extra protection, and recommendation.",
+      "platformPending": "Certification pending",
+      "platformPendingSub": "Admins are reviewing your platform certification application.",
       "platformApproved": "Platform certified",
-      "platformApprovedSub": "Certified creators get lower withdrawal fees and platform support.",
-      "platformRejectedSub": "Apply again after improving your channel profile."
+      "platformApprovedSub": "Signed certified creators get lower withdrawal fees and platform support.",
+      "platformRejectedSub": "Improve your channel profile and apply for certification again.",
+      "platformLocked": "Join the platform",
+      "platformLockedSub": "Live access must be approved before platform certification."
     },
     "platform": {
       "title": "Join the GoLive platform",
-      "description": "Submit a platform creator application. An administrator will approve or reject it with a reason.",
-      "applyFailed": "Application failed.",
+      "description": "This is a separate platform signing certification after live access. An administrator will approve or reject it with a reason.",
+      "applyFailed": "Certification application failed.",
       "alreadyApproved": "Your channel is already platform certified.",
-      "alreadyPending": "Your application is already waiting for admin review.",
+      "alreadyPending": "Your certification application is already waiting for admin review.",
       "lastReject": "Last rejection",
-      "reasonLabel": "Application note",
-      "reasonPlaceholder": "Tell admins your creator direction, schedule, and why this channel should be certified.",
+      "reasonLabel": "Certification note",
+      "reasonPlaceholder": "Tell admins your creator direction, schedule, signing intent, and why this channel should be certified.",
       "cancel": "Cancel",
       "submitting": "Submitting...",
-      "submit": "Submit application",
+      "submit": "Submit certification application",
       "benefits": {
-        "badge": "The orange platform certification badge appears on your channel.",
+        "badge": "The orange platform certification badge appears on your channel after approval.",
         "fee": "Withdrawal fees are reduced by 10 percentage points, from 35% to 25%.",
         "protection": "Certified creators receive stronger platform protection and recommendation."
-      }
+      },
+      "liveRequired": "Apply for and pass live access before platform certification."
     },
     "analytics": {
       "title": "Channel analytics",
@@ -1083,23 +1084,24 @@
       "disableFor": "Disable live permission for {{name}}"
     },
     "applications": {
-      "eyebrow": "Platform review",
-      "title": "Platform creator applications",
+      "eyebrow": "Live review",
+      "title": "Live permission applications",
       "platformHint": "Approving certifies the creator, enables the orange badge, and applies the lower withdrawal fee.",
-      "loading": "Loading applications...",
-      "error": "Could not load applications.",
-      "empty": "No creator applications yet.",
-      "reason": "Application note",
+      "loading": "Loading live applications...",
+      "error": "Could not load live applications.",
+      "empty": "No live access applications yet.",
+      "reason": "Live access note",
       "noReason": "No reason provided.",
       "rejectReason": "Reject reason",
       "approve": "Approve",
       "reject": "Reject",
-      "approved": "Application approved.",
-      "rejected": "Application rejected.",
+      "approved": "Live access application approved.",
+      "rejected": "Live access application rejected.",
       "reviewFailed": "Review failed.",
       "rejectReasonLabel": "Rejection reason",
       "rejectReasonPlaceholder": "Tell the creator what needs to be improved.",
-      "confirmReject": "Confirm reject"
+      "confirmReject": "Confirm reject",
+      "liveHint": "Approving only enables Creator Studio and live streaming. Platform certification is reviewed separately."
     },
     "nav": {
       "aria": "Admin modules"
@@ -1182,10 +1184,10 @@
     "creators": {
       "aria": "Creator management summary",
       "kpis": {
-        "pendingApplications": "Pending applications",
+        "pendingApplications": "Pending reviews",
         "liveCreators": "Creators who can go live",
-        "approvedApplications": "Approved applications",
-        "rejectedApplications": "Rejected applications"
+        "approvedApplications": "Certified creators",
+        "rejectedApplications": "Rejected certifications"
       }
     },
     "invites": {
@@ -1429,7 +1431,26 @@
         "forceEndLive": "Immediately stop the violating live stream."
       }
     },
-    "refreshDone": "Admin data refreshed."
+    "refreshDone": "Admin data refreshed.",
+    "platformApplications": {
+      "eyebrow": "Platform signing",
+      "title": "Platform certification applications",
+      "platformHint": "Approving certifies the creator, enables the orange badge, and applies the 25% withdrawal fee.",
+      "loading": "Loading certification applications...",
+      "error": "Could not load certification applications.",
+      "empty": "No platform certification applications yet.",
+      "reason": "Signing note",
+      "noReason": "No reason provided.",
+      "rejectReason": "Reject reason",
+      "approve": "Approve certification",
+      "reject": "Reject",
+      "approved": "Platform certification approved.",
+      "rejected": "Platform certification rejected.",
+      "reviewFailed": "Platform review failed.",
+      "rejectReasonLabel": "Rejection reason",
+      "rejectReasonPlaceholder": "Explain why the channel is not ready for signing certification.",
+      "confirmReject": "Confirm reject"
+    }
   },
   "upload": {
     "description": "Upload a JPG, PNG, WebP, or GIF image up to 5MB.",

@@ -47,6 +47,7 @@ import {
   useSubscriptionAppointments,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { GoogleIcon } from '@/components/GoogleIcon';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { Icons } from '@/components/Icons';
@@ -1007,9 +1008,7 @@ export function SettingsPage() {
       >
         <DialogContent className="gl-google-unbind-dialog p-0 sm:max-w-[380px]">
           <form className="gl-google-unbind-body" onSubmit={submitGoogleUnbind}>
-            <span className="gl-google-provider-icon is-large" aria-hidden="true">
-              G
-            </span>
+            <GoogleIcon size="large" />
             <DialogTitle>
               {t('library.settings.security.googleUnlinkTitle', {
                 defaultValue: 'Unlink Google account',
@@ -1298,9 +1297,7 @@ function SecuritySettings({
 
       <section className="gl-settings-card gl-settings-form gl-settings-google-card">
         <div className="gl-settings-card-head">
-          <span className="gl-google-provider-icon" aria-hidden="true">
-            G
-          </span>
+          <GoogleIcon />
           <div>
             <h2>
               {t('library.settings.security.googleTitle', { defaultValue: 'Google account' })}
@@ -1314,9 +1311,7 @@ function SecuritySettings({
         </div>
         {googleLinked ? (
           <div className="gl-settings-provider-state">
-            <span className="gl-google-provider-icon is-small" aria-hidden="true">
-              G
-            </span>
+            <GoogleIcon size="small" />
             <span>
               {t('library.settings.security.googleLinked', {
                 defaultValue: 'Google account connected.',

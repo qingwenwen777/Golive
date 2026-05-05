@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
-import { useSubmitCreatorApplication } from '@/api/creator';
+import { useSubmitCreatorApplication, useSubmitPlatformApplication } from '@/api/creator';
 import {
   useCreatePost,
   useStudioPosts,
@@ -227,19 +227,20 @@ export function CreatorStudioOverviewPage() {
   const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const { user } = useStudioUser();
-  const apply = useSubmitCreatorApplication();
+  const platformApply = useSubmitPlatformApplication();
   const channelKey = currentChannelKey(user);
   const analytics = useCreatorAnalytics(channelKey, Boolean(channelKey));
   const data = analytics.data;
   const latest = data?.history[0];
   const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
-  const platformStatus = user?.livePermissionStatus ?? 'none';
+  const liveApproved = user?.livePermissionStatus === 'approved';
+  const platformStatus = user?.platformVerificationStatus ?? 'none';
   const platformApproved = platformStatus === 'approved';
   const platformPending = platformStatus === 'pending';
   const platformRejected = platformStatus === 'rejected';
 
   const submitPlatformApplication = (reason: string) => {
-    apply.mutate(
+    platformApply.mutate(
       { reason },
       {
         onSuccess: (resp) => {
@@ -323,32 +324,51 @@ export function CreatorStudioOverviewPage() {
             <StudioAction
               icon={platformApproved ? <CheckCircle2 size={18} /> : <ShieldCheck size={18} />}
               title={
-                platformApproved
-                  ? t('studio.actions.platformApproved', { defaultValue: 'Platform certified' })
-                  : platformPending
-                    ? t('studio.actions.platformPending', { defaultValue: 'Application pending' })
-                    : t('studio.actions.platform', { defaultValue: 'Join the platform' })
+                !liveApproved
+                  ? t('studio.actions.platformLocked', { defaultValue: 'Join the platform' })
+                  : platformApproved
+                    ? t('studio.actions.platformApproved', { defaultValue: 'Platform certified' })
+                    : platformPending
+                      ? t('studio.actions.platformPending', { defaultValue: 'Application pending' })
+                      : t('studio.actions.platform', { defaultValue: 'Join the platform' })
               }
               body={
-                platformApproved
-                  ? t('studio.actions.platformApprovedSub', {
-                      defaultValue: 'Certified creators get lower withdrawal fees and platform support.',
+                !liveApproved
+                  ? t('studio.actions.platformLockedSub', {
+                      defaultValue: 'Live permission is required before platform certification.',
                     })
-                  : platformPending
-                    ? t('studio.actions.platformPendingSub', {
-                        defaultValue: 'Admins are reviewing your platform creator application.',
+                  : platformApproved
+                    ? t('studio.actions.platformApprovedSub', {
+                        defaultValue:
+                          'Certified creators get lower withdrawal fees and platform support.',
                       })
-                    : platformRejected
-                      ? t('studio.actions.platformRejectedSub', {
-                          defaultValue: 'Apply again after improving your channel profile.',
+                    : platformPending
+                      ? t('studio.actions.platformPendingSub', {
+                          defaultValue:
+                            'Admins are reviewing your platform certification application.',
                         })
-                      : t('studio.actions.platformSub', {
-                          defaultValue: 'Apply for certification, extra protection, and recommendation.',
-                        })
+                      : platformRejected
+                        ? t('studio.actions.platformRejectedSub', {
+                            defaultValue: 'Apply again after improving your channel profile.',
+                          })
+                        : t('studio.actions.platformSub', {
+                            defaultValue:
+                              'Apply for certification, extra protection, and recommendation.',
+                          })
               }
               className="is-platform"
-              disabled={platformApproved || platformPending || apply.isPending}
+              disabled={
+                !liveApproved || platformApproved || platformPending || platformApply.isPending
+              }
               onClick={() => {
+                if (!liveApproved) {
+                  toast.info(
+                    t('studio.platform.liveRequired', {
+                      defaultValue: 'Apply for live permission before joining the platform.',
+                    }),
+                  );
+                  return;
+                }
                 if (platformApproved) {
                   toast.info(
                     t('studio.platform.alreadyApproved', {
@@ -412,8 +432,8 @@ export function CreatorStudioOverviewPage() {
       </section>
       <JoinPlatformDialog
         open={platformDialogOpen}
-        pending={apply.isPending}
-        rejectReason={user?.livePermissionRejectReason}
+        pending={platformApply.isPending}
+        rejectReason={user?.platformVerificationRejectReason}
         onOpenChange={setPlatformDialogOpen}
         onSubmit={submitPlatformApplication}
       />
@@ -2786,7 +2806,7 @@ function StudioPermissionPage({
     ? t('studio.permission.pending.title', { defaultValue: 'Application under review' })
     : rejected
       ? t('studio.permission.rejected.title', { defaultValue: 'Application was rejected' })
-      : t('studio.permission.none.title', { defaultValue: 'Apply for creator access' });
+      : t('studio.permission.none.title', { defaultValue: 'Apply for live access' });
   const body = pending
     ? t('studio.permission.pending.body', {
         defaultValue: 'We are checking your channel and account status.',
@@ -2797,7 +2817,7 @@ function StudioPermissionPage({
             'Reason: your channel information needs another review before live access can be enabled.',
         })
       : t('studio.permission.none.body', {
-          defaultValue: 'Creator access is required before opening the streaming workspace.',
+          defaultValue: 'Live access is required before opening the streaming workspace.',
         });
 
   return (
@@ -2822,12 +2842,6 @@ function StudioPermissionPage({
         t('studio.permission.reviewTime', {
           defaultValue: 'Estimated review time: within 1 business day.',
         }),
-        t('studio.permission.platformFee', {
-          defaultValue: 'Certified creators pay 25% withdrawal fees instead of 35%.',
-        }),
-        t('studio.permission.platformProtection', {
-          defaultValue: 'Certified creators receive stronger platform protection and recommendations.',
-        }),
         t('studio.permission.notice', {
           defaultValue: 'Keep your channel name, avatar, and cover ready for review.',
         }),
@@ -2849,7 +2863,7 @@ function StudioPermissionPage({
         <label className="gl-creator-access-reason">
           <span>
             {t('studio.permission.reasonLabel', {
-              defaultValue: 'Why do you want to join the platform?',
+              defaultValue: 'Why do you want live access?',
             })}
           </span>
           <textarea
@@ -2858,8 +2872,7 @@ function StudioPermissionPage({
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}
             placeholder={t('studio.permission.reasonPlaceholder', {
-              defaultValue:
-                'Tell admins your creator plan and why this channel should become platform certified.',
+              defaultValue: 'Tell admins your live content plan, schedule, and channel readiness.',
             })}
           />
         </label>
@@ -2911,7 +2924,7 @@ function JoinPlatformDialog({
         <DialogDescription>
           {t('studio.platform.description', {
             defaultValue:
-              'Submit a platform creator application. An administrator will approve or reject it with a reason.',
+              'Submit a platform certification application. An administrator will approve or reject it with a reason.',
           })}
         </DialogDescription>
         <div className="gl-platform-benefits">
@@ -2929,9 +2942,7 @@ function JoinPlatformDialog({
           </div>
         )}
         <label className="gl-creator-access-reason">
-          <span>
-            {t('studio.platform.reasonLabel', { defaultValue: 'Application note' })}
-          </span>
+          <span>{t('studio.platform.reasonLabel', { defaultValue: 'Application note' })}</span>
           <textarea
             rows={5}
             maxLength={500}

@@ -36,13 +36,16 @@ import {
   useAdminCreatorApplications,
   useAdminInviteCodes,
   useAdminLiveCreators,
+  useAdminPlatformApplications,
   useCreateInviteCode,
   useDeleteInviteCode,
   useReviewCreatorApplication,
+  useReviewPlatformApplication,
   useUpdateLivePermission,
   type AdminInviteCode,
   type CreatorApplication,
   type LiveCreator,
+  type PlatformApplication,
 } from '@/api/creator';
 import {
   useAdminBlockedWords,
@@ -126,7 +129,7 @@ function moduleText(t: Translate, module: AdminModule) {
   };
 }
 
-function statusText(status: CreatorApplication['status'], t: Translate) {
+function statusText(status: string, t: Translate) {
   if (status === 'pending') return t('admin.status.pending', { defaultValue: 'Pending' });
   if (status === 'approved') return t('admin.status.approved', { defaultValue: 'Approved' });
   if (status === 'rejected') return t('admin.status.rejected', { defaultValue: 'Rejected' });
@@ -154,26 +157,32 @@ export default function AdminPage() {
   const currentText = moduleText(t, currentModule ?? 'dashboard');
 
   const apps = useAdminCreatorApplications(isAdmin);
+  const platformApps = useAdminPlatformApplications(isAdmin);
   const creators = useAdminLiveCreators(isAdmin);
   const invites = useAdminInviteCodes(isAdmin);
   const approve = useReviewCreatorApplication('approve');
   const reject = useReviewCreatorApplication('reject');
+  const approvePlatform = useReviewPlatformApplication('approve');
+  const rejectPlatform = useReviewPlatformApplication('reject');
   const updatePermission = useUpdateLivePermission();
   const createInvite = useCreateInviteCode();
   const deleteInvite = useDeleteInviteCode();
 
   const appItems = apps.data?.items ?? [];
+  const platformAppItems = platformApps.data?.items ?? [];
   const creatorItems = creators.data?.items ?? [];
   const inviteItems = invites.data?.items ?? [];
   const metrics = useMemo<AdminMetrics>(
     () => ({
-      pendingApplications: appItems.filter((item) => item.status === 'pending').length,
+      pendingApplications:
+        appItems.filter((item) => item.status === 'pending').length +
+        platformAppItems.filter((item) => item.status === 'pending').length,
       approvedCreators: creatorItems.length,
       availableInvites: inviteItems.filter((item) => !item.used).length,
-      totalApplications: appItems.length,
+      totalApplications: appItems.length + platformAppItems.length,
       totalInvites: inviteItems.length,
     }),
-    [appItems, creatorItems.length, inviteItems],
+    [appItems, creatorItems.length, inviteItems, platformAppItems],
   );
 
   if (!currentModule) {
@@ -202,6 +211,7 @@ export default function AdminPage() {
   const refresh = () => {
     void queryClient.invalidateQueries();
     void apps.refetch();
+    void platformApps.refetch();
     void creators.refetch();
     void invites.refetch();
     toast.success(t('admin.refreshDone', { defaultValue: 'Admin data refreshed.' }));
@@ -301,13 +311,18 @@ export default function AdminPage() {
           {currentModule === 'creators' && (
             <CreatorsPage
               applications={appItems}
+              platformApplications={platformAppItems}
               creators={creatorItems}
               applicationsLoading={apps.isLoading}
+              platformApplicationsLoading={platformApps.isLoading}
               creatorsLoading={creators.isLoading}
               applicationsError={apps.isError}
+              platformApplicationsError={platformApps.isError}
               creatorsError={creators.isError}
               approveBusy={approve.isPending}
               rejectBusy={reject.isPending}
+              platformApproveBusy={approvePlatform.isPending}
+              platformRejectBusy={rejectPlatform.isPending}
               permissionBusy={updatePermission.isPending}
               onApprove={(id) => {
                 approve.mutate(
@@ -344,6 +359,46 @@ export default function AdminPage() {
                         err.message ||
                           t('admin.applications.reviewFailed', {
                             defaultValue: 'Review failed.',
+                          }),
+                      ),
+                  },
+                );
+              }}
+              onApprovePlatform={(id) => {
+                approvePlatform.mutate(
+                  { id },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t('admin.platformApplications.approved', {
+                          defaultValue: 'Platform certification approved.',
+                        }),
+                      ),
+                    onError: (err) =>
+                      toast.error(
+                        err.message ||
+                          t('admin.platformApplications.reviewFailed', {
+                            defaultValue: 'Platform review failed.',
+                          }),
+                      ),
+                  },
+                );
+              }}
+              onRejectPlatform={(id, reason) => {
+                rejectPlatform.mutate(
+                  { id, reason },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t('admin.platformApplications.rejected', {
+                          defaultValue: 'Platform certification rejected.',
+                        }),
+                      ),
+                    onError: (err) =>
+                      toast.error(
+                        err.message ||
+                          t('admin.platformApplications.reviewFailed', {
+                            defaultValue: 'Platform review failed.',
                           }),
                       ),
                   },
@@ -622,29 +677,43 @@ function UsersPage({
 
 function CreatorsPage({
   applications,
+  platformApplications,
   creators,
   applicationsLoading,
+  platformApplicationsLoading,
   creatorsLoading,
   applicationsError,
+  platformApplicationsError,
   creatorsError,
   approveBusy,
   rejectBusy,
+  platformApproveBusy,
+  platformRejectBusy,
   permissionBusy,
   onApprove,
   onReject,
+  onApprovePlatform,
+  onRejectPlatform,
   onDisableCreator,
 }: {
   applications: CreatorApplication[];
+  platformApplications: PlatformApplication[];
   creators: LiveCreator[];
   applicationsLoading: boolean;
+  platformApplicationsLoading: boolean;
   creatorsLoading: boolean;
   applicationsError: boolean;
+  platformApplicationsError: boolean;
   creatorsError: boolean;
   approveBusy: boolean;
   rejectBusy: boolean;
+  platformApproveBusy: boolean;
+  platformRejectBusy: boolean;
   permissionBusy: boolean;
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
+  onApprovePlatform: (id: string) => void;
+  onRejectPlatform: (id: string, reason: string) => void;
   onDisableCreator: (item: LiveCreator) => void;
 }) {
   const { t } = useTranslation('pages');
@@ -659,7 +728,10 @@ function CreatorsPage({
           label={t('admin.creators.kpis.pendingApplications', {
             defaultValue: 'Pending applications',
           })}
-          value={applications.filter((item) => item.status === 'pending').length}
+          value={
+            applications.filter((item) => item.status === 'pending').length +
+            platformApplications.filter((item) => item.status === 'pending').length
+          }
           tone="red"
         />
         <AdminKpi
@@ -674,26 +746,37 @@ function CreatorsPage({
           label={t('admin.creators.kpis.approvedApplications', {
             defaultValue: 'Approved applications',
           })}
-          value={applications.filter((item) => item.status === 'approved').length}
+          value={platformApplications.filter((item) => item.status === 'approved').length}
         />
         <AdminKpi
           icon={X}
           label={t('admin.creators.kpis.rejectedApplications', {
             defaultValue: 'Rejected applications',
           })}
-          value={applications.filter((item) => item.status === 'rejected').length}
+          value={platformApplications.filter((item) => item.status === 'rejected').length}
         />
       </section>
       <div className="gl-admin-split-grid">
-        <ApplicationsPanel
-          items={applications}
-          loading={applicationsLoading}
-          error={applicationsError}
-          approveBusy={approveBusy}
-          rejectBusy={rejectBusy}
-          onApprove={onApprove}
-          onReject={onReject}
-        />
+        <div className="gl-admin-section-stack">
+          <ApplicationsPanel
+            items={applications}
+            loading={applicationsLoading}
+            error={applicationsError}
+            approveBusy={approveBusy}
+            rejectBusy={rejectBusy}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+          <PlatformApplicationsPanel
+            items={platformApplications}
+            loading={platformApplicationsLoading}
+            error={platformApplicationsError}
+            approveBusy={platformApproveBusy}
+            rejectBusy={platformRejectBusy}
+            onApprove={onApprovePlatform}
+            onReject={onRejectPlatform}
+          />
+        </div>
         <PermissionPanel
           items={creators}
           loading={creatorsLoading}
@@ -2074,12 +2157,12 @@ function ApplicationsPanel({
     <section className="gl-admin-panel">
       <div className="gl-admin-panel-head">
         <div>
-          <span>{t('admin.applications.eyebrow', { defaultValue: 'Platform review' })}</span>
-          <h2>{t('admin.applications.title', { defaultValue: 'Platform creator applications' })}</h2>
+          <span>{t('admin.applications.eyebrow', { defaultValue: 'Live access review' })}</span>
+          <h2>{t('admin.applications.title', { defaultValue: 'Live permission applications' })}</h2>
           <p>
-            {t('admin.applications.platformHint', {
+            {t('admin.applications.liveHint', {
               defaultValue:
-                'Approving certifies the creator, enables the orange badge, and applies the lower withdrawal fee.',
+                'Approving only enables creator studio and live streaming. Platform certification is reviewed separately.',
             })}
           </p>
         </div>
@@ -2118,7 +2201,9 @@ function ApplicationsPanel({
                   </div>
                 </div>
                 <div className="gl-admin-reason">
-                  <span>{t('admin.applications.reason', { defaultValue: 'Application note' })}</span>
+                  <span>
+                    {t('admin.applications.reason', { defaultValue: 'Live access note' })}
+                  </span>
                   <p>
                     {app.reason ||
                       t('admin.applications.noReason', { defaultValue: 'No reason provided.' })}
@@ -2196,6 +2281,175 @@ function ApplicationsPanel({
       ) : (
         <div className="gl-yt-shelf-empty">
           {t('admin.applications.empty', { defaultValue: 'No creator applications yet.' })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PlatformApplicationsPanel({
+  items,
+  loading,
+  error,
+  approveBusy,
+  rejectBusy,
+  onApprove,
+  onReject,
+}: {
+  items: PlatformApplication[];
+  loading: boolean;
+  error: boolean;
+  approveBusy: boolean;
+  rejectBusy: boolean;
+  onApprove: (id: string) => void;
+  onReject: (id: string, reason: string) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const [rejectingId, setRejectingId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+
+  return (
+    <section className="gl-admin-panel">
+      <div className="gl-admin-panel-head">
+        <div>
+          <span>
+            {t('admin.platformApplications.eyebrow', { defaultValue: 'Platform signing' })}
+          </span>
+          <h2>
+            {t('admin.platformApplications.title', {
+              defaultValue: 'Platform certification applications',
+            })}
+          </h2>
+          <p>
+            {t('admin.platformApplications.platformHint', {
+              defaultValue:
+                'Approving certifies the creator, enables the orange badge, and applies the 25% withdrawal fee.',
+            })}
+          </p>
+        </div>
+      </div>
+      {loading ? (
+        <div className="gl-yt-shelf-empty">
+          {t('admin.platformApplications.loading', { defaultValue: 'Loading applications...' })}
+        </div>
+      ) : error ? (
+        <div className="gl-yt-shelf-empty">
+          {t('admin.platformApplications.error', { defaultValue: 'Could not load applications.' })}
+        </div>
+      ) : items.length ? (
+        <div className="gl-admin-review-list">
+          {items.map((app) => {
+            const pending = app.status === 'pending';
+            const busy = approveBusy || rejectBusy;
+            const rejecting = rejectingId === app.id;
+            return (
+              <article className="gl-admin-review-card" key={app.id}>
+                <div className="gl-admin-review-top">
+                  <AdminUser
+                    avatar={app.avatar}
+                    name={
+                      app.displayName ||
+                      app.username ||
+                      t('admin.fallbackCreator', { defaultValue: 'Creator' })
+                    }
+                    handle={`@${app.username || app.userId.slice(0, 8)}`}
+                  />
+                  <div className="gl-admin-review-meta">
+                    <span className={`gl-admin-status is-${app.status}`}>
+                      {statusText(app.status, t)}
+                    </span>
+                    <small>{formatDate(app.createdAt)}</small>
+                  </div>
+                </div>
+                <div className="gl-admin-reason">
+                  <span>
+                    {t('admin.platformApplications.reason', { defaultValue: 'Signing note' })}
+                  </span>
+                  <p>
+                    {app.reason ||
+                      t('admin.platformApplications.noReason', {
+                        defaultValue: 'No reason provided.',
+                      })}
+                  </p>
+                </div>
+                {app.rejectReason && (
+                  <div className="gl-admin-reason is-reject">
+                    <span>
+                      {t('admin.platformApplications.rejectReason', {
+                        defaultValue: 'Reject reason',
+                      })}
+                    </span>
+                    <p>{app.rejectReason}</p>
+                  </div>
+                )}
+                {pending && (
+                  <div className="gl-admin-review-actions">
+                    <button
+                      type="button"
+                      className="gl-admin-action-text approve"
+                      disabled={busy}
+                      onClick={() => onApprove(app.id)}
+                    >
+                      <Check size={16} />
+                      {t('admin.platformApplications.approve', { defaultValue: 'Approve' })}
+                    </button>
+                    <button
+                      type="button"
+                      className="gl-admin-action-text reject"
+                      disabled={busy}
+                      onClick={() => {
+                        setRejectingId(rejecting ? '' : app.id);
+                        setRejectReason('');
+                      }}
+                    >
+                      <X size={16} />
+                      {t('admin.platformApplications.reject', { defaultValue: 'Reject' })}
+                    </button>
+                  </div>
+                )}
+                {rejecting && pending && (
+                  <div className="gl-admin-reject-form">
+                    <label>
+                      <span>
+                        {t('admin.platformApplications.rejectReasonLabel', {
+                          defaultValue: 'Rejection reason',
+                        })}
+                      </span>
+                      <textarea
+                        rows={3}
+                        value={rejectReason}
+                        maxLength={500}
+                        onChange={(event) => setRejectReason(event.target.value)}
+                        placeholder={t('admin.platformApplications.rejectReasonPlaceholder', {
+                          defaultValue: 'Tell the creator what needs to be improved.',
+                        })}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="gl-admin-danger-btn"
+                      disabled={busy || !rejectReason.trim()}
+                      onClick={() => {
+                        onReject(app.id, rejectReason.trim());
+                        setRejectingId('');
+                        setRejectReason('');
+                      }}
+                    >
+                      {t('admin.platformApplications.confirmReject', {
+                        defaultValue: 'Confirm reject',
+                      })}
+                    </button>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="gl-yt-shelf-empty">
+          {t('admin.platformApplications.empty', {
+            defaultValue: 'No platform certification applications yet.',
+          })}
         </div>
       )}
     </section>

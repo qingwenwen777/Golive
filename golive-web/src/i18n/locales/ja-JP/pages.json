@@ -711,28 +711,26 @@
       "action": "ログイン"
     },
     "permission": {
-      "reviewTime": "審査目安: 1 営業日以内。",
-      "notice": "チャンネル名、アイコン、カバーを整えておくと審査がスムーズです。",
-      "platformFee": "認定クリエイターの出金手数料は 35% ではなく 25% です。",
-      "platformProtection": "認定クリエイターは、より強いプラットフォーム保護とおすすめ露出を受けられます。",
-      "progress": "進捗: 申請済み -> 手動審査 -> 結果通知。",
-      "reasonLabel": "なぜプラットフォームに参加したいですか？",
-      "reasonPlaceholder": "クリエイターとしての計画と、このチャンネルが認定にふさわしい理由を入力してください。",
+      "reviewTime": "審査目安：1営業日以内。",
+      "notice": "配信権限の審査のため、チャンネル名、アバター、カバーを整えてください。",
+      "progress": "進行状況：提出 -> 手動審査 -> 結果通知。",
+      "reasonLabel": "配信権限を申請する理由",
+      "reasonPlaceholder": "配信内容、配信頻度、チャンネル準備状況を管理者へ伝えてください。",
       "pending": {
-        "title": "申請を審査中",
+        "title": "配信権限の申請を審査中",
         "body": "チャンネル情報とアカウント状態を確認しています。",
-        "action": "送信済み"
+        "action": "提出済み"
       },
       "rejected": {
-        "title": "申請は承認されませんでした",
-        "body": "理由: 配信権限を有効にする前にチャンネル情報の再確認が必要です。",
+        "title": "配信権限の申請が却下されました",
+        "body": "理由：配信権限を有効にする前にチャンネル情報の再確認が必要です。",
         "action": "再申請",
-        "reason": "却下理由: {{reason}}",
-        "reasonFallback": "現在のクリエイターポリシーに対してチャンネル準備が不足しています。"
+        "reason": "却下理由：{{reason}}",
+        "reasonFallback": "現在の配信権限ポリシーを満たしていません。"
       },
       "none": {
-        "title": "プラットフォーム参加を申請",
-        "body": "認定されると認定バッジが表示され、認定クリエイター特典を利用できます。",
+        "title": "配信権限を申請",
+        "body": "配信権限の承認後、クリエイタースタジオを利用し、別途プラットフォーム認証を申請できます。",
         "action": "申請を送信"
       }
     },
@@ -763,30 +761,33 @@
       "channel": "チャンネルを見る",
       "channelSub": "視聴者から見えるページを確認します。",
       "platform": "プラットフォームに参加",
-      "platformSub": "認定、おすすめ露出、より強い保護を申請します。",
-      "platformPending": "申請を審査中",
-      "platformPendingSub": "管理者がプラットフォーム認定申請を確認しています。",
-      "platformApproved": "プラットフォーム認定済み",
-      "platformApprovedSub": "認定クリエイターは低い出金手数料とサポートを受けられます。",
-      "platformRejectedSub": "チャンネル情報を整えてから再申請できます。"
+      "platformSub": "契約認証、推薦、より強い保護を申請します。",
+      "platformPending": "認証審査中",
+      "platformPendingSub": "管理者がプラットフォーム認証申請を確認しています。",
+      "platformApproved": "プラットフォーム認証済み",
+      "platformApprovedSub": "契約認証クリエイターは出金手数料とサポートが優遇されます。",
+      "platformRejectedSub": "チャンネル情報を整えて再申請できます。",
+      "platformLocked": "プラットフォームに参加",
+      "platformLockedSub": "先に配信権限の承認が必要です。"
     },
     "platform": {
       "title": "GoLive プラットフォームに参加",
-      "description": "プラットフォーム認定クリエイター申請を送信します。管理者が承認または理由付きで拒否します。",
-      "applyFailed": "申請に失敗しました。",
-      "alreadyApproved": "このチャンネルはすでにプラットフォーム認定済みです。",
-      "alreadyPending": "申請はすでに管理者審査待ちです。",
-      "lastReject": "前回の拒否理由",
-      "reasonLabel": "申請メモ",
-      "reasonPlaceholder": "活動方針、配信予定、このチャンネルを認定すべき理由を管理者に伝えてください。",
+      "description": "配信権限の次に行う、別枠のプラットフォーム契約認証申請です。管理者が理由付きで承認または却下します。",
+      "applyFailed": "認証申請に失敗しました。",
+      "alreadyApproved": "このチャンネルはすでにプラットフォーム認証済みです。",
+      "alreadyPending": "認証申請はすでに審査待ちです。",
+      "lastReject": "前回の却下理由",
+      "reasonLabel": "認証申請メモ",
+      "reasonPlaceholder": "創作方針、配信予定、契約意思、このチャンネルを認証すべき理由を伝えてください。",
       "cancel": "キャンセル",
       "submitting": "送信中...",
-      "submit": "申請を送信",
+      "submit": "認証申請を送信",
       "benefits": {
-        "badge": "承認後、チャンネルにオレンジ色の認定バッジが表示されます。",
-        "fee": "出金手数料が 10 ポイント下がり、35% から 25% になります。",
-        "protection": "認定クリエイターは、より強い保護とおすすめ露出を受けられます。"
-      }
+        "badge": "承認後、チャンネルにオレンジ色の認証バッジが表示されます。",
+        "fee": "出金手数料が10ポイント下がり、35%から25%になります。",
+        "protection": "認証クリエイターはより強い保護と推薦を受けられます。"
+      },
+      "liveRequired": "先に配信権限を申請し、承認を受けてください。"
     },
     "analytics": {
       "title": "チャンネル分析",
@@ -1083,23 +1084,24 @@
       "disableFor": "{{name}} の配信権限を無効にする"
     },
     "applications": {
-      "eyebrow": "プラットフォーム審査",
-      "title": "プラットフォーム認定申請",
+      "eyebrow": "配信審査",
+      "title": "配信権限申請",
       "platformHint": "承認するとクリエイターが認定され、オレンジ色のバッジと低い出金手数料が適用されます。",
-      "loading": "申請を読み込み中...",
-      "error": "申請一覧を読み込めませんでした。",
-      "empty": "クリエイター申請はまだありません。",
-      "reason": "申請メモ",
-      "noReason": "理由は入力されていません。",
-      "rejectReason": "拒否理由",
+      "loading": "配信申請を読み込み中...",
+      "error": "配信申請を読み込めませんでした。",
+      "empty": "配信権限の申請はまだありません。",
+      "reason": "配信申請メモ",
+      "noReason": "理由は未入力です。",
+      "rejectReason": "却下理由",
       "approve": "承認",
-      "reject": "拒否",
-      "approved": "申請を承認しました。",
-      "rejected": "申請を拒否しました。",
+      "reject": "却下",
+      "approved": "配信権限申請を承認しました。",
+      "rejected": "配信権限申請を却下しました。",
       "reviewFailed": "審査に失敗しました。",
-      "rejectReasonLabel": "拒否理由",
-      "rejectReasonPlaceholder": "改善が必要な内容をクリエイターに伝えてください。",
-      "confirmReject": "拒否を確定"
+      "rejectReasonLabel": "却下理由",
+      "rejectReasonPlaceholder": "改善が必要な内容を伝えてください。",
+      "confirmReject": "却下を確定",
+      "liveHint": "承認してもクリエイタースタジオと配信権限のみ有効になります。プラットフォーム認証は別途審査します。"
     },
     "nav": {
       "aria": "管理モジュール"
@@ -1182,10 +1184,10 @@
     "creators": {
       "aria": "クリエイター管理概要",
       "kpis": {
-        "pendingApplications": "未審査申請",
+        "pendingApplications": "未処理の申請",
         "liveCreators": "配信可能な配信者",
-        "approvedApplications": "承認済み申請",
-        "rejectedApplications": "拒否済み申請"
+        "approvedApplications": "認証済みクリエイター",
+        "rejectedApplications": "却下された認証"
       }
     },
     "invites": {
@@ -1429,7 +1431,26 @@
         "forceEndLive": "違反しているライブ配信を直ちに終了します。"
       }
     },
-    "refreshDone": "管理データを更新しました。"
+    "refreshDone": "管理データを更新しました。",
+    "platformApplications": {
+      "eyebrow": "プラットフォーム契約",
+      "title": "プラットフォーム認証申請",
+      "platformHint": "承認すると認証バッジが点灯し、出金手数料25%が適用されます。",
+      "loading": "認証申請を読み込み中...",
+      "error": "認証申請を読み込めませんでした。",
+      "empty": "プラットフォーム認証申請はまだありません。",
+      "reason": "契約申請メモ",
+      "noReason": "理由は未入力です。",
+      "rejectReason": "却下理由",
+      "approve": "認証を承認",
+      "reject": "却下",
+      "approved": "プラットフォーム認証を承認しました。",
+      "rejected": "プラットフォーム認証を却下しました。",
+      "reviewFailed": "認証審査に失敗しました。",
+      "rejectReasonLabel": "却下理由",
+      "rejectReasonPlaceholder": "契約認証できない理由を説明してください。",
+      "confirmReject": "却下を確定"
+    }
   },
   "upload": {
     "description": "JPG、PNG、WebP、GIF 画像を最大 5MB までアップロードできます。",

@@ -22,6 +22,8 @@ export interface User {
   role: 'user' | 'admin';
   livePermissionStatus: 'none' | 'pending' | 'approved' | 'rejected';
   livePermissionRejectReason?: string;
+  platformVerificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';
+  platformVerificationRejectReason?: string;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

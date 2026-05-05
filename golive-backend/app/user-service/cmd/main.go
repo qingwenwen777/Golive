@@ -235,7 +235,7 @@ func seedAdminUser(ctx context.Context, ur *repo.UserRepo, c config.AdminCfg) er
 		PasswordHash:         hash,
 		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=admin",
 		CoinBalance:          100000,
-		Verified:             true,
+		Verified:             false,
 		Role:                 model.RoleAdmin,
 		LivePermissionStatus: model.LivePermissionApproved,
 	})

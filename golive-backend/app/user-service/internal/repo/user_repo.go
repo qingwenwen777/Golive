@@ -26,6 +26,9 @@ var ErrInviteUsed = errors.New("invite code already used")
 var ErrUsernameCooldown = errors.New("username change cooldown")
 var ErrApplicationNotFound = errors.New("creator application not found")
 var ErrApplicationAlreadyReviewed = errors.New("creator application already reviewed")
+var ErrPlatformApplicationNotFound = errors.New("platform application not found")
+var ErrPlatformApplicationAlreadyReviewed = errors.New("platform application already reviewed")
+var ErrLivePermissionRequired = errors.New("approved live permission is required")
 
 type UsernameCooldownError struct {
 	AvailableAt time.Time
@@ -41,7 +44,7 @@ func NewUserRepo(db *gorm.DB) *UserRepo { return &UserRepo{db: db} }
 
 // AutoMigrate creates / updates the users table.
 func (r *UserRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.CoinTransaction{})
+	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{})
 }
 
 func (r *UserRepo) hydrateUserLevel(ctx context.Context, u *model.User) error {
@@ -286,9 +289,8 @@ func (r *UserRepo) ReconcilePlatformVerification(ctx context.Context) error {
 	return r.db.WithContext(ctx).Model(&model.User{}).Where("1 = 1").Update(
 		"verified",
 		gorm.Expr(
-			"CASE WHEN role = ? OR live_permission_status = ? THEN TRUE ELSE FALSE END",
-			model.RoleAdmin,
-			model.LivePermissionApproved,
+			"CASE WHEN platform_verification_status = ? THEN TRUE ELSE FALSE END",
+			model.PlatformVerificationApproved,
 		),
 	).Error
 }
@@ -360,7 +362,6 @@ func (r *UserRepo) UpdatePasswordHash(ctx context.Context, id, hash string) erro
 func (r *UserRepo) CreateAdmin(ctx context.Context, u *model.User) error {
 	u.Role = model.RoleAdmin
 	u.LivePermissionStatus = model.LivePermissionApproved
-	u.Verified = true
 	return r.Create(ctx, u)
 }
 
@@ -451,7 +452,6 @@ func (r *UserRepo) EnsureAdmin(ctx context.Context, username string) error {
 		Updates(map[string]any{
 			"role":                   model.RoleAdmin,
 			"live_permission_status": model.LivePermissionApproved,
-			"verified":               true,
 		}).Error
 }
 
@@ -485,8 +485,7 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 				if err := tx.Create(&app).Error; err != nil {
 					return err
 				}
-				user.Verified = false
-				return tx.Model(&model.User{}).Where("id = ?", userID).Update("verified", false).Error
+				return nil
 			}
 			return err
 		case model.LivePermissionNone, model.LivePermissionRejected:
@@ -505,13 +504,11 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 				Updates(map[string]any{
 					"live_permission_status":        model.LivePermissionPending,
 					"live_permission_reject_reason": "",
-					"verified":                      false,
 				}).Error; err != nil {
 				return err
 			}
 			user.LivePermissionStatus = model.LivePermissionPending
 			user.LivePermissionRejectReason = ""
-			user.Verified = false
 			return nil
 		default:
 			return errors.New("invalid live permission status")
@@ -590,10 +587,11 @@ func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID,
 		}
 		if status == model.LivePermissionRejected {
 			userUpdates["live_permission_reject_reason"] = rejectReason
+			userUpdates["platform_verification_status"] = model.PlatformVerificationRejected
+			userUpdates["platform_verification_reject_reason"] = rejectReason
 			userUpdates["verified"] = false
 		} else {
 			userUpdates["live_permission_reject_reason"] = ""
-			userUpdates["verified"] = true
 		}
 		if err := tx.Model(&model.User{}).
 			Where("id = ?", app.UserID).
@@ -607,6 +605,176 @@ func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID,
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, ErrApplicationNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &user); err != nil {
+		return nil, nil, err
+	}
+	return &app, &user, nil
+}
+
+func (r *UserRepo) SubmitPlatformApplication(ctx context.Context, userID, reason string) (*model.PlatformApplication, *model.User, bool, error) {
+	var app model.PlatformApplication
+	var user model.User
+	created := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", userID).Take(&user).Error; err != nil {
+			return err
+		}
+		if user.LivePermissionStatus != model.LivePermissionApproved {
+			return ErrLivePermissionRequired
+		}
+		if user.PlatformVerificationStatus == "" {
+			user.PlatformVerificationStatus = model.PlatformVerificationNone
+		}
+
+		switch user.PlatformVerificationStatus {
+		case model.PlatformVerificationApproved:
+			return nil
+		case model.PlatformVerificationPending:
+			err := tx.Where("user_id = ? AND status = ?", userID, model.PlatformVerificationPending).
+				Order("created_at DESC").
+				Take(&app).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				app = model.PlatformApplication{
+					ID:     newID(),
+					UserID: userID,
+					Reason: reason,
+					Status: model.PlatformVerificationPending,
+				}
+				created = true
+				return tx.Create(&app).Error
+			}
+			return err
+		case model.PlatformVerificationNone, model.PlatformVerificationRejected:
+			app = model.PlatformApplication{
+				ID:     newID(),
+				UserID: userID,
+				Reason: reason,
+				Status: model.PlatformVerificationPending,
+			}
+			if err := tx.Create(&app).Error; err != nil {
+				return err
+			}
+			created = true
+			if err := tx.Model(&model.User{}).
+				Where("id = ?", userID).
+				Updates(map[string]any{
+					"platform_verification_status":        model.PlatformVerificationPending,
+					"platform_verification_reject_reason": "",
+					"verified":                            false,
+				}).Error; err != nil {
+				return err
+			}
+			user.PlatformVerificationStatus = model.PlatformVerificationPending
+			user.PlatformVerificationRejectReason = ""
+			user.Verified = false
+			return nil
+		default:
+			return errors.New("invalid platform verification status")
+		}
+		return nil
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, false, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if err := r.hydrateUserLevel(ctx, &user); err != nil {
+		return nil, nil, false, err
+	}
+	return &app, &user, created, nil
+}
+
+type PlatformApplicationView struct {
+	ID                   string     `json:"id"`
+	UserID               string     `json:"userId"`
+	Username             string     `json:"username"`
+	DisplayName          string     `json:"displayName,omitempty"`
+	Avatar               string     `json:"avatar"`
+	LivePermissionStatus string     `json:"livePermissionStatus"`
+	Reason               string     `json:"reason"`
+	Status               string     `json:"status"`
+	ReviewerID           string     `json:"reviewerId,omitempty"`
+	RejectReason         string     `json:"rejectReason,omitempty"`
+	ReviewedAt           *time.Time `json:"reviewedAt,omitempty"`
+	CreatedAt            time.Time  `json:"createdAt"`
+	UpdatedAt            time.Time  `json:"updatedAt"`
+}
+
+func (r *UserRepo) ListPlatformApplications(ctx context.Context) ([]PlatformApplicationView, error) {
+	rows := make([]PlatformApplicationView, 0)
+	err := r.db.WithContext(ctx).
+		Table("platform_applications AS pa").
+		Select(`pa.id, pa.user_id, users.username, users.display_name, users.avatar,
+			users.live_permission_status,
+			pa.reason, pa.status, pa.reviewer_id, pa.reject_reason, pa.reviewed_at, pa.created_at, pa.updated_at`).
+		Joins("JOIN users ON users.id = pa.user_id").
+		Order("CASE pa.status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, pa.created_at DESC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (r *UserRepo) ReviewPlatformApplication(ctx context.Context, id, reviewerID, status, rejectReason string) (*model.PlatformApplication, *model.User, error) {
+	if status != model.PlatformVerificationApproved && status != model.PlatformVerificationRejected {
+		return nil, nil, errors.New("invalid review status")
+	}
+
+	var app model.PlatformApplication
+	var user model.User
+	now := time.Now()
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ?", id).Take(&app).Error; err != nil {
+			return err
+		}
+		if app.Status != model.PlatformVerificationPending {
+			return ErrPlatformApplicationAlreadyReviewed
+		}
+		if err := tx.Where("id = ?", app.UserID).Take(&user).Error; err != nil {
+			return err
+		}
+		if user.LivePermissionStatus != model.LivePermissionApproved {
+			return ErrLivePermissionRequired
+		}
+
+		updates := map[string]any{
+			"status":      status,
+			"reviewer_id": reviewerID,
+			"reviewed_at": &now,
+		}
+		if status == model.PlatformVerificationRejected {
+			updates["reject_reason"] = rejectReason
+		} else {
+			updates["reject_reason"] = ""
+		}
+		if err := tx.Model(&app).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		userUpdates := map[string]any{
+			"platform_verification_status": status,
+			"verified":                     status == model.PlatformVerificationApproved,
+		}
+		if status == model.PlatformVerificationRejected {
+			userUpdates["platform_verification_reject_reason"] = rejectReason
+		} else {
+			userUpdates["platform_verification_reject_reason"] = ""
+		}
+		if err := tx.Model(&model.User{}).
+			Where("id = ?", app.UserID).
+			Updates(userUpdates).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", app.ID).Take(&app).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", app.UserID).Take(&user).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, ErrPlatformApplicationNotFound
 	}
 	if err != nil {
 		return nil, nil, err
@@ -653,9 +821,27 @@ func (r *UserRepo) SetLivePermissionStatus(ctx context.Context, userID, status s
 		if err := tx.Model(&user).Updates(map[string]any{
 			"live_permission_status":        status,
 			"live_permission_reject_reason": rejectReason,
-			"verified":                      status == model.LivePermissionApproved,
 		}).Error; err != nil {
 			return err
+		}
+		if status == model.LivePermissionRejected {
+			now := time.Now()
+			if err := tx.Model(&model.PlatformApplication{}).
+				Where("user_id = ? AND status = ?", userID, model.PlatformVerificationPending).
+				Updates(map[string]any{
+					"status":        model.PlatformVerificationRejected,
+					"reject_reason": rejectReason,
+					"reviewed_at":   &now,
+				}).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&user).Updates(map[string]any{
+				"platform_verification_status":        model.PlatformVerificationRejected,
+				"platform_verification_reject_reason": rejectReason,
+				"verified":                            false,
+			}).Error; err != nil {
+				return err
+			}
 		}
 		return tx.Where("id = ?", userID).Take(&user).Error
 	})

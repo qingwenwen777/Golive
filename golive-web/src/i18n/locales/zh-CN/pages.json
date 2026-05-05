@@ -713,27 +713,25 @@
     },
     "permission": {
       "reviewTime": "预计审核时间：1 个工作日内。",
-      "notice": "请保持频道名、头像和封面信息完整，便于审核。",
-      "platformFee": "平台认证主播提现手续费从 35% 降至 25%。",
-      "platformProtection": "平台认证主播会获得更强的平台保护与推荐。",
+      "notice": "请保持频道名、头像和封面信息完整，便于开播权限审核。",
       "progress": "审核进度：已提交 -> 人工审核 -> 给出结果。",
-      "reasonLabel": "为什么想加入平台？",
-      "reasonPlaceholder": "说明你的创作规划，以及这个频道为什么适合成为平台认证主播。",
+      "reasonLabel": "为什么想申请开播权限？",
+      "reasonPlaceholder": "说明你的直播内容规划、开播频率，以及频道准备情况。",
       "pending": {
-        "title": "申请审核中",
+        "title": "开播申请审核中",
         "body": "我们正在检查你的频道资料与账号状态。",
         "action": "已提交"
       },
       "rejected": {
-        "title": "申请未通过",
+        "title": "开播申请未通过",
         "body": "拒绝原因：你的频道信息需要重新完善后再开启直播权限。",
         "action": "重新申请",
         "reason": "拒绝原因：{{reason}}",
-        "reasonFallback": "频道准备度暂未满足当前创作者策略。"
+        "reasonFallback": "频道准备度暂未满足当前开播策略。"
       },
       "none": {
-        "title": "申请加入平台",
-        "body": "加入平台并通过认证后，才会点亮认证标识并享受认证主播权益。",
+        "title": "申请开播权限",
+        "body": "通过开播权限审核后，你可以使用主播工作台并继续申请平台认证。",
         "action": "提交申请"
       }
     },
@@ -764,30 +762,33 @@
       "channel": "查看频道",
       "channelSub": "确认观众看到的频道页面。",
       "platform": "加入平台",
-      "platformSub": "申请平台认证、推荐和更强保护。",
-      "platformPending": "申请审核中",
-      "platformPendingSub": "管理员正在审核你的平台主播申请。",
+      "platformSub": "申请签约认证、推荐和更强保护。",
+      "platformPending": "认证审核中",
+      "platformPendingSub": "管理员正在审核你的平台认证申请。",
       "platformApproved": "已完成平台认证",
-      "platformApprovedSub": "认证主播享有更低提现手续费和平台支持。",
-      "platformRejectedSub": "完善频道资料后可以重新提交申请。"
+      "platformApprovedSub": "签约认证主播享有更低提现手续费和平台支持。",
+      "platformRejectedSub": "完善频道资料后可以重新提交认证申请。",
+      "platformLocked": "加入平台",
+      "platformLockedSub": "需要先通过开播权限审核，才能申请平台认证。"
     },
     "platform": {
       "title": "加入 GoLive 平台",
-      "description": "提交平台主播认证申请，管理员会进行审核；拒绝时会写明原因。",
-      "applyFailed": "申请提交失败。",
+      "description": "这是开播权限之后的进一步平台签约认证申请，管理员会进行审核；拒绝时会写明原因。",
+      "applyFailed": "认证申请提交失败。",
       "alreadyApproved": "你的频道已经完成平台认证。",
-      "alreadyPending": "你的申请已经在等待管理员审核。",
+      "alreadyPending": "你的认证申请已经在等待管理员审核。",
       "lastReject": "上次拒绝原因",
-      "reasonLabel": "申请说明",
-      "reasonPlaceholder": "告诉管理员你的创作方向、直播计划，以及这个频道为什么应该获得平台认证。",
+      "reasonLabel": "认证申请说明",
+      "reasonPlaceholder": "告诉管理员你的创作方向、直播计划、签约意愿，以及这个频道为什么应该获得平台认证。",
       "cancel": "取消",
       "submitting": "提交中...",
-      "submit": "提交申请",
+      "submit": "提交认证申请",
       "benefits": {
         "badge": "通过后频道会显示橙黄色平台认证标识。",
         "fee": "提现手续费降低 10 个百分点：从 35% 降至 25%。",
         "protection": "平台认证主播会获得更强的平台保护与推荐。"
-      }
+      },
+      "liveRequired": "请先申请并通过开播权限，再申请平台认证。"
     },
     "analytics": {
       "title": "频道数据分析",
@@ -1084,23 +1085,24 @@
       "disableFor": "为 {{name}} 关闭开播权限"
     },
     "applications": {
-      "eyebrow": "平台审核",
-      "title": "平台主播认证申请",
+      "eyebrow": "开播审核",
+      "title": "开播权限申请",
       "platformHint": "同意后会认证该主播、点亮橙黄色标识，并应用更低提现手续费。",
-      "loading": "正在加载申请...",
-      "error": "无法加载申请列表。",
-      "empty": "暂无主播申请。",
-      "reason": "申请说明",
+      "loading": "正在加载开播申请...",
+      "error": "无法加载开播申请列表。",
+      "empty": "暂无开播申请。",
+      "reason": "开播申请说明",
       "noReason": "未填写理由。",
       "rejectReason": "拒绝理由",
       "approve": "同意",
       "reject": "拒绝",
-      "approved": "已同意申请。",
-      "rejected": "已拒绝申请。",
+      "approved": "已同意开播申请。",
+      "rejected": "已拒绝开播申请。",
       "reviewFailed": "审核失败。",
       "rejectReasonLabel": "拒绝理由",
       "rejectReasonPlaceholder": "告诉主播需要补充或改进的内容。",
-      "confirmReject": "确认拒绝"
+      "confirmReject": "确认拒绝",
+      "liveHint": "同意后只会开启主播工作台和开播权限，平台认证/签约需要单独审核。"
     },
     "nav": {
       "aria": "管理员模块"
@@ -1183,10 +1185,10 @@
     "creators": {
       "aria": "主播管理概览",
       "kpis": {
-        "pendingApplications": "待审申请",
+        "pendingApplications": "待处理申请",
         "liveCreators": "可开播主播",
-        "approvedApplications": "通过申请",
-        "rejectedApplications": "拒绝申请"
+        "approvedApplications": "已认证主播",
+        "rejectedApplications": "未通过认证"
       }
     },
     "invites": {
@@ -1430,7 +1432,26 @@
         "forceEndLive": "立即结束违规直播间。"
       }
     },
-    "refreshDone": "后台数据已刷新。"
+    "refreshDone": "后台数据已刷新。",
+    "platformApplications": {
+      "eyebrow": "平台签约",
+      "title": "平台认证申请",
+      "platformHint": "同意后会认证该主播、点亮橙黄色标识，并应用 25% 提现手续费。",
+      "loading": "正在加载认证申请...",
+      "error": "无法加载认证申请列表。",
+      "empty": "暂无平台认证申请。",
+      "reason": "签约申请说明",
+      "noReason": "未填写理由。",
+      "rejectReason": "拒绝理由",
+      "approve": "同意认证",
+      "reject": "拒绝",
+      "approved": "已同意平台认证申请。",
+      "rejected": "已拒绝平台认证申请。",
+      "reviewFailed": "认证审核失败。",
+      "rejectReasonLabel": "拒绝理由",
+      "rejectReasonPlaceholder": "说明暂不签约认证的原因。",
+      "confirmReject": "确认拒绝"
+    }
   },
   "upload": {
     "description": "上传 JPG、PNG、WebP 或 GIF 图片，最大 5MB。",

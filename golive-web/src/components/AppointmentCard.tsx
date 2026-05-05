@@ -188,8 +188,10 @@ export function AppointmentCard({
         )}
         <div className="gl-appointment-copy">
           <div className="gl-appointment-head">
-            <h3>{appointment.title}</h3>
-            {appointment.verified && <VerifiedBadge size={15} />}
+            <h3>
+              <span>{appointment.title}</span>
+              {appointment.verified && <VerifiedBadge size={15} />}
+            </h3>
           </div>
           {showChannel && (
             <div className="gl-appointment-channel">

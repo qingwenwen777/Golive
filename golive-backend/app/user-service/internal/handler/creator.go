@@ -79,6 +79,62 @@ func (h *CreatorHandler) SubmitApplication(c *gin.Context) {
 	})
 }
 
+func (h *CreatorHandler) SubmitPlatformApplication(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+
+	var req submitCreatorApplicationReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "application reason is required"))
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "application reason is required"))
+		return
+	}
+
+	app, user, created, err := h.users.SubmitPlatformApplication(c.Request.Context(), uid, reason)
+	if errors.Is(err, repo.ErrLivePermissionRequired) {
+		errcode.Respond(c, errcode.New(http.StatusConflict, "live permission must be approved first"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+
+	status := user.PlatformVerificationStatus
+	if status == "" {
+		status = model.PlatformVerificationNone
+	}
+	message := "Platform certification application submitted."
+	if status == model.PlatformVerificationPending && !created {
+		message = "Platform certification application is already pending."
+	}
+	if status == model.PlatformVerificationApproved {
+		message = "Platform certification already approved."
+	}
+
+	code := http.StatusOK
+	if created {
+		code = http.StatusCreated
+	}
+	var application any = app
+	if app == nil || app.ID == "" {
+		application = nil
+	}
+	c.JSON(code, gin.H{
+		"application":                application,
+		"platformVerificationStatus": status,
+		"user":                       user.Public(),
+		"message":                    message,
+	})
+}
+
 type AdminHandler struct {
 	users *repo.UserRepo
 }
@@ -136,6 +192,15 @@ func (h *AdminHandler) ListCreatorApplications(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
+func (h *AdminHandler) ListPlatformApplications(c *gin.Context) {
+	items, err := h.users.ListPlatformApplications(c.Request.Context())
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
 func (h *AdminHandler) ListLiveCreators(c *gin.Context) {
 	items, err := h.users.ListLiveCreators(c.Request.Context())
 	if err != nil {
@@ -151,6 +216,14 @@ func (h *AdminHandler) ApproveCreatorApplication(c *gin.Context) {
 
 func (h *AdminHandler) RejectCreatorApplication(c *gin.Context) {
 	h.reviewCreatorApplication(c, model.LivePermissionRejected)
+}
+
+func (h *AdminHandler) ApprovePlatformApplication(c *gin.Context) {
+	h.reviewPlatformApplication(c, model.PlatformVerificationApproved)
+}
+
+func (h *AdminHandler) RejectPlatformApplication(c *gin.Context) {
+	h.reviewPlatformApplication(c, model.PlatformVerificationRejected)
 }
 
 func (h *AdminHandler) reviewCreatorApplication(c *gin.Context, status string) {
@@ -177,6 +250,46 @@ func (h *AdminHandler) reviewCreatorApplication(c *gin.Context, status string) {
 	}
 	if errors.Is(err, repo.ErrApplicationAlreadyReviewed) {
 		errcode.Respond(c, errcode.New(http.StatusConflict, "creator application already reviewed"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"application": app,
+		"user":        user.Public(),
+	})
+}
+
+func (h *AdminHandler) reviewPlatformApplication(c *gin.Context, status string) {
+	reviewerID := UserIDFromCtx(c)
+	rejectReason := ""
+	if status == model.PlatformVerificationRejected {
+		var req struct {
+			Reason string `json:"reason"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "reject reason is required"))
+			return
+		}
+		rejectReason = strings.TrimSpace(req.Reason)
+		if rejectReason == "" {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "reject reason is required"))
+			return
+		}
+	}
+	app, user, err := h.users.ReviewPlatformApplication(c.Request.Context(), c.Param("id"), reviewerID, status, rejectReason)
+	if errors.Is(err, repo.ErrPlatformApplicationNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "platform application not found"))
+		return
+	}
+	if errors.Is(err, repo.ErrPlatformApplicationAlreadyReviewed) {
+		errcode.Respond(c, errcode.New(http.StatusConflict, "platform application already reviewed"))
+		return
+	}
+	if errors.Is(err, repo.ErrLivePermissionRequired) {
+		errcode.Respond(c, errcode.New(http.StatusConflict, "live permission must be approved first"))
 		return
 	}
 	if err != nil {
@@ -257,7 +370,7 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 		PasswordHash:         hash,
 		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + url.QueryEscape(displayName),
 		CoinBalance:          1200,
-		Verified:             true,
+		Verified:             false,
 		Role:                 model.RoleAdmin,
 		LivePermissionStatus: model.LivePermissionApproved,
 	}

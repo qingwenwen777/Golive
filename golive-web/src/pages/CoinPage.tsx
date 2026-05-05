@@ -173,7 +173,9 @@ export default function CoinPage() {
   const topupAmount = parseCoinInput(topupText);
   const withdrawAmount = parseCoinInput(withdrawText);
   const platformCertified =
-    currentUser?.verified === true && currentUser.livePermissionStatus === 'approved';
+    currentUser?.verified === true &&
+    currentUser.livePermissionStatus === 'approved' &&
+    currentUser.platformVerificationStatus === 'approved';
   const withdrawFeeRate = platformCertified ? CERTIFIED_WITHDRAW_FEE_RATE : WITHDRAW_FEE_RATE;
   const withdrawFee = Math.floor(withdrawAmount * withdrawFeeRate);
   const withdrawNet = Math.max(0, withdrawAmount - withdrawFee);
@@ -199,7 +201,9 @@ export default function CoinPage() {
           );
         },
         onError: (err) =>
-          toast.error(err.message || t('coin.toast.topupFailed', { defaultValue: 'Top-up failed.' })),
+          toast.error(
+            err.message || t('coin.toast.topupFailed', { defaultValue: 'Top-up failed.' }),
+          ),
       },
     );
   };
@@ -211,7 +215,9 @@ export default function CoinPage() {
     }
     if (claimedByTask.has(task.id)) return;
     if (progress < task.target) {
-      toast.info(t('coin.toast.taskIncomplete', { defaultValue: 'Finish the task before claiming.' }));
+      toast.info(
+        t('coin.toast.taskIncomplete', { defaultValue: 'Finish the task before claiming.' }),
+      );
       return;
     }
     setClaimingTaskId(task.id);
@@ -220,7 +226,11 @@ export default function CoinPage() {
       {
         onSuccess: (resp) => {
           if (resp.alreadyClaimed) {
-            toast.info(t('coin.toast.alreadyClaimed', { defaultValue: 'You already claimed this task today.' }));
+            toast.info(
+              t('coin.toast.alreadyClaimed', {
+                defaultValue: 'You already claimed this task today.',
+              }),
+            );
             return;
           }
           toast.success(
@@ -231,7 +241,9 @@ export default function CoinPage() {
           );
         },
         onError: (err) =>
-          toast.error(err.message || t('coin.toast.claimFailed', { defaultValue: 'Claim failed.' })),
+          toast.error(
+            err.message || t('coin.toast.claimFailed', { defaultValue: 'Claim failed.' }),
+          ),
         onSettled: () => setClaimingTaskId(null),
       },
     );
@@ -258,7 +270,8 @@ export default function CoinPage() {
             <strong>{t('coin.authTitle', { defaultValue: 'Sign in to manage coins' })}</strong>
             <span>
               {t('coin.authSub', {
-                defaultValue: 'View spending records, top up, daily tasks, and withdrawal previews.',
+                defaultValue:
+                  'View spending records, top up, daily tasks, and withdrawal previews.',
               })}
             </span>
           </div>
@@ -480,7 +493,9 @@ export default function CoinPage() {
                   inputMode="numeric"
                   value={withdrawText}
                   onChange={(event) => setWithdrawText(cleanCoinText(event.target.value))}
-                  aria-label={t('coin.withdraw.amountAria', { defaultValue: 'Withdrawal coin amount' })}
+                  aria-label={t('coin.withdraw.amountAria', {
+                    defaultValue: 'Withdrawal coin amount',
+                  })}
                 />
                 <span>coins</span>
               </div>
@@ -680,7 +695,11 @@ function recordMeta(type: CoinTransactionType) {
       return { labelKey: 'coin.record.gift', labelDefault: 'Gift', icon: Gift };
     case 'super_chat_spend':
     case 'creator_super_chat_income':
-      return { labelKey: 'coin.record.superChat', labelDefault: 'Super Chat', icon: MessageSquareText };
+      return {
+        labelKey: 'coin.record.superChat',
+        labelDefault: 'Super Chat',
+        icon: MessageSquareText,
+      };
     case 'bet_wager':
     case 'bet_payout':
     case 'bet_refund':

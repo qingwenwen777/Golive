@@ -71,6 +71,7 @@ func NewRouter(d Deps) *gin.Engine {
 	creator := r.Group("/creator", handler.AuthRequired(d.Auth))
 	{
 		creator.POST("/applications", creatorH.SubmitApplication)
+		creator.POST("/platform-applications", creatorH.SubmitPlatformApplication)
 	}
 
 	admin := r.Group("/admin", handler.AuthRequired(d.Auth), handler.AdminRequired(d.Users))
@@ -83,6 +84,9 @@ func NewRouter(d Deps) *gin.Engine {
 		admin.GET("/creator-applications", adminH.ListCreatorApplications)
 		admin.POST("/creator-applications/:id/approve", adminH.ApproveCreatorApplication)
 		admin.POST("/creator-applications/:id/reject", adminH.RejectCreatorApplication)
+		admin.GET("/platform-applications", adminH.ListPlatformApplications)
+		admin.POST("/platform-applications/:id/approve", adminH.ApprovePlatformApplication)
+		admin.POST("/platform-applications/:id/reject", adminH.RejectPlatformApplication)
 		admin.POST("/admins", adminH.CreateAdmin)
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
 )
 
-func TestCreatorApplicationApprovalSetsPlatformVerification(t *testing.T) {
+func TestCreatorApplicationApprovalGrantsLivePermissionOnly(t *testing.T) {
 	router, users, auth := newCoinsTestRouter(t)
 	ctx := context.Background()
 
@@ -27,7 +27,7 @@ func TestCreatorApplicationApprovalSetsPlatformVerification(t *testing.T) {
 	require.False(t, creator.User.Verified)
 
 	submitReq := httptest.NewRequest(http.MethodPost, "/creator/applications", bytes.NewBufferString(`{
-		"reason":"I want to join the platform creator program."
+		"reason":"I want live permission."
 	}`))
 	submitReq.Header.Set("Authorization", "Bearer "+creator.Token)
 	submitReq.Header.Set("Content-Type", "application/json")
@@ -54,6 +54,66 @@ func TestCreatorApplicationApprovalSetsPlatformVerification(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(approveRec.Body.Bytes(), &approved))
 	require.Equal(t, model.LivePermissionApproved, approved.User.LivePermissionStatus)
+	require.Equal(t, model.PlatformVerificationNone, approved.User.PlatformVerificationStatus)
+	require.False(t, approved.User.Verified)
+
+	persisted, err := users.FindByID(ctx, creator.User.ID)
+	require.NoError(t, err)
+	require.False(t, persisted.Verified)
+}
+
+func TestPlatformApplicationRequiresLivePermissionThenApprovesVerification(t *testing.T) {
+	router, users, auth := newCoinsTestRouter(t)
+	ctx := context.Background()
+
+	admin, err := auth.Register(ctx, "admin2", "secret123", "Admin")
+	require.NoError(t, err)
+	require.NoError(t, users.EnsureAdmin(ctx, "admin2"))
+
+	creator, err := auth.Register(ctx, "creator2", "secret123", "Creator 2")
+	require.NoError(t, err)
+
+	blockedReq := httptest.NewRequest(http.MethodPost, "/creator/platform-applications", bytes.NewBufferString(`{
+		"reason":"I want platform certification."
+	}`))
+	blockedReq.Header.Set("Authorization", "Bearer "+creator.Token)
+	blockedReq.Header.Set("Content-Type", "application/json")
+	blockedRec := httptest.NewRecorder()
+	router.ServeHTTP(blockedRec, blockedReq)
+	require.Equal(t, http.StatusConflict, blockedRec.Code)
+
+	_, err = users.SetLivePermissionStatus(ctx, creator.User.ID, model.LivePermissionApproved)
+	require.NoError(t, err)
+
+	submitReq := httptest.NewRequest(http.MethodPost, "/creator/platform-applications", bytes.NewBufferString(`{
+		"reason":"I want to sign with the platform."
+	}`))
+	submitReq.Header.Set("Authorization", "Bearer "+creator.Token)
+	submitReq.Header.Set("Content-Type", "application/json")
+	submitRec := httptest.NewRecorder()
+	router.ServeHTTP(submitRec, submitReq)
+	require.Equal(t, http.StatusCreated, submitRec.Code)
+
+	var submitted struct {
+		Application model.PlatformApplication `json:"application"`
+		User        model.PublicUser          `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(submitRec.Body.Bytes(), &submitted))
+	require.Equal(t, model.PlatformVerificationPending, submitted.User.PlatformVerificationStatus)
+	require.False(t, submitted.User.Verified)
+
+	approveReq := httptest.NewRequest(http.MethodPost, "/admin/platform-applications/"+submitted.Application.ID+"/approve", nil)
+	approveReq.Header.Set("Authorization", "Bearer "+admin.Token)
+	approveRec := httptest.NewRecorder()
+	router.ServeHTTP(approveRec, approveReq)
+	require.Equal(t, http.StatusOK, approveRec.Code)
+
+	var approved struct {
+		User model.PublicUser `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(approveRec.Body.Bytes(), &approved))
+	require.Equal(t, model.LivePermissionApproved, approved.User.LivePermissionStatus)
+	require.Equal(t, model.PlatformVerificationApproved, approved.User.PlatformVerificationStatus)
 	require.True(t, approved.User.Verified)
 
 	persisted, err := users.FindByID(ctx, creator.User.ID)
@@ -61,28 +121,31 @@ func TestCreatorApplicationApprovalSetsPlatformVerification(t *testing.T) {
 	require.True(t, persisted.Verified)
 }
 
-func TestCreatorApplicationRejectRequiresReasonAndClearsVerification(t *testing.T) {
+func TestPlatformApplicationRejectRequiresReasonAndClearsVerification(t *testing.T) {
 	router, users, auth := newCoinsTestRouter(t)
+	ctx := context.Background()
 
-	admin, err := auth.Register(context.Background(), "admin", "secret123", "Admin")
+	admin, err := auth.Register(ctx, "admin3", "secret123", "Admin")
 	require.NoError(t, err)
-	require.NoError(t, users.EnsureAdmin(context.Background(), "admin"))
+	require.NoError(t, users.EnsureAdmin(ctx, "admin3"))
 
-	creator, err := auth.Register(context.Background(), "creator2", "secret123", "Creator 2")
+	creator, err := auth.Register(ctx, "creator3", "secret123", "Creator 3")
+	require.NoError(t, err)
+	_, err = users.SetLivePermissionStatus(ctx, creator.User.ID, model.LivePermissionApproved)
 	require.NoError(t, err)
 
-	app, _, _, err := users.SubmitCreatorApplication(context.Background(), creator.User.ID, "Please review.")
+	app, _, _, err := users.SubmitPlatformApplication(ctx, creator.User.ID, "Please certify my channel.")
 	require.NoError(t, err)
 
-	rejectWithoutReasonReq := httptest.NewRequest(http.MethodPost, "/admin/creator-applications/"+app.ID+"/reject", bytes.NewBufferString(`{}`))
+	rejectWithoutReasonReq := httptest.NewRequest(http.MethodPost, "/admin/platform-applications/"+app.ID+"/reject", bytes.NewBufferString(`{}`))
 	rejectWithoutReasonReq.Header.Set("Authorization", "Bearer "+admin.Token)
 	rejectWithoutReasonReq.Header.Set("Content-Type", "application/json")
 	rejectWithoutReasonRec := httptest.NewRecorder()
 	router.ServeHTTP(rejectWithoutReasonRec, rejectWithoutReasonReq)
 	require.Equal(t, http.StatusBadRequest, rejectWithoutReasonRec.Code)
 
-	rejectReq := httptest.NewRequest(http.MethodPost, "/admin/creator-applications/"+app.ID+"/reject", bytes.NewBufferString(`{
-		"reason":"Please complete the channel profile first."
+	rejectReq := httptest.NewRequest(http.MethodPost, "/admin/platform-applications/"+app.ID+"/reject", bytes.NewBufferString(`{
+		"reason":"Please complete a stable streaming schedule first."
 	}`))
 	rejectReq.Header.Set("Authorization", "Bearer "+admin.Token)
 	rejectReq.Header.Set("Content-Type", "application/json")
@@ -94,23 +157,25 @@ func TestCreatorApplicationRejectRequiresReasonAndClearsVerification(t *testing.
 		User model.PublicUser `json:"user"`
 	}
 	require.NoError(t, json.Unmarshal(rejectRec.Body.Bytes(), &rejected))
-	require.Equal(t, model.LivePermissionRejected, rejected.User.LivePermissionStatus)
+	require.Equal(t, model.LivePermissionApproved, rejected.User.LivePermissionStatus)
+	require.Equal(t, model.PlatformVerificationRejected, rejected.User.PlatformVerificationStatus)
 	require.False(t, rejected.User.Verified)
-	require.NotEmpty(t, rejected.User.LivePermissionRejectReason)
+	require.NotEmpty(t, rejected.User.PlatformVerificationRejectReason)
 
-	_, err = auth.Login(context.Background(), "creator2", "secret123")
+	_, err = auth.Login(ctx, "creator3", "secret123")
 	require.NoError(t, err)
 }
 
-func TestReconcilePlatformVerificationMatchesApplicationStatus(t *testing.T) {
+func TestReconcilePlatformVerificationMatchesCertificationStatus(t *testing.T) {
 	_, users, auth := newCoinsTestRouter(t)
 	ctx := context.Background()
 
-	admin, err := auth.Register(ctx, "admin", "secret123", "Admin")
+	admin, err := auth.Register(ctx, "admin4", "secret123", "Admin")
 	require.NoError(t, err)
-	require.NoError(t, users.EnsureAdmin(ctx, "admin"))
+	require.NoError(t, users.EnsureAdmin(ctx, "admin4"))
 	hash, err := service.HashPassword("secret123")
 	require.NoError(t, err)
+
 	legacy := &model.User{
 		ID:                   "legacy-google-id",
 		Username:             "legacygoogle",
@@ -121,9 +186,24 @@ func TestReconcilePlatformVerificationMatchesApplicationStatus(t *testing.T) {
 		CoinBalance:          1200,
 		Verified:             true,
 		Role:                 model.RoleUser,
-		LivePermissionStatus: model.LivePermissionNone,
+		LivePermissionStatus: model.LivePermissionApproved,
 	}
 	require.NoError(t, users.Create(ctx, legacy))
+
+	certified := &model.User{
+		ID:                         "certified-id",
+		Username:                   "certified",
+		Email:                      "certified@example.com",
+		DisplayName:                "Certified",
+		PasswordHash:               hash,
+		Avatar:                     "https://example.com/certified.png",
+		CoinBalance:                1200,
+		Verified:                   false,
+		Role:                       model.RoleUser,
+		LivePermissionStatus:       model.LivePermissionApproved,
+		PlatformVerificationStatus: model.PlatformVerificationApproved,
+	}
+	require.NoError(t, users.Create(ctx, certified))
 
 	require.NoError(t, users.ReconcilePlatformVerification(ctx))
 
@@ -132,5 +212,8 @@ func TestReconcilePlatformVerificationMatchesApplicationStatus(t *testing.T) {
 	require.False(t, got.Verified)
 	adminUser, err := users.FindByID(ctx, admin.User.ID)
 	require.NoError(t, err)
-	require.True(t, adminUser.Verified)
+	require.False(t, adminUser.Verified)
+	certifiedUser, err := users.FindByID(ctx, certified.ID)
+	require.NoError(t, err)
+	require.True(t, certifiedUser.Verified)
 }
