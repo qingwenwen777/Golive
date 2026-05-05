@@ -133,7 +133,12 @@ function isAdminModule(value: string): value is AdminModule {
   return ADMIN_MODULES.some((module) => module.key === value);
 }
 
-function getModuleFromPath(pathname: string): AdminModule | undefined {
+export function isAdminPath(pathname: string): boolean {
+  return pathname === '/admin' || pathname.startsWith('/admin/');
+}
+
+export function getModuleFromPath(pathname: string): AdminModule | undefined {
+  if (!isAdminPath(pathname)) return undefined;
   const section = pathname.replace(/^\/admin\/?/, '').split('/')[0] || 'dashboard';
   if (section === 'applications') return 'creators';
   if (isAdminModule(section)) return section;
@@ -174,13 +179,16 @@ export default function AdminPage() {
   const isAdmin = user?.role === 'admin';
   const isModerator = user?.role === 'moderator';
   const canAccessAdmin = isAdmin || isModerator;
+  const onAdminRoute = isAdminPath(location.pathname);
+  const canUseAdminOnlyApis = isAdmin && onAdminRoute;
+  const canUseAdminApis = canAccessAdmin && onAdminRoute;
   const currentModule = getModuleFromPath(location.pathname);
   const currentText = moduleText(t, currentModule ?? 'dashboard');
 
-  const apps = useAdminCreatorApplications(isAdmin);
-  const platformApps = useAdminPlatformApplications(isAdmin);
-  const creators = useAdminLiveCreators(isAdmin);
-  const invites = useAdminInviteCodes(isAdmin);
+  const apps = useAdminCreatorApplications(canUseAdminOnlyApis);
+  const platformApps = useAdminPlatformApplications(canUseAdminOnlyApis);
+  const creators = useAdminLiveCreators(canUseAdminOnlyApis);
+  const invites = useAdminInviteCodes(canUseAdminOnlyApis);
   const approve = useReviewCreatorApplication('approve');
   const reject = useReviewCreatorApplication('reject');
   const approvePlatform = useReviewPlatformApplication('approve');
@@ -188,7 +196,7 @@ export default function AdminPage() {
   const updatePermission = useUpdateLivePermission();
   const createInvite = useCreateInviteCode();
   const deleteInvite = useDeleteInviteCode();
-  const overview = useAdminOverview(canAccessAdmin);
+  const overview = useAdminOverview(canUseAdminApis);
 
   const appItems = apps.data?.items ?? [];
   const platformAppItems = platformApps.data?.items ?? [];
@@ -206,6 +214,10 @@ export default function AdminPage() {
     }),
     [appItems, creatorItems.length, inviteItems, platformAppItems],
   );
+
+  if (!onAdminRoute) {
+    return null;
+  }
 
   if (!currentModule) {
     return <Navigate to="/admin/dashboard" replace />;
