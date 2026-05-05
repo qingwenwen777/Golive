@@ -134,7 +134,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
   const youItems: NavItem[] = [
     { key: 'you', icon: Icons.Library, label: t('nav.yourLibrary'), chev: true, route: '/you' },
     { key: 'history', icon: Icons.History, label: t('nav.history'), route: '/history' },
-    { key: 'later', icon: Icons.Clock, label: t('nav.watchLater'), route: '/watch-later' },
+    { key: 'later', icon: Icons.WatchLater, label: t('nav.watchLater'), route: '/watch-later' },
     { key: 'liked', icon: Icons.Heart, label: t('nav.liked'), route: '/liked' },
   ];
 

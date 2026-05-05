@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, CheckCircle2, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
+import { Check, CheckCircle2, Clock3, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useReserveAppointment, useUnreserveAppointment } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { Icons } from '@/components/Icons';
 import { LoadableImage } from '@/components/LoadableImage';
 import { cn } from '@/lib/cn';
 import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
@@ -241,7 +242,7 @@ export function AppointmentCard({
             title={watchLaterLabel}
             onClick={handleWatchLater}
           >
-            {savedLater ? <Check size={20} /> : <ListPlus size={21} />}
+            <Icons.WatchLater size={21} />
           </button>
         </div>
       )}

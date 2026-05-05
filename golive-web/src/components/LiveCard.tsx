@@ -227,6 +227,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48" onClick={(e) => e.stopPropagation()}>
               <DropdownMenuItem onSelect={toggleWatchLater}>
+                <Icons.WatchLater size={15} />
                 {saved
                   ? t('liveCard.menu.removeWatchLater', { defaultValue: 'Remove from Watch later' })
                   : t('liveCard.menu.saveWatchLater', { defaultValue: 'Save to Watch later' })}

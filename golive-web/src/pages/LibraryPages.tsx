@@ -7,10 +7,8 @@ import { useQueries } from '@tanstack/react-query';
 import {
   AtSign,
   Bell,
-  Bookmark,
   Camera,
   ChevronRight,
-  Clock3,
   Crown,
   Heart,
   History,
@@ -44,6 +42,7 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
+import { Icons } from '@/components/Icons';
 import { LiveCard } from '@/components/LiveCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
@@ -429,7 +428,7 @@ export function YouPage() {
               <span className="gl-yt-coin-chip-add">{t('library.you.recharge')}</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
-              <Bookmark size={14} />{' '}
+              <Icons.WatchLater size={14} />{' '}
               {t('library.you.watchLaterCount', { count: hydratedSaved.length })}
             </Link>
             <Link className="gl-yt-chip" to="/liked">
@@ -545,7 +544,7 @@ export function YouPage() {
             onClick={() => navigate('/')}
           />
           <QuickChip
-            icon={<Clock3 size={16} />}
+            icon={<Icons.WatchLater size={16} />}
             label={t('library.you.watchLater')}
             onClick={() => navigate('/watch-later')}
           />
@@ -689,7 +688,7 @@ export function WatchLaterPage() {
   return (
     <LibraryCollectionPage
       storageKey={WATCH_LATER_KEY}
-      icon={<Bookmark size={22} />}
+      icon={<Icons.WatchLater size={22} />}
       title={t('library.watchLaterPage.title')}
       subtitle={t('library.watchLaterPage.subtitle')}
       emptyTitle={t('library.watchLaterPage.emptyTitle')}

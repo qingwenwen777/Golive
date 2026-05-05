@@ -7,7 +7,6 @@ import {
   ThumbsUp,
   ThumbsDown,
   Share2,
-  Bookmark,
   Bell,
   Gift,
   MoreHorizontal,
@@ -268,7 +267,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             aria-pressed={saved}
             onClick={handleSave}
           >
-            <Bookmark size={18} />
+            <Icons.WatchLater size={18} />
             <span>{saved ? t('liveRoom.saved') : t('liveRoom.save')}</span>
           </button>
           <DropdownMenu>

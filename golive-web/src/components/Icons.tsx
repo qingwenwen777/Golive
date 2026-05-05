@@ -1,4 +1,5 @@
-import type { LucideIcon } from 'lucide-react';
+import { forwardRef } from 'react';
+import type { LucideIcon, LucideProps } from 'lucide-react';
 import {
   Menu,
   Search,
@@ -47,7 +48,47 @@ export interface IconSet {
   Moon: LucideIcon;
   Wallet: LucideIcon;
   ShieldCheck: LucideIcon;
+  WatchLater: LucideIcon;
 }
+
+const WatchLater = forwardRef<SVGSVGElement, LucideProps>(
+  (
+    {
+      color = 'currentColor',
+      size = 24,
+      strokeWidth = 2,
+      absoluteStrokeWidth,
+      ...props
+    },
+    ref,
+  ) => {
+    const computedStrokeWidth =
+      absoluteStrokeWidth && typeof size === 'number'
+        ? (Number(strokeWidth) * 24) / size
+        : strokeWidth;
+
+    return (
+      <svg
+        ref={ref}
+        xmlns="http://www.w3.org/2000/svg"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={color}
+        strokeWidth={computedStrokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        {...props}
+      >
+        <path d="M16 6H3" />
+        <path d="M11 12H3" />
+        <path d="M16 18H3" />
+      </svg>
+    );
+  },
+);
+WatchLater.displayName = 'WatchLater';
 
 export const Icons: IconSet = {
   Menu,
@@ -72,4 +113,5 @@ export const Icons: IconSet = {
   Moon,
   Wallet,
   ShieldCheck,
+  WatchLater,
 };
