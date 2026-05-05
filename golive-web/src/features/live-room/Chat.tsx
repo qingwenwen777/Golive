@@ -21,6 +21,8 @@ import {
   Users,
   Crown,
   ShieldCheck,
+  Flag,
+  Ban,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
@@ -38,6 +40,7 @@ import { userDisplayName } from '@/types/user';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import type { RoomViewer } from '@/stores/useRealtimeStore';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
+import type { ReportTargetDraft } from '@/features/reporting/ReportDialog';
 
 export interface ChatProps {
   messages: Message[];
@@ -45,6 +48,7 @@ export interface ChatProps {
   viewerTotal?: number;
   ownerId?: string;
   ownerName?: string;
+  roomId?: string;
   onSendSuperChat?: () => void;
   sheetMode?: boolean;
   reconnecting?: boolean;
@@ -55,6 +59,7 @@ export interface ChatProps {
   chatMuted?: boolean;
   moderationRole?: 'owner' | 'moderator' | 'viewer' | string;
   onOpenModeration?: (target: ChatModerationTarget) => void;
+  onReportMessage?: (target: ReportTargetDraft) => void;
   readOnly?: boolean;
   readOnlyLabel?: string;
   showViewersTab?: boolean;
@@ -232,32 +237,54 @@ function ChatRow({
   isFan,
   canModerate,
   onOpenModeration,
+  onReportMessage,
 }: {
   m: ChatMessage;
   isOwner?: boolean;
   isFan?: boolean;
   canModerate?: boolean;
   onOpenModeration?: (target: ChatModerationTarget) => void;
+  onReportMessage?: (target: ChatModerationTarget & { messageId: string; text: string }) => void;
 }) {
   const { t } = useTranslation('pages');
+  const [menuOpen, setMenuOpen] = useState(false);
   const role = isOwner ? 'owner' : m.role;
   const canOpenModeration = Boolean(canModerate && m.userId);
+  const target = {
+    userId: m.userId ?? '',
+    user: m.user,
+    avatar: m.avatar,
+    role,
+  };
 
   return (
-    <div className={cn('gl-chat-line', isOwner && 'is-owner', isFan && 'is-fan')}>
+    <div
+      className={cn(
+        'gl-chat-line',
+        isOwner && 'is-owner',
+        isFan && 'is-fan',
+        menuOpen && 'is-menu-open',
+      )}
+      onClick={() => setMenuOpen((open) => !open)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setMenuOpen((open) => !open);
+        }
+        if (event.key === 'Escape') setMenuOpen(false);
+      }}
+    >
       <div className="gl-chat-avatar-wrap">
         <button
           type="button"
           className="gl-chat-avatar-btn"
           disabled={!canOpenModeration}
-          onClick={() => {
+          onClick={(event) => {
+            event.stopPropagation();
             if (!m.userId) return;
-            onOpenModeration?.({
-              userId: m.userId,
-              user: m.user,
-              avatar: m.avatar,
-              role,
-            });
+            onOpenModeration?.(target);
           }}
           aria-label={t('liveRoom.chatPanel.moderateUser', {
             user: m.user,
@@ -294,6 +321,34 @@ function ChatRow({
           )}
         </span>
         <span className="gl-chat-text">{m.text}</span>
+        {menuOpen && (
+          <div className="gl-chat-action-popover" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onReportMessage?.({ ...target, messageId: m.id, text: m.text });
+              }}
+            >
+              <Flag size={14} />
+              <span>{t('report.chatAction')}</span>
+            </button>
+            {canModerate && m.userId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenModeration?.(target);
+                }}
+              >
+                <Ban size={14} />
+                <span>
+                  {t('liveRoom.moderation.muteActionShort', { defaultValue: 'Mute user' })}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -367,13 +422,7 @@ function PinnedSuperChatPill({
   );
 }
 
-function PinnedSuperChatBubble({
-  m,
-  locale,
-}: {
-  m: SuperChatMessage;
-  locale: string;
-}) {
+function PinnedSuperChatBubble({ m, locale }: { m: SuperChatMessage; locale: string }) {
   const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
   const style = {
@@ -535,6 +584,7 @@ export function Chat({
   viewerTotal,
   ownerId,
   ownerName,
+  roomId,
   onSendSuperChat,
   sheetMode,
   reconnecting,
@@ -544,6 +594,7 @@ export function Chat({
   canModerate,
   chatMuted,
   onOpenModeration,
+  onReportMessage,
   readOnly,
   readOnlyLabel,
   showViewersTab = true,
@@ -925,6 +976,21 @@ export function Chat({
                 isFan={isFan}
                 canModerate={canModerate}
                 onOpenModeration={onOpenModeration}
+                onReportMessage={(target) =>
+                  onReportMessage?.({
+                    targetType: 'danmu',
+                    targetId: target.messageId,
+                    targetUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+                    roomId,
+                    channelId: ownerId ? `ch-${ownerId}` : undefined,
+                    targetOwnerId: ownerId,
+                    targetOwnerName: ownerName,
+                    targetUserId: target.userId,
+                    targetUserName: target.user,
+                    targetTitle: ownerName,
+                    targetText: target.text,
+                  })
+                }
               />
             );
           })}

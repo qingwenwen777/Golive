@@ -1235,7 +1235,80 @@
         "systemSub": "Configuration changes, service restarts, and policy updates"
       }
     },
-    "exit": "Exit admin"
+    "exit": "Exit admin",
+    "content": {
+      "aria": "Content moderation summary",
+      "kpis": {
+        "pending": "Pending reports",
+        "reviewing": "In review",
+        "today": "Today new",
+        "total": "Total reports"
+      },
+      "filters": {
+        "status": "Status",
+        "target": "Target",
+        "reason": "Reason",
+        "search": "Search",
+        "searchPlaceholder": "Reporter, target, text"
+      },
+      "status": {
+        "all": "All statuses",
+        "pending": "Pending",
+        "reviewing": "Reviewing",
+        "resolved": "Resolved",
+        "dismissed": "Dismissed"
+      },
+      "targets": {
+        "all": "All targets",
+        "room": "Live room",
+        "channel": "Channel",
+        "danmu": "Chat message",
+        "post": "Post",
+        "postComment": "Post comment",
+        "superChat": "SuperChat"
+      },
+      "reasons": {
+        "all": "All reasons"
+      },
+      "reports": {
+        "eyebrow": "Reports",
+        "title": "Report management",
+        "loading": "Loading reports...",
+        "empty": "No reports in this filter.",
+        "pick": "Select a report to review.",
+        "reporter": "Reporter",
+        "reportedUser": "Reported user",
+        "time": "Report time",
+        "status": "Status",
+        "snapshot": "Content snapshot",
+        "noTitle": "No title",
+        "noSnapshot": "No text snapshot.",
+        "openTarget": "Open target",
+        "note": "Resolution note",
+        "notePlaceholder": "Record action notes for audit.",
+        "updated": "Report status updated.",
+        "updateFailed": "Could not update report."
+      },
+      "words": {
+        "eyebrow": "Policy",
+        "title": "Blocked word management",
+        "wordPlaceholder": "Blocked word",
+        "notePlaceholder": "Note, optional",
+        "add": "Add",
+        "empty": "No blocked words yet.",
+        "noNote": "No note",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "wordRequired": "Blocked word is required.",
+        "created": "Blocked word added.",
+        "createFailed": "Could not add blocked word.",
+        "updated": "Blocked word updated.",
+        "updateFailed": "Could not update blocked word.",
+        "deleted": "Blocked word deleted.",
+        "deleteFailed": "Could not delete blocked word.",
+        "confirmDelete": "Delete blocked word {{word}}?"
+      }
+    }
   },
   "upload": {
     "description": "Upload a JPG, PNG, WebP, or GIF image up to 5MB.",
@@ -1412,5 +1485,49 @@
     "errorBadQuestion": "Bet title is required and must be 80 characters or fewer.",
     "errorForbidden": "Only the streamer can manage betting.",
     "errorGeneric": "Action failed."
+  },
+  "liveCard": {
+    "menu": {
+      "more": "More actions",
+      "saveWatchLater": "Save to Watch later",
+      "removeWatchLater": "Remove from Watch later",
+      "copyLiveLink": "Copy live link",
+      "openChannel": "Open channel",
+      "report": "Report"
+    }
+  },
+  "report": {
+    "moreActions": "More actions",
+    "action": "Report",
+    "chatAction": "Report message",
+    "type": "Report type",
+    "dialogTitle": "Report content",
+    "dialogDescription": "Choose the reason that best matches this content. Moderators will review the snapshot.",
+    "descriptionLabel": "Additional details",
+    "descriptionPlaceholder": "Optional, up to 100 characters",
+    "cancel": "Cancel",
+    "submit": "Submit report",
+    "submitting": "Submitting...",
+    "submitted": "Report submitted. Thank you for your feedback.",
+    "reasons": {
+      "spam": "Spam or ads",
+      "harassment": "Harassment",
+      "sexual": "Sexual content",
+      "violence": "Violence or danger",
+      "hate": "Hate speech",
+      "scam": "Scam or misleading",
+      "illegal": "Illegal activity",
+      "other": "Other issue"
+    },
+    "errors": {
+      "loginRequired": "Please sign in to report.",
+      "reasonRequired": "Select a report type.",
+      "duplicate": "You already reported this target in the past 24 hours.",
+      "dailyLimit": "You have reached today's report limit.",
+      "failed": "Could not submit report."
+    }
+  },
+  "contentPolicy": {
+    "blockedWord": "Content contains blocked words and cannot be sent."
   }
 }

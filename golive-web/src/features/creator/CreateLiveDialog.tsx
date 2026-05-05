@@ -51,6 +51,12 @@ function liveErrorMessage(err: Error, t: ReturnType<typeof useTranslation>['t'])
       const data = err.response.data as { message?: string } | undefined;
       return data?.message || t('createLive.errors.notApproved');
     }
+    const data = err.response?.data as { reason?: string; message?: string } | undefined;
+    if (data?.reason === 'blocked_word') {
+      return t('contentPolicy.blockedWord', {
+        defaultValue: 'Content contains blocked words and cannot be sent.',
+      });
+    }
     if (err.response?.status === 400) return t('createLive.errors.required');
   }
   return t('createLive.errors.startFailed');
@@ -114,10 +120,13 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
       toast.error(t('createLive.permission.reasonRequired'));
       return;
     }
-    apply.mutate({ reason }, {
-      onSuccess: (resp) => toast.success(resp.message),
-      onError: (err) => toast.error(err.message || t('createLive.errors.applicationFailed')),
-    });
+    apply.mutate(
+      { reason },
+      {
+        onSuccess: (resp) => toast.success(resp.message),
+        onError: (err) => toast.error(err.message || t('createLive.errors.applicationFailed')),
+      },
+    );
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -154,7 +163,9 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
       );
     } catch (err) {
       setProcessingCover(false);
-      setError(err instanceof Error ? liveErrorMessage(err, t) : t('createLive.errors.coverUpload'));
+      setError(
+        err instanceof Error ? liveErrorMessage(err, t) : t('createLive.errors.coverUpload'),
+      );
     }
   };
 
@@ -196,7 +207,9 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
             )}
             <button
               type="button"
-              disabled={apply.isPending || livePermissionStatus === 'pending' || !applicationReason.trim()}
+              disabled={
+                apply.isPending || livePermissionStatus === 'pending' || !applicationReason.trim()
+              }
               className="gl-auth-submit"
               onClick={submitApplication}
             >
@@ -264,7 +277,9 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
                 pickLabel={t('upload.chooseImage', { defaultValue: '选择图片' })}
                 validateFile={(file) => {
                   if (!isAllowedLiveCover(file)) {
-                    return t('upload.imageTypeError', { defaultValue: '请使用 JPG、PNG、WebP 或 GIF 图片。' });
+                    return t('upload.imageTypeError', {
+                      defaultValue: '请使用 JPG、PNG、WebP 或 GIF 图片。',
+                    });
                   }
                   if (file.size > MAX_LIVE_COVER_SIZE) {
                     return t('upload.cover.sizeError', { defaultValue: '封面必须小于等于 5MB。' });

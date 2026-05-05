@@ -1235,7 +1235,80 @@
         "systemSub": "設定変更、サービス再起動、ポリシー調整"
       }
     },
-    "exit": "管理画面を終了"
+    "exit": "管理画面を終了",
+    "content": {
+      "aria": "コンテンツ審査概要",
+      "kpis": {
+        "pending": "未対応の通報",
+        "reviewing": "対応中",
+        "today": "今日の新規",
+        "total": "通報合計"
+      },
+      "filters": {
+        "status": "ステータス",
+        "target": "対象",
+        "reason": "理由",
+        "search": "検索",
+        "searchPlaceholder": "通報者、対象、本文"
+      },
+      "status": {
+        "all": "すべての状態",
+        "pending": "未対応",
+        "reviewing": "対応中",
+        "resolved": "解決済み",
+        "dismissed": "却下"
+      },
+      "targets": {
+        "all": "すべての対象",
+        "room": "ライブルーム",
+        "channel": "チャンネル",
+        "danmu": "チャットメッセージ",
+        "post": "投稿",
+        "postComment": "投稿コメント",
+        "superChat": "SuperChat"
+      },
+      "reasons": {
+        "all": "すべての理由"
+      },
+      "reports": {
+        "eyebrow": "通報",
+        "title": "通報管理",
+        "loading": "通報を読み込み中...",
+        "empty": "この条件の通報はありません。",
+        "pick": "通報を選択して確認してください。",
+        "reporter": "通報者",
+        "reportedUser": "対象ユーザー",
+        "time": "通報時刻",
+        "status": "状態",
+        "snapshot": "コンテンツスナップショット",
+        "noTitle": "タイトルなし",
+        "noSnapshot": "テキストのスナップショットはありません。",
+        "openTarget": "対象を開く",
+        "note": "対応メモ",
+        "notePlaceholder": "対応内容を監査用に記録します。",
+        "updated": "通報ステータスを更新しました。",
+        "updateFailed": "通報を更新できませんでした。"
+      },
+      "words": {
+        "eyebrow": "ポリシー",
+        "title": "ブロックワード管理",
+        "wordPlaceholder": "ブロックワード",
+        "notePlaceholder": "メモ（任意）",
+        "add": "追加",
+        "empty": "ブロックワードはまだありません。",
+        "noNote": "メモなし",
+        "enabled": "有効",
+        "disabled": "無効",
+        "wordRequired": "ブロックワードを入力してください。",
+        "created": "ブロックワードを追加しました。",
+        "createFailed": "ブロックワードを追加できませんでした。",
+        "updated": "ブロックワードを更新しました。",
+        "updateFailed": "ブロックワードを更新できませんでした。",
+        "deleted": "ブロックワードを削除しました。",
+        "deleteFailed": "ブロックワードを削除できませんでした。",
+        "confirmDelete": "{{word}} を削除しますか？"
+      }
+    }
   },
   "upload": {
     "description": "JPG、PNG、WebP、GIF 画像を最大 5MB までアップロードできます。",
@@ -1412,5 +1485,49 @@
     "errorBadQuestion": "予想タイトルは必須で、80 文字以内です。",
     "errorForbidden": "配信者のみ予想を操作できます。",
     "errorGeneric": "操作に失敗しました。"
+  },
+  "liveCard": {
+    "menu": {
+      "more": "その他の操作",
+      "saveWatchLater": "後で見るに保存",
+      "removeWatchLater": "後で見るから削除",
+      "copyLiveLink": "ライブリンクをコピー",
+      "openChannel": "チャンネルを開く",
+      "report": "通報"
+    }
+  },
+  "report": {
+    "moreActions": "その他の操作",
+    "action": "通報",
+    "chatAction": "この弾幕を通報",
+    "type": "通報タイプ",
+    "dialogTitle": "コンテンツを通報",
+    "dialogDescription": "該当する理由を選択してください。管理者がスナップショットを確認します。",
+    "descriptionLabel": "補足説明",
+    "descriptionPlaceholder": "任意、100文字以内",
+    "cancel": "キャンセル",
+    "submit": "通報を送信",
+    "submitting": "送信中...",
+    "submitted": "通報を送信しました。フィードバックありがとうございます。",
+    "reasons": {
+      "spam": "迷惑広告",
+      "harassment": "嫌がらせ",
+      "sexual": "性的コンテンツ",
+      "violence": "暴力や危険行為",
+      "hate": "ヘイトスピーチ",
+      "scam": "詐欺や誤情報",
+      "illegal": "違法行為",
+      "other": "その他"
+    },
+    "errors": {
+      "loginRequired": "ログインしてから通報してください。",
+      "reasonRequired": "通報タイプを選択してください。",
+      "duplicate": "24時間以内に同じ対象を通報済みです。",
+      "dailyLimit": "本日の通報上限に達しました。",
+      "failed": "通報を送信できませんでした。"
+    }
+  },
+  "contentPolicy": {
+    "blockedWord": "ブロックワードが含まれているため送信できません。"
   }
 }

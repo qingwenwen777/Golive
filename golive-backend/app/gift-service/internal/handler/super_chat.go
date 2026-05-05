@@ -73,6 +73,10 @@ func (h *SuperChatHandler) Send(c *gin.Context) {
 		errcode.Respond(c, errcode.New(400, "Amount below minimum tier"))
 		return
 	}
+	if errors.Is(sErr, service.ErrContentBlocked) {
+		errcode.Respond(c, errcode.New(400, "Content contains blocked word").WithReason("blocked_word"))
+		return
+	}
 
 	switch {
 	case sErr == nil:

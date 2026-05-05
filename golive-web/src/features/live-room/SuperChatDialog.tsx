@@ -126,6 +126,12 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
                 defaultValue: 'Insufficient coins',
               }),
             );
+          } else if (err.reason === 'blocked_word') {
+            toast.error(
+              t('contentPolicy.blockedWord', {
+                defaultValue: 'Content contains blocked words and cannot be sent.',
+              }),
+            );
           } else {
             toast.error(
               err.message ||

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/room-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/errcode"
 )
@@ -67,6 +68,106 @@ func (h *ModerationHandler) Logs(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) CreateReport(c *gin.Context) {
+	var req service.CreateReportReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	resp, err := h.svc.CreateReport(c.Request.Context(), UserIDFromCtx(c), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) ListReports(c *gin.Context) {
+	page, size := pageSize(c, 1, 20)
+	resp, err := h.svc.ListReports(c.Request.Context(), UserIDFromCtx(c), repo.ReportListFilter{
+		Status:     c.Query("status"),
+		TargetType: c.Query("targetType"),
+		Reason:     c.Query("reason"),
+		Query:      c.Query("q"),
+		Page:       page,
+		Size:       size,
+	})
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) ReportDetail(c *gin.Context) {
+	resp, err := h.svc.ReportDetail(c.Request.Context(), UserIDFromCtx(c), c.Param("id"))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) UpdateReport(c *gin.Context) {
+	var req service.UpdateReportReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	resp, err := h.svc.UpdateReport(c.Request.Context(), UserIDFromCtx(c), c.Param("id"), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) ListBlockedWords(c *gin.Context) {
+	page, size := pageSize(c, 1, 50)
+	resp, err := h.svc.ListBlockedWords(c.Request.Context(), UserIDFromCtx(c), page, size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) CreateBlockedWord(c *gin.Context) {
+	var req service.CreateBlockedWordReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	resp, err := h.svc.CreateBlockedWord(c.Request.Context(), UserIDFromCtx(c), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) UpdateBlockedWord(c *gin.Context) {
+	var req service.UpdateBlockedWordReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	resp, err := h.svc.UpdateBlockedWord(c.Request.Context(), UserIDFromCtx(c), c.Param("id"), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) DeleteBlockedWord(c *gin.Context) {
+	if err := h.svc.DeleteBlockedWord(c.Request.Context(), UserIDFromCtx(c), c.Param("id")); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (h *ModerationHandler) RoomState(c *gin.Context) {

@@ -569,6 +569,11 @@
   align-items: center;
   gap: 6px;
 }
+.gl-pg-more {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+}
 .gl-pg-solo:hover {
   background: #e5e5e5;
 }
@@ -1302,12 +1307,18 @@
   }
 }
 .gl-chat-line {
+  position: relative;
   display: flex;
   gap: 10px;
   align-items: center;
   padding: 4px 16px;
   font-size: 13px;
   animation: glFadeIn 0.2s ease-out;
+  cursor: pointer;
+}
+.gl-chat-line:hover,
+.gl-chat-line.is-menu-open {
+  background: var(--gl-bg-hover);
 }
 .gl-chat-line.is-owner {
   position: relative;
@@ -1392,6 +1403,7 @@
   }
 }
 .gl-chat-body {
+  position: relative;
   flex: 1;
   line-height: 1.4;
   padding-top: 1px;
@@ -1418,6 +1430,42 @@
 .gl-chat-line.is-owner .gl-chat-user {
   color: var(--gl-text);
   font-weight: 800;
+}
+.gl-chat-action-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 8;
+  display: flex;
+  min-width: 154px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow-lg);
+  padding: 4px;
+}
+.gl-chat-action-popover button {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: left;
+}
+.gl-chat-action-popover button:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-chat-action-popover button:first-child {
+  color: var(--gl-red);
 }
 .gl-chat-owner-badge {
   display: inline-flex;

@@ -6,18 +6,23 @@ import {
   Check,
   Clipboard,
   Coins,
+  Eye,
   FileCheck2,
   FileText,
   Gauge,
   History,
   ListFilter,
   LogOut,
+  Pencil,
   Plus,
   RefreshCw,
+  Save,
+  Search,
   Settings,
   Shield,
   SlidersHorizontal,
   Ticket,
+  Trash2,
   Users,
   Video,
   X,
@@ -36,6 +41,16 @@ import {
   type CreatorApplication,
   type LiveCreator,
 } from '@/api/creator';
+import {
+  useAdminBlockedWords,
+  useAdminReports,
+  useCreateBlockedWord,
+  useDeleteBlockedWord,
+  useUpdateAdminReport,
+  useUpdateBlockedWord,
+  type BlockedWord,
+  type ReportStatus,
+} from '@/api/contentModeration';
 import { Avatar } from '@/components/Avatar';
 import { GoLiveLogo } from '@/components/Logo';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -156,7 +171,11 @@ export default function AdminPage() {
         <section className="gl-admin-denied">
           <Shield size={34} />
           <h1>{t('admin.denied.title', { defaultValue: 'No admin access' })}</h1>
-          <p>{t('admin.denied.body', { defaultValue: 'This area is only available to administrators.' })}</p>
+          <p>
+            {t('admin.denied.body', {
+              defaultValue: 'This area is only available to administrators.',
+            })}
+          </p>
           <button type="button" className="gl-retry-btn" onClick={() => navigate('/')}>
             {t('admin.denied.action', { defaultValue: 'Back to home' })}
           </button>
@@ -190,7 +209,11 @@ export default function AdminPage() {
                 <RefreshCw size={16} />
                 {t('admin.refresh', { defaultValue: 'Refresh' })}
               </button>
-              <button type="button" className="gl-secondary-btn gl-admin-exit" onClick={() => navigate('/')}>
+              <button
+                type="button"
+                className="gl-secondary-btn gl-admin-exit"
+                onClick={() => navigate('/')}
+              >
                 <LogOut size={16} />
                 {t('admin.exit', { defaultValue: 'Exit admin' })}
               </button>
@@ -338,7 +361,7 @@ export default function AdminPage() {
               }}
             />
           )}
-          {currentModule === 'content' && <ScaffoldModulePage module="content" />}
+          {currentModule === 'content' && <ContentPage />}
           {currentModule === 'economy' && <ScaffoldModulePage module="economy" />}
           {currentModule === 'system' && <ScaffoldModulePage module="system" />}
           {currentModule === 'logs' && <LogsPage />}
@@ -348,16 +371,26 @@ export default function AdminPage() {
   );
 }
 
-function AdminNav({ currentModule, metrics }: { currentModule: AdminModule; metrics: AdminMetrics }) {
+function AdminNav({
+  currentModule,
+  metrics,
+}: {
+  currentModule: AdminModule;
+  metrics: AdminMetrics;
+}) {
   const { t } = useTranslation('pages');
   const badgeFor = (module: AdminModule) => {
-    if (module === 'creators' && metrics.pendingApplications > 0) return metrics.pendingApplications;
+    if (module === 'creators' && metrics.pendingApplications > 0)
+      return metrics.pendingApplications;
     if (module === 'users' && metrics.availableInvites > 0) return metrics.availableInvites;
     return undefined;
   };
 
   return (
-    <aside className="gl-admin-nav" aria-label={t('admin.nav.aria', { defaultValue: 'Admin modules' })}>
+    <aside
+      className="gl-admin-nav"
+      aria-label={t('admin.nav.aria', { defaultValue: 'Admin modules' })}
+    >
       <div className="gl-admin-nav-brand">
         <span className="gl-admin-mark" aria-hidden="true">
           <GoLiveLogo variant="mark" height={34} />
@@ -396,10 +429,15 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
   const { t } = useTranslation('pages');
   return (
     <div className="gl-admin-section-stack">
-      <section className="gl-admin-kpi-grid" aria-label={t('admin.dashboard.aria', { defaultValue: 'Admin overview' })}>
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.dashboard.aria', { defaultValue: 'Admin overview' })}
+      >
         <AdminKpi
           icon={FileCheck2}
-          label={t('admin.dashboard.kpis.pendingApplications', { defaultValue: 'Pending live applications' })}
+          label={t('admin.dashboard.kpis.pendingApplications', {
+            defaultValue: 'Pending live applications',
+          })}
           value={loading ? '-' : metrics.pendingApplications}
           tone="red"
         />
@@ -410,7 +448,9 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
         />
         <AdminKpi
           icon={Ticket}
-          label={t('admin.dashboard.kpis.availableInvites', { defaultValue: 'Available invite codes' })}
+          label={t('admin.dashboard.kpis.availableInvites', {
+            defaultValue: 'Available invite codes',
+          })}
           value={loading ? '-' : metrics.availableInvites}
         />
         <AdminKpi
@@ -451,7 +491,9 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
         </div>
         <div className="gl-admin-detail-list">
           <AdminDetailRow
-            label={t('admin.dashboard.focus.applicationReview', { defaultValue: 'Live application review' })}
+            label={t('admin.dashboard.focus.applicationReview', {
+              defaultValue: 'Live application review',
+            })}
             value={t('admin.dashboard.focus.applicationReviewValue', {
               pending: metrics.pendingApplications,
               total: metrics.totalApplications,
@@ -459,14 +501,18 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
             })}
           />
           <AdminDetailRow
-            label={t('admin.dashboard.focus.permissionManagement', { defaultValue: 'Live permission management' })}
+            label={t('admin.dashboard.focus.permissionManagement', {
+              defaultValue: 'Live permission management',
+            })}
             value={t('admin.dashboard.focus.permissionManagementValue', {
               count: metrics.approvedCreators,
               defaultValue: '{{count}} creators can go live',
             })}
           />
           <AdminDetailRow
-            label={t('admin.dashboard.focus.inviteManagement', { defaultValue: 'Invite code management' })}
+            label={t('admin.dashboard.focus.inviteManagement', {
+              defaultValue: 'Invite code management',
+            })}
             value={t('admin.dashboard.focus.inviteManagementValue', {
               available: metrics.availableInvites,
               total: metrics.totalInvites,
@@ -499,7 +545,10 @@ function UsersPage({
   const { t } = useTranslation('pages');
   return (
     <div className="gl-admin-section-stack">
-      <section className="gl-admin-kpi-grid" aria-label={t('admin.users.aria', { defaultValue: 'User management summary' })}>
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.users.aria', { defaultValue: 'User management summary' })}
+      >
         <AdminKpi
           icon={Ticket}
           label={t('admin.users.kpis.availableInvites', { defaultValue: 'Available invite codes' })}
@@ -510,8 +559,16 @@ function UsersPage({
           label={t('admin.users.kpis.usedInvites', { defaultValue: 'Used invite codes' })}
           value={inviteItems.filter((item) => item.used).length}
         />
-        <AdminKpi icon={Users} label={t('admin.users.kpis.accountDirectory', { defaultValue: 'Account directory' })} value="-" />
-        <AdminKpi icon={Shield} label={t('admin.users.kpis.admins', { defaultValue: 'Admins' })} value="-" />
+        <AdminKpi
+          icon={Users}
+          label={t('admin.users.kpis.accountDirectory', { defaultValue: 'Account directory' })}
+          value="-"
+        />
+        <AdminKpi
+          icon={Shield}
+          label={t('admin.users.kpis.admins', { defaultValue: 'Admins' })}
+          value="-"
+        />
       </section>
       <InvitesPanel
         items={inviteItems}
@@ -536,7 +593,9 @@ function UsersPage({
           ],
           [
             t('admin.users.framework.risk', { defaultValue: 'Risk status' }),
-            t('admin.users.framework.riskSub', { defaultValue: 'Registration, login, and invite redemption' }),
+            t('admin.users.framework.riskSub', {
+              defaultValue: 'Registration, login, and invite redemption',
+            }),
           ],
         ]}
       />
@@ -574,26 +633,37 @@ function CreatorsPage({
   const { t } = useTranslation('pages');
   return (
     <div className="gl-admin-section-stack">
-      <section className="gl-admin-kpi-grid" aria-label={t('admin.creators.aria', { defaultValue: 'Creator management summary' })}>
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.creators.aria', { defaultValue: 'Creator management summary' })}
+      >
         <AdminKpi
           icon={FileCheck2}
-          label={t('admin.creators.kpis.pendingApplications', { defaultValue: 'Pending applications' })}
+          label={t('admin.creators.kpis.pendingApplications', {
+            defaultValue: 'Pending applications',
+          })}
           value={applications.filter((item) => item.status === 'pending').length}
           tone="red"
         />
         <AdminKpi
           icon={Video}
-          label={t('admin.creators.kpis.liveCreators', { defaultValue: 'Creators who can go live' })}
+          label={t('admin.creators.kpis.liveCreators', {
+            defaultValue: 'Creators who can go live',
+          })}
           value={creators.length}
         />
         <AdminKpi
           icon={Check}
-          label={t('admin.creators.kpis.approvedApplications', { defaultValue: 'Approved applications' })}
+          label={t('admin.creators.kpis.approvedApplications', {
+            defaultValue: 'Approved applications',
+          })}
           value={applications.filter((item) => item.status === 'approved').length}
         />
         <AdminKpi
           icon={X}
-          label={t('admin.creators.kpis.rejectedApplications', { defaultValue: 'Rejected applications' })}
+          label={t('admin.creators.kpis.rejectedApplications', {
+            defaultValue: 'Rejected applications',
+          })}
           value={applications.filter((item) => item.status === 'rejected').length}
         />
       </section>
@@ -619,7 +689,544 @@ function CreatorsPage({
   );
 }
 
-function ScaffoldModulePage({ module }: { module: Exclude<AdminModule, 'dashboard' | 'users' | 'creators' | 'logs'> }) {
+function ContentPage() {
+  const { t } = useTranslation('pages');
+  const [status, setStatus] = useState('all');
+  const [targetType, setTargetType] = useState('all');
+  const [reason, setReason] = useState('all');
+  const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [word, setWord] = useState('');
+  const [wordNote, setWordNote] = useState('');
+  const [editingWord, setEditingWord] = useState<BlockedWord | null>(null);
+
+  const reports = useAdminReports({
+    status,
+    targetType,
+    reason,
+    q: query.trim() || undefined,
+    page: 1,
+    size: 20,
+  });
+  const updateReport = useUpdateAdminReport();
+  const blockedWords = useAdminBlockedWords(1, 50);
+  const createWord = useCreateBlockedWord();
+  const updateWord = useUpdateBlockedWord();
+  const deleteWord = useDeleteBlockedWord();
+
+  const items = reports.data?.items ?? [];
+  const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+  const stats = reports.data?.stats ?? { pending: 0, reviewing: 0, today: 0, total: 0 };
+
+  const submitReportStatus = (nextStatus: ReportStatus) => {
+    if (!selected) return;
+    updateReport.mutate(
+      { id: selected.id, status: nextStatus, note: resolutionNote },
+      {
+        onSuccess: (updated) => {
+          setSelectedId(updated.id);
+          setResolutionNote(updated.resolutionNote ?? '');
+          toast.success(
+            t('admin.content.reports.updated', { defaultValue: 'Report status updated.' }),
+          );
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('admin.content.reports.updateFailed', {
+                defaultValue: 'Could not update report.',
+              }),
+          ),
+      },
+    );
+  };
+
+  const submitWord = () => {
+    const trimmed = word.trim();
+    if (!trimmed) {
+      toast.error(
+        t('admin.content.words.wordRequired', { defaultValue: 'Blocked word is required.' }),
+      );
+      return;
+    }
+    createWord.mutate(
+      { word: trimmed, note: wordNote.trim() },
+      {
+        onSuccess: () => {
+          setWord('');
+          setWordNote('');
+          toast.success(t('admin.content.words.created', { defaultValue: 'Blocked word added.' }));
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('admin.content.words.createFailed', {
+                defaultValue: 'Could not add blocked word.',
+              }),
+          ),
+      },
+    );
+  };
+
+  const saveEditingWord = () => {
+    if (!editingWord) return;
+    updateWord.mutate(
+      {
+        id: editingWord.id,
+        word: editingWord.word,
+        note: editingWord.note ?? '',
+        enabled: editingWord.enabled,
+      },
+      {
+        onSuccess: () => {
+          setEditingWord(null);
+          toast.success(
+            t('admin.content.words.updated', { defaultValue: 'Blocked word updated.' }),
+          );
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('admin.content.words.updateFailed', {
+                defaultValue: 'Could not update blocked word.',
+              }),
+          ),
+      },
+    );
+  };
+
+  return (
+    <div className="gl-admin-section-stack">
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.content.aria', { defaultValue: 'Content moderation summary' })}
+      >
+        <AdminKpi
+          icon={FileCheck2}
+          label={t('admin.content.kpis.pending', { defaultValue: 'Pending reports' })}
+          value={stats.pending}
+          tone="red"
+        />
+        <AdminKpi
+          icon={ListFilter}
+          label={t('admin.content.kpis.reviewing', { defaultValue: 'In review' })}
+          value={stats.reviewing}
+        />
+        <AdminKpi
+          icon={Plus}
+          label={t('admin.content.kpis.today', { defaultValue: 'Today new' })}
+          value={stats.today}
+        />
+        <AdminKpi
+          icon={Shield}
+          label={t('admin.content.kpis.total', { defaultValue: 'Total reports' })}
+          value={stats.total}
+        />
+      </section>
+
+      <section className="gl-admin-panel gl-admin-content-panel">
+        <div className="gl-admin-panel-head">
+          <div>
+            <span>{t('admin.content.reports.eyebrow', { defaultValue: 'Reports' })}</span>
+            <h2>{t('admin.content.reports.title', { defaultValue: 'Report management' })}</h2>
+          </div>
+        </div>
+        <div className="gl-admin-content-filters">
+          <label>
+            <span>{t('admin.content.filters.status', { defaultValue: 'Status' })}</span>
+            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+              {['all', 'pending', 'reviewing', 'resolved', 'dismissed'].map((value) => (
+                <option key={value} value={value}>
+                  {reportStatusLabel(value, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t('admin.content.filters.target', { defaultValue: 'Target' })}</span>
+            <select value={targetType} onChange={(event) => setTargetType(event.target.value)}>
+              {['all', 'room', 'channel', 'danmu', 'post', 'post_comment', 'super_chat'].map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {reportTargetLabel(value, t)}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+          <label>
+            <span>{t('admin.content.filters.reason', { defaultValue: 'Reason' })}</span>
+            <select value={reason} onChange={(event) => setReason(event.target.value)}>
+              {[
+                'all',
+                'spam',
+                'harassment',
+                'sexual',
+                'violence',
+                'hate',
+                'scam',
+                'illegal',
+                'other',
+              ].map((value) => (
+                <option key={value} value={value}>
+                  {reportReasonLabel(value, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="gl-admin-content-search">
+            <span>{t('admin.content.filters.search', { defaultValue: 'Search' })}</span>
+            <div>
+              <Search size={15} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t('admin.content.filters.searchPlaceholder', {
+                  defaultValue: 'Reporter, target, text',
+                })}
+              />
+            </div>
+          </label>
+        </div>
+
+        <div className="gl-admin-content-grid">
+          <div className="gl-admin-report-list" aria-busy={reports.isFetching}>
+            {reports.isLoading ? (
+              <AdminEmptyState
+                label={t('admin.content.reports.loading', { defaultValue: 'Loading reports...' })}
+              />
+            ) : items.length === 0 ? (
+              <AdminEmptyState
+                label={t('admin.content.reports.empty', {
+                  defaultValue: 'No reports in this filter.',
+                })}
+              />
+            ) : (
+              items.map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  className={
+                    item.id === selected?.id
+                      ? 'gl-admin-report-card is-active'
+                      : 'gl-admin-report-card'
+                  }
+                  onClick={() => {
+                    setSelectedId(item.id);
+                    setResolutionNote(item.resolutionNote ?? '');
+                  }}
+                >
+                  <div className="gl-admin-report-card-head">
+                    <span className={`gl-admin-report-severity ${item.status}`}>
+                      {reportStatusLabel(item.status, t)}
+                    </span>
+                    <time>{formatDate(item.createdAt)}</time>
+                  </div>
+                  <strong>{reportReasonLabel(item.reason, t)}</strong>
+                  <p>
+                    {item.targetTitle || item.targetText || item.targetOwnerName || item.targetId}
+                  </p>
+                  <div className="gl-admin-report-card-meta">
+                    <span>{reportTargetLabel(item.targetType, t)}</span>
+                    <span>{item.reporterName}</span>
+                    {item.targetUserName && <span>{item.targetUserName}</span>}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+
+          <aside className="gl-admin-report-detail">
+            {selected ? (
+              <>
+                <div className="gl-admin-report-detail-head">
+                  <span>{reportTargetLabel(selected.targetType, t)}</span>
+                  <strong>{reportReasonLabel(selected.reason, t)}</strong>
+                  <small>#{selected.id.slice(0, 8)}</small>
+                </div>
+                <div className="gl-admin-report-detail-grid">
+                  <AdminDetailRow
+                    label={t('admin.content.reports.reporter', { defaultValue: 'Reporter' })}
+                    value={selected.reporterName}
+                  />
+                  <AdminDetailRow
+                    label={t('admin.content.reports.reportedUser', {
+                      defaultValue: 'Reported user',
+                    })}
+                    value={selected.targetUserName || selected.targetOwnerName || '-'}
+                  />
+                  <AdminDetailRow
+                    label={t('admin.content.reports.time', { defaultValue: 'Report time' })}
+                    value={formatDate(selected.createdAt)}
+                  />
+                  <AdminDetailRow
+                    label={t('admin.content.reports.status', { defaultValue: 'Status' })}
+                    value={reportStatusLabel(selected.status, t)}
+                  />
+                </div>
+                <div className="gl-admin-report-snapshot">
+                  <span>
+                    {t('admin.content.reports.snapshot', { defaultValue: 'Content snapshot' })}
+                  </span>
+                  <h3>
+                    {selected.targetTitle ||
+                      t('admin.content.reports.noTitle', { defaultValue: 'No title' })}
+                  </h3>
+                  <p>
+                    {selected.targetText ||
+                      selected.description ||
+                      t('admin.content.reports.noSnapshot', { defaultValue: 'No text snapshot.' })}
+                  </p>
+                  {selected.targetUrl && (
+                    <a href={selected.targetUrl} target="_blank" rel="noreferrer">
+                      <Eye size={15} />
+                      {t('admin.content.reports.openTarget', { defaultValue: 'Open target' })}
+                    </a>
+                  )}
+                </div>
+                <label className="gl-admin-resolution-note">
+                  <span>
+                    {t('admin.content.reports.note', { defaultValue: 'Resolution note' })}
+                  </span>
+                  <textarea
+                    value={resolutionNote}
+                    onChange={(event) => setResolutionNote(event.target.value)}
+                    placeholder={t('admin.content.reports.notePlaceholder', {
+                      defaultValue: 'Record action notes for audit.',
+                    })}
+                  />
+                </label>
+                <div className="gl-admin-report-actions-bar">
+                  <button
+                    type="button"
+                    onClick={() => submitReportStatus('reviewing')}
+                    disabled={updateReport.isPending}
+                  >
+                    <ListFilter size={15} />
+                    {reportStatusLabel('reviewing', t)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => submitReportStatus('resolved')}
+                    disabled={updateReport.isPending}
+                  >
+                    <Check size={15} />
+                    {reportStatusLabel('resolved', t)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => submitReportStatus('dismissed')}
+                    disabled={updateReport.isPending}
+                  >
+                    <X size={15} />
+                    {reportStatusLabel('dismissed', t)}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <AdminEmptyState
+                label={t('admin.content.reports.pick', {
+                  defaultValue: 'Select a report to review.',
+                })}
+              />
+            )}
+          </aside>
+        </div>
+      </section>
+
+      <section className="gl-admin-panel gl-admin-words-panel">
+        <div className="gl-admin-panel-head">
+          <div>
+            <span>{t('admin.content.words.eyebrow', { defaultValue: 'Policy' })}</span>
+            <h2>{t('admin.content.words.title', { defaultValue: 'Blocked word management' })}</h2>
+          </div>
+        </div>
+        <div className="gl-admin-word-form">
+          <input
+            value={word}
+            maxLength={60}
+            onChange={(event) => setWord(event.target.value)}
+            placeholder={t('admin.content.words.wordPlaceholder', { defaultValue: 'Blocked word' })}
+          />
+          <input
+            value={wordNote}
+            maxLength={120}
+            onChange={(event) => setWordNote(event.target.value)}
+            placeholder={t('admin.content.words.notePlaceholder', {
+              defaultValue: 'Note, optional',
+            })}
+          />
+          <button type="button" onClick={submitWord} disabled={createWord.isPending}>
+            <Plus size={15} />
+            {t('admin.content.words.add', { defaultValue: 'Add' })}
+          </button>
+        </div>
+        <div className="gl-admin-word-list" aria-busy={blockedWords.isFetching}>
+          {(blockedWords.data?.items ?? []).length === 0 ? (
+            <AdminEmptyState
+              label={t('admin.content.words.empty', { defaultValue: 'No blocked words yet.' })}
+            />
+          ) : (
+            (blockedWords.data?.items ?? []).map((item) => {
+              const editing = editingWord?.id === item.id;
+              const row = editingWord ?? item;
+              return (
+                <div className="gl-admin-word-row" key={item.id}>
+                  {editing ? (
+                    <>
+                      <input
+                        value={row.word}
+                        onChange={(event) => setEditingWord({ ...row, word: event.target.value })}
+                      />
+                      <input
+                        value={row.note ?? ''}
+                        onChange={(event) => setEditingWord({ ...row, note: event.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <strong>{item.word}</strong>
+                        <span>
+                          {item.note ||
+                            t('admin.content.words.noNote', { defaultValue: 'No note' })}
+                        </span>
+                      </div>
+                      <span
+                        className={
+                          item.enabled ? 'gl-admin-word-status is-on' : 'gl-admin-word-status'
+                        }
+                      >
+                        {item.enabled
+                          ? t('admin.content.words.enabled', { defaultValue: 'Enabled' })
+                          : t('admin.content.words.disabled', { defaultValue: 'Disabled' })}
+                      </span>
+                    </>
+                  )}
+                  <div className="gl-admin-word-actions">
+                    {editing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={saveEditingWord}
+                          disabled={updateWord.isPending}
+                        >
+                          <Save size={15} />
+                        </button>
+                        <button type="button" onClick={() => setEditingWord(null)}>
+                          <X size={15} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateWord.mutate({
+                              id: item.id,
+                              enabled: !item.enabled,
+                            })
+                          }
+                          disabled={updateWord.isPending}
+                        >
+                          {item.enabled ? <Ban size={15} /> : <Check size={15} />}
+                        </button>
+                        <button type="button" onClick={() => setEditingWord(item)}>
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          className="is-danger"
+                          onClick={() => {
+                            const ok = window.confirm(
+                              t('admin.content.words.confirmDelete', {
+                                word: item.word,
+                                defaultValue: 'Delete blocked word {{word}}?',
+                              }),
+                            );
+                            if (!ok) return;
+                            deleteWord.mutate(item.id, {
+                              onSuccess: () =>
+                                toast.success(
+                                  t('admin.content.words.deleted', {
+                                    defaultValue: 'Blocked word deleted.',
+                                  }),
+                                ),
+                              onError: (err) =>
+                                toast.error(
+                                  err.message ||
+                                    t('admin.content.words.deleteFailed', {
+                                      defaultValue: 'Could not delete blocked word.',
+                                    }),
+                                ),
+                            });
+                          }}
+                          disabled={deleteWord.isPending}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AdminEmptyState({ label }: { label: string }) {
+  return <div className="gl-admin-empty-state">{label}</div>;
+}
+
+function reportStatusLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    all: t('admin.content.status.all', { defaultValue: 'All statuses' }),
+    pending: t('admin.content.status.pending', { defaultValue: 'Pending' }),
+    reviewing: t('admin.content.status.reviewing', { defaultValue: 'Reviewing' }),
+    resolved: t('admin.content.status.resolved', { defaultValue: 'Resolved' }),
+    dismissed: t('admin.content.status.dismissed', { defaultValue: 'Dismissed' }),
+  };
+  return map[value] ?? value;
+}
+
+function reportTargetLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    all: t('admin.content.targets.all', { defaultValue: 'All targets' }),
+    room: t('admin.content.targets.room', { defaultValue: 'Live room' }),
+    channel: t('admin.content.targets.channel', { defaultValue: 'Channel' }),
+    danmu: t('admin.content.targets.danmu', { defaultValue: 'Chat message' }),
+    post: t('admin.content.targets.post', { defaultValue: 'Post' }),
+    post_comment: t('admin.content.targets.postComment', { defaultValue: 'Post comment' }),
+    super_chat: t('admin.content.targets.superChat', { defaultValue: 'SuperChat' }),
+  };
+  return map[value] ?? value;
+}
+
+function reportReasonLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    all: t('admin.content.reasons.all', { defaultValue: 'All reasons' }),
+    spam: t('report.reasons.spam', { defaultValue: 'Spam or ads' }),
+    harassment: t('report.reasons.harassment', { defaultValue: 'Harassment' }),
+    sexual: t('report.reasons.sexual', { defaultValue: 'Sexual content' }),
+    violence: t('report.reasons.violence', { defaultValue: 'Violence' }),
+    hate: t('report.reasons.hate', { defaultValue: 'Hate speech' }),
+    scam: t('report.reasons.scam', { defaultValue: 'Scam' }),
+    illegal: t('report.reasons.illegal', { defaultValue: 'Illegal activity' }),
+    other: t('report.reasons.other', { defaultValue: 'Other' }),
+  };
+  return map[value] ?? value;
+}
+
+function ScaffoldModulePage({
+  module,
+}: {
+  module: Exclude<AdminModule, 'dashboard' | 'users' | 'creators' | 'logs'>;
+}) {
   const { t } = useTranslation('pages');
   const config = {
     content: {
@@ -635,15 +1242,21 @@ function ScaffoldModulePage({ module }: { module: Exclude<AdminModule, 'dashboar
       rows: [
         [
           t('admin.scaffold.content.rows.liveRooms', { defaultValue: 'Live room review' }),
-          t('admin.scaffold.content.rows.liveRoomsSub', { defaultValue: 'Title, cover, category, and live state' }),
+          t('admin.scaffold.content.rows.liveRoomsSub', {
+            defaultValue: 'Title, cover, category, and live state',
+          }),
         ],
         [
           t('admin.scaffold.content.rows.posts', { defaultValue: 'Post content review' }),
-          t('admin.scaffold.content.rows.postsSub', { defaultValue: 'Posts, images, and comments' }),
+          t('admin.scaffold.content.rows.postsSub', {
+            defaultValue: 'Posts, images, and comments',
+          }),
         ],
         [
           t('admin.scaffold.content.rows.reports', { defaultValue: 'Report handling' }),
-          t('admin.scaffold.content.rows.reportsSub', { defaultValue: 'User reports and moderation results' }),
+          t('admin.scaffold.content.rows.reportsSub', {
+            defaultValue: 'User reports and moderation results',
+          }),
         ],
       ] as [string, string][],
     },
@@ -655,20 +1268,29 @@ function ScaffoldModulePage({ module }: { module: Exclude<AdminModule, 'dashboar
         [t('admin.scaffold.economy.stats.topup', { defaultValue: 'Today top-up' }), '-'],
         [t('admin.scaffold.economy.stats.gifts', { defaultValue: 'Gift ledger' }), '-'],
         [t('admin.scaffold.economy.stats.superChat', { defaultValue: 'SC ledger' }), '-'],
-        [t('admin.scaffold.economy.stats.withdrawals', { defaultValue: 'Withdrawal reserve' }), '-'],
+        [
+          t('admin.scaffold.economy.stats.withdrawals', { defaultValue: 'Withdrawal reserve' }),
+          '-',
+        ],
       ] as [string, string][],
       rows: [
         [
           t('admin.scaffold.economy.rows.accounts', { defaultValue: 'Coins accounts' }),
-          t('admin.scaffold.economy.rows.accountsSub', { defaultValue: 'Balance, top-up, and spending ledger' }),
+          t('admin.scaffold.economy.rows.accountsSub', {
+            defaultValue: 'Balance, top-up, and spending ledger',
+          }),
         ],
         [
           t('admin.scaffold.economy.rows.gifts', { defaultValue: 'Gifts and SuperChat' }),
-          t('admin.scaffold.economy.rows.giftsSub', { defaultValue: 'Price, level, and revenue collection' }),
+          t('admin.scaffold.economy.rows.giftsSub', {
+            defaultValue: 'Price, level, and revenue collection',
+          }),
         ],
         [
           t('admin.scaffold.economy.rows.revenue', { defaultValue: 'Creator revenue' }),
-          t('admin.scaffold.economy.rows.revenueSub', { defaultValue: 'Split, withdrawal, and settlement state' }),
+          t('admin.scaffold.economy.rows.revenueSub', {
+            defaultValue: 'Split, withdrawal, and settlement state',
+          }),
         ],
       ] as [string, string][],
     },
@@ -694,15 +1316,21 @@ function ScaffoldModulePage({ module }: { module: Exclude<AdminModule, 'dashboar
       rows: [
         [
           t('admin.scaffold.system.rows.site', { defaultValue: 'Site configuration' }),
-          t('admin.scaffold.system.rows.siteSub', { defaultValue: 'Brand, domain, and base switches' }),
+          t('admin.scaffold.system.rows.siteSub', {
+            defaultValue: 'Brand, domain, and base switches',
+          }),
         ],
         [
           t('admin.scaffold.system.rows.review', { defaultValue: 'Review policies' }),
-          t('admin.scaffold.system.rows.reviewSub', { defaultValue: 'Live applications, content review, and report rules' }),
+          t('admin.scaffold.system.rows.reviewSub', {
+            defaultValue: 'Live applications, content review, and report rules',
+          }),
         ],
         [
           t('admin.scaffold.system.rows.services', { defaultValue: 'Service configuration' }),
-          t('admin.scaffold.system.rows.servicesSub', { defaultValue: 'RTMP, replays, and upload limits' }),
+          t('admin.scaffold.system.rows.servicesSub', {
+            defaultValue: 'RTMP, replays, and upload limits',
+          }),
         ],
       ] as [string, string][],
     },
@@ -725,11 +1353,30 @@ function LogsPage() {
   const { t } = useTranslation('pages');
   return (
     <div className="gl-admin-section-stack">
-      <section className="gl-admin-kpi-grid" aria-label={t('admin.logs.aria', { defaultValue: 'Action logs summary' })}>
-        <AdminKpi icon={History} label={t('admin.logs.kpis.today', { defaultValue: 'Today actions' })} value="0" />
-        <AdminKpi icon={Shield} label={t('admin.logs.kpis.permissions', { defaultValue: 'Permission changes' })} value="0" />
-        <AdminKpi icon={FileText} label={t('admin.logs.kpis.reviews', { defaultValue: 'Review records' })} value="0" />
-        <AdminKpi icon={Users} label={t('admin.logs.kpis.accounts', { defaultValue: 'Account actions' })} value="0" />
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.logs.aria', { defaultValue: 'Action logs summary' })}
+      >
+        <AdminKpi
+          icon={History}
+          label={t('admin.logs.kpis.today', { defaultValue: 'Today actions' })}
+          value="0"
+        />
+        <AdminKpi
+          icon={Shield}
+          label={t('admin.logs.kpis.permissions', { defaultValue: 'Permission changes' })}
+          value="0"
+        />
+        <AdminKpi
+          icon={FileText}
+          label={t('admin.logs.kpis.reviews', { defaultValue: 'Review records' })}
+          value="0"
+        />
+        <AdminKpi
+          icon={Users}
+          label={t('admin.logs.kpis.accounts', { defaultValue: 'Account actions' })}
+          value="0"
+        />
       </section>
       <section className="gl-admin-panel">
         <div className="gl-admin-panel-head">
@@ -741,15 +1388,21 @@ function LogsPage() {
         <div className="gl-admin-log-table">
           <AdminDetailRow
             label={t('admin.logs.rows.reviews', { defaultValue: 'Review actions' })}
-            value={t('admin.logs.rows.reviewsSub', { defaultValue: 'Live applications, content review, and report handling' })}
+            value={t('admin.logs.rows.reviewsSub', {
+              defaultValue: 'Live applications, content review, and report handling',
+            })}
           />
           <AdminDetailRow
             label={t('admin.logs.rows.permissions', { defaultValue: 'Permission actions' })}
-            value={t('admin.logs.rows.permissionsSub', { defaultValue: 'Admins, creator permissions, and ban states' })}
+            value={t('admin.logs.rows.permissionsSub', {
+              defaultValue: 'Admins, creator permissions, and ban states',
+            })}
           />
           <AdminDetailRow
             label={t('admin.logs.rows.system', { defaultValue: 'System actions' })}
-            value={t('admin.logs.rows.systemSub', { defaultValue: 'Configuration changes, service restarts, and policy updates' })}
+            value={t('admin.logs.rows.systemSub', {
+              defaultValue: 'Configuration changes, service restarts, and policy updates',
+            })}
           />
         </div>
       </section>
@@ -839,9 +1492,13 @@ function PermissionPanel({
         </div>
       </div>
       {loading ? (
-        <div className="gl-yt-shelf-empty">{t('admin.permissions.loading', { defaultValue: 'Loading creators...' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.permissions.loading', { defaultValue: 'Loading creators...' })}
+        </div>
       ) : error ? (
-        <div className="gl-yt-shelf-empty">{t('admin.permissions.error', { defaultValue: 'Could not load creators.' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.permissions.error', { defaultValue: 'Could not load creators.' })}
+        </div>
       ) : items.length ? (
         <div className="gl-admin-list">
           {items.map((item) => (
@@ -852,7 +1509,9 @@ function PermissionPanel({
                 handle={`@${item.username || item.id.slice(0, 8)}`}
               />
               <span className="gl-admin-muted">{formatDate(item.updatedAt)}</span>
-              <span className="gl-admin-status is-approved">{t('admin.status.approved', { defaultValue: 'Approved' })}</span>
+              <span className="gl-admin-status is-approved">
+                {t('admin.status.approved', { defaultValue: 'Approved' })}
+              </span>
               <button
                 type="button"
                 className="gl-admin-danger-btn"
@@ -871,7 +1530,11 @@ function PermissionPanel({
           ))}
         </div>
       ) : (
-        <div className="gl-yt-shelf-empty">{t('admin.permissions.empty', { defaultValue: 'No creators currently have live permission.' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.permissions.empty', {
+            defaultValue: 'No creators currently have live permission.',
+          })}
+        </div>
       )}
     </section>
   );
@@ -907,9 +1570,13 @@ function ApplicationsPanel({
         </div>
       </div>
       {loading ? (
-        <div className="gl-yt-shelf-empty">{t('admin.applications.loading', { defaultValue: 'Loading applications...' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.applications.loading', { defaultValue: 'Loading applications...' })}
+        </div>
       ) : error ? (
-        <div className="gl-yt-shelf-empty">{t('admin.applications.error', { defaultValue: 'Could not load applications.' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.applications.error', { defaultValue: 'Could not load applications.' })}
+        </div>
       ) : items.length ? (
         <div className="gl-admin-review-list">
           {items.map((app) => {
@@ -921,27 +1588,43 @@ function ApplicationsPanel({
                 <div className="gl-admin-review-top">
                   <AdminUser
                     avatar={app.avatar}
-                    name={app.displayName || app.username || t('admin.fallbackCreator', { defaultValue: 'Creator' })}
+                    name={
+                      app.displayName ||
+                      app.username ||
+                      t('admin.fallbackCreator', { defaultValue: 'Creator' })
+                    }
                     handle={`@${app.username || app.userId.slice(0, 8)}`}
                   />
                   <div className="gl-admin-review-meta">
-                    <span className={`gl-admin-status is-${app.status}`}>{statusText(app.status, t)}</span>
+                    <span className={`gl-admin-status is-${app.status}`}>
+                      {statusText(app.status, t)}
+                    </span>
                     <small>{formatDate(app.createdAt)}</small>
                   </div>
                 </div>
                 <div className="gl-admin-reason">
                   <span>{t('admin.applications.reason', { defaultValue: 'Live reason' })}</span>
-                  <p>{app.reason || t('admin.applications.noReason', { defaultValue: 'No reason provided.' })}</p>
+                  <p>
+                    {app.reason ||
+                      t('admin.applications.noReason', { defaultValue: 'No reason provided.' })}
+                  </p>
                 </div>
                 {app.rejectReason && (
                   <div className="gl-admin-reason is-reject">
-                    <span>{t('admin.applications.rejectReason', { defaultValue: 'Reject reason' })}</span>
+                    <span>
+                      {t('admin.applications.rejectReason', { defaultValue: 'Reject reason' })}
+                    </span>
                     <p>{app.rejectReason}</p>
                   </div>
                 )}
                 {pending && (
                   <div className="gl-admin-review-actions">
-                    <button type="button" className="gl-admin-action-text approve" disabled={busy} onClick={() => onApprove(app.id)}>
+                    <button
+                      type="button"
+                      className="gl-admin-action-text approve"
+                      disabled={busy}
+                      onClick={() => onApprove(app.id)}
+                    >
                       <Check size={16} />
                       {t('admin.applications.approve', { defaultValue: 'Approve' })}
                     </button>
@@ -962,7 +1645,11 @@ function ApplicationsPanel({
                 {rejecting && pending && (
                   <div className="gl-admin-reject-form">
                     <label>
-                      <span>{t('admin.applications.rejectReasonLabel', { defaultValue: 'Rejection reason' })}</span>
+                      <span>
+                        {t('admin.applications.rejectReasonLabel', {
+                          defaultValue: 'Rejection reason',
+                        })}
+                      </span>
                       <textarea
                         rows={3}
                         value={rejectReason}
@@ -992,7 +1679,9 @@ function ApplicationsPanel({
           })}
         </div>
       ) : (
-        <div className="gl-yt-shelf-empty">{t('admin.applications.empty', { defaultValue: 'No creator applications yet.' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.applications.empty', { defaultValue: 'No creator applications yet.' })}
+        </div>
       )}
     </section>
   );
@@ -1033,15 +1722,24 @@ function InvitesPanel({
           <span>{t('admin.invites.eyebrow', { defaultValue: 'Registration access' })}</span>
           <h2>{t('admin.invites.title', { defaultValue: 'Invite codes' })}</h2>
         </div>
-        <button type="button" className="gl-admin-action-text approve" disabled={busy} onClick={onCreate}>
+        <button
+          type="button"
+          className="gl-admin-action-text approve"
+          disabled={busy}
+          onClick={onCreate}
+        >
           <Plus size={16} />
           {t('admin.invites.create', { defaultValue: 'Create invite' })}
         </button>
       </div>
       {loading ? (
-        <div className="gl-yt-shelf-empty">{t('admin.invites.loading', { defaultValue: 'Loading invite codes...' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.invites.loading', { defaultValue: 'Loading invite codes...' })}
+        </div>
       ) : error ? (
-        <div className="gl-yt-shelf-empty">{t('admin.invites.error', { defaultValue: 'Could not load invite codes.' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.invites.error', { defaultValue: 'Could not load invite codes.' })}
+        </div>
       ) : items.length ? (
         <div className="gl-admin-invite-list">
           {items.map((item) => (
@@ -1066,16 +1764,30 @@ function InvitesPanel({
                 ) : (
                   <>
                     <strong>{t('admin.invites.noUser', { defaultValue: 'No account yet' })}</strong>
-                    <span>{t('admin.invites.available', { defaultValue: 'Available for one registration' })}</span>
+                    <span>
+                      {t('admin.invites.available', {
+                        defaultValue: 'Available for one registration',
+                      })}
+                    </span>
                   </>
                 )}
               </div>
               <span className="gl-admin-muted">
                 {item.usedAt
-                  ? t('admin.invites.usedAt', { time: formatDate(item.usedAt), defaultValue: 'Used {{time}}' })
-                  : t('admin.invites.createdAt', { time: formatDate(item.createdAt), defaultValue: 'Created {{time}}' })}
+                  ? t('admin.invites.usedAt', {
+                      time: formatDate(item.usedAt),
+                      defaultValue: 'Used {{time}}',
+                    })
+                  : t('admin.invites.createdAt', {
+                      time: formatDate(item.createdAt),
+                      defaultValue: 'Created {{time}}',
+                    })}
               </span>
-              <button type="button" className="gl-admin-action-text" onClick={() => copyCode(item.code)}>
+              <button
+                type="button"
+                className="gl-admin-action-text"
+                onClick={() => copyCode(item.code)}
+              >
                 <Clipboard size={16} />
                 {t('admin.invites.copy', { defaultValue: 'Copy' })}
               </button>
@@ -1099,21 +1811,15 @@ function InvitesPanel({
           ))}
         </div>
       ) : (
-        <div className="gl-yt-shelf-empty">{t('admin.invites.empty', { defaultValue: 'No invite codes have been created.' })}</div>
+        <div className="gl-yt-shelf-empty">
+          {t('admin.invites.empty', { defaultValue: 'No invite codes have been created.' })}
+        </div>
       )}
     </section>
   );
 }
 
-function AdminUser({
-  avatar,
-  name,
-  handle,
-}: {
-  avatar?: string;
-  name: string;
-  handle: string;
-}) {
+function AdminUser({ avatar, name, handle }: { avatar?: string; name: string; handle: string }) {
   return (
     <div className="gl-admin-user">
       <Avatar name={name} src={avatar} size={38} />

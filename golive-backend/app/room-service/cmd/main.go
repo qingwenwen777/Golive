@@ -94,12 +94,14 @@ func main() {
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
+	liveSvc.SetTextPolicy(moderationSvc)
 	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL)
 	if err != nil {
 		log.Fatal("new user permission client", zap.Error(err))
 	}
 	defer permission.Close()
 	postSvc := service.NewPostService(postRepo, roomRepo, socialRepo, permission)
+	postSvc.SetTextPolicy(moderationSvc)
 	searchSvc := service.NewSearchService(roomSvc, socialSvc, postSvc, appointmentSvc)
 	if activeRooms, err := roomRepo.ActiveRooms(context.Background()); err != nil {
 		log.Warn("load active rooms for moderation cache", zap.Error(err))
@@ -108,6 +110,9 @@ func main() {
 	}
 	if err := moderationRepo.SyncActiveMutes(context.Background(), time.Now()); err != nil {
 		log.Warn("sync active mutes", zap.Error(err))
+	}
+	if err := moderationRepo.SyncBlockedWords(context.Background()); err != nil {
+		log.Warn("sync blocked words", zap.Error(err))
 	}
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {

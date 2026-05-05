@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v9"
 	"github.com/google/uuid"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/contentpolicy"
 )
 
 type SendSuperChatReq struct {
@@ -44,19 +46,30 @@ func AmountToTier(amount int64) int {
 // ErrInvalidAmount is returned when amount maps to tier 0. Tier 0 super
 // chats are not allowed (the frontend won't send them but we double-check).
 var ErrInvalidAmount = errors.New("amount below minimum tier")
+var ErrContentBlocked = errors.New("content contains blocked word")
 
 type SuperChatService struct {
 	orders *repo.OrderRepo
+	rdb    *redis.Client
 }
 
-func NewSuperChatService(o *repo.OrderRepo) *SuperChatService {
-	return &SuperChatService{orders: o}
+func NewSuperChatService(o *repo.OrderRepo, rdb ...*redis.Client) *SuperChatService {
+	var client *redis.Client
+	if len(rdb) > 0 {
+		client = rdb[0]
+	}
+	return &SuperChatService{orders: o, rdb: client}
 }
 
 func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*model.SuperChatOrder, bool, error) {
 	tier := AmountToTier(req.Amount)
 	if tier == 0 {
 		return nil, false, ErrInvalidAmount
+	}
+	if blocked, err := s.containsBlockedWord(ctx, req.Text); err != nil {
+		return nil, false, err
+	} else if blocked {
+		return nil, false, ErrContentBlocked
 	}
 
 	now := time.Now().UTC()
@@ -111,6 +124,17 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 		return nil, false, fmt.Errorf("persist sc failure: %w", perr)
 	}
 	return persisted, false, ErrInsufficientCoin
+}
+
+func (s *SuperChatService) containsBlockedWord(ctx context.Context, text string) (bool, error) {
+	if s == nil || s.rdb == nil {
+		return false, nil
+	}
+	words, err := s.rdb.SMembers(ctx, contentpolicy.RedisBlockedWordsKey).Result()
+	if err != nil && err != redis.Nil {
+		return false, err
+	}
+	return contentpolicy.Contains(text, words), nil
 }
 
 func (s *SuperChatService) broadcastName(ctx context.Context, req SendSuperChatReq) string {

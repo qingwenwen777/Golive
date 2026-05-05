@@ -12,9 +12,17 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
+	"github.com/qingwenwen777/golive/pkg/contentpolicy"
 )
 
 var ErrModeratorNotFound = errors.New("moderator not found")
+
+var (
+	ErrReportDuplicate     = errors.New("report duplicate within 24h")
+	ErrReportDailyLimit    = errors.New("daily report limit reached")
+	ErrBlockedWordExists   = errors.New("blocked word exists")
+	ErrBlockedWordNotFound = errors.New("blocked word not found")
+)
 
 type ModerationRepo struct {
 	db  *gorm.DB
@@ -30,6 +38,8 @@ func (r *ModerationRepo) AutoMigrate() error {
 		&model.RoomModerator{},
 		&model.RoomMute{},
 		&model.ModeratorActionLog{},
+		&model.ContentReport{},
+		&model.BlockedWord{},
 	)
 }
 
@@ -57,6 +67,22 @@ type ModerationLogRow struct {
 	Action          string
 	DurationMinutes int
 	CreatedAt       time.Time
+}
+
+type ReportListFilter struct {
+	Status     string
+	TargetType string
+	Reason     string
+	Query      string
+	Page       int
+	Size       int
+}
+
+type ReportStats struct {
+	Pending   int64
+	Reviewing int64
+	Today     int64
+	Total     int64
 }
 
 func (r *ModerationRepo) ListFollowers(ctx context.Context, ownerID, query string, page, size int, followerIDs []string) ([]ModerationUser, int64, error) {
@@ -339,6 +365,251 @@ func (r *ModerationRepo) Logs(ctx context.Context, ownerID string, page, size in
 		Limit(size).
 		Scan(&rows).Error
 	return rows, total, err
+}
+
+func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.ContentReport, now time.Time) error {
+	if report == nil {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var daily int64
+		dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		if err := tx.Model(&model.ContentReport{}).
+			Where("reporter_id = ? AND created_at >= ?", report.ReporterID, dayStart).
+			Count(&daily).Error; err != nil {
+			return err
+		}
+		if daily >= 20 {
+			return ErrReportDailyLimit
+		}
+		var duplicate int64
+		if err := tx.Model(&model.ContentReport{}).
+			Where("reporter_id = ? AND target_type = ? AND target_id = ? AND created_at >= ?",
+				report.ReporterID, report.TargetType, report.TargetID, now.Add(-24*time.Hour)).
+			Count(&duplicate).Error; err != nil {
+			return err
+		}
+		if duplicate > 0 {
+			return ErrReportDuplicate
+		}
+		return tx.Create(report).Error
+	})
+}
+
+func (r *ModerationRepo) ListContentReports(ctx context.Context, filter ReportListFilter) ([]model.ContentReport, int64, error) {
+	page, size := normalizeModerationPage(filter.Page, filter.Size)
+	q := r.db.WithContext(ctx).Model(&model.ContentReport{})
+	if status := strings.TrimSpace(filter.Status); status != "" && status != "all" {
+		q = q.Where("status = ?", status)
+	}
+	if targetType := strings.TrimSpace(filter.TargetType); targetType != "" && targetType != "all" {
+		q = q.Where("target_type = ?", targetType)
+	}
+	if reason := strings.TrimSpace(filter.Reason); reason != "" && reason != "all" {
+		q = q.Where("reason = ?", reason)
+	}
+	if query := strings.ToLower(strings.TrimSpace(filter.Query)); query != "" {
+		like := "%" + query + "%"
+		q = q.Where(`
+LOWER(COALESCE(reporter_name, '')) LIKE ?
+OR LOWER(COALESCE(target_owner_name, '')) LIKE ?
+OR LOWER(COALESCE(target_user_name, '')) LIKE ?
+OR LOWER(COALESCE(target_title, '')) LIKE ?
+OR LOWER(COALESCE(target_text, '')) LIKE ?
+OR LOWER(COALESCE(description, '')) LIKE ?
+OR LOWER(COALESCE(target_id, '')) LIKE ?
+`, like, like, like, like, like, like, like)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []model.ContentReport
+	err := q.Order("CASE status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END, created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Find(&rows).Error
+	return rows, total, err
+}
+
+func (r *ModerationRepo) ContentReportStats(ctx context.Context, now time.Time) (ReportStats, error) {
+	var stats ReportStats
+	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("status = ?", model.ReportStatusPending).Count(&stats.Pending).Error; err != nil {
+		return stats, err
+	}
+	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("status = ?", model.ReportStatusReviewing).Count(&stats.Reviewing).Error; err != nil {
+		return stats, err
+	}
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("created_at >= ?", dayStart).Count(&stats.Today).Error; err != nil {
+		return stats, err
+	}
+	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).Count(&stats.Total).Error; err != nil {
+		return stats, err
+	}
+	return stats, nil
+}
+
+func (r *ModerationRepo) GetContentReport(ctx context.Context, id string) (*model.ContentReport, error) {
+	var report model.ContentReport
+	err := r.db.WithContext(ctx).Where("id = ?", id).Take(&report).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, gorm.ErrRecordNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &report, nil
+}
+
+func (r *ModerationRepo) UpdateContentReport(ctx context.Context, id, status, reviewerID, note string, now time.Time) (*model.ContentReport, error) {
+	updates := map[string]any{
+		"status":          status,
+		"reviewer_id":     reviewerID,
+		"resolution_note": note,
+		"updated_at":      now,
+	}
+	if status == model.ReportStatusResolved || status == model.ReportStatusDismissed {
+		updates["resolved_at"] = now
+	} else {
+		updates["resolved_at"] = nil
+	}
+	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("id = ?", id).
+		Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	return r.GetContentReport(ctx, id)
+}
+
+func (r *ModerationRepo) ListBlockedWords(ctx context.Context, page, size int) ([]model.BlockedWord, int64, error) {
+	page, size = normalizeModerationPage(page, size)
+	q := r.db.WithContext(ctx).Model(&model.BlockedWord{})
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []model.BlockedWord
+	err := q.Order("enabled DESC, updated_at DESC, created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Find(&rows).Error
+	return rows, total, err
+}
+
+func (r *ModerationRepo) ActiveBlockedWords(ctx context.Context) ([]model.BlockedWord, error) {
+	var rows []model.BlockedWord
+	err := r.db.WithContext(ctx).Model(&model.BlockedWord{}).
+		Where("enabled = ?", true).
+		Order("updated_at DESC, created_at DESC").
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *ModerationRepo) CreateBlockedWord(ctx context.Context, word *model.BlockedWord) error {
+	if err := r.db.WithContext(ctx).Create(word).Error; err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "unique") {
+			return ErrBlockedWordExists
+		}
+		return err
+	}
+	return r.SyncBlockedWords(ctx)
+}
+
+func (r *ModerationRepo) UpdateBlockedWord(ctx context.Context, id string, updates map[string]any) (*model.BlockedWord, error) {
+	var row model.BlockedWord
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&model.BlockedWord{}).Where("id = ?", id).Updates(updates)
+		if res.Error != nil {
+			if strings.Contains(strings.ToLower(res.Error.Error()), "duplicate") || strings.Contains(strings.ToLower(res.Error.Error()), "unique") {
+				return ErrBlockedWordExists
+			}
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrBlockedWordNotFound
+		}
+		return tx.Where("id = ?", id).Take(&row).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &row, r.SyncBlockedWords(ctx)
+}
+
+func (r *ModerationRepo) DeleteBlockedWord(ctx context.Context, id string) error {
+	res := r.db.WithContext(ctx).Delete(&model.BlockedWord{}, "id = ?", id)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrBlockedWordNotFound
+	}
+	return r.SyncBlockedWords(ctx)
+}
+
+func (r *ModerationRepo) BlockedWordHit(ctx context.Context, texts ...string) (string, error) {
+	if len(texts) == 0 {
+		return "", nil
+	}
+	rows, err := r.ActiveBlockedWords(ctx)
+	if err != nil {
+		return "", err
+	}
+	words := make([]string, 0, len(rows))
+	for _, row := range rows {
+		words = append(words, row.NormalizedWord)
+	}
+	for _, text := range texts {
+		if hit := contentpolicy.Hit(text, words); hit != "" {
+			return hit, nil
+		}
+	}
+	return "", nil
+}
+
+func (r *ModerationRepo) SyncBlockedWords(ctx context.Context) error {
+	if r.rdb == nil {
+		return nil
+	}
+	rows, err := r.ActiveBlockedWords(ctx)
+	if err != nil {
+		return err
+	}
+	pipe := r.rdb.TxPipeline()
+	pipe.Del(ctx, contentpolicy.RedisBlockedWordsKey)
+	if len(rows) > 0 {
+		members := make([]any, 0, len(rows))
+		for _, row := range rows {
+			if word := contentpolicy.NormalizeWord(row.NormalizedWord); word != "" {
+				members = append(members, word)
+			}
+		}
+		if len(members) > 0 {
+			pipe.SAdd(ctx, contentpolicy.RedisBlockedWordsKey, members...)
+		}
+	}
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {
+	if userID == "" {
+		return false, nil
+	}
+	var role string
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Select("COALESCE(role, 'user')").
+		Where("id = ?", userID).
+		Take(&role).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return role == "admin", err
 }
 
 func (r *ModerationRepo) UserProfile(ctx context.Context, userID string) (ModerationUser, error) {

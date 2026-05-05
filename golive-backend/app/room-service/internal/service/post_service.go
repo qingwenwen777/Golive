@@ -27,10 +27,19 @@ type PostService struct {
 	rooms      *repo.RoomRepo
 	social     *repo.SocialRepo
 	permission LivePermissionChecker
+	textPolicy TextPolicy
 }
 
 func NewPostService(posts *repo.PostRepo, rooms *repo.RoomRepo, social *repo.SocialRepo, permission LivePermissionChecker) *PostService {
 	return &PostService{posts: posts, rooms: rooms, social: social, permission: permission}
+}
+
+type TextPolicy interface {
+	EnsureTextAllowed(ctx context.Context, texts ...string) error
+}
+
+func (s *PostService) SetTextPolicy(policy TextPolicy) {
+	s.textPolicy = policy
 }
 
 type CreatePostReq struct {
@@ -130,6 +139,11 @@ func (s *PostService) CreatePost(ctx context.Context, ownerID string, req Create
 	images, err := cleanPostImages(req.Images)
 	if err != nil {
 		return nil, err
+	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureTextAllowed(ctx, content); err != nil {
+			return nil, err
+		}
 	}
 	if content == "" && len(images) == 0 {
 		return nil, errcode.New(http.StatusBadRequest, "post content or image is required").WithReason("content_required")
@@ -369,6 +383,11 @@ func (s *PostService) CreateComment(ctx context.Context, userID, postID string, 
 	content := cleanPostText(req.Content, maxCommentTextLen)
 	if content == "" {
 		return nil, errcode.New(http.StatusBadRequest, "comment content is required").WithReason("content_required")
+	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureTextAllowed(ctx, content); err != nil {
+			return nil, err
+		}
 	}
 
 	commentID := uuid.NewString()

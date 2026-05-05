@@ -3,7 +3,16 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ThumbsUp, ThumbsDown, Share2, Bookmark, Bell, Gift } from 'lucide-react';
+import {
+  ThumbsUp,
+  ThumbsDown,
+  Share2,
+  Bookmark,
+  Bell,
+  Gift,
+  MoreHorizontal,
+  Flag,
+} from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { Icons } from '@/components/Icons';
@@ -12,6 +21,13 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useFollowState, useFollow, useUnfollow, useLikeState, useLike } from '@/api/room';
 import { usePublicUser } from '@/api/auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
 import { copyText } from '@/lib/clipboard';
 import {
@@ -44,6 +60,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [expanded, setExpanded] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
 
   const channelId = stream.channelId || stream.channel;
   const streamId = stream.id;
@@ -135,6 +152,11 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     onOpenGifts?.();
   };
 
+  const title = lang === 'ja' ? (stream.titleJa ?? stream.title) : stream.title;
+  const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
+  const channelPath = `/channel/${encodeURIComponent(channelId || stream.ownerId || channelName)}`;
+  const description = stream.description?.trim() ?? '';
+
   const handleShare = async () => {
     try {
       const method = await copyText(window.location.href, t('liveRoom.copyTarget'));
@@ -150,11 +172,24 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     }
   };
 
-  const title = lang === 'ja' ? (stream.titleJa ?? stream.title) : stream.title;
-  const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
-  const channelPath = `/channel/${encodeURIComponent(channelId || stream.ownerId || channelName)}`;
-
-  const description = stream.description?.trim() ?? '';
+  const openReport = () => {
+    const target: ReportTargetDraft = {
+      targetType: 'room',
+      targetId: stream.id,
+      targetUrl: window.location.href,
+      roomId: stream.id,
+      channelId,
+      targetOwnerId: stream.ownerId,
+      targetOwnerName: channelName,
+      targetTitle: title,
+      targetText: description,
+    };
+    if (!isAuthed) {
+      openLogin(() => setReportTarget(target));
+      return;
+    }
+    setReportTarget(target);
+  };
 
   return (
     <div>
@@ -236,6 +271,19 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             <Bookmark size={18} />
             <span>{saved ? t('liveRoom.saved') : t('liveRoom.save')}</span>
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="gl-pg-solo gl-pg-more" aria-label={t('report.moreActions')}>
+                <MoreHorizontal size={18} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem className="gl-menu-danger" onSelect={openReport}>
+                <Flag size={15} />
+                {t('report.action')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -256,6 +304,13 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
           </>
         )}
       </div>
+      <ReportDialog
+        open={Boolean(reportTarget)}
+        target={reportTarget}
+        onOpenChange={(open) => {
+          if (!open) setReportTarget(null);
+        }}
+      />
     </div>
   );
 }

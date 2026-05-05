@@ -28,6 +28,7 @@ import { GiftPanel } from '@/features/live-room/GiftPanel';
 import { SuperChatDialog } from '@/features/live-room/SuperChatDialog';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { FlyingGiftLayer, type FlyingGift } from '@/features/live-room/FlyingGiftLayer';
+import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
@@ -102,6 +103,7 @@ export default function LiveRoomPage() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [superChatOpen, setSuperChatOpen] = useState(false);
   const [moderationTarget, setModerationTarget] = useState<ChatModerationTarget | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const [flying, setFlying] = useState<FlyingGift[]>([]);
   const isAuthed = useIsAuthed();
   const authHydrated = useAuthHydrated();
@@ -178,10 +180,21 @@ export default function LiveRoomPage() {
     moderationTarget?.userId ?? '',
     Boolean(moderationTarget && canModerate && roomId),
   );
+  const openReportTarget = useCallback(
+    (target: ReportTargetDraft) => {
+      if (!isAuthed) {
+        openLogin(() => setReportTarget(target));
+        return;
+      }
+      setReportTarget(target);
+    },
+    [isAuthed, openLogin],
+  );
   const chatModerationProps = {
     canModerate,
     chatMuted: Boolean(moderationState.data?.muted),
     onOpenModeration: setModerationTarget,
+    onReportMessage: openReportTarget,
     ...(endTransition
       ? {
           readOnly: true,
@@ -517,6 +530,15 @@ export default function LiveRoomPage() {
       onUnmute={submitUnmute}
     />
   );
+  const reportDialog = (
+    <ReportDialog
+      open={Boolean(reportTarget)}
+      target={reportTarget}
+      onOpenChange={(open) => {
+        if (!open) setReportTarget(null);
+      }}
+    />
+  );
 
   if (!liveEnding && roomIsReplay && stream?.replay?.embedUrl) {
     return (
@@ -604,6 +626,7 @@ export default function LiveRoomPage() {
               <div className="gl-mobile-chat">
                 <Chat
                   messages={messages}
+                  roomId={roomId}
                   viewers={viewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
@@ -623,6 +646,7 @@ export default function LiveRoomPage() {
             <div className="gl-side-rail sticky top-20 self-start">
               <Chat
                 messages={messages}
+                roomId={roomId}
                 viewers={viewers}
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
@@ -653,6 +677,7 @@ export default function LiveRoomPage() {
                 </SheetHeader>
                 <Chat
                   messages={messages}
+                  roomId={roomId}
                   viewers={viewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
@@ -668,6 +693,7 @@ export default function LiveRoomPage() {
             </Sheet>
           </>
         )}
+        {reportDialog}
         {moderationDialog}
       </>
     );
@@ -812,6 +838,7 @@ export default function LiveRoomPage() {
               <div className="gl-mobile-chat">
                 <Chat
                   messages={messages}
+                  roomId={roomId}
                   viewers={viewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
@@ -831,6 +858,7 @@ export default function LiveRoomPage() {
             <div className="gl-side-rail sticky top-20 self-start">
               <Chat
                 messages={messages}
+                roomId={roomId}
                 viewers={viewers}
                 viewerTotal={effectiveViewers}
                 ownerId={stream.ownerId}
@@ -861,6 +889,7 @@ export default function LiveRoomPage() {
                 </SheetHeader>
                 <Chat
                   messages={messages}
+                  roomId={roomId}
                   viewers={viewers}
                   viewerTotal={effectiveViewers}
                   ownerId={stream.ownerId}
@@ -932,6 +961,7 @@ export default function LiveRoomPage() {
           items={flying}
           onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
         />
+        {reportDialog}
         {moderationDialog}
       </>
     );
@@ -992,6 +1022,7 @@ export default function LiveRoomPage() {
           )}
           <Chat
             messages={messages}
+            roomId={roomId}
             viewers={viewers}
             viewerTotal={effectiveViewers}
             ownerId={displayStream.ownerId}
@@ -1028,6 +1059,7 @@ export default function LiveRoomPage() {
             )}
             <Chat
               messages={messages}
+              roomId={roomId}
               viewers={viewers}
               viewerTotal={effectiveViewers}
               ownerId={displayStream.ownerId}
@@ -1061,6 +1093,7 @@ export default function LiveRoomPage() {
               )}
               <Chat
                 messages={messages}
+                roomId={roomId}
                 viewers={viewers}
                 viewerTotal={effectiveViewers}
                 ownerId={displayStream.ownerId}
@@ -1132,6 +1165,7 @@ export default function LiveRoomPage() {
         items={flying}
         onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
       />
+      {reportDialog}
       {moderationDialog}
     </>
   );

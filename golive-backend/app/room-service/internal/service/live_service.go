@@ -26,6 +26,7 @@ type LiveService struct {
 	live           *repo.LiveRepo
 	appointments   *repo.AppointmentRepo
 	moderation     *repo.ModerationRepo
+	textPolicy     TextPolicy
 	replay         *ReplayService
 	keySecret      []byte
 	keyTTL         time.Duration
@@ -70,6 +71,10 @@ func (s *LiveService) SetAppointmentRepo(appointments *repo.AppointmentRepo) {
 
 func (s *LiveService) SetModerationRepo(moderation *repo.ModerationRepo) {
 	s.moderation = moderation
+}
+
+func (s *LiveService) SetTextPolicy(policy TextPolicy) {
+	s.textPolicy = policy
 }
 
 func (s *LiveService) SetReplayService(replay *ReplayService) {
@@ -120,13 +125,23 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	roomID := "live-" + ownerID + "-" + strconv.FormatInt(now.UnixNano(), 36)
 	channelID := "ch-" + ownerID
 	ownerName := cleanDisplayName(req.ChannelName, ownerID)
+	title := trimRunes(strings.TrimSpace(req.Title), 120)
+	if title == "" {
+		return nil, errcode.New(400, "title is required")
+	}
+	description := cleanDescription(req.Description)
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureTextAllowed(ctx, title, description); err != nil {
+			return nil, err
+		}
+	}
 
 	streamKey := s.generateKey(roomID, ownerID, now)
 
 	room := &model.Room{
 		ID:                  roomID,
-		Title:               strings.TrimSpace(req.Title),
-		Description:         cleanDescription(req.Description),
+		Title:               title,
+		Description:         description,
 		Category:            strings.TrimSpace(req.Category),
 		Cover:               req.Cover,
 		Channel:             ownerName,
@@ -176,6 +191,11 @@ func (s *LiveService) UpdateLiveMetadata(ctx context.Context, ownerID string, re
 	}
 	description := cleanDescription(req.Description)
 	cover := trimRunes(strings.TrimSpace(req.Cover), 500)
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureTextAllowed(ctx, title, description); err != nil {
+			return nil, err
+		}
+	}
 
 	room, err := s.rooms.ActiveByOwner(ctx, ownerID)
 	if errors.Is(err, repo.ErrRoomNotFound) {

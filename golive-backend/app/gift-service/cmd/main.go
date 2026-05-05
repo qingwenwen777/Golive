@@ -74,7 +74,7 @@ func main() {
 
 	idem := service.NewIdemCache(rdb, cfg.Idempotency.TTL)
 	giftSvc := service.NewGiftService(giftRepo, orderRepo)
-	scSvc := service.NewSuperChatService(orderRepo)
+	scSvc := service.NewSuperChatService(orderRepo, rdb)
 	betSvc := service.NewBetService(orderRepo)
 
 	var prod producer.Producer

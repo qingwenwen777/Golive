@@ -1236,7 +1236,80 @@
         "systemSub": "配置变更、服务重启、策略调整"
       }
     },
-    "exit": "退出后台"
+    "exit": "退出后台",
+    "content": {
+      "aria": "内容审核概览",
+      "kpis": {
+        "pending": "待处理举报",
+        "reviewing": "处理中",
+        "today": "今日新增",
+        "total": "举报总数"
+      },
+      "filters": {
+        "status": "状态",
+        "target": "目标",
+        "reason": "原因",
+        "search": "搜索",
+        "searchPlaceholder": "举报人、目标、文本"
+      },
+      "status": {
+        "all": "全部状态",
+        "pending": "待处理",
+        "reviewing": "处理中",
+        "resolved": "已处理",
+        "dismissed": "已驳回"
+      },
+      "targets": {
+        "all": "全部目标",
+        "room": "直播间",
+        "channel": "频道",
+        "danmu": "弹幕/评论",
+        "post": "帖子",
+        "postComment": "帖子评论",
+        "superChat": "SuperChat"
+      },
+      "reasons": {
+        "all": "全部原因"
+      },
+      "reports": {
+        "eyebrow": "举报",
+        "title": "举报管理",
+        "loading": "正在加载举报...",
+        "empty": "当前筛选下没有举报。",
+        "pick": "选择一条举报进行处理。",
+        "reporter": "举报人",
+        "reportedUser": "被举报用户",
+        "time": "举报时间",
+        "status": "状态",
+        "snapshot": "内容快照",
+        "noTitle": "无标题",
+        "noSnapshot": "暂无文本快照。",
+        "openTarget": "打开目标",
+        "note": "处理备注",
+        "notePlaceholder": "记录处理说明，便于审计。",
+        "updated": "举报状态已更新。",
+        "updateFailed": "无法更新举报。"
+      },
+      "words": {
+        "eyebrow": "策略",
+        "title": "屏蔽词管理",
+        "wordPlaceholder": "屏蔽词",
+        "notePlaceholder": "备注，可选",
+        "add": "添加",
+        "empty": "暂无屏蔽词。",
+        "noNote": "无备注",
+        "enabled": "已启用",
+        "disabled": "已停用",
+        "wordRequired": "请输入屏蔽词。",
+        "created": "屏蔽词已添加。",
+        "createFailed": "无法添加屏蔽词。",
+        "updated": "屏蔽词已更新。",
+        "updateFailed": "无法更新屏蔽词。",
+        "deleted": "屏蔽词已删除。",
+        "deleteFailed": "无法删除屏蔽词。",
+        "confirmDelete": "确定删除 {{word}}？"
+      }
+    }
   },
   "upload": {
     "description": "上传 JPG、PNG、WebP 或 GIF 图片，最大 5MB。",
@@ -1413,5 +1486,49 @@
     "errorBadQuestion": "竞猜标题不能为空，最多 80 个字。",
     "errorForbidden": "只有主播可以操作竞猜。",
     "errorGeneric": "操作失败。"
+  },
+  "liveCard": {
+    "menu": {
+      "more": "更多操作",
+      "saveWatchLater": "稍后观看",
+      "removeWatchLater": "移出稍后观看",
+      "copyLiveLink": "复制直播链接",
+      "openChannel": "打开频道",
+      "report": "举报"
+    }
+  },
+  "report": {
+    "moreActions": "更多操作",
+    "action": "举报",
+    "chatAction": "举报该弹幕",
+    "type": "举报类型",
+    "dialogTitle": "举报内容",
+    "dialogDescription": "请选择最符合的举报原因，管理员会查看内容快照。",
+    "descriptionLabel": "补充说明",
+    "descriptionPlaceholder": "可选，最多 100 字",
+    "cancel": "取消",
+    "submit": "提交举报",
+    "submitting": "提交中...",
+    "submitted": "举报已提交，感谢你的反馈",
+    "reasons": {
+      "spam": "垃圾广告",
+      "harassment": "骚扰辱骂",
+      "sexual": "色情低俗",
+      "violence": "暴力危险",
+      "hate": "仇恨歧视",
+      "scam": "诈骗误导",
+      "illegal": "违法违规",
+      "other": "其他问题"
+    },
+    "errors": {
+      "loginRequired": "请登录后再举报。",
+      "reasonRequired": "请选择举报类型。",
+      "duplicate": "24 小时内你已经举报过该目标。",
+      "dailyLimit": "今天的举报次数已达上限。",
+      "failed": "举报提交失败。"
+    }
+  },
+  "contentPolicy": {
+    "blockedWord": "内容包含屏蔽词，无法发送。"
   }
 }

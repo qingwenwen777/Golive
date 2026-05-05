@@ -14,6 +14,7 @@ import {
   Coins,
   FileText,
   ImagePlus,
+  MoreHorizontal,
   PlayCircle,
   Plus,
   Radio,
@@ -22,6 +23,7 @@ import {
   UserPlus,
   Users,
   Video,
+  Flag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePublicUser } from '@/api/auth';
@@ -43,10 +45,17 @@ import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { ChannelCoverUploadDialog } from '@/features/account/ChannelCoverUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
 import { PostCard } from '@/features/posts/PostCard';
+import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
@@ -84,6 +93,7 @@ export default function ChannelPage() {
   const [postPage, setPostPage] = useState(1);
   const [activeTab, setActiveTab] = useState<ChannelTab>('home');
   const [fanBadgeDialogOpen, setFanBadgeDialogOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const activeLiveId = useActiveCreatorLiveId(authUser?.id);
 
   const profile = useMemo(
@@ -203,6 +213,24 @@ export default function ChannelPage() {
     } catch {
       toast.info(url);
     }
+  };
+
+  const handleReportChannel = () => {
+    const target: ReportTargetDraft = {
+      targetType: 'channel',
+      targetId: channelId || channelKey,
+      targetUrl: window.location.href,
+      channelId,
+      targetOwnerId: creatorId,
+      targetOwnerName: channelName,
+      targetTitle: channelName,
+      targetText: profile?.displayName || profile?.username || primary?.description || '',
+    };
+    if (!isAuthed) {
+      openLogin(() => setReportTarget(target));
+      return;
+    }
+    setReportTarget(target);
   };
 
   const handleOwnerLiveAction = () => {
@@ -344,6 +372,23 @@ export default function ChannelPage() {
                 <Share2 size={16} />
                 {t('channel.share')}
               </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="gl-secondary-btn gl-channel-more-btn"
+                    type="button"
+                    aria-label={t('report.moreActions')}
+                  >
+                    <MoreHorizontal size={17} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem className="gl-menu-danger" onSelect={handleReportChannel}>
+                    <Flag size={15} />
+                    {t('report.action')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -598,6 +643,13 @@ export default function ChannelPage() {
       />
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={authUser} />
       <ChannelCoverUploadDialog open={coverOpen} onOpenChange={setCoverOpen} user={authUser} />
+      <ReportDialog
+        open={Boolean(reportTarget)}
+        target={reportTarget}
+        onOpenChange={(open) => {
+          if (!open) setReportTarget(null);
+        }}
+      />
     </div>
   );
 }

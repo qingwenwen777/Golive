@@ -241,6 +241,14 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 				role = "moderator"
 			}
 		}
+		blocked, err := c.moderation.ContainsBlockedWord(ctx, text)
+		if err != nil {
+			logger.L().Warn("check blocked word", zap.String("room", c.roomID), zap.Error(err))
+		} else if blocked {
+			_ = c.Send(hub.EncodeSystem("Message contains blocked words."))
+			metrics.MessagesDropped.WithLabelValues("blocked_word").Inc()
+			return
+		}
 	}
 	now := time.Now().UnixMilli()
 	id := safeClientID(clientID)
