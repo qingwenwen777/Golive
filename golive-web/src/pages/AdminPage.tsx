@@ -1059,7 +1059,7 @@ function ContentPage() {
       </section>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="gl-admin-report-dialog p-0 sm:max-w-[920px]">
+        <DialogContent className="gl-admin-report-dialog p-0 sm:max-w-[1080px]">
           {detail ? (
             <div className="gl-admin-report-modal">
               <div className="gl-admin-report-modal-head">

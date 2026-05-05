@@ -6051,6 +6051,8 @@ input:focus-visible,
   background: var(--gl-bg-hover);
 }
 .gl-admin-report-dialog {
+  width: min(1040px, calc(100vw - 32px));
+  max-width: min(1040px, calc(100vw - 32px));
   overflow: hidden;
   border-radius: 14px;
 }
@@ -6107,7 +6109,7 @@ input:focus-visible,
 .gl-admin-report-modal-grid {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) 310px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -6131,6 +6133,23 @@ input:focus-visible,
   background: var(--gl-bg);
   overflow-y: auto;
   padding: 18px;
+}
+html[lang='zh-CN'] .gl-admin-report-dialog,
+html[lang='zh'] .gl-admin-report-dialog {
+  width: min(1080px, calc(100vw - 32px));
+  max-width: min(1080px, calc(100vw - 32px));
+}
+html[lang='zh-CN'] .gl-admin-report-modal-grid,
+html[lang='zh'] .gl-admin-report-modal-grid {
+  grid-template-columns: minmax(0, 1fr) 390px;
+}
+html[lang='zh-CN'] .gl-admin-report-modal-side .gl-admin-detail-row,
+html[lang='zh'] .gl-admin-report-modal-side .gl-admin-detail-row {
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+html[lang='zh-CN'] .gl-admin-report-modal-side .gl-admin-detail-row strong,
+html[lang='zh'] .gl-admin-report-modal-side .gl-admin-detail-row strong {
+  white-space: nowrap;
 }
 .gl-admin-report-snapshot.is-modal {
   background: var(--gl-bg-card);
@@ -6215,6 +6234,21 @@ input:focus-visible,
   font-weight: 750;
   line-height: 1.35;
   text-align: right;
+}
+html[lang='zh-CN'] .gl-admin-action-select-head,
+html[lang='zh'] .gl-admin-action-select-head {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: start;
+}
+html[lang='zh-CN'] .gl-admin-action-select-head span,
+html[lang='zh'] .gl-admin-action-select-head span {
+  white-space: nowrap;
+}
+html[lang='zh-CN'] .gl-admin-action-select-head small,
+html[lang='zh'] .gl-admin-action-select-head small {
+  max-width: none;
+  text-align: left;
 }
 .gl-admin-action-select select {
   height: 38px;
@@ -6464,6 +6498,10 @@ input:focus-visible,
 @media (max-width: 980px) {
   .gl-admin-content-filters,
   .gl-admin-report-modal-grid {
+    grid-template-columns: 1fr;
+  }
+  html[lang='zh-CN'] .gl-admin-report-modal-grid,
+  html[lang='zh'] .gl-admin-report-modal-grid {
     grid-template-columns: 1fr;
   }
 
