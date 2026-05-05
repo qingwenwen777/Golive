@@ -1081,7 +1081,7 @@ input:focus-visible,
   height: 56px;
   padding: 0 16px;
   background: var(--gl-bg);
-  border-bottom: 1px solid var(--gl-border);
+  border-bottom: 0;
 }
 .gl-topbar-left {
   display: flex;
@@ -1125,7 +1125,7 @@ input:focus-visible,
 .gl-topbar-search {
   position: relative;
   display: flex;
-  width: min(720px, 100%);
+  width: min(600px, 100%);
   justify-content: center;
   justify-self: center;
   align-items: center;
@@ -1599,7 +1599,7 @@ input:focus-visible,
   background: var(--gl-bg);
   width: 100%;
   max-width: 100%;
-  height: 40px;
+  height: 38px;
   transition:
     border 0.12s,
     box-shadow 0.12s;
@@ -1620,12 +1620,12 @@ input:focus-visible,
   padding: 0 16px;
   background: transparent;
   color: var(--gl-text);
-  font-size: 16px;
+  font-size: 15px;
   outline: none;
 }
 .gl-search-clear {
   display: inline-flex;
-  width: 42px;
+  width: 38px;
   height: 100%;
   flex: 0 0 auto;
   align-items: center;
@@ -1638,7 +1638,7 @@ input:focus-visible,
   background: color-mix(in srgb, var(--gl-bg-hover) 72%, transparent);
 }
 .gl-search-btn {
-  width: 64px;
+  width: 56px;
   height: 100%;
   border: 0;
   border-left: 1px solid var(--gl-border);
@@ -1663,10 +1663,10 @@ input:focus-visible,
 }
 .gl-search-suggest-popover {
   position: absolute;
-  top: 46px;
+  top: 43px;
   left: 0;
   z-index: 70;
-  width: 100%;
+  width: calc(100% - 56px);
   max-height: min(72vh, 620px);
   overflow-y: auto;
   border: 1px solid var(--gl-border);
@@ -1972,8 +1972,8 @@ input:focus-visible,
   top: 56px;
   z-index: 20;
   background: var(--gl-bg);
-  padding: 12px 40px;
-  border-bottom: 1px solid var(--gl-border);
+  padding: 10px 40px 8px;
+  border-bottom: 0;
 }
 .gl-chips {
   display: flex;
@@ -2010,7 +2010,7 @@ input:focus-visible,
 }
 
 .gl-page {
-  padding: 16px 40px 40px;
+  padding: 10px 40px 40px;
 }
 .gl-route-page {
   min-width: 0;
@@ -8214,7 +8214,7 @@ button.gl-fan-badge-empty {
     display: none;
   }
   .gl-chips-wrap {
-    padding: 8px 12px;
+    padding: 8px 12px 6px;
   }
   .gl-chip {
     height: 24px;

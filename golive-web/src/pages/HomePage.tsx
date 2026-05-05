@@ -347,11 +347,11 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
   return (
     <section
       className="gl-home-live-all"
-      aria-label={t('home.allLive.title', { defaultValue: '正在直播' })}
+      aria-label={t('home.allLive.title', { defaultValue: '更多直播' })}
     >
       <div className="gl-section-title-row">
         <div>
-          <h2>{t('home.allLive.title', { defaultValue: '正在直播' })}</h2>
+          <h2>{t('home.allLive.title', { defaultValue: '更多直播' })}</h2>
         </div>
       </div>
 

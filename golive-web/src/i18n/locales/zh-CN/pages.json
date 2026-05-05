@@ -14,6 +14,11 @@
     "retry": "重试",
     "watching": "{{count}} 人正在观看",
     "subscribers": "{{count}} 位订阅者",
+    "allLive": {
+      "title": "更多直播",
+      "loading": "加载中...",
+      "loadMore": "加载更多"
+    },
     "recommendations": {
       "title": "热门主播推荐",
       "subtitle": "先订阅感兴趣的频道，开播时更容易回来看。",
