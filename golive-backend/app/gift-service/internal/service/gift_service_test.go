@@ -387,6 +387,12 @@ func TestListFanClubMembersRanksByContribution(t *testing.T) {
 	require.Equal(t, 5, members[0].Level)
 	require.Equal(t, "fan-1", members[1].UserID)
 	require.Equal(t, 2, members[1].Level)
+
+	empty, emptyTotal, err := repo.NewOrderRepo(db).ListFanClubMembers(context.Background(), "missing", 5)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, emptyTotal)
+	require.NotNil(t, empty)
+	require.Len(t, empty, 0)
 }
 
 func TestListFanBadgesUsesCurrentCreatorProfile(t *testing.T) {

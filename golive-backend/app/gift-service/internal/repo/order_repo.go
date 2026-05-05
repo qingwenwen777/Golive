@@ -242,6 +242,9 @@ fb.updated_at
 	for i := range members {
 		members[i].Level = FanBadgeLevel(members[i].TotalContribution)
 	}
+	if members == nil {
+		members = []model.FanClubMember{}
+	}
 	return members, total, nil
 }
 
