@@ -571,7 +571,15 @@
         "googleSub": "Use Google as a faster sign-in method for this account.",
         "googleBind": "Connect Google",
         "googleLinked": "Google account connected.",
-        "googleUnavailable": "Google sign-in is not configured yet."
+        "googleUnavailable": "Google sign-in is not configured yet.",
+        "googleUnlink": "Unlink",
+        "googleUnlinkTitle": "Unlink Google account",
+        "googleUnlinkSub": "Enter your current password before unlinking Google.",
+        "googleUnlinkPassword": "Current password",
+        "googleUnlinkCancel": "Cancel",
+        "googleUnlinkConfirm": "Unlink Google",
+        "googleUnlinking": "Unlinking...",
+        "googleUnlinked": "Google account unlinked."
       },
       "preferences": {
         "displayTitle": "Display preferences",
@@ -597,7 +605,9 @@
         "googleEmailExists": "That Google email is already used by another GoLive account.",
         "googleAlreadyLinked": "That Google account is already connected.",
         "invalidGoogleCredential": "Google sign-in could not be verified.",
-        "googleNotConfigured": "Google sign-in is not configured yet."
+        "googleNotConfigured": "Google sign-in is not configured yet.",
+        "googleNotLinked": "This account is not linked to Google.",
+        "googleUnlinkPasswordRequired": "Enter your current password to unlink Google."
       }
     }
   },

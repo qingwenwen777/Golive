@@ -48,6 +48,7 @@ func NewRouter(d Deps) *gin.Engine {
 		auth.POST("/google/register", authH.GoogleRegister)
 		auth.POST("/google/link-existing", authH.GoogleLinkExisting)
 		auth.POST("/google/bind", handler.AuthRequired(d.Auth), authH.GoogleBind)
+		auth.POST("/google/unbind", handler.AuthRequired(d.Auth), authH.GoogleUnbind)
 		auth.POST("/password/reset", authH.ResetPassword)
 		auth.POST("/refresh", authH.Refresh)
 		auth.POST("/logout", authH.Logout)

@@ -28,7 +28,14 @@ import {
   Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBindGoogleAccount, useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
+import {
+  useBindGoogleAccount,
+  useChangePassword,
+  useMe,
+  useUnbindGoogleAccount,
+  useUpdateProfile,
+} from '@/api/auth';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useCreateUnbanAppeal } from '@/api/contentModeration';
 import { useFanBadges } from '@/api/gift';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
@@ -730,14 +737,17 @@ export function SettingsPage() {
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const bindGoogle = useBindGoogleAccount();
+  const unbindGoogle = useUnbindGoogleAccount();
   const createUnbanAppeal = useCreateUnbanAppeal();
   const [tab, setTab] = useState<SettingsTab>('profile');
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [googleUnbindOpen, setGoogleUnbindOpen] = useState(false);
   const [profileUsername, setProfileUsername] = useState('');
   const [profileDisplayName, setProfileDisplayName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [googleUnbindPassword, setGoogleUnbindPassword] = useState('');
   const [unbanReason, setUnbanReason] = useState('');
   const currentUser = me.data ?? user;
   const displayName = userDisplayName(currentUser);
@@ -861,6 +871,37 @@ export function SettingsPage() {
     );
   };
 
+  const submitGoogleUnbind = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    if (!googleUnbindPassword) {
+      toast.error(
+        t('library.settings.errors.googleUnlinkPasswordRequired', {
+          defaultValue: 'Enter your current password to unlink Google.',
+        }),
+      );
+      return;
+    }
+    unbindGoogle.mutate(
+      { password: googleUnbindPassword },
+      {
+        onSuccess: () => {
+          setGoogleUnbindPassword('');
+          setGoogleUnbindOpen(false);
+          toast.success(
+            t('library.settings.security.googleUnlinked', {
+              defaultValue: 'Google account unlinked.',
+            }),
+          );
+        },
+        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
+      },
+    );
+  };
+
   return (
     <div className="gl-page gl-library-page gl-settings-page">
       <header className="gl-settings-hero">
@@ -924,6 +965,7 @@ export function SettingsPage() {
               pending={changePassword.isPending}
               googleLinked={Boolean(currentUser?.googleLinked)}
               googlePending={bindGoogle.isPending}
+              googleUnlinkPending={unbindGoogle.isPending}
               usernameAvailableAt={usernameAvailableAt}
               unbanReason={unbanReason}
               appealPending={createUnbanAppeal.isPending}
@@ -933,6 +975,7 @@ export function SettingsPage() {
               onUnbanReasonChange={setUnbanReason}
               onSubmit={submitPassword}
               onGoogleCredential={handleGoogleBind}
+              onGoogleUnlinkClick={() => setGoogleUnbindOpen(true)}
               onGoogleUnavailable={() =>
                 toast.error(
                   t('library.settings.errors.googleLoadFailed', {
@@ -955,6 +998,67 @@ export function SettingsPage() {
         </div>
       </div>
       <AvatarUploadDialog open={avatarOpen} onOpenChange={setAvatarOpen} user={currentUser} />
+      <Dialog
+        open={googleUnbindOpen}
+        onOpenChange={(open) => {
+          setGoogleUnbindOpen(open);
+          if (!open) setGoogleUnbindPassword('');
+        }}
+      >
+        <DialogContent className="gl-google-unbind-dialog p-0 sm:max-w-[380px]">
+          <form className="gl-google-unbind-body" onSubmit={submitGoogleUnbind}>
+            <span className="gl-google-provider-icon is-large" aria-hidden="true">
+              G
+            </span>
+            <DialogTitle>
+              {t('library.settings.security.googleUnlinkTitle', {
+                defaultValue: 'Unlink Google account',
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t('library.settings.security.googleUnlinkSub', {
+                defaultValue: 'Enter your current password before unlinking Google.',
+              })}
+            </DialogDescription>
+            <label className="gl-settings-field">
+              <span>
+                {t('library.settings.security.googleUnlinkPassword', {
+                  defaultValue: 'Current password',
+                })}
+              </span>
+              <input
+                type="password"
+                value={googleUnbindPassword}
+                onChange={(event) => setGoogleUnbindPassword(event.target.value)}
+                autoComplete="current-password"
+                className="gl-settings-input"
+              />
+            </label>
+            <div className="gl-google-unbind-actions">
+              <button
+                className="gl-settings-button"
+                type="button"
+                onClick={() => setGoogleUnbindOpen(false)}
+              >
+                {t('library.settings.security.googleUnlinkCancel', { defaultValue: 'Cancel' })}
+              </button>
+              <button
+                className="gl-settings-button is-danger"
+                type="submit"
+                disabled={unbindGoogle.isPending}
+              >
+                {unbindGoogle.isPending
+                  ? t('library.settings.security.googleUnlinking', {
+                      defaultValue: 'Unlinking...',
+                    })
+                  : t('library.settings.security.googleUnlinkConfirm', {
+                      defaultValue: 'Unlink Google',
+                    })}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -975,7 +1079,7 @@ function SettingsNavButton({
   return (
     <button
       type="button"
-      className={`gl-settings-nav-item${active ? 'is-active' : ''}`}
+      className={cn('gl-settings-nav-item', active && 'is-active')}
       onClick={onClick}
     >
       <span className="gl-settings-nav-icon">{icon}</span>
@@ -1100,6 +1204,7 @@ function SecuritySettings({
   pending,
   googleLinked,
   googlePending,
+  googleUnlinkPending,
   usernameAvailableAt,
   unbanReason,
   appealPending,
@@ -1109,6 +1214,7 @@ function SecuritySettings({
   onUnbanReasonChange,
   onSubmit,
   onGoogleCredential,
+  onGoogleUnlinkClick,
   onGoogleUnavailable,
   onAppealSubmit,
 }: {
@@ -1118,6 +1224,7 @@ function SecuritySettings({
   pending: boolean;
   googleLinked: boolean;
   googlePending: boolean;
+  googleUnlinkPending: boolean;
   usernameAvailableAt: Date | null;
   unbanReason: string;
   appealPending: boolean;
@@ -1127,6 +1234,7 @@ function SecuritySettings({
   onUnbanReasonChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onGoogleCredential: (credential: string) => void;
+  onGoogleUnlinkClick: () => void;
   onGoogleUnavailable: () => void;
   onAppealSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -1188,10 +1296,10 @@ function SecuritySettings({
         </div>
       </form>
 
-      <section className="gl-settings-card gl-settings-form">
+      <section className="gl-settings-card gl-settings-form gl-settings-google-card">
         <div className="gl-settings-card-head">
-          <span className="gl-settings-card-icon">
-            <ShieldCheck size={18} />
+          <span className="gl-google-provider-icon" aria-hidden="true">
+            G
           </span>
           <div>
             <h2>
@@ -1206,15 +1314,26 @@ function SecuritySettings({
         </div>
         {googleLinked ? (
           <div className="gl-settings-provider-state">
-            <ShieldCheck size={16} />
+            <span className="gl-google-provider-icon is-small" aria-hidden="true">
+              G
+            </span>
             <span>
               {t('library.settings.security.googleLinked', {
                 defaultValue: 'Google account connected.',
               })}
             </span>
+            <button
+              className="gl-settings-button is-danger is-compact"
+              type="button"
+              disabled={googleUnlinkPending}
+              onClick={onGoogleUnlinkClick}
+            >
+              {t('library.settings.security.googleUnlink', { defaultValue: 'Unlink' })}
+            </button>
           </div>
         ) : (
           <GoogleIdentityButton
+            className="gl-settings-google-button"
             text="continue_with"
             disabled={googlePending}
             fallbackLabel={
@@ -1419,6 +1538,11 @@ function settingsErrorMessage(
     if (data?.reason === 'google_not_configured') {
       return t('library.settings.errors.googleNotConfigured', {
         defaultValue: 'Google sign-in is not configured yet.',
+      });
+    }
+    if (data?.reason === 'google_not_linked') {
+      return t('library.settings.errors.googleNotLinked', {
+        defaultValue: 'This account is not linked to Google.',
       });
     }
     if (data?.message) return data.message;

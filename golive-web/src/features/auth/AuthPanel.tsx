@@ -19,6 +19,7 @@ import {
   decodeGoogleCredentialEmail,
   isGoogleConfigured,
 } from '@/lib/googleIdentity';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import type { LoginResp } from '@/types/user';
 
 type AuthMode = 'signin' | 'signup' | 'reset';
@@ -118,6 +119,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const [googleLinkCredential, setGoogleLinkCredential] = useState('');
   const [googleLinkEmail, setGoogleLinkEmail] = useState('');
   const [googleLinkPassword, setGoogleLinkPassword] = useState('');
+  const [googleRegisterOpen, setGoogleRegisterOpen] = useState(false);
+  const [googleRegisterUsername, setGoogleRegisterUsername] = useState('');
+  const [googleRegisterInviteCode, setGoogleRegisterInviteCode] = useState('');
+  const [googleRegisterError, setGoogleRegisterError] = useState<string | null>(null);
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -145,6 +150,8 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const resetPasswordId = `${id}-reset-password`;
   const resetConfirmPasswordId = `${id}-reset-confirm-password`;
   const captchaIdAttr = `${id}-captcha`;
+  const googleRegisterUsernameId = `${id}-google-register-username`;
+  const googleRegisterInviteCodeId = `${id}-google-register-invite`;
 
   const refreshCaptcha = useCallback(async () => {
     if (mode === 'reset') return;
@@ -176,6 +183,8 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     setGoogleLinkCredential('');
     setGoogleLinkEmail('');
     setGoogleLinkPassword('');
+    setGoogleRegisterOpen(false);
+    setGoogleRegisterError(null);
     if (mode === 'reset') {
       setCaptchaId('');
       setCaptchaImage('');
@@ -289,7 +298,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
 
   const handleGoogleCredential = useCallback(
     (credential: string) => {
-      if (isResetting) return;
+      if (isResetting || isSigningUp) return;
       setError(null);
       setSuccess(null);
       setGoogleLinkCredential('');
@@ -305,52 +314,70 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         },
       };
 
-      if (isSigningUp) {
-        const cleanUsername = username.trim();
-        const cleanDisplayName = displayName.trim();
-        const cleanInviteCode = inviteCode.trim();
-        if (!cleanInviteCode) {
-          setError(
-            t('auth.errors.inviteRequired', {
-              defaultValue: 'Enter an invite code before continuing with Google.',
-            }),
-          );
-          return;
-        }
-        if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/.test(cleanUsername)) {
-          setError(
-            t('auth.errors.invalidUsername', {
-              defaultValue: 'Choose a valid username before continuing with Google.',
-            }),
-          );
-          return;
-        }
-        googleRegisterMut.mutate(
-          {
-            credential,
-            username: cleanUsername,
-            displayName: cleanDisplayName,
-            inviteCode: cleanInviteCode,
-          },
-          callbacks,
+      googleLoginMut.mutate({ credential }, callbacks);
+    },
+    [googleLoginMut, isResetting, isSigningUp, mode, onAuthenticated, showGoogleLinkPrompt, t],
+  );
+
+  const openGoogleRegisterDialog = () => {
+    setError(null);
+    setSuccess(null);
+    setGoogleRegisterError(null);
+    setGoogleRegisterUsername(username.trim());
+    setGoogleRegisterInviteCode(inviteCode.trim().toUpperCase());
+    setGoogleRegisterOpen(true);
+  };
+
+  const handleGoogleRegisterCredential = useCallback(
+    (credential: string) => {
+      const cleanUsername = googleRegisterUsername.trim();
+      const cleanInviteCode = googleRegisterInviteCode.trim().toUpperCase();
+      setGoogleRegisterError(null);
+      if (!cleanInviteCode) {
+        setGoogleRegisterError(
+          t('auth.errors.inviteRequired', {
+            defaultValue: 'Enter an invite code before continuing with Google.',
+          }),
         );
         return;
       }
-
-      googleLoginMut.mutate({ credential }, callbacks);
+      if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/.test(cleanUsername)) {
+        setGoogleRegisterError(
+          t('auth.errors.invalidUsername', {
+            defaultValue: 'Choose a valid username before continuing with Google.',
+          }),
+        );
+        return;
+      }
+      googleRegisterMut.mutate(
+        {
+          credential,
+          username: cleanUsername,
+          displayName: '',
+          inviteCode: cleanInviteCode,
+        },
+        {
+          onSuccess: (resp) => {
+            setGoogleRegisterOpen(false);
+            onAuthenticated?.(resp);
+          },
+          onError: (err: Error) => {
+            if (showGoogleLinkPrompt(credential, err)) {
+              setGoogleRegisterOpen(false);
+              return;
+            }
+            setGoogleRegisterError(authErrorMessage(err, 'signup', t));
+          },
+        },
+      );
     },
     [
-      displayName,
-      googleLoginMut,
+      googleRegisterInviteCode,
       googleRegisterMut,
-      inviteCode,
-      isResetting,
-      isSigningUp,
-      mode,
+      googleRegisterUsername,
       onAuthenticated,
       showGoogleLinkPrompt,
       t,
-      username,
     ],
   );
 
@@ -385,6 +412,11 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       ),
     [t],
   );
+
+  const googleRegisterReady =
+    /^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/.test(googleRegisterUsername.trim()) &&
+    googleRegisterInviteCode.trim().length > 0 &&
+    !googleRegisterMut.isPending;
 
   const title = isResetting
     ? t('auth.resetTitle', { defaultValue: 'Reset password' })
@@ -751,9 +783,21 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
             <UserRound size={18} />
             <span>{t('auth.backToSignIn', { defaultValue: 'Back to sign in' })}</span>
           </button>
+        ) : isSigningUp ? (
+          <button
+            type="button"
+            className="gl-auth-secondary gl-auth-google-register-trigger"
+            disabled={isPending}
+            onClick={openGoogleRegisterDialog}
+          >
+            <span className="gl-google-letter-mark" aria-hidden="true">
+              G
+            </span>
+            <span>{t('auth.googleRegisterCta', { defaultValue: 'Sign up with Google' })}</span>
+          </button>
         ) : (
           <GoogleIdentityButton
-            text={isSigningUp ? 'signup_with' : 'continue_with'}
+            text="continue_with"
             disabled={isPending}
             fallbackLabel={
               isGoogleConfigured() ? t('auth.continueGoogle') : t('auth.socialUnavailable')
@@ -763,6 +807,95 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           />
         )}
       </form>
+
+      <Dialog
+        open={googleRegisterOpen}
+        onOpenChange={(open) => {
+          setGoogleRegisterOpen(open);
+          if (!open) setGoogleRegisterError(null);
+        }}
+      >
+        <DialogContent className="gl-google-register-dialog p-0 sm:max-w-[380px]">
+          <div className="gl-google-register-body">
+            <span className="gl-google-provider-icon is-large" aria-hidden="true">
+              G
+            </span>
+            <DialogTitle>
+              {t('auth.googleRegisterDialogTitle', {
+                defaultValue: 'Register with Google',
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t('auth.googleRegisterDialogSub', {
+                defaultValue: 'Enter a username and invite code, then continue with Google.',
+              })}
+            </DialogDescription>
+            <label className="gl-auth-field" htmlFor={googleRegisterUsernameId}>
+              <span className="gl-auth-label">{t('auth.username')}</span>
+              <span className="gl-auth-input-wrap">
+                <UserRound size={18} />
+                <input
+                  id={googleRegisterUsernameId}
+                  type="text"
+                  autoComplete="username"
+                  value={googleRegisterUsername}
+                  onChange={(event) => setGoogleRegisterUsername(event.target.value)}
+                  placeholder={t('auth.usernamePlaceholder')}
+                  minLength={3}
+                />
+              </span>
+            </label>
+            <label className="gl-auth-field" htmlFor={googleRegisterInviteCodeId}>
+              <span className="gl-auth-label">
+                {t('auth.inviteCode', { defaultValue: 'Invite code' })}
+              </span>
+              <span className="gl-auth-input-wrap">
+                <Ticket size={18} />
+                <input
+                  id={googleRegisterInviteCodeId}
+                  type="text"
+                  autoComplete="one-time-code"
+                  value={googleRegisterInviteCode}
+                  onChange={(event) =>
+                    setGoogleRegisterInviteCode(event.target.value.toUpperCase())
+                  }
+                  placeholder={t('auth.inviteCodePlaceholder', {
+                    defaultValue: 'Enter invite code',
+                  })}
+                />
+              </span>
+            </label>
+            {googleRegisterError && (
+              <div className="gl-auth-error" role="alert">
+                {googleRegisterError}
+              </div>
+            )}
+            <GoogleIdentityButton
+              className="gl-google-register-button"
+              text="signup_with"
+              disabled={!googleRegisterReady}
+              fallbackLabel={
+                !isGoogleConfigured()
+                  ? t('auth.socialUnavailable')
+                  : googleRegisterReady
+                    ? t('auth.continueGoogle')
+                    : t('auth.googleRegisterFillFirst', {
+                        defaultValue: 'Fill username and invite code first',
+                      })
+              }
+              onCredential={handleGoogleRegisterCredential}
+              onUnavailable={(message) =>
+                setGoogleRegisterError(
+                  message ||
+                    t('auth.errors.googleLoadFailed', {
+                      defaultValue: 'Could not load Google sign-in.',
+                    }),
+                )
+              }
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

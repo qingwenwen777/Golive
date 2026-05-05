@@ -97,12 +97,14 @@ export function GoogleIdentityButton({
   text = 'continue_with',
   disabled,
   fallbackLabel,
+  className,
   onCredential,
   onUnavailable,
 }: {
   text?: GoogleButtonText;
   disabled?: boolean;
   fallbackLabel: string;
+  className?: string;
   onCredential: (credential: string) => void;
   onUnavailable?: (message: string) => void;
 }) {
@@ -156,14 +158,18 @@ export function GoogleIdentityButton({
 
   if (!clientId || disabled) {
     return (
-      <button type="button" className="gl-google-fallback" disabled>
+      <button
+        type="button"
+        className={`gl-google-fallback${className ? ` ${className}` : ''}`}
+        disabled
+      >
         {fallbackLabel}
       </button>
     );
   }
 
   return (
-    <div className="gl-google-button-shell">
+    <div className={`gl-google-button-shell${className ? ` ${className}` : ''}`}>
       <div ref={ref} className="gl-google-button" aria-label={fallbackLabel} />
       {!ready && (
         <button type="button" className="gl-google-fallback" disabled>

@@ -84,6 +84,15 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
     navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/');
   };
 
+  const handleLogoClick = () => {
+    if (onLogoClick) {
+      onLogoClick();
+      return;
+    }
+    navigate('/');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     commitSearch();
@@ -125,7 +134,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           >
             <Icons.Menu size={24} />
           </button>
-          <button type="button" className="gl-logo" onClick={onLogoClick} aria-label="GoLive">
+          <button type="button" className="gl-logo" onClick={handleLogoClick} aria-label="GoLive">
             <GoLiveLogo height={28} />
             <span className="gl-logo-country">{t(`lang.short.${lang}`)}</span>
           </button>

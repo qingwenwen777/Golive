@@ -17,7 +17,10 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 var ErrUsernameTaken = errors.New("username already exists")
 var ErrEmailTaken = errors.New("email already exists")
-var ErrGoogleAlreadyLinked = errors.New("google account already linked")
+var (
+	ErrGoogleAlreadyLinked = errors.New("google account already linked")
+	ErrGoogleNotLinked     = errors.New("google account not linked")
+)
 var ErrInviteNotFound = errors.New("invite code not found")
 var ErrInviteUsed = errors.New("invite code already used")
 var ErrUsernameCooldown = errors.New("username change cooldown")
@@ -214,6 +217,37 @@ func (r *UserRepo) LinkGoogleAccount(ctx context.Context, id, googleSub, googleE
 		}
 
 		if err := tx.Model(&u).Updates(updates).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", id).Take(&u).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) UnlinkGoogleAccount(ctx context.Context, id string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).
+			Take(&u).Error; err != nil {
+			return err
+		}
+		if u.GoogleSub == nil || strings.TrimSpace(*u.GoogleSub) == "" {
+			return ErrGoogleNotLinked
+		}
+		if err := tx.Model(&u).Updates(map[string]any{
+			"google_sub":       nil,
+			"google_linked_at": nil,
+		}).Error; err != nil {
 			return err
 		}
 		return tx.Where("id = ?", id).Take(&u).Error

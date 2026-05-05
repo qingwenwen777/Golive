@@ -141,6 +141,29 @@ func TestGoogleRegisterCanLinkExistingEmailByPassword(t *testing.T) {
 	require.Equal(t, manual.User.ID, linked.User.ID)
 	require.True(t, linked.User.GoogleLinked)
 
+	badUnlinkReq := httptest.NewRequest(http.MethodPost, "/auth/google/unbind", bytes.NewBufferString(`{
+		"password":"wrong-password"
+	}`))
+	badUnlinkReq.Header.Set("Content-Type", "application/json")
+	badUnlinkReq.Header.Set("Authorization", "Bearer "+linked.Token)
+	badUnlinkRec := httptest.NewRecorder()
+	router.ServeHTTP(badUnlinkRec, badUnlinkReq)
+	require.Equal(t, http.StatusUnauthorized, badUnlinkRec.Code)
+
+	unlinkReq := httptest.NewRequest(http.MethodPost, "/auth/google/unbind", bytes.NewBufferString(`{
+		"password":"secret123"
+	}`))
+	unlinkReq.Header.Set("Content-Type", "application/json")
+	unlinkReq.Header.Set("Authorization", "Bearer "+linked.Token)
+	unlinkRec := httptest.NewRecorder()
+	router.ServeHTTP(unlinkRec, unlinkReq)
+	require.Equal(t, http.StatusOK, unlinkRec.Code)
+	var unlinked struct {
+		GoogleLinked bool `json:"googleLinked"`
+	}
+	require.NoError(t, json.Unmarshal(unlinkRec.Body.Bytes(), &unlinked))
+	require.False(t, unlinked.GoogleLinked)
+
 	items, err := users.ListInviteCodes(ctx)
 	require.NoError(t, err)
 	usedCount := 0

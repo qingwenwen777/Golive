@@ -47,6 +47,10 @@ export interface GoogleLinkExistingPayload extends GoogleCredentialPayload {
   password: string;
 }
 
+export interface GoogleUnbindPayload {
+  password: string;
+}
+
 export interface UpdateProfilePayload {
   username: string;
   displayName: string;
@@ -236,6 +240,20 @@ export function useBindGoogleAccount() {
   return useMutation<User, Error, GoogleCredentialPayload>({
     mutationFn: async (payload) => {
       const { data } = await http.post<User>('/auth/google/bind', payload);
+      return data;
+    },
+    onSuccess: (user) => {
+      qc.setQueryData(['me'], user);
+      useAuthStore.getState().setUser(user);
+    },
+  });
+}
+
+export function useUnbindGoogleAccount() {
+  const qc = useQueryClient();
+  return useMutation<User, Error, GoogleUnbindPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<User>('/auth/google/unbind', payload);
       return data;
     },
     onSuccess: (user) => {

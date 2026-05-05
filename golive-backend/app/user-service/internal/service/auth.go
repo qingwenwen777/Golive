@@ -39,6 +39,7 @@ var (
 	ErrGoogleAccountNotFound   = errcode.New(http.StatusNotFound, "Google account is not linked to a GoLive account").WithReason("google_account_not_found")
 	ErrGoogleEmailTaken        = errcode.New(http.StatusConflict, "This Google email is already used by another account").WithReason("google_email_exists")
 	ErrGoogleAlreadyLinked     = errcode.New(http.StatusConflict, "This Google account is already linked").WithReason("google_already_linked")
+	ErrGoogleNotLinked         = errcode.New(http.StatusBadRequest, "This account is not linked to Google").WithReason("google_not_linked")
 )
 
 type UserStore interface {
@@ -64,6 +65,10 @@ type googleSubFinder interface {
 
 type googleLinker interface {
 	LinkGoogleAccount(ctx context.Context, id, googleSub, googleEmail string, linkedAt time.Time) (*model.User, error)
+}
+
+type googleUnlinker interface {
+	UnlinkGoogleAccount(ctx context.Context, id string) (*model.User, error)
 }
 
 type passwordResetter interface {

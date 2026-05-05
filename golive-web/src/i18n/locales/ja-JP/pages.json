@@ -571,7 +571,15 @@
         "googleSub": "このアカウントに Google を連携して、よりすばやくログインできます。",
         "googleBind": "Google を連携",
         "googleLinked": "Google アカウントを連携済みです。",
-        "googleUnavailable": "Google ログインはまだ設定されていません。"
+        "googleUnavailable": "Google ログインはまだ設定されていません。",
+        "googleUnlink": "解除",
+        "googleUnlinkTitle": "Google アカウントの連携を解除",
+        "googleUnlinkSub": "Google の連携を解除する前に、現在のパスワードを入力してください。",
+        "googleUnlinkPassword": "現在のパスワード",
+        "googleUnlinkCancel": "キャンセル",
+        "googleUnlinkConfirm": "Google 連携を解除",
+        "googleUnlinking": "解除中...",
+        "googleUnlinked": "Google アカウントの連携を解除しました。"
       },
       "preferences": {
         "displayTitle": "表示設定",
@@ -597,7 +605,9 @@
         "googleEmailExists": "この Google メールは別の GoLive アカウントで使用されています。",
         "googleAlreadyLinked": "この Google アカウントはすでに連携されています。",
         "invalidGoogleCredential": "Google ログインを確認できませんでした。",
-        "googleNotConfigured": "Google ログインはまだ設定されていません。"
+        "googleNotConfigured": "Google ログインはまだ設定されていません。",
+        "googleNotLinked": "このアカウントは Google と連携されていません。",
+        "googleUnlinkPasswordRequired": "Google 連携を解除するには現在のパスワードを入力してください。"
       }
     }
   },

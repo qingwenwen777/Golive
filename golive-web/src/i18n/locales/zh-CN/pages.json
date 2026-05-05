@@ -572,7 +572,15 @@
         "googleSub": "绑定后可以更快登录当前账号。",
         "googleBind": "绑定 Google",
         "googleLinked": "已绑定 Google 账号。",
-        "googleUnavailable": "Google 登录尚未配置完成。"
+        "googleUnavailable": "Google 登录尚未配置完成。",
+        "googleUnlink": "解绑",
+        "googleUnlinkTitle": "解绑 Google 账号",
+        "googleUnlinkSub": "解绑前需要输入当前账号密码进行验证。",
+        "googleUnlinkPassword": "当前密码",
+        "googleUnlinkCancel": "取消",
+        "googleUnlinkConfirm": "解绑 Google",
+        "googleUnlinking": "解绑中...",
+        "googleUnlinked": "Google 账号已解绑。"
       },
       "preferences": {
         "displayTitle": "显示偏好",
@@ -598,7 +606,9 @@
         "googleEmailExists": "这个 Google 邮箱已经属于另一个 GoLive 账号。",
         "googleAlreadyLinked": "这个 Google 账号已经被绑定。",
         "invalidGoogleCredential": "无法验证 Google 登录。",
-        "googleNotConfigured": "Google 登录尚未配置完成。"
+        "googleNotConfigured": "Google 登录尚未配置完成。",
+        "googleNotLinked": "当前账号尚未绑定 Google。",
+        "googleUnlinkPasswordRequired": "请输入当前密码来解绑 Google。"
       }
     }
   },

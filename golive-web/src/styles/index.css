@@ -3902,12 +3902,21 @@ input:focus-visible,
 .gl-google-button-shell {
   position: relative;
   min-height: 42px;
-  width: 100%;
+  width: min(100%, 320px);
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
 }
 .gl-google-button,
 .gl-google-button > div,
 .gl-google-button iframe {
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+.gl-google-button {
+  overflow: hidden;
+  border-radius: 999px;
 }
 .gl-google-fallback {
   display: inline-flex;
@@ -3925,6 +3934,9 @@ input:focus-visible,
 .gl-google-button-shell .gl-google-fallback {
   position: absolute;
   inset: 0;
+}
+.gl-auth-form > .gl-google-button-shell {
+  width: 100%;
 }
 .gl-auth-google-link {
   display: flex;
@@ -3956,6 +3968,83 @@ input:focus-visible,
   background: var(--gl-btn-primary);
   color: var(--gl-btn-primary-text);
   padding: 0 16px;
+}
+.gl-auth-google-register-trigger {
+  width: 100%;
+  border: 1px solid var(--gl-border);
+  background: var(--gl-bg);
+  color: var(--gl-text);
+}
+.gl-google-letter-mark,
+.gl-google-provider-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+.gl-google-provider-icon {
+  width: 34px;
+  height: 34px;
+  font-size: 20px;
+}
+.gl-google-provider-icon.is-small {
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+}
+.gl-google-provider-icon.is-large {
+  width: 44px;
+  height: 44px;
+  font-size: 25px;
+}
+.gl-google-register-dialog,
+.gl-google-unbind-dialog {
+  overflow: hidden;
+  border-radius: 16px;
+}
+.gl-google-register-body,
+.gl-google-unbind-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+}
+.gl-google-register-body .gl-google-provider-icon,
+.gl-google-unbind-body .gl-google-provider-icon {
+  align-self: flex-start;
+}
+.gl-google-register-body h2,
+.gl-google-unbind-body h2 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.18;
+}
+.gl-google-register-body p,
+.gl-google-unbind-body p {
+  margin: -6px 0 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.gl-google-register-button {
+  align-self: stretch;
+  width: 100%;
+}
+.gl-google-unbind-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .gl-auth-submit {
   margin-top: 4px;
@@ -10356,6 +10445,7 @@ button.gl-fan-badge-empty {
   background: var(--gl-bg-card);
   box-shadow: var(--gl-shadow);
   padding: 18px;
+  min-width: 0;
 }
 
 .gl-settings-auth-card {
@@ -10430,23 +10520,53 @@ button.gl-fan-badge-empty {
   background: var(--gl-btn-primary-hover);
 }
 
+.gl-settings-button.is-danger {
+  border-color: rgba(210, 44, 44, 0.26);
+  background: rgba(210, 44, 44, 0.08);
+  color: #b4232f;
+}
+
+.gl-settings-button.is-danger:hover {
+  background: rgba(210, 44, 44, 0.14);
+}
+
+.gl-settings-button.is-compact {
+  min-height: 34px;
+  height: 34px;
+  padding: 0 12px;
+}
+
 .gl-settings-button:disabled {
   cursor: default;
   opacity: 0.55;
 }
 
 .gl-settings-provider-state {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  width: fit-content;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
   border: 1px solid rgba(21, 128, 61, 0.24);
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(21, 128, 61, 0.08);
   color: #15803d;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 13px;
   font-weight: 850;
+}
+
+.gl-settings-provider-state > span:not(.gl-google-provider-icon) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gl-settings-google-card .gl-settings-card-head {
+  align-items: center;
+}
+
+.gl-settings-google-button {
+  width: min(100%, 280px);
 }
 
 .gl-settings-form {

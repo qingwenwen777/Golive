@@ -188,6 +188,35 @@ func (s *AuthService) GoogleLinkCurrentUser(ctx context.Context, userID, credent
 	return &pu, nil
 }
 
+func (s *AuthService) GoogleUnlinkCurrentUser(ctx context.Context, userID, password string) (*model.PublicUser, error) {
+	u, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUnauthorized
+	}
+	if u.GoogleSub == nil || strings.TrimSpace(*u.GoogleSub) == "" {
+		return nil, ErrGoogleNotLinked
+	}
+	if err := ComparePassword(u.PasswordHash, password); err != nil {
+		return nil, ErrInvalidCredentials.WithReason("invalid_current_password")
+	}
+	unlinker, ok := s.users.(googleUnlinker)
+	if !ok {
+		return nil, errors.New("user store cannot unlink google accounts")
+	}
+	updated, err := unlinker.UnlinkGoogleAccount(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrUserNotFound) {
+			return nil, ErrUnauthorized
+		}
+		if errors.Is(err, repo.ErrGoogleNotLinked) {
+			return nil, ErrGoogleNotLinked
+		}
+		return nil, fmt.Errorf("unlink google account: %w", err)
+	}
+	pu := updated.Public()
+	return &pu, nil
+}
+
 func (s *AuthService) verifyGoogleProfile(ctx context.Context, credential string) (*GoogleProfile, error) {
 	if strings.TrimSpace(s.googleClientID) == "" {
 		return nil, ErrGoogleNotConfigured

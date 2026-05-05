@@ -57,6 +57,10 @@ type googleLinkReq struct {
 	Password   string `json:"password" binding:"required"`
 }
 
+type googleUnlinkReq struct {
+	Password string `json:"password" binding:"required"`
+}
+
 func (h *AuthHandler) Captcha(c *gin.Context) {
 	if h.captcha == nil {
 		errcode.Respond(c, service.ErrInvalidCaptcha)
@@ -193,6 +197,25 @@ func (h *AuthHandler) GoogleBind(c *gin.Context) {
 		return
 	}
 	user, err := h.svc.GoogleLinkCurrentUser(c.Request.Context(), uid, req.Credential)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) GoogleUnbind(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req googleUnlinkReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister)
+		return
+	}
+	user, err := h.svc.GoogleUnlinkCurrentUser(c.Request.Context(), uid, req.Password)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
