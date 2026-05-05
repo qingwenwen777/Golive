@@ -528,6 +528,7 @@
 }
 .gl-pg-left,
 .gl-pg-right {
+  position: relative;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -581,6 +582,80 @@
 .gl-pg-right.is-on,
 .gl-pg-solo.is-on {
   color: #1c62b9;
+}
+.gl-like-burst {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.gl-like-burst b {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(28, 98, 185, 0.42);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  animation: glLikeRing 0.58s ease-out both;
+}
+.gl-like-burst i {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #065fd4;
+  box-shadow: 0 0 0 3px rgba(6, 95, 212, 0.12);
+  transform: translate(-50%, -50%);
+  animation: glLikeSpark 0.62s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.gl-like-burst i:nth-child(1) {
+  --x: -20px;
+  --y: -18px;
+}
+.gl-like-burst i:nth-child(2) {
+  --x: 4px;
+  --y: -24px;
+  background: #3ea6ff;
+}
+.gl-like-burst i:nth-child(3) {
+  --x: 24px;
+  --y: -9px;
+}
+.gl-like-burst i:nth-child(4) {
+  --x: 18px;
+  --y: 17px;
+  background: #3ea6ff;
+}
+.gl-like-burst i:nth-child(5) {
+  --x: -16px;
+  --y: 18px;
+}
+@keyframes glLikeRing {
+  from {
+    opacity: 0.75;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.8);
+  }
+}
+@keyframes glLikeSpark {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) scale(0.85);
+  }
 }
 .dark .gl-pg-solo:hover {
   background: #4f4f4f;

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clipboard,
   Coins,
+  Database,
   Eye,
   FileCheck2,
   FileText,
@@ -20,14 +21,19 @@ import {
   RefreshCw,
   Save,
   Search,
+  Server,
   Settings,
   Shield,
   SlidersHorizontal,
   Ticket,
   Trash2,
   Upload,
+  UserCheck,
+  UserCog,
+  UserX,
   Users,
   Video,
+  Wallet,
   X,
   type LucideProps,
 } from 'lucide-react';
@@ -61,6 +67,19 @@ import {
   type BlockedWord,
   type ReportAction,
 } from '@/api/contentModeration';
+import {
+  useAdminAdjustUserCoins,
+  useAdminOverview,
+  useAdminSetUserBan,
+  useAdminUpdateUserProfile,
+  useAdminUpdateUserRole,
+  useAdminUserDetail,
+  useAdminUsers,
+  type AdminOverview,
+  type AdminUserRole,
+  type AdminUserStatus,
+  type CoinAdjustAction,
+} from '@/api/admin';
 import { Avatar } from '@/components/Avatar';
 import { GoLiveLogo } from '@/components/Logo';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -153,6 +172,8 @@ export default function AdminPage() {
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === 'admin';
+  const isModerator = user?.role === 'moderator';
+  const canAccessAdmin = isAdmin || isModerator;
   const currentModule = getModuleFromPath(location.pathname);
   const currentText = moduleText(t, currentModule ?? 'dashboard');
 
@@ -167,6 +188,7 @@ export default function AdminPage() {
   const updatePermission = useUpdateLivePermission();
   const createInvite = useCreateInviteCode();
   const deleteInvite = useDeleteInviteCode();
+  const overview = useAdminOverview(canAccessAdmin);
 
   const appItems = apps.data?.items ?? [];
   const platformAppItems = platformApps.data?.items ?? [];
@@ -189,7 +211,11 @@ export default function AdminPage() {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  if (!isAdmin) {
+  if (isModerator && currentModule !== 'content') {
+    return <Navigate to="/admin/content" replace />;
+  }
+
+  if (!canAccessAdmin) {
     return (
       <div className="gl-page gl-admin-page">
         <section className="gl-admin-denied">
@@ -210,17 +236,20 @@ export default function AdminPage() {
 
   const refresh = () => {
     void queryClient.invalidateQueries();
-    void apps.refetch();
-    void platformApps.refetch();
-    void creators.refetch();
-    void invites.refetch();
+    void overview.refetch();
+    if (isAdmin) {
+      void apps.refetch();
+      void platformApps.refetch();
+      void creators.refetch();
+      void invites.refetch();
+    }
     toast.success(t('admin.refreshDone', { defaultValue: 'Admin data refreshed.' }));
   };
 
   return (
     <div className="gl-page gl-admin-page">
       <div className="gl-admin-workspace">
-        <AdminNav currentModule={currentModule} metrics={metrics} />
+        <AdminNav currentModule={currentModule} metrics={metrics} limited={isModerator} />
         <main className="gl-admin-stage">
           <header className="gl-admin-topbar">
             <div>
@@ -250,7 +279,9 @@ export default function AdminPage() {
           {currentModule === 'dashboard' && (
             <DashboardPage
               metrics={metrics}
+              overview={overview.data}
               loading={apps.isLoading || creators.isLoading || invites.isLoading}
+              overviewLoading={overview.isLoading}
             />
           )}
           {currentModule === 'users' && (
@@ -446,9 +477,11 @@ export default function AdminPage() {
 function AdminNav({
   currentModule,
   metrics,
+  limited = false,
 }: {
   currentModule: AdminModule;
   metrics: AdminMetrics;
+  limited?: boolean;
 }) {
   const { t } = useTranslation('pages');
   const badgeFor = (module: AdminModule) => {
@@ -473,7 +506,7 @@ function AdminNav({
         </div>
       </div>
       <nav className="gl-admin-nav-list">
-        {ADMIN_MODULES.map((module) => {
+        {ADMIN_MODULES.filter((module) => !limited || module.key === 'content').map((module) => {
           const Icon = module.icon;
           const badge = badgeFor(module.key);
           const copy = moduleText(t, module.key);
@@ -497,8 +530,21 @@ function AdminNav({
   );
 }
 
-function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: boolean }) {
+function DashboardPage({
+  metrics,
+  overview,
+  loading,
+  overviewLoading,
+}: {
+  metrics: AdminMetrics;
+  overview?: AdminOverview;
+  loading: boolean;
+  overviewLoading: boolean;
+}) {
   const { t } = useTranslation('pages');
+  const healthOk = overview?.health?.filter((item) => item.status === 'ok').length ?? 0;
+  const healthTotal = overview?.health?.length ?? 0;
+  const healthValue = overviewLoading ? '-' : `${healthOk}/${healthTotal || 0}`;
   return (
     <div className="gl-admin-section-stack">
       <section
@@ -506,30 +552,71 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
         aria-label={t('admin.dashboard.aria', { defaultValue: 'Admin overview' })}
       >
         <AdminKpi
-          icon={FileCheck2}
-          label={t('admin.dashboard.kpis.pendingApplications', {
-            defaultValue: 'Pending live applications',
+          icon={Video}
+          label={t('admin.dashboard.kpis.onlineRooms', {
+            defaultValue: 'Live rooms online',
           })}
-          value={loading ? '-' : metrics.pendingApplications}
+          value={overviewLoading ? '-' : (overview?.onlineRooms ?? 0)}
           tone="red"
         />
         <AdminKpi
-          icon={Video}
-          label={t('admin.dashboard.kpis.approvedCreators', { defaultValue: 'Approved creators' })}
-          value={loading ? '-' : metrics.approvedCreators}
-        />
-        <AdminKpi
-          icon={Ticket}
-          label={t('admin.dashboard.kpis.availableInvites', {
-            defaultValue: 'Available invite codes',
+          icon={Eye}
+          label={t('admin.dashboard.kpis.onlineViewers', {
+            defaultValue: 'Online viewers',
           })}
-          value={loading ? '-' : metrics.availableInvites}
+          value={overviewLoading ? '-' : (overview?.onlineViewers ?? 0)}
         />
         <AdminKpi
-          icon={ListFilter}
-          label={t('admin.dashboard.kpis.pendingContent', { defaultValue: 'Pending content' })}
-          value="0"
+          icon={UserCheck}
+          label={t('admin.dashboard.kpis.todayUsers', {
+            defaultValue: 'New users today',
+          })}
+          value={overviewLoading ? '-' : (overview?.todayNewUsers ?? 0)}
         />
+        <AdminKpi
+          icon={Wallet}
+          label={t('admin.dashboard.kpis.todayRevenue', {
+            defaultValue: 'Today revenue (Coins)',
+          })}
+          value={overviewLoading ? '-' : (overview?.todayRevenueCoins ?? 0)}
+        />
+        <AdminKpi
+          icon={Server}
+          label={t('admin.dashboard.kpis.systemHealth', { defaultValue: 'System health' })}
+          value={healthValue}
+        />
+      </section>
+
+      <section className="gl-admin-panel">
+        <div className="gl-admin-panel-head">
+          <div>
+            <span>{t('admin.dashboard.health.eyebrow', { defaultValue: 'Health' })}</span>
+            <h2>{t('admin.dashboard.health.title', { defaultValue: 'Service and storage status' })}</h2>
+          </div>
+        </div>
+        <div className="gl-admin-health-grid">
+          {(overview?.health ?? []).map((item) => (
+            <div className={`gl-admin-health-card is-${item.status}`} key={item.key}>
+              <span>
+                {item.key === 'mysql' || item.key === 'redis' || item.key === 'nsq' ? (
+                  <Database size={17} />
+                ) : (
+                  <Server size={17} />
+                )}
+              </span>
+              <div>
+                <strong>{item.label}</strong>
+                <small>{healthStatusLabel(item.status, t)}</small>
+                {item.detail && <p>{item.detail}</p>}
+              </div>
+            </div>
+          ))}
+          {!overviewLoading && (overview?.health?.length ?? 0) === 0 && (
+            <AdminEmptyState
+              label={t('admin.dashboard.health.empty', { defaultValue: 'No health data.' })}
+            />
+          )}
+        </div>
       </section>
 
       <section className="gl-admin-panel">
@@ -567,8 +654,8 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
               defaultValue: 'Live application review',
             })}
             value={t('admin.dashboard.focus.applicationReviewValue', {
-              pending: metrics.pendingApplications,
-              total: metrics.totalApplications,
+              pending: loading ? '-' : metrics.pendingApplications,
+              total: loading ? '-' : metrics.totalApplications,
               defaultValue: '{{pending}} pending / {{total}} total applications',
             })}
           />
@@ -576,18 +663,22 @@ function DashboardPage({ metrics, loading }: { metrics: AdminMetrics; loading: b
             label={t('admin.dashboard.focus.permissionManagement', {
               defaultValue: 'Live permission management',
             })}
-            value={t('admin.dashboard.focus.permissionManagementValue', {
-              count: metrics.approvedCreators,
-              defaultValue: '{{count}} creators can go live',
-            })}
+            value={
+              loading
+                ? '-'
+                : t('admin.dashboard.focus.permissionManagementValue', {
+                    count: metrics.approvedCreators,
+                    defaultValue: '{{count}} creators can go live',
+                  })
+            }
           />
           <AdminDetailRow
             label={t('admin.dashboard.focus.inviteManagement', {
               defaultValue: 'Invite code management',
             })}
             value={t('admin.dashboard.focus.inviteManagementValue', {
-              available: metrics.availableInvites,
-              total: metrics.totalInvites,
+              available: loading ? '-' : metrics.availableInvites,
+              total: loading ? '-' : metrics.totalInvites,
               defaultValue: '{{available}} available / {{total}} total',
             })}
           />
@@ -615,6 +706,34 @@ function UsersPage({
   onDeleteInvite: (item: AdminInviteCode) => void;
 }) {
   const { t } = useTranslation('pages');
+  const [query, setQuery] = useState('');
+  const [role, setRole] = useState<string>('all');
+  const [status, setStatus] = useState<AdminUserStatus>('all');
+  const [page, setPage] = useState(1);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const pageSize = 10;
+  const users = useAdminUsers({
+    q: query.trim() || undefined,
+    role,
+    status,
+    page,
+    size: pageSize,
+  });
+  const userItems = users.data?.items ?? [];
+  const stats = users.data?.stats ?? {
+    total: 0,
+    active: 0,
+    banned: 0,
+    admins: 0,
+    moderators: 0,
+  };
+  const totalPages = Math.max(1, Math.ceil((users.data?.total ?? 0) / pageSize));
+  const activeUserId = selectedUserId || userItems[0]?.id || '';
+  const setFilter = (fn: () => void) => {
+    fn();
+    setPage(1);
+    setSelectedUserId('');
+  };
   return (
     <div className="gl-admin-section-stack">
       <section
@@ -622,26 +741,129 @@ function UsersPage({
         aria-label={t('admin.users.aria', { defaultValue: 'User management summary' })}
       >
         <AdminKpi
-          icon={Ticket}
-          label={t('admin.users.kpis.availableInvites', { defaultValue: 'Available invite codes' })}
-          value={inviteItems.filter((item) => !item.used).length}
-        />
-        <AdminKpi
-          icon={Clipboard}
-          label={t('admin.users.kpis.usedInvites', { defaultValue: 'Used invite codes' })}
-          value={inviteItems.filter((item) => item.used).length}
-        />
-        <AdminKpi
           icon={Users}
-          label={t('admin.users.kpis.accountDirectory', { defaultValue: 'Account directory' })}
-          value="-"
+          label={t('admin.users.kpis.totalUsers', { defaultValue: 'Total users' })}
+          value={users.isLoading ? '-' : stats.total}
         />
         <AdminKpi
-          icon={Shield}
-          label={t('admin.users.kpis.admins', { defaultValue: 'Admins' })}
-          value="-"
+          icon={UserCheck}
+          label={t('admin.users.kpis.activeUsers', { defaultValue: 'Active users' })}
+          value={users.isLoading ? '-' : stats.active}
+        />
+        <AdminKpi
+          icon={UserX}
+          label={t('admin.users.kpis.bannedUsers', { defaultValue: 'Banned users' })}
+          value={users.isLoading ? '-' : stats.banned}
+          tone={stats.banned > 0 ? 'red' : undefined}
+        />
+        <AdminKpi
+          icon={UserCog}
+          label={t('admin.users.kpis.maintainers', { defaultValue: 'Admins / moderators' })}
+          value={users.isLoading ? '-' : `${stats.admins}/${stats.moderators}`}
         />
       </section>
+
+      <section className="gl-admin-panel gl-admin-user-panel">
+        <div className="gl-admin-panel-head">
+          <div>
+            <span>{t('admin.users.directory.eyebrow', { defaultValue: 'Directory' })}</span>
+            <h2>{t('admin.users.directory.title', { defaultValue: 'User list' })}</h2>
+          </div>
+        </div>
+        <div className="gl-admin-content-filters gl-admin-user-filters">
+          <label className="gl-admin-content-search">
+            <span>{t('admin.users.filters.search', { defaultValue: 'Search' })}</span>
+            <div>
+              <Search size={15} />
+              <input
+                value={query}
+                onChange={(event) => setFilter(() => setQuery(event.target.value))}
+                placeholder={t('admin.users.filters.searchPlaceholder', {
+                  defaultValue: 'Username, display name, email',
+                })}
+              />
+            </div>
+          </label>
+          <AdminFilterSelect
+            label={t('admin.users.filters.role', { defaultValue: 'Role' })}
+            value={role}
+            options={['all', 'user', 'admin', 'moderator'].map((value) => ({
+              value,
+              label: userRoleLabel(value, t),
+            }))}
+            onChange={(value) => setFilter(() => setRole(value))}
+          />
+          <AdminFilterSelect
+            label={t('admin.users.filters.status', { defaultValue: 'Status' })}
+            value={status}
+            options={['all', 'active', 'banned', 'frozen', 'live_approved'].map((value) => ({
+              value,
+              label: userStatusLabel(value, t),
+            }))}
+            onChange={(value) => setFilter(() => setStatus(value as AdminUserStatus))}
+          />
+        </div>
+        <div className="gl-admin-user-manager">
+          <div className="gl-admin-user-list" aria-busy={users.isFetching}>
+            {users.isLoading ? (
+              <AdminEmptyState
+                label={t('admin.users.loading', { defaultValue: 'Loading users...' })}
+              />
+            ) : userItems.length === 0 ? (
+              <AdminEmptyState
+                label={t('admin.users.empty', { defaultValue: 'No users match this filter.' })}
+              />
+            ) : (
+              userItems.map((item) => (
+                <button
+                  type="button"
+                  className={
+                    item.id === activeUserId ? 'gl-admin-user-card is-active' : 'gl-admin-user-card'
+                  }
+                  key={item.id}
+                  onClick={() => setSelectedUserId(item.id)}
+                >
+                  <Avatar name={item.displayName || item.username} src={item.avatar} size={38} />
+                  <div>
+                    <strong>{item.displayName || item.username}</strong>
+                    <span>@{item.username}</span>
+                    <small>{formatDate(item.createdAt)}</small>
+                  </div>
+                  <em className={`gl-admin-user-role is-${item.role}`}>
+                    {userRoleLabel(item.role, t)}
+                  </em>
+                  <em className={item.banned ? 'gl-admin-user-state is-banned' : 'gl-admin-user-state'}>
+                    {item.banned
+                      ? userStatusLabel('banned', t)
+                      : userStatusLabel('active', t)}
+                  </em>
+                </button>
+              ))
+            )}
+            <div className="gl-admin-pagination">
+              <button type="button" disabled={page <= 1} onClick={() => setPage((v) => v - 1)}>
+                {t('admin.users.pagination.prev', { defaultValue: 'Previous' })}
+              </button>
+              <span>
+                {t('admin.users.pagination.page', {
+                  page,
+                  total: totalPages,
+                  defaultValue: '{{page}} / {{total}}',
+                })}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((v) => v + 1)}
+              >
+                {t('admin.users.pagination.next', { defaultValue: 'Next' })}
+              </button>
+            </div>
+          </div>
+          <AdminUserDetailPanel userId={activeUserId} />
+        </div>
+      </section>
+
       <InvitesPanel
         items={inviteItems}
         loading={invitesLoading}
@@ -651,27 +873,301 @@ function UsersPage({
         onCreate={onCreateInvite}
         onDelete={onDeleteInvite}
       />
-      <StaticOperationsPanel
-        eyebrow={t('admin.users.framework.eyebrow', { defaultValue: 'Users' })}
-        title={t('admin.users.framework.title', { defaultValue: 'User management framework' })}
-        rows={[
-          [
-            t('admin.users.framework.accounts', { defaultValue: 'Account list' }),
-            t('admin.users.framework.accountsSub', { defaultValue: 'Profiles, roles, and status' }),
-          ],
-          [
-            t('admin.users.framework.groups', { defaultValue: 'Permission groups' }),
-            t('admin.users.framework.groupsSub', { defaultValue: 'Regular users and admins' }),
-          ],
-          [
-            t('admin.users.framework.risk', { defaultValue: 'Risk status' }),
-            t('admin.users.framework.riskSub', {
-              defaultValue: 'Registration, login, and invite redemption',
-            }),
-          ],
-        ]}
-      />
     </div>
+  );
+}
+
+function AdminUserDetailPanel({ userId }: { userId: string }) {
+  const { t } = useTranslation('pages');
+  const [tab, setTab] = useState<'profile' | 'coins' | 'lives' | 'reports'>('profile');
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [banReason, setBanReason] = useState('');
+  const [coinAction, setCoinAction] = useState<CoinAdjustAction>('add');
+  const [coinAmount, setCoinAmount] = useState('100');
+  const [coinNote, setCoinNote] = useState('');
+  const detail = useAdminUserDetail(userId, Boolean(userId));
+  const updateProfile = useAdminUpdateUserProfile(userId);
+  const updateRole = useAdminUpdateUserRole(userId);
+  const setBan = useAdminSetUserBan(userId);
+  const adjustCoins = useAdminAdjustUserCoins(userId);
+  const user = detail.data?.user;
+
+  useEffect(() => {
+    if (!user) return;
+    setUsername(user.username);
+    setDisplayName(user.displayName || user.username);
+    setBanReason(user.banReason || '');
+    setTab('profile');
+  }, [user?.id]);
+
+  if (!userId) {
+    return (
+      <aside className="gl-admin-user-detail">
+        <AdminEmptyState
+          label={t('admin.users.detail.empty', { defaultValue: 'Select a user to view details.' })}
+        />
+      </aside>
+    );
+  }
+
+  if (detail.isLoading || !user) {
+    return (
+      <aside className="gl-admin-user-detail">
+        <AdminEmptyState
+          label={t('admin.users.detail.loading', { defaultValue: 'Loading user details...' })}
+        />
+      </aside>
+    );
+  }
+
+  const availableCoins = Math.max(0, user.coinBalance - (user.frozenCoins ?? 0));
+  const submitProfile = () => {
+    updateProfile.mutate(
+      {
+        username: username.trim(),
+        displayName: displayName.trim(),
+      },
+      {
+        onSuccess: () =>
+          toast.success(t('admin.users.detail.profileSaved', { defaultValue: 'Profile updated.' })),
+        onError: (err) => toast.error(apiErrorMessage(err)),
+      },
+    );
+  };
+  const submitRole = (role: string) => {
+    updateRole.mutate(
+      { role: role as AdminUserRole },
+      {
+        onSuccess: () =>
+          toast.success(t('admin.users.detail.roleSaved', { defaultValue: 'Role updated.' })),
+        onError: (err) => toast.error(apiErrorMessage(err)),
+      },
+    );
+  };
+  const toggleBan = () => {
+    setBan.mutate(
+      { banned: !user.banned, reason: banReason.trim() },
+      {
+        onSuccess: () =>
+          toast.success(
+            user.banned
+              ? t('admin.users.detail.unbanned', { defaultValue: 'User unbanned.' })
+              : t('admin.users.detail.banned', { defaultValue: 'User banned.' }),
+          ),
+        onError: (err) => toast.error(apiErrorMessage(err)),
+      },
+    );
+  };
+  const submitCoins = () => {
+    const amount = Number.parseInt(coinAmount, 10);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error(t('admin.users.detail.invalidAmount', { defaultValue: 'Enter a valid amount.' }));
+      return;
+    }
+    adjustCoins.mutate(
+      { action: coinAction, amount, note: coinNote.trim() },
+      {
+        onSuccess: () => {
+          setCoinNote('');
+          toast.success(
+            t('admin.users.detail.coinsSaved', { defaultValue: 'Coin balance updated.' }),
+          );
+        },
+        onError: (err) => toast.error(apiErrorMessage(err)),
+      },
+    );
+  };
+
+  return (
+    <aside className="gl-admin-user-detail">
+      <div className="gl-admin-user-detail-head">
+        <Avatar name={user.displayName || user.username} src={user.avatar} size={48} />
+        <div>
+          <strong>{user.displayName || user.username}</strong>
+          <span>@{user.username}</span>
+        </div>
+        <em className={user.banned ? 'is-banned' : undefined}>
+          {user.banned ? userStatusLabel('banned', t) : userRoleLabel(user.role, t)}
+        </em>
+      </div>
+      <div className="gl-admin-user-detail-tabs">
+        {(['profile', 'coins', 'lives', 'reports'] as const).map((item) => (
+          <button
+            type="button"
+            key={item}
+            className={tab === item ? 'is-active' : undefined}
+            onClick={() => setTab(item)}
+          >
+            {userDetailTabLabel(item, t)}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'profile' && (
+        <div className="gl-admin-user-detail-body">
+          <AdminDetailRow
+            label={t('admin.users.detail.status', { defaultValue: 'Status' })}
+            value={user.banned ? userStatusLabel('banned', t) : userStatusLabel('active', t)}
+          />
+          <AdminDetailRow
+            label={t('admin.users.detail.livePermission', { defaultValue: 'Live permission' })}
+            value={statusText(user.livePermissionStatus, t)}
+          />
+          <div className="gl-admin-user-form">
+            <label>
+              <span>{t('admin.users.detail.username', { defaultValue: 'Username' })}</span>
+              <input value={username} onChange={(event) => setUsername(event.target.value)} />
+            </label>
+            <label>
+              <span>{t('admin.users.detail.displayName', { defaultValue: 'Display name' })}</span>
+              <input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+            </label>
+            <button type="button" onClick={submitProfile} disabled={updateProfile.isPending}>
+              <Save size={15} />
+              {t('admin.users.detail.saveProfile', { defaultValue: 'Save profile' })}
+            </button>
+          </div>
+          <div className="gl-admin-user-form is-compact">
+            <AdminFilterSelect
+              label={t('admin.users.detail.role', { defaultValue: 'Role' })}
+              value={user.role}
+              options={['user', 'admin', 'moderator'].map((value) => ({
+                value,
+                label: userRoleLabel(value, t),
+              }))}
+              onChange={submitRole}
+            />
+            <label>
+              <span>{t('admin.users.detail.banReason', { defaultValue: 'Ban reason' })}</span>
+              <input
+                value={banReason}
+                onChange={(event) => setBanReason(event.target.value)}
+                placeholder={t('admin.users.detail.banReasonPlaceholder', {
+                  defaultValue: 'Visible in audit and appeal review',
+                })}
+              />
+            </label>
+            <button
+              type="button"
+              className={user.banned ? undefined : 'is-danger'}
+              onClick={toggleBan}
+              disabled={setBan.isPending}
+            >
+              {user.banned ? <Check size={15} /> : <Ban size={15} />}
+              {user.banned
+                ? t('admin.users.detail.unban', { defaultValue: 'Unban user' })
+                : t('admin.users.detail.ban', { defaultValue: 'Ban user' })}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'coins' && (
+        <div className="gl-admin-user-detail-body">
+          <div className="gl-admin-coin-summary">
+            <AdminKpi
+              icon={Coins}
+              label={t('admin.users.detail.coinBalance', { defaultValue: 'Balance' })}
+              value={user.coinBalance}
+            />
+            <AdminKpi
+              icon={Shield}
+              label={t('admin.users.detail.frozenCoins', { defaultValue: 'Frozen' })}
+              value={user.frozenCoins ?? 0}
+            />
+            <AdminKpi
+              icon={Wallet}
+              label={t('admin.users.detail.availableCoins', { defaultValue: 'Available' })}
+              value={availableCoins}
+            />
+          </div>
+          <div className="gl-admin-user-form is-compact">
+            <AdminFilterSelect
+              label={t('admin.users.detail.coinAction', { defaultValue: 'Action' })}
+              value={coinAction}
+              options={(['add', 'deduct', 'freeze', 'unfreeze'] as CoinAdjustAction[]).map(
+                (value) => ({
+                  value,
+                  label: coinActionLabel(value, t),
+                }),
+              )}
+              onChange={(value) => setCoinAction(value as CoinAdjustAction)}
+            />
+            <label>
+              <span>{t('admin.users.detail.amount', { defaultValue: 'Amount' })}</span>
+              <input
+                inputMode="numeric"
+                value={coinAmount}
+                onChange={(event) => setCoinAmount(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>{t('admin.users.detail.note', { defaultValue: 'Note' })}</span>
+              <input value={coinNote} onChange={(event) => setCoinNote(event.target.value)} />
+            </label>
+            <button type="button" onClick={submitCoins} disabled={adjustCoins.isPending}>
+              <Plus size={15} />
+              {t('admin.users.detail.applyCoins', { defaultValue: 'Apply' })}
+            </button>
+          </div>
+          <div className="gl-admin-mini-list">
+            {detail.data?.coinTransactions?.slice(0, 8).map((tx) => (
+              <div key={tx.id}>
+                <strong>{tx.title || tx.type}</strong>
+                <span>
+                  {tx.amount > 0 ? '+' : ''}
+                  {tx.amount} · {formatDate(tx.createdAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'lives' && (
+        <div className="gl-admin-mini-list">
+          {(detail.data?.liveRecords ?? []).length === 0 ? (
+            <AdminEmptyState
+              label={t('admin.users.detail.noLives', { defaultValue: 'No live records.' })}
+            />
+          ) : (
+            detail.data?.liveRecords.map((record) => (
+              <div key={record.id}>
+                <strong>{record.title || record.id}</strong>
+                <span>
+                  {record.status} · {formatDate(record.startedAt)} · {record.peakViewers}{' '}
+                  {t('admin.users.detail.peak', { defaultValue: 'peak' })}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'reports' && (
+        <div className="gl-admin-mini-list">
+          {(detail.data?.reportRecords ?? []).length === 0 ? (
+            <AdminEmptyState
+              label={t('admin.users.detail.noReports', { defaultValue: 'No report records.' })}
+            />
+          ) : (
+            detail.data?.reportRecords.map((record) => (
+              <div key={record.id}>
+                <strong>{reportReasonLabel(record.reason, t)}</strong>
+                <span>
+                  {reportTargetLabel(record.targetType, t)} · {reportStatusLabel(record.status, t)}{' '}
+                  · {formatDate(record.createdAt)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -1561,6 +2057,63 @@ function AdminFilterSelect({
       </DropdownMenu>
     </div>
   );
+}
+
+function healthStatusLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    ok: t('admin.dashboard.health.ok', { defaultValue: 'Healthy' }),
+    down: t('admin.dashboard.health.down', { defaultValue: 'Down' }),
+    unknown: t('admin.dashboard.health.unknown', { defaultValue: 'Not checked' }),
+  };
+  return map[value] ?? value;
+}
+
+function userRoleLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    all: t('admin.users.roles.all', { defaultValue: 'All roles' }),
+    user: t('admin.users.roles.user', { defaultValue: 'User' }),
+    admin: t('admin.users.roles.admin', { defaultValue: 'Admin' }),
+    moderator: t('admin.users.roles.moderator', { defaultValue: 'Moderator' }),
+  };
+  return map[value] ?? value;
+}
+
+function userStatusLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    all: t('admin.users.status.all', { defaultValue: 'All statuses' }),
+    active: t('admin.users.status.active', { defaultValue: 'Active' }),
+    banned: t('admin.users.status.banned', { defaultValue: 'Banned' }),
+    frozen: t('admin.users.status.frozen', { defaultValue: 'Frozen coins' }),
+    live_approved: t('admin.users.status.liveApproved', { defaultValue: 'Live approved' }),
+  };
+  return map[value] ?? value;
+}
+
+function userDetailTabLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    profile: t('admin.users.detail.tabs.profile', { defaultValue: 'Profile' }),
+    coins: t('admin.users.detail.tabs.coins', { defaultValue: 'Coins' }),
+    lives: t('admin.users.detail.tabs.lives', { defaultValue: 'Live records' }),
+    reports: t('admin.users.detail.tabs.reports', { defaultValue: 'Reports' }),
+  };
+  return map[value] ?? value;
+}
+
+function coinActionLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    add: t('admin.users.coinActions.add', { defaultValue: 'Recharge' }),
+    deduct: t('admin.users.coinActions.deduct', { defaultValue: 'Deduct' }),
+    freeze: t('admin.users.coinActions.freeze', { defaultValue: 'Freeze' }),
+    unfreeze: t('admin.users.coinActions.unfreeze', { defaultValue: 'Unfreeze' }),
+  };
+  return map[value] ?? value;
+}
+
+function apiErrorMessage(err: unknown) {
+  const response = (err as { response?: { data?: { message?: string } } })?.response;
+  if (response?.data?.message) return response.data.message;
+  if (err instanceof Error && err.message) return err.message;
+  return 'Request failed';
 }
 
 function reportStatusLabel(value: string, t: Translate) {

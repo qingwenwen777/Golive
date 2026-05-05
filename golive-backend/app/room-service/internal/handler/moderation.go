@@ -80,6 +80,15 @@ func (h *ModerationHandler) AdminAuditLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *ModerationHandler) AdminOverview(c *gin.Context) {
+	resp, err := h.svc.AdminOverview(c.Request.Context(), UserIDFromCtx(c))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	var req service.CreateReportReq
 	if err := c.ShouldBindJSON(&req); err != nil {

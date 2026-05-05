@@ -3,7 +3,7 @@
 // The hot path uses a single transaction containing:
 //
 //  1. UPDATE users SET coin_balance = coin_balance - amount
-//     WHERE id = ? AND coin_balance >= amount    -- atomic balance check
+//     WHERE id = ? AND available balance >= amount and account is active
 //  2. INSERT INTO {gift_orders | super_chat_orders}     -- success ledger
 //  3. INSERT INTO local_messages (status='pending')      -- outbox
 //
@@ -134,6 +134,26 @@ func createCoinTransaction(
 		RoomID:         roomID,
 		CounterpartyID: counterpartyID,
 	}).Error
+}
+
+func debitUserBalance(tx *gorm.DB, userID string, amount int64) error {
+	res := tx.Exec(
+		"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND COALESCE(banned, false) = false AND coin_balance - COALESCE(frozen_coins, 0) >= ?",
+		amount, userID, amount,
+	)
+	if isMissingUserControlColumn(res.Error) {
+		res = tx.Exec(
+			"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND coin_balance >= ?",
+			amount, userID, amount,
+		)
+	}
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrInsufficientFunds
+	}
+	return nil
 }
 
 func FanBadgeLevel(totalContribution int64) int {
@@ -298,15 +318,8 @@ func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, ou
 		}
 		wager.RoomID = round.RoomID
 		wager.Amount = round.Amount
-		res := tx.Exec(
-			"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND coin_balance >= ?",
-			wager.Amount, wager.UserID, wager.Amount,
-		)
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return ErrInsufficientFunds
+		if err := debitUserBalance(tx, wager.UserID, wager.Amount); err != nil {
+			return err
 		}
 		if err := tx.Create(wager).Error; err != nil {
 			if isDuplicateKey(err) {
@@ -642,15 +655,8 @@ func (r *OrderRepo) PlaceGiftOrder(
 		}
 
 		// Decrement balance only if sufficient.
-		res := tx.Exec(
-			"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND coin_balance >= ?",
-			o.TotalCoin, o.UserID, o.TotalCoin,
-		)
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return ErrInsufficientFunds
+		if err := debitUserBalance(tx, o.UserID, o.TotalCoin); err != nil {
+			return err
 		}
 		if err := tx.Create(o).Error; err != nil {
 			if isDuplicateKey(err) {
@@ -673,7 +679,7 @@ func (r *OrderRepo) PlaceGiftOrder(
 			return err
 		}
 		if receiverID != "" {
-			res = tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.TotalCoin, receiverID)
+			res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.TotalCoin, receiverID)
 			if res.Error != nil {
 				return res.Error
 			}
@@ -748,15 +754,8 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			return err
 		}
 
-		res := tx.Exec(
-			"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND coin_balance >= ?",
-			o.Amount, o.UserID, o.Amount,
-		)
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return ErrInsufficientFunds
+		if err := debitUserBalance(tx, o.UserID, o.Amount); err != nil {
+			return err
 		}
 		if err := tx.Create(o).Error; err != nil {
 			if isDuplicateKey(err) {
@@ -779,7 +778,7 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			return err
 		}
 		if receiverID != "" {
-			res = tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.Amount, receiverID)
+			res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.Amount, receiverID)
 			if res.Error != nil {
 				return res.Error
 			}
@@ -991,4 +990,12 @@ func isDuplicateKey(err error) bool {
 	return strings.Contains(s, "Error 1062") ||
 		strings.Contains(s, "Duplicate entry") ||
 		strings.Contains(s, "UNIQUE constraint failed")
+}
+
+func isMissingUserControlColumn(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unknown column") || strings.Contains(msg, "no such column")
 }

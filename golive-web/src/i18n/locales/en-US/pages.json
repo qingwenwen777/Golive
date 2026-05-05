@@ -1142,10 +1142,23 @@
     "dashboard": {
       "aria": "Admin overview",
       "kpis": {
+        "onlineRooms": "Online live rooms",
+        "onlineViewers": "Online viewers",
+        "todayUsers": "New users today",
+        "todayRevenue": "Today revenue (Coins)",
+        "systemHealth": "System health",
         "pendingApplications": "Pending live applications",
         "approvedCreators": "Approved creators",
         "availableInvites": "Available invite codes",
         "pendingContent": "Pending content"
+      },
+      "health": {
+        "eyebrow": "Health",
+        "title": "Service and storage status",
+        "ok": "Healthy",
+        "down": "Down",
+        "unknown": "Not checked",
+        "empty": "No health data."
       },
       "modules": {
         "eyebrow": "Modules",
@@ -1165,10 +1178,86 @@
     "users": {
       "aria": "User management summary",
       "kpis": {
+        "totalUsers": "Total users",
+        "activeUsers": "Active users",
+        "bannedUsers": "Banned users",
+        "maintainers": "Admins / moderators",
         "availableInvites": "Available invite codes",
         "usedInvites": "Used invite codes",
         "accountDirectory": "Account directory",
         "admins": "Admins"
+      },
+      "directory": {
+        "eyebrow": "Directory",
+        "title": "User list"
+      },
+      "filters": {
+        "search": "Search",
+        "searchPlaceholder": "Search username, display name, or email",
+        "role": "Role",
+        "status": "Status"
+      },
+      "roles": {
+        "all": "All roles",
+        "user": "User",
+        "admin": "Admin",
+        "moderator": "Moderator"
+      },
+      "status": {
+        "all": "All statuses",
+        "active": "Active",
+        "banned": "Banned",
+        "frozen": "Frozen coins",
+        "liveApproved": "Live approved"
+      },
+      "loading": "Loading users...",
+      "empty": "No users match this filter.",
+      "pagination": {
+        "prev": "Previous",
+        "next": "Next",
+        "page": "Page {{page}} / {{pages}}"
+      },
+      "detail": {
+        "empty": "Select a user to view details.",
+        "loading": "Loading user details...",
+        "profileSaved": "Profile updated.",
+        "roleSaved": "Role updated.",
+        "banned": "User banned.",
+        "unbanned": "User unbanned.",
+        "invalidAmount": "Enter a valid amount.",
+        "coinsSaved": "Coin balance updated.",
+        "tabs": {
+          "profile": "Profile",
+          "coins": "Coins",
+          "lives": "Live records",
+          "reports": "Reports"
+        },
+        "status": "Status",
+        "livePermission": "Live permission",
+        "username": "Username",
+        "displayName": "Display name",
+        "saveProfile": "Save profile",
+        "role": "Role",
+        "banReason": "Ban reason",
+        "banReasonPlaceholder": "Record the ban reason for later review.",
+        "ban": "Ban user",
+        "unban": "Unban user",
+        "coinBalance": "Balance",
+        "frozenCoins": "Frozen",
+        "availableCoins": "Available",
+        "coinAction": "Action",
+        "amount": "Amount",
+        "note": "Note",
+        "applyCoins": "Apply",
+        "noLives": "No live records.",
+        "noReports": "No report records.",
+        "peak": "peak"
+      },
+      "coinActions": {
+        "add": "Recharge",
+        "deduct": "Deduct",
+        "freeze": "Freeze",
+        "unfreeze": "Unfreeze"
       },
       "framework": {
         "eyebrow": "Users",

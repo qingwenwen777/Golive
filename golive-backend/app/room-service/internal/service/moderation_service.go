@@ -316,6 +316,22 @@ type AdminAuditLogListResp struct {
 	Stats AdminAuditStatsDTO `json:"stats"`
 }
 
+type AdminOverviewResp struct {
+	OnlineRooms       int64            `json:"onlineRooms"`
+	OnlineViewers     int64            `json:"onlineViewers"`
+	TodayNewUsers     int64            `json:"todayNewUsers"`
+	TodayRevenueCoins int64            `json:"todayRevenueCoins"`
+	Health            []AdminHealthDTO `json:"health"`
+}
+
+type AdminHealthDTO struct {
+	Key     string `json:"key"`
+	Label   string `json:"label"`
+	Status  string `json:"status"`
+	Detail  string `json:"detail,omitempty"`
+	Checked bool   `json:"checked"`
+}
+
 type CreateUnbanAppealReq struct {
 	Reason string `json:"reason"`
 }
@@ -456,6 +472,33 @@ func (s *ModerationService) AdminAuditLogs(ctx context.Context, adminID, categor
 			Permission: stats.Permission,
 			System:     stats.System,
 		},
+	}, nil
+}
+
+func (s *ModerationService) AdminOverview(ctx context.Context, adminID string) (*AdminOverviewResp, error) {
+	if err := s.requireAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
+	metrics, err := s.moderation.AdminDashboardMetrics(ctx, s.now())
+	if err != nil {
+		return nil, err
+	}
+	health := make([]AdminHealthDTO, 0, len(metrics.Health))
+	for _, item := range metrics.Health {
+		health = append(health, AdminHealthDTO{
+			Key:     item.Key,
+			Label:   item.Label,
+			Status:  item.Status,
+			Detail:  item.Detail,
+			Checked: item.Checked,
+		})
+	}
+	return &AdminOverviewResp{
+		OnlineRooms:       metrics.OnlineRooms,
+		OnlineViewers:     metrics.OnlineViewers,
+		TodayNewUsers:     metrics.TodayNewUsers,
+		TodayRevenueCoins: metrics.TodayRevenueCoins,
+		Health:            health,
 	}, nil
 }
 

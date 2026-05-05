@@ -303,8 +303,14 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                     <span>{t('account.rechargeCoins')}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {currentUser?.role === 'admin' && (
-                    <DropdownMenuItem onClick={() => navigate('/admin/dashboard')}>
+                  {(currentUser?.role === 'admin' || currentUser?.role === 'moderator') && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        navigate(
+                          currentUser?.role === 'moderator' ? '/admin/content' : '/admin/dashboard',
+                        )
+                      }
+                    >
                       {t('account.adminDashboard')}
                     </DropdownMenuItem>
                   )}

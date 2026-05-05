@@ -61,6 +61,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [expanded, setExpanded] = useState(false);
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
+  const [likeBurstKey, setLikeBurstKey] = useState(0);
 
   const channelId = stream.channelId || stream.channel;
   const streamId = stream.id;
@@ -109,6 +110,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     const nextLiked = !liked;
     if (nextLiked) {
       saveToLibrary(LIKED_STREAMS_KEY, stream);
+      setLikeBurstKey((value) => value + 1);
       toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
     } else {
       removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
@@ -239,6 +241,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             >
               <ThumbsUp size={18} />
               <span>{likes.toLocaleString()}</span>
+              {likeBurstKey > 0 && <LikeBurst key={likeBurstKey} />}
             </button>
             <div className="gl-pg-div" />
             <button
@@ -312,5 +315,18 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
         }}
       />
     </div>
+  );
+}
+
+function LikeBurst() {
+  return (
+    <span className="gl-like-burst" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+      <i />
+      <b />
+    </span>
   );
 }

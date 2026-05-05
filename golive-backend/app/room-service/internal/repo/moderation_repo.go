@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -148,6 +149,22 @@ type UserRestriction struct {
 	MuteExpiresAt *time.Time
 	BanReason     string
 	MuteReason    string
+}
+
+type AdminDashboardMetrics struct {
+	OnlineRooms       int64
+	OnlineViewers     int64
+	TodayNewUsers     int64
+	TodayRevenueCoins int64
+	Health            []AdminHealthItem
+}
+
+type AdminHealthItem struct {
+	Key     string
+	Label   string
+	Status  string
+	Detail  string
+	Checked bool
 }
 
 func (r *ModerationRepo) ListFollowers(ctx context.Context, ownerID, query string, page, size int, followerIDs []string) ([]ModerationUser, int64, error) {
@@ -1024,21 +1041,37 @@ func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, ta
 func (r *ModerationRepo) UserRestriction(ctx context.Context, userID string, now time.Time) (UserRestriction, error) {
 	var state model.UserModerationState
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Take(&state).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return UserRestriction{}, nil
-	}
-	if err != nil {
+	restriction := UserRestriction{}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return UserRestriction{}, err
 	}
-	restriction := UserRestriction{
-		Banned:     state.Banned,
-		BanReason:  state.BanReason,
-		MuteReason: state.MuteReason,
+	if err == nil {
+		restriction.Banned = state.Banned
+		restriction.BanReason = state.BanReason
+		restriction.MuteReason = state.MuteReason
 	}
-	if state.MutedUntil != nil && state.MutedUntil.After(now) {
+	if err == nil && state.MutedUntil != nil && state.MutedUntil.After(now) {
 		restriction.Muted = true
 		restriction.MuteExpiresAt = state.MutedUntil
 		restriction.MuteRemaining = state.MutedUntil.Sub(now)
+	}
+	var userState struct {
+		Banned    bool
+		BanReason string
+	}
+	userErr := r.db.WithContext(ctx).
+		Table("users").
+		Select("COALESCE(banned, false) AS banned, COALESCE(ban_reason, '') AS ban_reason").
+		Where("id = ?", userID).
+		Take(&userState).Error
+	if userErr != nil && !errors.Is(userErr, gorm.ErrRecordNotFound) && !isMissingTableName(userErr) && !isMissingColumn(userErr) {
+		return UserRestriction{}, userErr
+	}
+	if userErr == nil && userState.Banned {
+		restriction.Banned = true
+		if strings.TrimSpace(restriction.BanReason) == "" {
+			restriction.BanReason = userState.BanReason
+		}
 	}
 	return restriction, nil
 }
@@ -1202,6 +1235,75 @@ func (r *ModerationRepo) SyncBlockedWords(ctx context.Context) error {
 	return err
 }
 
+func (r *ModerationRepo) AdminDashboardMetrics(ctx context.Context, now time.Time) (AdminDashboardMetrics, error) {
+	metrics := AdminDashboardMetrics{
+		Health: []AdminHealthItem{
+			{Key: "room-service", Label: "room-service", Status: "ok", Detail: "HTTP service responding", Checked: true},
+			{Key: "api-gateway", Label: "api-gateway", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
+			{Key: "user-service", Label: "user-service", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
+			{Key: "gift-service", Label: "gift-service", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
+			{Key: "chat-service", Label: "chat-service", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
+			{Key: "im-gateway", Label: "im-gateway", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
+			{Key: "nsq", Label: "NSQ", Status: "unknown", Detail: "No NSQ probe configured", Checked: false},
+		},
+	}
+	if sqlDB, err := r.db.DB(); err != nil {
+		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "mysql", Label: "MySQL", Status: "down", Detail: err.Error(), Checked: true})
+	} else if err := sqlDB.PingContext(ctx); err != nil {
+		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "mysql", Label: "MySQL", Status: "down", Detail: err.Error(), Checked: true})
+	} else {
+		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "mysql", Label: "MySQL", Status: "ok", Detail: "Connected", Checked: true})
+	}
+	if r.rdb == nil {
+		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "redis", Label: "Redis", Status: "unknown", Detail: "Redis client not configured", Checked: false})
+	} else if err := r.rdb.Ping(ctx).Err(); err != nil {
+		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "redis", Label: "Redis", Status: "down", Detail: err.Error(), Checked: true})
+	} else {
+		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "redis", Label: "Redis", Status: "ok", Detail: "Connected", Checked: true})
+	}
+
+	type roomRow struct {
+		ID      string
+		Viewers int64
+	}
+	var rooms []roomRow
+	err := r.db.WithContext(ctx).
+		Table("rooms").
+		Select("id, viewers").
+		Where("status IN ?", []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Scan(&rooms).Error
+	if err != nil && !isMissingTableName(err) {
+		return metrics, err
+	}
+	metrics.OnlineRooms = int64(len(rooms))
+	for _, room := range rooms {
+		viewers := room.Viewers
+		if r.rdb != nil {
+			values, err := r.rdb.HMGet(ctx, "roommetrics:"+room.ID, "viewers", "peak").Result()
+			if err == nil && len(values) > 0 && values[0] != nil {
+				viewers = parseRedisDashboardInt(values[0])
+			}
+		}
+		metrics.OnlineViewers += viewers
+	}
+
+	dayStart := beijingDayStartUTC(now)
+	err = r.db.WithContext(ctx).Table("users").Where("created_at >= ?", dayStart).Count(&metrics.TodayNewUsers).Error
+	if err != nil && !isMissingTableName(err) {
+		return metrics, err
+	}
+	err = r.db.WithContext(ctx).
+		Table("coin_transactions").
+		Select("COALESCE(SUM(amount), 0)").
+		Where("type = ? AND amount > 0 AND created_at >= ?", "topup", dayStart).
+		Row().
+		Scan(&metrics.TodayRevenueCoins)
+	if err != nil && !isMissingTableName(err) {
+		return metrics, err
+	}
+	return metrics, nil
+}
+
 func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {
 	if userID == "" {
 		return false, nil
@@ -1215,7 +1317,7 @@ func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, erro
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, nil
 	}
-	return role == "admin", err
+	return role == "admin" || role == "moderator", err
 }
 
 func (r *ModerationRepo) UserProfile(ctx context.Context, userID string) (ModerationUser, error) {
@@ -1391,6 +1493,28 @@ func isMissingColumn(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "unknown column") || strings.Contains(msg, "no such column")
+}
+
+func beijingDayStartUTC(now time.Time) time.Time {
+	loc := time.FixedZone("Asia/Shanghai", 8*60*60)
+	local := now.In(loc)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc).UTC()
+}
+
+func parseRedisDashboardInt(value any) int64 {
+	switch v := value.(type) {
+	case string:
+		n, _ := strconv.ParseInt(v, 10, 64)
+		return n
+	case []byte:
+		n, _ := strconv.ParseInt(string(v), 10, 64)
+		return n
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	}
+	return 0
 }
 
 func roomModeratorsKey(roomID string) string { return "room:moderators:" + roomID }

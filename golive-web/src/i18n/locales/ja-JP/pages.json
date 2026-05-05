@@ -1142,10 +1142,23 @@
     "dashboard": {
       "aria": "管理概要",
       "kpis": {
+        "onlineRooms": "配信中のルーム",
+        "onlineViewers": "現在の視聴者数",
+        "todayUsers": "本日の新規ユーザー",
+        "todayRevenue": "本日の収益（Coins）",
+        "systemHealth": "システム状態",
         "pendingApplications": "未審査の配信申請",
         "approvedCreators": "承認済み配信者",
         "availableInvites": "利用可能な招待コード",
         "pendingContent": "未処理コンテンツ"
+      },
+      "health": {
+        "eyebrow": "ヘルス",
+        "title": "サービスとストレージの状態",
+        "ok": "正常",
+        "down": "異常",
+        "unknown": "未確認",
+        "empty": "ヘルスデータはありません。"
       },
       "modules": {
         "eyebrow": "モジュール",
@@ -1165,10 +1178,86 @@
     "users": {
       "aria": "ユーザー管理概要",
       "kpis": {
+        "totalUsers": "総ユーザー数",
+        "activeUsers": "有効ユーザー",
+        "bannedUsers": "停止中ユーザー",
+        "maintainers": "管理者/モデレーター",
         "availableInvites": "利用可能な招待コード",
         "usedInvites": "使用済み招待コード",
         "accountDirectory": "アカウント一覧",
         "admins": "管理者"
+      },
+      "directory": {
+        "eyebrow": "ディレクトリ",
+        "title": "ユーザー一覧"
+      },
+      "filters": {
+        "search": "検索",
+        "searchPlaceholder": "ユーザー名、表示名、メールで検索",
+        "role": "ロール",
+        "status": "状態"
+      },
+      "roles": {
+        "all": "すべてのロール",
+        "user": "ユーザー",
+        "admin": "管理者",
+        "moderator": "モデレーター"
+      },
+      "status": {
+        "all": "すべての状態",
+        "active": "有効",
+        "banned": "停止中",
+        "frozen": "Coins 凍結あり",
+        "liveApproved": "配信承認済み"
+      },
+      "loading": "ユーザーを読み込み中...",
+      "empty": "条件に一致するユーザーはいません。",
+      "pagination": {
+        "prev": "前へ",
+        "next": "次へ",
+        "page": "{{page}} / {{pages}} ページ"
+      },
+      "detail": {
+        "empty": "ユーザーを選択すると詳細を表示します。",
+        "loading": "ユーザー詳細を読み込み中...",
+        "profileSaved": "プロフィールを更新しました。",
+        "roleSaved": "ロールを更新しました。",
+        "banned": "ユーザーを停止しました。",
+        "unbanned": "ユーザー停止を解除しました。",
+        "invalidAmount": "有効な金額を入力してください。",
+        "coinsSaved": "Coin 残高を更新しました。",
+        "tabs": {
+          "profile": "Profile",
+          "coins": "Coins",
+          "lives": "配信記録",
+          "reports": "通報記録"
+        },
+        "status": "状態",
+        "livePermission": "配信権限",
+        "username": "ユーザー名",
+        "displayName": "表示名",
+        "saveProfile": "プロフィールを保存",
+        "role": "ロール",
+        "banReason": "停止理由",
+        "banReasonPlaceholder": "後で確認できるよう停止理由を記録します。",
+        "ban": "ユーザーを停止",
+        "unban": "停止を解除",
+        "coinBalance": "残高",
+        "frozenCoins": "凍結",
+        "availableCoins": "利用可能",
+        "coinAction": "操作",
+        "amount": "金額",
+        "note": "メモ",
+        "applyCoins": "適用",
+        "noLives": "配信記録はありません。",
+        "noReports": "通報記録はありません。",
+        "peak": "最大"
+      },
+      "coinActions": {
+        "add": "チャージ",
+        "deduct": "減算",
+        "freeze": "凍結",
+        "unfreeze": "凍結解除"
       },
       "framework": {
         "eyebrow": "ユーザー",

@@ -16,10 +16,13 @@ export interface User {
   avatar: string;
   cover?: string;
   coinBalance: number;
+  frozenCoins?: number;
   levelInfo?: UserLevelInfo;
   verified?: boolean;
+  banned?: boolean;
+  banReason?: string;
   googleLinked?: boolean;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'moderator';
   livePermissionStatus: 'none' | 'pending' | 'approved' | 'rejected';
   livePermissionRejectReason?: string;
   platformVerificationStatus?: 'none' | 'pending' | 'approved' | 'rejected';

@@ -40,6 +40,7 @@ var (
 	ErrGoogleEmailTaken        = errcode.New(http.StatusConflict, "This Google email is already used by another account").WithReason("google_email_exists")
 	ErrGoogleAlreadyLinked     = errcode.New(http.StatusConflict, "This Google account is already linked").WithReason("google_already_linked")
 	ErrGoogleNotLinked         = errcode.New(http.StatusBadRequest, "This account is not linked to Google").WithReason("google_not_linked")
+	ErrUserBanned              = errcode.New(http.StatusForbidden, "This account has been banned").WithReason("user_banned")
 )
 
 type UserStore interface {
@@ -141,6 +142,9 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Lo
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
 		return nil, ErrInvalidCredentials
+	}
+	if u.Banned {
+		return nil, ErrUserBanned
 	}
 
 	access, err := s.signAccess(u.ID)
@@ -337,6 +341,9 @@ func (s *AuthService) Me(ctx context.Context, accessToken string) (*model.Public
 	u, err := s.users.FindByID(ctx, uid)
 	if err != nil {
 		return nil, ErrUnauthorized
+	}
+	if u.Banned {
+		return nil, ErrUserBanned
 	}
 	pu := u.Public()
 	return &pu, nil

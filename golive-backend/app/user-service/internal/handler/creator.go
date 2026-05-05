@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -181,6 +182,171 @@ func (h *AdminHandler) DeleteInviteCode(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"inviteCode": invite})
+}
+
+func (h *AdminHandler) ListUsers(c *gin.Context) {
+	page, size := adminPageSize(c, 1, 20)
+	items, total, stats, err := h.users.AdminListUsers(c.Request.Context(), repo.AdminUserListFilter{
+		Query:  c.Query("q"),
+		Role:   c.DefaultQuery("role", "all"),
+		Status: c.DefaultQuery("status", "all"),
+		Page:   page,
+		Size:   size,
+	})
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
+		"stats": stats,
+	})
+}
+
+func (h *AdminHandler) UserDetail(c *gin.Context) {
+	detail, err := h.users.AdminUserDetail(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, detail)
+}
+
+type adminUpdateUserProfileReq struct {
+	Username    *string `json:"username"`
+	DisplayName *string `json:"displayName"`
+}
+
+func (h *AdminHandler) UpdateUserProfile(c *gin.Context) {
+	var req adminUpdateUserProfileReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	username, ok := cleanUsernamePatch(req.Username, c)
+	if !ok {
+		return
+	}
+	displayName, ok := cleanDisplayNamePatch(req.DisplayName, c)
+	if !ok {
+		return
+	}
+	if username == nil && displayName == nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "nothing to update"))
+		return
+	}
+	u, err := h.users.AdminUpdateProfile(c.Request.Context(), c.Param("id"), username, displayName)
+	if errors.Is(err, repo.ErrUsernameTaken) {
+		errcode.Respond(c, service.ErrUsernameTaken.WithReason("username_taken"))
+		return
+	}
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
+}
+
+type adminUpdateUserRoleReq struct {
+	Role string `json:"role" binding:"required"`
+}
+
+func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
+	var req adminUpdateUserRoleReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "role is required"))
+		return
+	}
+	role := strings.TrimSpace(req.Role)
+	if role != model.RoleUser && role != model.RoleAdmin && role != model.RoleModerator {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid role"))
+		return
+	}
+	if c.Param("id") == UserIDFromCtx(c) && role != model.RoleAdmin {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "cannot remove your own admin role"))
+		return
+	}
+	u, err := h.users.AdminUpdateRole(c.Request.Context(), c.Param("id"), role)
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
+}
+
+type adminBanUserReq struct {
+	Banned bool   `json:"banned"`
+	Reason string `json:"reason"`
+}
+
+func (h *AdminHandler) SetUserBan(c *gin.Context) {
+	var req adminBanUserReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	if c.Param("id") == UserIDFromCtx(c) && req.Banned {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "cannot ban your own account"))
+		return
+	}
+	u, err := h.users.AdminSetUserBan(c.Request.Context(), c.Param("id"), req.Banned, req.Reason)
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
+}
+
+type adminAdjustCoinsReq struct {
+	Action string `json:"action" binding:"required"`
+	Amount int64  `json:"amount" binding:"required"`
+	Note   string `json:"note"`
+}
+
+func (h *AdminHandler) AdjustUserCoins(c *gin.Context) {
+	var req adminAdjustCoinsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid coin adjustment"))
+		return
+	}
+	action := strings.TrimSpace(req.Action)
+	if action != "add" && action != "deduct" && action != "freeze" && action != "unfreeze" {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid coin action"))
+		return
+	}
+	u, coinTx, err := h.users.AdminAdjustCoins(c.Request.Context(), c.Param("id"), action, req.Amount, req.Note, UserIDFromCtx(c))
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if errors.Is(err, repo.ErrInsufficientCoins) {
+		errcode.Respond(c, errcode.New(http.StatusConflict, "insufficient available coins").WithReason("insufficient_coins"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": u.Public(), "transaction": coinTx})
 }
 
 func (h *AdminHandler) ListCreatorApplications(c *gin.Context) {
@@ -404,4 +570,19 @@ func (h *InternalHandler) UserPermission(c *gin.Context) {
 		"role":                 u.Public().Role,
 		"livePermissionStatus": u.Public().LivePermissionStatus,
 	})
+}
+
+func adminPageSize(c *gin.Context, defaultPage, defaultSize int) (int, int) {
+	page, err := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(defaultPage)))
+	if err != nil || page < 1 {
+		page = defaultPage
+	}
+	size, err := strconv.Atoi(c.DefaultQuery("size", strconv.Itoa(defaultSize)))
+	if err != nil || size < 1 {
+		size = defaultSize
+	}
+	if size > 100 {
+		size = 100
+	}
+	return page, size
 }

@@ -7,8 +7,9 @@ import (
 )
 
 const (
-	RoleUser  = "user"
-	RoleAdmin = "admin"
+	RoleUser      = "user"
+	RoleAdmin     = "admin"
+	RoleModerator = "moderator"
 
 	LivePermissionNone     = "none"
 	LivePermissionPending  = "pending"
@@ -35,7 +36,10 @@ type User struct {
 	Avatar                           string     `gorm:"type:varchar(500)" json:"avatar"`
 	Cover                            string     `gorm:"type:varchar(500)" json:"cover"`
 	CoinBalance                      int64      `gorm:"not null;default:0" json:"coinBalance"`
+	FrozenCoins                      int64      `gorm:"not null;default:0" json:"frozenCoins"`
 	TotalTopupCoins                  int64      `gorm:"-" json:"-"`
+	Banned                           bool       `gorm:"not null;default:false" json:"banned,omitempty"`
+	BanReason                        string     `gorm:"type:text" json:"banReason,omitempty"`
 	Verified                         bool       `gorm:"not null;default:false" json:"verified,omitempty"`
 	Role                             string     `gorm:"type:varchar(16);not null;default:user" json:"role"`
 	LivePermissionStatus             string     `gorm:"type:varchar(16);not null;default:none" json:"livePermissionStatus"`
@@ -100,7 +104,10 @@ type PublicUser struct {
 	Avatar                           string             `json:"avatar"`
 	Cover                            string             `json:"cover"`
 	CoinBalance                      int64              `json:"coinBalance"`
+	FrozenCoins                      int64              `json:"frozenCoins,omitempty"`
 	LevelInfo                        userlevel.Snapshot `json:"levelInfo"`
+	Banned                           bool               `json:"banned,omitempty"`
+	BanReason                        string             `json:"banReason,omitempty"`
 	Verified                         bool               `json:"verified,omitempty"`
 	Role                             string             `json:"role"`
 	LivePermissionStatus             string             `json:"livePermissionStatus"`
@@ -130,7 +137,10 @@ func (u *User) Public() PublicUser {
 		Avatar:                           u.Avatar,
 		Cover:                            u.Cover,
 		CoinBalance:                      u.CoinBalance,
+		FrozenCoins:                      u.FrozenCoins,
 		LevelInfo:                        userlevel.SnapshotForTotalTopup(u.TotalTopupCoins),
+		Banned:                           u.Banned,
+		BanReason:                        u.BanReason,
 		Verified:                         u.Verified,
 		Role:                             role,
 		LivePermissionStatus:             liveStatus,

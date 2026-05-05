@@ -12,6 +12,9 @@ const (
 	CoinTxBetRefund              = "bet_refund"
 	CoinTxCreatorGiftIncome      = "creator_gift_income"
 	CoinTxCreatorSuperChatIncome = "creator_super_chat_income"
+	CoinTxAdminAdjust            = "admin_adjust"
+	CoinTxAdminFreeze            = "admin_freeze"
+	CoinTxAdminUnfreeze          = "admin_unfreeze"
 )
 
 type CoinTransaction struct {
