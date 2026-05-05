@@ -333,6 +333,59 @@ func TestListFanBadgesRecomputesLevels(t *testing.T) {
 	require.Equal(t, 1, badges[1].Level)
 }
 
+func TestListFanBadgesUsesCurrentCreatorProfile(t *testing.T) {
+	db := newTestDB(t, 0)
+	require.NoError(t, db.Exec(
+		"INSERT INTO users (id, username, display_name, avatar, coin_balance) VALUES (?, ?, ?, ?, ?)",
+		"creator-fresh", "fresh", "Fresh Name", "fresh.png", int64(0),
+	).Error)
+	require.NoError(t, db.Create(&model.FanBadge{
+		UserID:            "u-demo",
+		CreatorID:         "creator-fresh",
+		CreatorName:       "Old Name",
+		CreatorAvatar:     "old.png",
+		TotalContribution: 30,
+		Level:             1,
+	}).Error)
+
+	badges, err := repo.NewOrderRepo(db).ListFanBadges(context.Background(), "u-demo")
+	require.NoError(t, err)
+	require.Len(t, badges, 1)
+	require.Equal(t, "Fresh Name", badges[0].CreatorName)
+	require.Equal(t, "fresh.png", badges[0].CreatorAvatar)
+}
+
+func TestJoinFanClubWithoutLiveCreatesBadgeAndIncomeLedger(t *testing.T) {
+	db := newTestDB(t, 2000)
+	seedGift(t, db, "fan_light", 1000)
+	svc := service.NewGiftService(repo.NewGiftRepo(db), repo.NewOrderRepo(db))
+
+	order, replayed, err := svc.JoinFanClub(context.Background(), service.JoinFanClubReq{
+		UserID:    "u-demo",
+		CreatorID: "u-owner",
+		RequestID: "join-fan-1",
+	})
+	require.NoError(t, err)
+	require.False(t, replayed)
+	require.Equal(t, model.StatusSuccess, order.Status)
+	require.Equal(t, "", order.RoomID)
+	require.EqualValues(t, 1000, balanceOf(t, db, "u-demo"))
+	require.EqualValues(t, 1000, balanceOf(t, db, "u-owner"))
+
+	var badge model.FanBadge
+	require.NoError(t, db.Where("user_id = ? AND creator_id = ?", "u-demo", "u-owner").Take(&badge).Error)
+	require.Equal(t, "Streamer", badge.CreatorName)
+	require.Equal(t, "owner.png", badge.CreatorAvatar)
+
+	var title string
+	require.NoError(t, db.Raw(
+		"SELECT title FROM coin_transactions WHERE user_id = ? AND type = ?",
+		"u-owner",
+		model.CoinTxCreatorGiftIncome,
+	).Scan(&title).Error)
+	require.Equal(t, "加入粉丝团收入", title)
+}
+
 // 7) SC tier 0 rejected.
 func TestSuperChat_TierZeroRejected(t *testing.T) {
 	db := newTestDB(t, 1000)

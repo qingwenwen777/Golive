@@ -50,6 +50,7 @@ type Room struct {
 	ReplayUploadEnabled  bool      `gorm:"not null;default:false"`
 	ReplayStatus         string    `gorm:"type:varchar(20);not null;default:'none';index"`
 	ReplayVisibility     string    `gorm:"type:varchar(16);not null;default:'public';index"`
+	FanClubOnly          bool      `gorm:"not null;default:false;index"`
 	ReplayBunnyVideoID   string    `gorm:"type:varchar(80);index"`
 	ReplayBunnyLibraryID string    `gorm:"type:varchar(32)"`
 	ReplayError          string    `gorm:"type:text"`
@@ -103,6 +104,8 @@ type Stream struct {
 	StreamKey       string  `json:"streamKey,omitempty"`
 	Status          string  `json:"status,omitempty"`
 	SubscriberCount int64   `json:"subscriberCount"`
+	FanClubOnly     bool    `json:"fanClubOnly"`
+	FanClubMember   bool    `json:"fanClubMember,omitempty"`
 	Replay          *Replay `json:"replay,omitempty"`
 }
 
@@ -152,6 +155,7 @@ func (r *Room) ToStream(now time.Time) Stream {
 		IsLive:      r.Status == StatusLive,
 		OwnerID:     r.OwnerID,
 		Status:      r.Status,
+		FanClubOnly: r.FanClubOnly,
 	}
 	return st
 }

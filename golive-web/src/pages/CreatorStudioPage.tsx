@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Copy,
+  Crown,
   CalendarClock,
   Eye,
   FileText,
@@ -80,6 +81,7 @@ import {
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { AppointmentCard } from '@/components/AppointmentCard';
+import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
@@ -230,6 +232,8 @@ export function CreatorStudioOverviewPage() {
   const analytics = useCreatorAnalytics(channelKey, Boolean(channelKey));
   const data = analytics.data;
   const latest = data?.history[0];
+  const fanClubAudience =
+    data?.fanBadgeDistribution.reduce((sum, bucket) => sum + bucket.fanCount, 0) ?? 0;
   const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
   const liveApproved = user?.livePermissionStatus === 'approved';
   const platformStatus = user?.platformVerificationStatus ?? 'none';
@@ -258,16 +262,20 @@ export function CreatorStudioOverviewPage() {
     <div className="gl-creator-overview">
       <section className="gl-creator-kpis" aria-label={t('studio.overview.kpis')}>
         <StudioKpi
-          icon={<Eye size={18} />}
-          label={t('studio.overview.cards.online', { defaultValue: 'Current audience' })}
-          value={(data?.peakViewers ?? 0).toLocaleString()}
-          sub={t('studio.overview.cards.onlineSub', { defaultValue: 'peak audience' })}
-        />
-        <StudioKpi
           icon={<Users size={18} />}
           label={t('studio.overview.cards.subscribers', { defaultValue: 'Subscribers' })}
           value={(data?.subscriberCount ?? 0).toLocaleString()}
           sub={t('studio.overview.cards.subscribersSub', { defaultValue: 'channel total' })}
+        />
+        <StudioKpi
+          icon={<Crown size={18} />}
+          label={t('studio.overview.cards.fanClubAudience', {
+            defaultValue: 'Fan club audience',
+          })}
+          value={fanClubAudience.toLocaleString()}
+          sub={t('studio.overview.cards.fanClubAudienceSub', {
+            defaultValue: 'joined fans',
+          })}
         />
         <StudioKpi
           icon={<Radio size={18} />}
@@ -452,6 +460,7 @@ export function CreatorPreparePage() {
   const [title, setTitle] = useState(() => t('createLive.defaultTitle'));
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [fanClubOnly, setFanClubOnly] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [step, setStep] = useState(0);
@@ -482,6 +491,7 @@ export function CreatorPreparePage() {
     setTitle(lastLive.title || t('createLive.defaultTitle'));
     setDescription(lastLive.description ?? '');
     setCategory(lastLive.category || DEFAULT_CATEGORY);
+    setFanClubOnly(Boolean(lastLive.fanClubOnly));
     setCoverFile(null);
     setCoverPreview(lastLive.cover || '');
     toast.success(
@@ -514,6 +524,7 @@ export function CreatorPreparePage() {
           cover: uploadedCover,
           channelName: userDisplayName(user),
           avatar: user.avatar,
+          fanClubOnly,
         },
         {
           onSuccess: (stream) => {
@@ -616,6 +627,7 @@ export function CreatorPreparePage() {
               setCoverPreview(file ? URL.createObjectURL(file) : '');
             }}
           />
+          <FanClubOnlyToggle checked={fanClubOnly} onChange={setFanClubOnly} />
           <button
             className="gl-creator-primary"
             type="button"
@@ -724,6 +736,7 @@ export function CreatorPreparePage() {
           category={category}
           cover={coverPreview}
           status={t('studio.prepare.waitingStatus', { defaultValue: 'Waiting to go live' })}
+          fanClubOnly={fanClubOnly}
         />
       </aside>
     </div>
@@ -1036,6 +1049,7 @@ export function CreatorAppointmentsPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [fanClubOnly, setFanClubOnly] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [error, setError] = useState('');
@@ -1056,6 +1070,7 @@ export function CreatorAppointmentsPage() {
     setTitle('');
     setDescription('');
     setCategory(DEFAULT_CATEGORY);
+    setFanClubOnly(false);
     setScheduledAt(defaultAppointmentTime());
     setCoverFile(null);
     setCoverPreview('');
@@ -1070,6 +1085,7 @@ export function CreatorAppointmentsPage() {
     setTitle(editing.title);
     setDescription(editing.description ?? '');
     setCategory(appointmentCategoryDraft(editing.category));
+    setFanClubOnly(Boolean(editing.fanClubOnly));
     setScheduledAt(toLocalDateTimeInput(editing.scheduledAt));
     setCoverFile(null);
     setCoverPreview(editing.cover ?? '');
@@ -1086,6 +1102,7 @@ export function CreatorAppointmentsPage() {
     setTitle(item.title);
     setDescription(item.description ?? '');
     setCategory(appointmentCategoryDraft(item.category));
+    setFanClubOnly(Boolean(item.fanClubOnly));
     setScheduledAt(toLocalDateTimeInput(item.scheduledAt));
     setCoverFile(null);
     setCoverPreview(item.cover ?? '');
@@ -1134,6 +1151,7 @@ export function CreatorAppointmentsPage() {
         cover,
         channelName: userDisplayName(user),
         avatar: user.avatar,
+        fanClubOnly,
       };
       if (!editing) {
         await createAppointment.mutateAsync(payload);
@@ -1333,6 +1351,17 @@ export function CreatorAppointmentsPage() {
                     onChange={(event) => setDescription(event.target.value)}
                   />
                 </label>
+                <FanClubOnlyToggle
+                  checked={fanClubOnly}
+                  onChange={setFanClubOnly}
+                  title={t('studio.appointments.fanClubOnly', {
+                    defaultValue: 'Fan club exclusive appointment',
+                  })}
+                  description={t('studio.appointments.fanClubOnlySub', {
+                    defaultValue:
+                      'Non-members see the fan club join screen before the appointment room.',
+                  })}
+                />
               </div>
               <div className="gl-creator-field gl-appointment-cover-field">
                 <span>{t('createLive.fields.cover')}</span>
@@ -3178,18 +3207,57 @@ function CategoryPicker({
   );
 }
 
+function FanClubOnlyToggle({
+  checked,
+  onChange,
+  title,
+  description,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  title?: string;
+  description?: string;
+}) {
+  const { t } = useTranslation('pages');
+  const resolvedTitle =
+    title ?? t('studio.prepare.fanClubOnly', { defaultValue: 'Fan club exclusive live' });
+  const resolvedDescription =
+    description ??
+    t('studio.prepare.fanClubOnlySub', {
+      defaultValue: 'Only fan club members can watch and chat after joining.',
+    });
+  return (
+    <label className={cn('gl-fan-exclusive-toggle', checked && 'is-active')}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span className="gl-fan-exclusive-toggle-mark">
+        <LockKeyhole size={15} />
+      </span>
+      <span>
+        <strong>{resolvedTitle}</strong>
+        <small>{resolvedDescription}</small>
+      </span>
+    </label>
+  );
+}
+
 function LiveSetupPreview({
   title,
   description,
   category,
   cover,
   status,
+  fanClubOnly,
 }: {
   title: string;
   description: string;
   category: string;
   cover: string;
   status: string;
+  fanClubOnly: boolean;
 }) {
   const { t } = useTranslation('pages');
   return (
@@ -3197,6 +3265,7 @@ function LiveSetupPreview({
       <div className="gl-creator-live-preview-cover">
         {cover ? <img src={cover} alt="" /> : <Upload size={34} />}
         <span>{status}</span>
+        {fanClubOnly && <FanClubExclusiveBadge compact className="gl-creator-preview-exclusive" />}
       </div>
       <div className="gl-creator-live-preview-copy">
         <strong>{title || t('createLive.defaultTitle')}</strong>

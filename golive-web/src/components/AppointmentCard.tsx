@@ -5,6 +5,7 @@ import { Check, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-r
 import { toast } from 'sonner';
 import { useReserveAppointment, useUnreserveAppointment } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
@@ -171,6 +172,9 @@ export function AppointmentCard({
             {t('liveRoom.appointmentStartingSoon', { defaultValue: '即将开始' })}
           </div>
         )}
+        {appointment.fanClubOnly && (
+          <FanClubExclusiveBadge compact className="gl-appointment-exclusive-badge" />
+        )}
         {managementMode && (
           <div className="gl-appointment-scheduled">
             <Clock3 size={13} />
@@ -323,5 +327,6 @@ function appointmentToStream(appointment: AppointmentItem, waitingCount: number)
     ownerId: appointment.ownerId,
     status: appointment.status,
     subscriberCount: appointment.reservationCount,
+    fanClubOnly: appointment.fanClubOnly,
   };
 }

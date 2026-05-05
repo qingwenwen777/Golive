@@ -147,7 +147,7 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 
 	items := make([]model.Stream, 0, len(scored))
 	for _, item := range scored {
-		st := s.streamFromRoom(ctx, &item.room, now)
+		st := s.streamFromRoom(ctx, &item.room, now, viewerID)
 		st.SubscriberCount = subscriberByChannel[item.room.ChannelID]
 		items = append(items, st)
 	}

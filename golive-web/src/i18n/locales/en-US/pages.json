@@ -247,6 +247,17 @@
       "topUp": "Top up",
       "sending": "Sending...",
       "send": "Send"
+    },
+    "fanClubExclusive": {
+      "badge": "Members only",
+      "liveTitle": "Fan club members only",
+      "scheduledTitle": "Fan club members enter this appointment first",
+      "body": "Only fan club members can watch this live and use chat. Join the fan club to unlock the stream.",
+      "scheduledBody": "Join the fan club to enter the appointment room, reserve, and see the countdown.",
+      "join": "Join fan club",
+      "joining": "Joining...",
+      "joined": "Fan club joined. The room is unlocked.",
+      "signIn": "Sign in to join"
     }
   },
   "player": {
@@ -363,10 +374,10 @@
     },
     "fanBadge": {
       "title": "Join {{channelName}} fan club",
-      "description": "Spend {{amount}} coins to buy a fan badge.",
+      "description": "Spend {{amount}} coins to join the fan club and unlock fan-club-exclusive lives.",
       "name": "Fan badge",
       "price": "{{amount}} coins",
-      "noRoom": "This channel has no live room where a fan badge can be purchased right now.",
+      "noRoom": "Could not find this creator yet. Please try again later.",
       "cancel": "Cancel",
       "confirm": "Confirm purchase",
       "pending": "Purchasing...",
@@ -448,7 +459,9 @@
     "fanBadges": {
       "signIn": "Sign in to view your fan badges.",
       "empty": "Send a Fan Light to unlock a creator badge.",
-      "contribution": "{{amount}} contribution"
+      "contribution": "{{amount}} contribution",
+      "scrollLeft": "Scroll fan badges left",
+      "scrollRight": "Scroll fan badges right"
     },
     "historyPage": {
       "title": "History",
@@ -621,7 +634,9 @@
       "title": "Title",
       "category": "Category",
       "cover": "Cover",
-      "description": "Description"
+      "description": "Description",
+      "fanClubOnly": "Fan club exclusive live",
+      "fanClubOnlySub": "Only fan club members can watch and chat; non-members see a join screen first."
     },
     "categories": {
       "gaming": "Gaming",
@@ -744,7 +759,9 @@
         "streams": "Streams",
         "streamsSub": "completed",
         "revenue": "Revenue",
-        "revenueSub": "live income"
+        "revenueSub": "live income",
+        "fanClubAudience": "Fan club audience",
+        "fanClubAudienceSub": "joined fans"
       },
       "quickTitle": "Quick actions",
       "quickHeading": "Prepare your next live",
@@ -928,7 +945,9 @@
         "cover": "Choose cover and category",
         "check": "Check publishing and permission",
         "confirm": "Confirm and start live"
-      }
+      },
+      "fanClubOnly": "Fan club exclusive live",
+      "fanClubOnlySub": "Only fan club members can watch and chat; non-members see a join screen first."
     },
     "appointments": {
       "total": "Appointments",
@@ -965,7 +984,9 @@
       "hour": "Hour",
       "minute": "Minute",
       "oneHourLater": "1 hour later",
-      "done": "Done"
+      "done": "Done",
+      "fanClubOnly": "Fan club exclusive appointment",
+      "fanClubOnlySub": "Non-members see the fan club join screen before the appointment room."
     },
     "moderators": {
       "added": "{{name}} is now a room moderator.",
@@ -1102,11 +1123,11 @@
       "rejectReasonPlaceholder": "Tell the creator what needs to be improved.",
       "confirmReject": "Confirm reject",
       "liveHint": "Approving only enables Creator Studio and live streaming. Platform certification is reviewed separately."
-      },
-      "nav": {
-        "aria": "Admin modules",
-        "home": "Back to GoLive"
-      },
+    },
+    "nav": {
+      "aria": "Admin modules",
+      "home": "Back to GoLive"
+    },
     "brand": {
       "controlCenter": "Control Center"
     },

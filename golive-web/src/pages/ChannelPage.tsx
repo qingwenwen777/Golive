@@ -35,7 +35,7 @@ import {
   useUnfollow,
   type LiveHistoryItem,
 } from '@/api/room';
-import { useFanBadges, useSendGift } from '@/api/gift';
+import { useFanBadges, useJoinFanClub } from '@/api/gift';
 import { useChannelPosts } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
@@ -146,18 +146,11 @@ export default function ChannelPage() {
 
   const subscriberCount = followState.data?.subscriberCount ?? primary?.subscriberCount ?? 0;
   const isUnknown = !profile && !primary && !publicUser.isPending && !rooms.isPending;
-  const sendGift = useSendGift();
+  const joinFanClub = useJoinFanClub();
   const fanBadges = useFanBadges(isAuthed, authUser?.id);
   const creatorId = profile?.id || primary?.ownerId || normalizeCreatorId(channelId);
   const currentFanBadge =
     fanBadges.data?.find((badge) => creatorId && badge.creatorId === creatorId) ?? null;
-  const fanBadgeRoomId =
-    channelStreams.find((stream) => stream.isLive || stream.status === 'live')?.id ??
-    channelStreams[0]?.id ??
-    channelAppointments.data?.items.find(
-      (item) => item.status !== 'canceled' && item.status !== 'expired',
-    )?.roomId ??
-    '';
   const fanPreviewItems = useMemo(
     () =>
       buildFanPreviewItems({
@@ -261,7 +254,7 @@ export default function ChannelPage() {
       openLogin(() => setFanBadgeDialogOpen(true));
       return;
     }
-    if (!fanBadgeRoomId) {
+    if (!creatorId) {
       toast.info(
         t('channel.fanBadge.noRoom', {
           defaultValue: '当前频道暂时没有可购买粉丝灯牌的直播间。',
@@ -269,11 +262,9 @@ export default function ChannelPage() {
       );
       return;
     }
-    sendGift.mutate(
+    joinFanClub.mutate(
       {
-        roomId: fanBadgeRoomId,
-        giftId: 'fan_light',
-        count: 1,
+        creatorId,
       },
       {
         onSuccess: () => {
@@ -664,8 +655,8 @@ export default function ChannelPage() {
       <FanBadgeConfirmDialog
         open={fanBadgeDialogOpen}
         channelName={channelName}
-        canPurchase={Boolean(fanBadgeRoomId)}
-        pending={sendGift.isPending}
+        canPurchase={Boolean(creatorId)}
+        pending={joinFanClub.isPending}
         onOpenChange={setFanBadgeDialogOpen}
         onConfirm={handleConfirmFanBadge}
       />

@@ -89,6 +89,7 @@ type GoLiveReq struct {
 	Cover       string `json:"cover"`
 	ChannelName string `json:"channelName"`
 	Avatar      string `json:"avatar"`
+	FanClubOnly bool   `json:"fanClubOnly"`
 }
 
 // UpdateLiveReq is the body of PATCH /rooms/live.
@@ -152,6 +153,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		ChannelID:           channelID,
 		Verified:            verified,
 		Avatar:              cleanAvatar(req.Avatar, ownerName),
+		FanClubOnly:         req.FanClubOnly,
 		Viewers:             0,
 		PeakViewers:         0,
 		StartedAt:           now,

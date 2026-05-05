@@ -27,6 +27,7 @@ type appointmentReq struct {
 	Cover       string `json:"cover"`
 	ChannelName string `json:"channelName"`
 	Avatar      string `json:"avatar"`
+	FanClubOnly bool   `json:"fanClubOnly"`
 }
 
 func (h *AppointmentHandler) Create(c *gin.Context) {
@@ -246,6 +247,7 @@ func bindAppointmentPayload(c *gin.Context) (service.AppointmentPayload, bool) {
 		Cover:       req.Cover,
 		ChannelName: req.ChannelName,
 		Avatar:      req.Avatar,
+		FanClubOnly: req.FanClubOnly,
 	}, true
 }
 

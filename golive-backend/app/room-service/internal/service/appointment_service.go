@@ -42,6 +42,7 @@ type AppointmentPayload struct {
 	Cover       string
 	ChannelName string
 	Avatar      string
+	FanClubOnly bool
 }
 
 type AppointmentDTO struct {
@@ -65,6 +66,7 @@ type AppointmentDTO struct {
 	WaitingCount     int64  `json:"waitingCount"`
 	Reserved         bool   `json:"reserved"`
 	CanStart         bool   `json:"canStart"`
+	FanClubOnly      bool   `json:"fanClubOnly"`
 }
 
 type AppointmentListResp struct {
@@ -148,6 +150,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 		ChannelID:   channelID,
 		Verified:    verified,
 		Avatar:      cleanAvatar(payload.Avatar, channelName),
+		FanClubOnly: payload.FanClubOnly,
 		Viewers:     0,
 		PeakViewers: 0,
 		StartedAt:   payload.ScheduledAt,
@@ -210,6 +213,7 @@ func (s *AppointmentService) Update(ctx context.Context, ownerID, id string, pay
 		Category:    category,
 		Cover:       cover,
 		StartedAt:   payload.ScheduledAt,
+		FanClubOnly: payload.FanClubOnly,
 	}
 	if err := s.appointments.UpdateScheduled(ctx, appt, room); err != nil {
 		return nil, err
@@ -459,6 +463,7 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 	}
 	st := room.ToStream(now)
 	st.StreamKey = streamKey
+	st.FanClubMember = true
 	return &st, nil
 }
 
@@ -642,7 +647,22 @@ func (s *AppointmentService) applyOwnerVerification(ctx context.Context, ownerID
 	if room == nil {
 		return
 	}
-	room.Verified = s.ownerVerified(ctx, ownerID)
+	profile, err := s.rooms.OwnerProfile(ctx, ownerID)
+	if err != nil {
+		room.Verified = s.ownerVerified(ctx, ownerID)
+		return
+	}
+	name := strings.TrimSpace(profile.DisplayName)
+	if name == "" {
+		name = strings.TrimSpace(profile.Username)
+	}
+	if name != "" {
+		room.Channel = name
+	}
+	if avatar := strings.TrimSpace(profile.Avatar); avatar != "" {
+		room.Avatar = avatar
+	}
+	room.Verified = profile.Verified
 }
 
 func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Room, count int64, reserved bool, waitingCount int64, now time.Time) AppointmentDTO {
@@ -674,6 +694,7 @@ func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Roo
 		dto.Verified = room.Verified
 		dto.Category = publicAppointmentCategory(room.Category)
 		dto.CategoryJa = room.CategoryJa
+		dto.FanClubOnly = room.FanClubOnly
 		if dto.Cover == "" {
 			dto.Cover = room.Cover
 		}

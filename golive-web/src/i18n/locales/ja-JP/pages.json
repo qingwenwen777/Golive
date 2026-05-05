@@ -247,6 +247,17 @@
       "topUp": "チャージ",
       "sending": "送信中...",
       "send": "送信"
+    },
+    "fanClubExclusive": {
+      "badge": "メンバー限定",
+      "liveTitle": "ファンクラブ限定配信",
+      "scheduledTitle": "ファンクラブ会員が先に入れる予約配信",
+      "body": "この配信を視聴してチャットできるのはファンクラブ会員だけです。参加すると配信画面が解放されます。",
+      "scheduledBody": "ファンクラブに参加すると予約ルーム、予約操作、カウントダウンが解放されます。",
+      "join": "ファンクラブに参加",
+      "joining": "参加中...",
+      "joined": "ファンクラブに参加しました。ルームが解放されました。",
+      "signIn": "ログインして参加"
     }
   },
   "player": {
@@ -363,10 +374,10 @@
     },
     "fanBadge": {
       "title": "{{channelName}} ファンクラブに参加",
-      "description": "{{amount}} coins でファンバッジを購入します。",
+      "description": "{{amount}} coins でファンクラブに参加し、限定配信を解放します。",
       "name": "ファンバッジ",
       "price": "{{amount}} coins",
-      "noRoom": "現在このチャンネルにはファンバッジを購入できるライブルームがありません。",
+      "noRoom": "このクリエイターをまだ見つけられません。しばらくしてからもう一度お試しください。",
       "cancel": "キャンセル",
       "confirm": "購入を確認",
       "pending": "購入中...",
@@ -448,7 +459,9 @@
     "fanBadges": {
       "signIn": "ログインしてファンバッジを見る。",
       "empty": "Fan Light を送るとクリエイターバッジを解除できます。",
-      "contribution": "{{amount}} 貢献"
+      "contribution": "{{amount}} 貢献",
+      "scrollLeft": "ファンバッジを左へスクロール",
+      "scrollRight": "ファンバッジを右へスクロール"
     },
     "historyPage": {
       "title": "履歴",
@@ -621,7 +634,9 @@
       "title": "タイトル",
       "category": "カテゴリ",
       "cover": "カバー",
-      "description": "説明"
+      "description": "説明",
+      "fanClubOnly": "ファンクラブ限定配信",
+      "fanClubOnlySub": "視聴とチャットはファンクラブ会員のみ。未参加のユーザーには参加画面が先に表示されます。"
     },
     "categories": {
       "gaming": "ゲーム",
@@ -744,7 +759,9 @@
         "streams": "配信数",
         "streamsSub": "完了済み",
         "revenue": "収益",
-        "revenueSub": "ライブ収益"
+        "revenueSub": "ライブ収益",
+        "fanClubAudience": "ファンクラブ視聴者",
+        "fanClubAudienceSub": "参加済みファン"
       },
       "quickTitle": "クイック操作",
       "quickHeading": "次の配信を準備",
@@ -928,7 +945,9 @@
         "cover": "カバーとカテゴリを選択",
         "check": "配信接続と権限を確認",
         "confirm": "確認して配信開始"
-      }
+      },
+      "fanClubOnly": "ファンクラブ限定配信",
+      "fanClubOnlySub": "視聴とチャットはファンクラブ会員のみ。未参加のユーザーには参加画面が先に表示されます。"
     },
     "appointments": {
       "total": "予約",
@@ -965,7 +984,9 @@
       "hour": "時",
       "minute": "分",
       "oneHourLater": "1時間後",
-      "done": "完了"
+      "done": "完了",
+      "fanClubOnly": "ファンクラブ限定予約配信",
+      "fanClubOnlySub": "未参加のユーザーには予約ルームの前にファンクラブ参加画面が表示されます。"
     },
     "moderators": {
       "added": "{{name}} をルームモデレーターにしました。",
@@ -1102,11 +1123,11 @@
       "rejectReasonPlaceholder": "改善が必要な内容を伝えてください。",
       "confirmReject": "却下を確定",
       "liveHint": "承認してもクリエイタースタジオと配信権限のみ有効になります。プラットフォーム認証は別途審査します。"
-      },
-      "nav": {
-        "aria": "管理モジュール",
-        "home": "GoLive に戻る"
-      },
+    },
+    "nav": {
+      "aria": "管理モジュール",
+      "home": "GoLive に戻る"
+    },
     "brand": {
       "controlCenter": "コントロールセンター"
     },

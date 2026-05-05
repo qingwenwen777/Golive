@@ -16,6 +16,7 @@ import { useFollow, useUnfollow, type AppointmentItem } from '@/api/room';
 import { useSearchResults, type SearchCreator } from '@/api/search';
 import type { ChannelPost } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
+import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LiveBadge } from '@/components/LiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -269,6 +270,9 @@ function StreamResultRow({ stream, kind }: { stream: Stream; kind: 'live' | 'rep
         <span className={cn('gl-search-thumb-badge', isLive && 'is-live')}>
           {isLive ? <LiveBadge /> : t('liveRoom.replay.badge', { defaultValue: '回放' })}
         </span>
+        {stream.fanClubOnly && (
+          <FanClubExclusiveBadge compact className="gl-search-exclusive-badge" />
+        )}
         {!isLive && <span className="gl-search-duration">{stream.duration}</span>}
       </Link>
       <div className="gl-search-result-main">
@@ -312,6 +316,9 @@ function AppointmentResultRow({ appointment }: { appointment: AppointmentItem })
           <CalendarClock size={14} />
           {t('search.appointmentBadge', { defaultValue: '预告' })}
         </span>
+        {appointment.fanClubOnly && (
+          <FanClubExclusiveBadge compact className="gl-search-exclusive-badge" />
+        )}
       </Link>
       <div className="gl-search-result-main">
         <Link className="gl-search-title" to={`/live/${encodeURIComponent(appointment.roomId)}`}>

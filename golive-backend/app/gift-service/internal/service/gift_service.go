@@ -24,6 +24,12 @@ type SendGiftReq struct {
 	RequestID string
 }
 
+type JoinFanClubReq struct {
+	UserID    string
+	CreatorID string
+	RequestID string
+}
+
 // SendResp wraps the order plus a replay flag the handler uses to set
 // the Idempotent-Replayed header. status=success → HTTP 200. status=failed +
 // failReason=insufficient_coin → HTTP 402.
@@ -67,6 +73,7 @@ var (
 	ErrGiftNotFound     = errors.New("gift not found")
 	ErrInsufficientCoin = errors.New("insufficient coin")
 	ErrGiftLevelLocked  = errors.New("gift level locked")
+	ErrSelfFanClubJoin  = errors.New("cannot join your own fan club")
 )
 
 type GiftLevelLockedError struct {
@@ -187,6 +194,75 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 		return nil, false, fmt.Errorf("persist failure: %w", perr)
 	}
 	obs.GiftRevenueTotal.WithLabelValues(model.StatusFailed).Add(0) // count failures w/o revenue
+	return persisted, false, ErrInsufficientCoin
+}
+
+func (s *GiftService) JoinFanClub(ctx context.Context, req JoinFanClubReq) (*model.GiftOrder, bool, error) {
+	if req.CreatorID == "" || req.UserID == "" {
+		return nil, false, ErrGiftNotFound
+	}
+	if req.CreatorID == req.UserID {
+		return nil, false, ErrSelfFanClubJoin
+	}
+	gift, err := s.gifts.Get(ctx, "fan_light")
+	if err != nil {
+		if errors.Is(err, repo.ErrGiftNotFound) {
+			return nil, false, ErrGiftNotFound
+		}
+		return nil, false, fmt.Errorf("get fan light: %w", err)
+	}
+	userLevel, err := s.orders.UserLevel(ctx, req.UserID)
+	if err != nil {
+		return nil, false, fmt.Errorf("user level: %w", err)
+	}
+	if gift.UnlockLevel > 1 && userLevel < gift.UnlockLevel {
+		return nil, false, &GiftLevelLockedError{
+			RequiredLevel: gift.UnlockLevel,
+			UserLevel:     userLevel,
+		}
+	}
+
+	totalCoin := gift.PriceCoin
+	now := time.Now().UTC()
+	order := &model.GiftOrder{
+		OrderID:   "gift-" + uuid.NewString(),
+		RequestID: req.RequestID,
+		UserID:    req.UserID,
+		RoomID:    "",
+		GiftID:    gift.ID,
+		Count:     1,
+		TotalCoin: totalCoin,
+		Status:    model.StatusSuccess,
+		CreatedAt: now,
+	}
+	placed, replayed, err := s.orders.PlaceFanClubJoinOrder(ctx, order, req.CreatorID)
+	if err == nil {
+		obs.GiftRevenueTotal.WithLabelValues(model.StatusSuccess).Add(float64(placed.TotalCoin))
+		return placed, replayed, nil
+	}
+	if errors.Is(err, repo.ErrRoomOwnerNotFound) {
+		return nil, false, ErrGiftNotFound
+	}
+	if !errors.Is(err, repo.ErrInsufficientFunds) {
+		return nil, false, err
+	}
+	failed := &model.GiftOrder{
+		OrderID:    "gift-" + uuid.NewString(),
+		RequestID:  req.RequestID,
+		UserID:     req.UserID,
+		RoomID:     "",
+		GiftID:     gift.ID,
+		Count:      1,
+		TotalCoin:  totalCoin,
+		Status:     model.StatusFailed,
+		FailReason: model.FailInsufficientCoin,
+		CreatedAt:  now,
+	}
+	persisted, perr := s.orders.PersistGiftFailure(ctx, failed)
+	if perr != nil {
+		return nil, false, fmt.Errorf("persist failure: %w", perr)
+	}
+	obs.GiftRevenueTotal.WithLabelValues(model.StatusFailed).Add(0)
 	return persisted, false, ErrInsufficientCoin
 }
 

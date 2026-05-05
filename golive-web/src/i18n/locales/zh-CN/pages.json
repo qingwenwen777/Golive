@@ -247,6 +247,17 @@
       "topUp": "去充值",
       "sending": "发送中...",
       "send": "发送"
+    },
+    "fanClubExclusive": {
+      "badge": "会员专享",
+      "liveTitle": "粉丝团会员专属直播",
+      "scheduledTitle": "粉丝团会员优先进入预约",
+      "body": "这场直播仅粉丝团成员可观看和参与聊天。加入粉丝团后即可解锁直播画面。",
+      "scheduledBody": "加入粉丝团后才能进入预约直播间，预约、倒计时和提醒都会为你解锁。",
+      "join": "一键加入粉丝团",
+      "joining": "加入中...",
+      "joined": "已加入粉丝团，直播间已解锁。",
+      "signIn": "登录后加入"
     }
   },
   "player": {
@@ -364,10 +375,10 @@
     },
     "fanBadge": {
       "title": "加入 {{channelName}} 粉丝团",
-      "description": "确认花费 {{amount}} coins 购买粉丝灯牌。",
+      "description": "确认花费 {{amount}} coins 加入粉丝团，加入后可解锁粉丝团专属直播。",
       "name": "粉丝灯牌",
       "price": "{{amount}} coins",
-      "noRoom": "当前频道暂时没有可购买粉丝灯牌的直播间。",
+      "noRoom": "暂时无法找到这个主播，请稍后再试。",
       "cancel": "取消",
       "confirm": "确认购买",
       "pending": "购买中...",
@@ -449,7 +460,9 @@
     "fanBadges": {
       "signIn": "登录后查看你的粉丝徽章。",
       "empty": "送出 Fan Light 后即可解锁创作者徽章。",
-      "contribution": "{{amount}} 贡献"
+      "contribution": "{{amount}} 贡献",
+      "scrollLeft": "向左滑动粉丝徽章",
+      "scrollRight": "向右滑动粉丝徽章"
     },
     "historyPage": {
       "title": "观看历史",
@@ -622,7 +635,9 @@
       "title": "标题",
       "category": "分类",
       "cover": "封面",
-      "description": "简介"
+      "description": "简介",
+      "fanClubOnly": "粉丝团专属直播",
+      "fanClubOnlySub": "仅粉丝团成员可观看和聊天，非成员会先看到加入入口。"
     },
     "categories": {
       "gaming": "游戏",
@@ -745,7 +760,9 @@
         "streams": "直播场次",
         "streamsSub": "已完成",
         "revenue": "收益",
-        "revenueSub": "直播收入"
+        "revenueSub": "直播收入",
+        "fanClubAudience": "粉丝团观众",
+        "fanClubAudienceSub": "已加入粉丝"
       },
       "quickTitle": "快捷操作",
       "quickHeading": "准备下一场直播",
@@ -929,7 +946,9 @@
         "cover": "选择封面与分类",
         "check": "检查推流连接与权限",
         "confirm": "确认开始直播"
-      }
+      },
+      "fanClubOnly": "粉丝团专属直播",
+      "fanClubOnlySub": "仅粉丝团成员可观看和聊天，非成员会先看到加入入口。"
     },
     "appointments": {
       "total": "预约",
@@ -966,7 +985,9 @@
       "hour": "小时",
       "minute": "分钟",
       "oneHourLater": "一小时后",
-      "done": "完成"
+      "done": "完成",
+      "fanClubOnly": "粉丝团专属预约直播",
+      "fanClubOnlySub": "非成员会先看到加入粉丝团界面，加入后才能进入预约直播间。"
     },
     "moderators": {
       "added": "{{name}} 已成为房间房管。",
@@ -1103,11 +1124,11 @@
       "rejectReasonPlaceholder": "告诉主播需要补充或改进的内容。",
       "confirmReject": "确认拒绝",
       "liveHint": "同意后只会开启主播工作台和开播权限，平台认证/签约需要单独审核。"
-      },
-      "nav": {
-        "aria": "管理员模块",
-        "home": "返回主界面"
-      },
+    },
+    "nav": {
+      "aria": "管理员模块",
+      "home": "返回主界面"
+    },
     "brand": {
       "controlCenter": "控制中心"
     },

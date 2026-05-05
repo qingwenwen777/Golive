@@ -43,7 +43,7 @@ import {
   useUnmuteRoomUser,
   type MuteUserPayload,
 } from '@/api/moderation';
-import { fanBadgesQueryKey, useFanBadges } from '@/api/gift';
+import { fanBadgesQueryKey, useFanBadges, useJoinFanClub } from '@/api/gift';
 import {
   useChannelAppointments,
   useReserveAppointment,
@@ -70,6 +70,7 @@ import {
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { LoadableImage } from '@/components/LoadableImage';
 import { Avatar } from '@/components/Avatar';
+import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
 import type { AppointmentItem } from '@/api/room';
@@ -146,7 +147,9 @@ export default function LiveRoomPage() {
   const roomIsReplay = Boolean(
     stream?.status === 'ended' && stream.replay?.canWatch && stream.replay?.embedUrl,
   );
-  const roomCanWatch = Boolean(stream && stream.status !== 'ended');
+  const ownsFetchedStream = Boolean(currentUser?.id && stream?.ownerId === currentUser.id);
+  const fanClubLocked = Boolean(stream?.fanClubOnly && !stream.fanClubMember && !ownsFetchedStream);
+  const roomCanWatch = Boolean(stream && stream.status !== 'ended' && !fanClubLocked);
   const [replayTime, setReplayTime] = useState(0);
   const replayHistory = useReplayMessages(roomId, stream?.startedAt, stream?.endedAt, roomIsReplay);
   const replayMessages = useMemo(() => {
@@ -156,6 +159,7 @@ export default function LiveRoomPage() {
     return (replayHistory.data ?? []).filter((message) => message.ts <= visibleUntil);
   }, [replayHistory.data, replayTime, stream?.startedAt]);
   const fanBadges = useFanBadges(isAuthed, currentUser?.id);
+  const joinFanClub = useJoinFanClub();
   const reserveAppointment = useReserveAppointment(roomId);
   const unreserveAppointment = useUnreserveAppointment(roomId);
   const startAppointment = useStartAppointment(roomId);
@@ -365,12 +369,13 @@ export default function LiveRoomPage() {
   }, [currentUser?.id, stream]);
 
   useEffect(() => {
-    if (!stream || (!roomIsLive && !roomIsReplay)) return;
+    if (!stream || fanClubLocked || (!roomIsLive && !roomIsReplay)) return;
     saveToLibrary(WATCH_HISTORY_KEY, stream, 'watchedAt');
-  }, [roomIsLive, roomIsReplay, stream]);
+  }, [fanClubLocked, roomIsLive, roomIsReplay, stream]);
 
   useEffect(() => {
-    if (!isAuthed || !currentUser?.id || !stream || (!roomIsLive && !roomIsReplay)) return;
+    if (!isAuthed || !currentUser?.id || !stream || fanClubLocked || (!roomIsLive && !roomIsReplay))
+      return;
     const key = `${currentUser.id}:${stream.id}`;
     if (recordedWatchKeyRef.current === key) return;
     recordedWatchKeyRef.current = key;
@@ -379,16 +384,16 @@ export default function LiveRoomPage() {
         recordedWatchKeyRef.current = '';
       },
     });
-  }, [currentUser?.id, isAuthed, recordRoomWatch, roomIsLive, roomIsReplay, stream]);
+  }, [currentUser?.id, fanClubLocked, isAuthed, recordRoomWatch, roomIsLive, roomIsReplay, stream]);
 
   useEffect(() => {
-    if (!roomIsLive || !roomId || !currentUser?.id) return;
+    if (!roomIsLive || fanClubLocked || !roomId || !currentUser?.id) return;
     markDailyCoinRoomWatched(currentUser.id, roomId);
     const timer = window.setInterval(() => {
       addDailyCoinWatchSeconds(currentUser.id, 30);
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [currentUser?.id, roomId, roomIsLive]);
+  }, [currentUser?.id, fanClubLocked, roomId, roomIsLive]);
 
   useEffect(() => {
     if (!stream) return;
@@ -504,6 +509,43 @@ export default function LiveRoomPage() {
       ];
     });
   };
+  const handleJoinFanClub = () => {
+    if (!displayStream.ownerId || ownsStream) return;
+    if (!isAuthed) {
+      openLogin(handleJoinFanClub);
+      return;
+    }
+    joinFanClub.mutate(
+      { creatorId: displayStream.ownerId },
+      {
+        onSuccess: (order) => {
+          updateLocalFanBadge(order.totalCoin || 1000, true);
+          void queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+          void queryClient.invalidateQueries({ queryKey: ['channel-appointments'] });
+          void refetch();
+          toast.success(
+            t('liveRoom.fanClubExclusive.joined', {
+              defaultValue: 'Fan club joined. The room is unlocked.',
+            }),
+          );
+        },
+        onError: (err) => {
+          if (err.reason === 'insufficient_coin') {
+            toast.error(
+              t('channel.fanBadge.insufficient', {
+                defaultValue: 'Not enough coins to join the fan club.',
+              }),
+            );
+            return;
+          }
+          toast.error(
+            err.message ||
+              t('channel.fanBadge.failed', { defaultValue: 'Could not join the fan club.' }),
+          );
+        },
+      },
+    );
+  };
   const handleStopLive = () => {
     stopLive.mutate(undefined, {
       onSuccess: () => {
@@ -540,6 +582,26 @@ export default function LiveRoomPage() {
       }}
     />
   );
+  const exclusiveLocked = Boolean(
+    displayStream.fanClubOnly && !displayStream.fanClubMember && !ownsStream,
+  );
+
+  if (!liveEnding && exclusiveLocked) {
+    return (
+      <>
+        <FanClubExclusiveRoomGate
+          stream={displayStream}
+          appointment={appointment}
+          pending={joinFanClub.isPending || fanBadges.isPending}
+          authed={isAuthed}
+          scheduled={isScheduledRoom || roomIsStarting}
+          onJoin={handleJoinFanClub}
+          onLogin={() => openLogin(handleJoinFanClub)}
+        />
+        {reportDialog}
+      </>
+    );
+  }
 
   if (!liveEnding && roomIsReplay && stream?.replay?.embedUrl) {
     return (
@@ -1475,6 +1537,94 @@ function formatReplayClock(seconds: number): string {
     : `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function FanClubExclusiveRoomGate({
+  stream,
+  appointment,
+  authed,
+  pending,
+  scheduled,
+  onJoin,
+  onLogin,
+}: {
+  stream: Stream;
+  appointment?: AppointmentItem | null;
+  authed: boolean;
+  pending: boolean;
+  scheduled: boolean;
+  onJoin: () => void;
+  onLogin: () => void;
+}) {
+  const { t, i18n } = useTranslation('pages');
+  const scheduledAt = appointment?.scheduledAt || stream.startedAt;
+  const scheduledLabel = scheduledAt
+    ? new Intl.DateTimeFormat(i18n.language, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(scheduledAt))
+    : '';
+  return (
+    <div className="gl-fan-exclusive-room">
+      <section className="gl-fan-exclusive-hero">
+        <div className="gl-fan-exclusive-cover">
+          {stream.cover ? (
+            <LoadableImage src={stream.cover} alt="" />
+          ) : (
+            <div className="gl-scheduled-player-fallback" />
+          )}
+          <div className="gl-fan-exclusive-cover-glow" aria-hidden="true" />
+          <div className="gl-fan-exclusive-overlay">
+            <FanClubExclusiveBadge />
+            <h1>
+              {scheduled
+                ? t('liveRoom.fanClubExclusive.scheduledTitle', {
+                    defaultValue: 'Fan club members see this appointment first',
+                  })
+                : t('liveRoom.fanClubExclusive.liveTitle', {
+                    defaultValue: 'Fan club members only',
+                  })}
+            </h1>
+            <p>
+              {scheduled
+                ? t('liveRoom.fanClubExclusive.scheduledBody', {
+                    defaultValue:
+                      'Join the fan club to unlock the appointment room, reservations, and countdown.',
+                  })
+                : t('liveRoom.fanClubExclusive.body', {
+                    defaultValue:
+                      'This live is exclusive to the creator fan club. Join to unlock playback and live chat.',
+                  })}
+            </p>
+            {scheduledLabel && <span className="gl-fan-exclusive-time">{scheduledLabel}</span>}
+            <button
+              type="button"
+              className="gl-fan-exclusive-join"
+              disabled={pending}
+              onClick={authed ? onJoin : onLogin}
+            >
+              <UserPlus size={17} />
+              {pending
+                ? t('liveRoom.fanClubExclusive.joining', { defaultValue: 'Joining...' })
+                : authed
+                  ? t('liveRoom.fanClubExclusive.join', { defaultValue: 'Join fan club' })
+                  : t('liveRoom.fanClubExclusive.signIn', { defaultValue: 'Sign in to join' })}
+            </button>
+          </div>
+        </div>
+      </section>
+      <section className="gl-fan-exclusive-info">
+        <Avatar name={stream.channel || stream.title} src={stream.avatar} size={52} />
+        <div>
+          {stream.fanClubOnly && <FanClubExclusiveBadge className="gl-scheduled-exclusive" />}
+          <h2>{stream.title}</h2>
+          <span>{stream.channel}</span>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function StartingRoomPlayer({ stream }: { stream: Stream }) {
   const { t } = useTranslation('pages');
   return (
@@ -1539,6 +1689,7 @@ function ScheduledRoomPlayer({
             <CalendarClock size={14} />
             {t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' })}
           </span>
+          {stream.fanClubOnly && <FanClubExclusiveBadge className="gl-scheduled-exclusive" />}
           <h2>{stream.title}</h2>
           <p>{scheduled}</p>
           <div className="gl-scheduled-player-meta">

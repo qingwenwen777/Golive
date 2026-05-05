@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
-import { ImagePlus, Radio, Send, Wand2 } from 'lucide-react';
+import { ImagePlus, LockKeyhole, Radio, Send, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMe } from '@/api/auth';
 import { useSubmitCreatorApplication } from '@/api/creator';
@@ -96,6 +96,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const [description, setDescription] = useState('');
   const [applicationReason, setApplicationReason] = useState('');
   const [category, setCategory] = useState('Just Chatting');
+  const [fanClubOnly, setFanClubOnly] = useState(false);
   const [coverSelection, setCoverSelection] = useState<ImageCropSelection | null>(null);
   const [processingCover, setProcessingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +149,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
           cover: uploadedCover,
           channelName,
           avatar: currentUser?.avatar,
+          fanClubOnly,
         },
         {
           onSuccess: (stream) => {
@@ -255,6 +257,29 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className={`gl-fan-exclusive-toggle ${fanClubOnly ? 'is-active' : ''}`}>
+              <input
+                type="checkbox"
+                checked={fanClubOnly}
+                onChange={(event) => setFanClubOnly(event.target.checked)}
+              />
+              <span className="gl-fan-exclusive-toggle-mark">
+                <LockKeyhole size={15} />
+              </span>
+              <span>
+                <strong>
+                  {t('createLive.fields.fanClubOnly', {
+                    defaultValue: 'Fan club exclusive live',
+                  })}
+                </strong>
+                <small>
+                  {t('createLive.fields.fanClubOnlySub', {
+                    defaultValue: 'Only fan club members can watch and chat after joining.',
+                  })}
+                </small>
+              </span>
             </label>
 
             <div className="gl-auth-field">

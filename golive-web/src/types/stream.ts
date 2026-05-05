@@ -31,6 +31,8 @@ export interface Stream {
     | 'canceled'
     | string;
   subscriberCount?: number;
+  fanClubOnly?: boolean;
+  fanClubMember?: boolean;
   replay?: ReplayInfo;
 }
 

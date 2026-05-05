@@ -128,6 +128,7 @@ export interface GoLivePayload {
   cover?: string;
   channelName?: string;
   avatar?: string;
+  fanClubOnly?: boolean;
 }
 
 export function useGoLive() {
@@ -405,6 +406,7 @@ export interface LiveHistoryItem {
   newSubscribers: number;
   topFan?: FanContribution;
   replay?: ReplayInfo;
+  fanClubOnly?: boolean;
 }
 
 export interface LiveHistoryResp {
@@ -498,6 +500,7 @@ export interface AppointmentItem {
   waitingCount?: number;
   reserved: boolean;
   canStart: boolean;
+  fanClubOnly?: boolean;
 }
 
 export interface AppointmentListResp {
@@ -751,6 +754,7 @@ export interface AppointmentPayload {
   cover?: string;
   channelName?: string;
   avatar?: string;
+  fanClubOnly?: boolean;
 }
 
 function useAppointmentMutation<T>(method: 'post' | 'patch' | 'delete', path: string) {

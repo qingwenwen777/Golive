@@ -181,6 +181,9 @@ func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.F
 	for i := range badges {
 		badges[i].Level = FanBadgeLevel(badges[i].TotalContribution)
 	}
+	if err := r.refreshFanBadgeCreatorProfiles(ctx, badges); err != nil {
+		return nil, err
+	}
 	sort.SliceStable(badges, func(i, j int) bool {
 		if badges[i].Level != badges[j].Level {
 			return badges[i].Level > badges[j].Level
@@ -191,6 +194,66 @@ func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.F
 		return badges[i].UpdatedAt.After(badges[j].UpdatedAt)
 	})
 	return badges, nil
+}
+
+func (r *OrderRepo) refreshFanBadgeCreatorProfiles(ctx context.Context, badges []model.FanBadge) error {
+	if len(badges) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(badges))
+	seen := make(map[string]struct{}, len(badges))
+	for _, badge := range badges {
+		creatorID := strings.TrimSpace(badge.CreatorID)
+		if creatorID == "" {
+			continue
+		}
+		if _, ok := seen[creatorID]; ok {
+			continue
+		}
+		seen[creatorID] = struct{}{}
+		ids = append(ids, creatorID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	var profiles []struct {
+		ID     string
+		Name   string
+		Avatar string
+	}
+	err := r.db.WithContext(ctx).Raw(`
+SELECT
+  id,
+  COALESCE(NULLIF(display_name, ''), NULLIF(username, ''), id) AS name,
+  COALESCE(NULLIF(avatar, ''), '') AS avatar
+FROM users
+WHERE id IN ?
+`, ids).Scan(&profiles).Error
+	if isMissingTable(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]struct {
+		Name   string
+		Avatar string
+	}, len(profiles))
+	for _, profile := range profiles {
+		byID[profile.ID] = struct {
+			Name   string
+			Avatar string
+		}{Name: strings.TrimSpace(profile.Name), Avatar: strings.TrimSpace(profile.Avatar)}
+	}
+	for i := range badges {
+		if profile, ok := byID[badges[i].CreatorID]; ok {
+			if profile.Name != "" {
+				badges[i].CreatorName = profile.Name
+			}
+			badges[i].CreatorAvatar = profile.Avatar
+		}
+	}
+	return nil
 }
 
 func (r *OrderRepo) UserLevel(ctx context.Context, userID string) (int, error) {
@@ -686,12 +749,16 @@ func (r *OrderRepo) PlaceGiftOrder(
 			if res.RowsAffected == 0 {
 				return ErrRoomOwnerNotFound
 			}
+			creatorIncomeTitle := "直播礼物收入"
+			if o.GiftID == "fan_light" {
+				creatorIncomeTitle = "加入粉丝团收入"
+			}
 			if err := createCoinTransaction(
 				tx,
 				receiverID,
 				o.TotalCoin,
 				model.CoinTxCreatorGiftIncome,
-				"直播礼物收入",
+				creatorIncomeTitle,
 				fmt.Sprintf("%s x%d", o.GiftID, o.Count),
 				"gift_order",
 				o.OrderID,
@@ -713,6 +780,84 @@ func (r *OrderRepo) PlaceGiftOrder(
 			NextAt:  time.Now(),
 		}
 		return tx.Create(msg).Error
+	})
+	if errors.Is(err, ErrDuplicateRequest) {
+		existing, ferr := r.FindGiftByRequestID(ctx, o.UserID, o.RequestID)
+		if ferr != nil {
+			return nil, false, ferr
+		}
+		return existing, true, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return o, false, nil
+}
+
+func (r *OrderRepo) PlaceFanClubJoinOrder(
+	ctx context.Context,
+	o *model.GiftOrder,
+	creatorID string,
+) (placed *model.GiftOrder, replayed bool, err error) {
+	creatorID = strings.TrimSpace(creatorID)
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		creatorName, _, err := creatorProfile(tx, creatorID)
+		if err != nil {
+			return err
+		}
+		if creatorName == "" {
+			creatorName = creatorID
+		}
+
+		if err := debitUserBalance(tx, o.UserID, o.TotalCoin); err != nil {
+			return err
+		}
+		if err := tx.Create(o).Error; err != nil {
+			if isDuplicateKey(err) {
+				return ErrDuplicateRequest
+			}
+			return err
+		}
+		if err := createCoinTransaction(
+			tx,
+			o.UserID,
+			-o.TotalCoin,
+			model.CoinTxGiftSpend,
+			"加入粉丝团",
+			creatorName,
+			"gift_order",
+			o.OrderID,
+			o.RoomID,
+			creatorID,
+		); err != nil {
+			return err
+		}
+		res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.TotalCoin, creatorID)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return ErrRoomOwnerNotFound
+		}
+		fanName, _, _ := creatorProfile(tx, o.UserID)
+		if fanName == "" {
+			fanName = o.UserID
+		}
+		if err := createCoinTransaction(
+			tx,
+			creatorID,
+			o.TotalCoin,
+			model.CoinTxCreatorGiftIncome,
+			"加入粉丝团收入",
+			fanName,
+			"gift_order",
+			o.OrderID,
+			o.RoomID,
+			o.UserID,
+		); err != nil {
+			return err
+		}
+		return applyFanBadgeContribution(tx, o.UserID, o.RoomID, creatorID, o.TotalCoin, FanBadgeCreate)
 	})
 	if errors.Is(err, ErrDuplicateRequest) {
 		existing, ferr := r.FindGiftByRequestID(ctx, o.UserID, o.RequestID)
@@ -927,7 +1072,7 @@ func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, co
 		if mode != FanBadgeCreate {
 			return nil
 		}
-		name, avatar, err := roomCreatorProfile(tx, roomID)
+		name, avatar, err := creatorProfileForFanBadge(tx, roomID, creatorID)
 		if err != nil {
 			return err
 		}
@@ -956,6 +1101,38 @@ func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, co
 			"level":              FanBadgeLevel(total),
 			"updated_at":         time.Now(),
 		}).Error
+}
+
+func creatorProfileForFanBadge(tx *gorm.DB, roomID, creatorID string) (string, string, error) {
+	if strings.TrimSpace(roomID) != "" {
+		return roomCreatorProfile(tx, roomID)
+	}
+	return creatorProfile(tx, creatorID)
+}
+
+func creatorProfile(tx *gorm.DB, creatorID string) (string, string, error) {
+	creatorID = strings.TrimSpace(creatorID)
+	if creatorID == "" {
+		return "", "", ErrRoomOwnerNotFound
+	}
+	var row struct {
+		Name   string
+		Avatar string
+	}
+	err := tx.Raw(`
+SELECT
+  COALESCE(NULLIF(display_name, ''), NULLIF(username, ''), id, '') AS name,
+  COALESCE(NULLIF(avatar, ''), '') AS avatar
+FROM users
+WHERE id = ?
+`, creatorID).Row().Scan(&row.Name, &row.Avatar)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", ErrRoomOwnerNotFound
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return row.Name, row.Avatar, nil
 }
 
 func roomCreatorProfile(tx *gorm.DB, roomID string) (string, string, error) {
@@ -998,4 +1175,12 @@ func isMissingUserControlColumn(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "unknown column") || strings.Contains(msg, "no such column")
+}
+
+func isMissingTable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") || strings.Contains(msg, "doesn't exist")
 }

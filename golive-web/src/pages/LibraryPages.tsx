@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import {
   AtSign,
   Bell,
   Camera,
+  ChevronLeft,
   ChevronRight,
   Crown,
   Heart,
@@ -583,6 +584,12 @@ function FanBadgeShelf({
   onLogin: () => void;
 }) {
   const { t } = useTranslation('pages');
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const scrollBadges = (direction: -1 | 1) => {
+    const node = scrollerRef.current;
+    if (!node) return;
+    node.scrollBy({ left: direction * 260, behavior: 'smooth' });
+  };
 
   if (!isAuthed) {
     return (
@@ -594,10 +601,12 @@ function FanBadgeShelf({
 
   if (isPending) {
     return (
-      <div className="gl-fan-badge-grid">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="gl-fan-badge-card is-loading" />
-        ))}
+      <div className="gl-fan-badge-rail-wrap">
+        <div className="gl-fan-badge-grid">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="gl-fan-badge-card is-loading" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -607,27 +616,45 @@ function FanBadgeShelf({
   }
 
   return (
-    <div className="gl-fan-badge-grid">
-      {badges.slice(0, 12).map((badge) => (
-        <div key={`${badge.creatorId}:${badge.level}`} className="gl-fan-badge-card">
-          <div className="gl-fan-badge-avatar">
-            <Avatar name={badge.creatorName} src={badge.creatorAvatar} size={42} />
-          </div>
-          <div className="gl-fan-badge-copy">
-            <div className="gl-fan-badge-name">{badge.creatorName}</div>
-            <div className="gl-fan-badge-meta">
-              <span className={`gl-fan-badge-level ${fanBadgeToneClass(badge.level)}`}>
-                <Crown size={13} strokeWidth={2.4} /> #{badge.level}
-              </span>
-              <span>
-                {t('library.fanBadges.contribution', {
-                  amount: badge.totalContribution.toLocaleString(),
-                })}
-              </span>
+    <div className={cn('gl-fan-badge-rail-wrap', badges.length > 3 && 'has-overflow')}>
+      <button
+        type="button"
+        className="gl-fan-badge-scroll is-left"
+        aria-label={t('library.fanBadges.scrollLeft', { defaultValue: 'Scroll left' })}
+        onClick={() => scrollBadges(-1)}
+      >
+        <ChevronLeft size={17} />
+      </button>
+      <div className="gl-fan-badge-grid" ref={scrollerRef}>
+        {badges.slice(0, 12).map((badge) => (
+          <div key={`${badge.creatorId}:${badge.level}`} className="gl-fan-badge-card">
+            <div className="gl-fan-badge-avatar">
+              <Avatar name={badge.creatorName} src={badge.creatorAvatar} size={42} />
+            </div>
+            <div className="gl-fan-badge-copy">
+              <div className="gl-fan-badge-name">{badge.creatorName}</div>
+              <div className="gl-fan-badge-meta">
+                <span className={`gl-fan-badge-level ${fanBadgeToneClass(badge.level)}`}>
+                  <Crown size={13} strokeWidth={2.4} /> #{badge.level}
+                </span>
+                <span>
+                  {t('library.fanBadges.contribution', {
+                    amount: badge.totalContribution.toLocaleString(),
+                  })}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      <button
+        type="button"
+        className="gl-fan-badge-scroll is-right"
+        aria-label={t('library.fanBadges.scrollRight', { defaultValue: 'Scroll right' })}
+        onClick={() => scrollBadges(1)}
+      >
+        <ChevronRight size={17} />
+      </button>
     </div>
   );
 }
@@ -1320,7 +1347,6 @@ function SecuritySettings({
           </p>
         </div>
       </section>
-
     </>
   );
 }
@@ -1600,10 +1626,7 @@ function collectionThemeClass(storageKey: string): string {
 }
 
 function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
-  const lookupItems = useMemo(
-    () => items.filter((item) => item.status === 'ended').slice(0, 60),
-    [items],
-  );
+  const lookupItems = useMemo(() => items.filter((item) => Boolean(item.id)).slice(0, 60), [items]);
   const lookups = useQueries({
     queries: lookupItems.map((item) => ({
       queryKey: ['room', item.id],
@@ -1631,9 +1654,13 @@ function useReplayHydratedStreams<T extends Stream>(items: T[]): T[] {
   if (lookupItems.length === 0) return items;
   const lookupIds = new Set(lookupItems.map((item) => item.id));
   return items.map((item) => {
-    if (item.status !== 'ended' || !lookupIds.has(item.id)) return item;
+    if (!lookupIds.has(item.id)) return item;
     const replayRoom = replayRooms.get(item.id);
-    if (!replayRoom) return { ...item, replay: undefined, isLive: false, status: 'ended' };
+    if (!replayRoom) {
+      return item.status === 'ended'
+        ? { ...item, replay: undefined, isLive: false, status: 'ended' }
+        : item;
+    }
     return {
       ...item,
       ...replayRoom,

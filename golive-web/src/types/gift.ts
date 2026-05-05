@@ -43,6 +43,11 @@ export interface GiftSendPayload {
   requestId: string;
 }
 
+export interface JoinFanClubPayload {
+  creatorId: string;
+  requestId: string;
+}
+
 export interface SuperChatPayload {
   roomId: string;
   amount: number;

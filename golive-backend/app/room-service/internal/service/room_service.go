@@ -83,7 +83,7 @@ func (s *RoomService) List(ctx context.Context, rawCategory string, page, size i
 	now := s.now()
 	items := make([]model.Stream, 0, len(rooms))
 	for i := range rooms {
-		st := s.streamFromRoom(ctx, &rooms[i], now)
+		st := s.streamFromRoom(ctx, &rooms[i], now, "")
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
 		}
@@ -110,7 +110,7 @@ func (s *RoomService) SearchLive(ctx context.Context, query string, limit int) (
 	now := s.now()
 	items := make([]model.Stream, 0, len(rooms))
 	for i := range rooms {
-		st := s.streamFromRoom(ctx, &rooms[i], now)
+		st := s.streamFromRoom(ctx, &rooms[i], now, "")
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func (s *RoomService) SearchReplays(ctx context.Context, viewerID, query string,
 		if replay == nil || !replay.CanWatch {
 			continue
 		}
-		st := rooms[i].ToStream(now)
+		st := s.streamFromRoom(ctx, &rooms[i], now, viewerID)
 		st.Replay = replay
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
@@ -179,7 +179,7 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 	if r.Status != model.StatusLive && !isPublicScheduled && !isPublicAppointmentStarting && !(isOwner && r.Status == model.StatusPublishing) && !replayVisible {
 		return nil, ErrRoomNotFound
 	}
-	st := s.streamFromRoom(ctx, r, s.now())
+	st := s.streamFromRoom(ctx, r, s.now(), viewerID)
 	st.Replay = replay
 	if err := s.addSubscriberCount(ctx, &st); err != nil {
 		return nil, err
@@ -190,12 +190,16 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 	return &st, nil
 }
 
-func (s *RoomService) streamFromRoom(ctx context.Context, room *model.Room, now time.Time) model.Stream {
+func (s *RoomService) streamFromRoom(ctx context.Context, room *model.Room, now time.Time, viewerID string) model.Stream {
 	adjusted := *room
 	s.applyLiveViewerMetrics(ctx, &adjusted)
 	s.applyOwnerProfile(ctx, &adjusted)
 	st := adjusted.ToStream(now)
 	st.PlaybackURL = s.playbackURL(&adjusted)
+	st.FanClubMember = s.canWatchFanClubRoom(ctx, &adjusted, viewerID)
+	if adjusted.FanClubOnly && !st.FanClubMember {
+		st.PlaybackURL = ""
+	}
 	return st
 }
 
@@ -208,9 +212,31 @@ func (s *RoomService) applyOwnerProfile(ctx context.Context, room *model.Room) {
 		return
 	}
 	room.Verified = profile.Verified
-	if strings.TrimSpace(room.Avatar) == "" && strings.TrimSpace(profile.Avatar) != "" {
+	name := strings.TrimSpace(profile.DisplayName)
+	if name == "" {
+		name = strings.TrimSpace(profile.Username)
+	}
+	if name != "" {
+		room.Channel = name
+	}
+	if strings.TrimSpace(profile.Avatar) != "" {
 		room.Avatar = profile.Avatar
 	}
+}
+
+func (s *RoomService) canWatchFanClubRoom(ctx context.Context, room *model.Room, viewerID string) bool {
+	if room == nil || !room.FanClubOnly {
+		return false
+	}
+	viewerID = strings.TrimSpace(viewerID)
+	if viewerID == "" {
+		return false
+	}
+	if viewerID == room.OwnerID {
+		return true
+	}
+	ok, err := s.rooms.IsFanClubMember(ctx, viewerID, room.OwnerID)
+	return err == nil && ok
 }
 
 func (s *RoomService) applyLiveViewerMetrics(ctx context.Context, room *model.Room) {

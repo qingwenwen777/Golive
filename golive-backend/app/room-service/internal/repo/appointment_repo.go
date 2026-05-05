@@ -76,11 +76,12 @@ func (r *AppointmentRepo) UpdateScheduled(ctx context.Context, appt *model.LiveA
 		}
 		return tx.Model(&model.Room{}).Where("id = ?", room.ID).
 			Updates(map[string]any{
-				"title":       room.Title,
-				"description": room.Description,
-				"category":    room.Category,
-				"cover":       room.Cover,
-				"started_at":  room.StartedAt,
+				"title":         room.Title,
+				"description":   room.Description,
+				"category":      room.Category,
+				"cover":         room.Cover,
+				"started_at":    room.StartedAt,
+				"fan_club_only": room.FanClubOnly,
 			}).Error
 	})
 }

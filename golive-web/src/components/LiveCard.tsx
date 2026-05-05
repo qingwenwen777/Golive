@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Flag } from 'lucide-react';
 import { Icons } from '@/components/Icons';
 import { Avatar } from '@/components/Avatar';
+import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LiveBadge } from '@/components/LiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -152,17 +153,20 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
           ) : null}
           <div className="gl-card-gloss" />
           <div className="gl-card-top">
-            {isLive ? (
-              <LiveBadge />
-            ) : (
-              <span className="gl-dur-pill">
-                {hasReplay
-                  ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
-                  : isScheduled
-                    ? t('liveRoom.appointmentStartingSoon', { defaultValue: 'Starting soon' })
-                    : t('library.status.offline', { defaultValue: 'Offline' })}
-              </span>
-            )}
+            <span className="gl-card-top-left">
+              {isLive ? (
+                <LiveBadge />
+              ) : (
+                <span className="gl-dur-pill">
+                  {hasReplay
+                    ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
+                    : isScheduled
+                      ? t('liveRoom.appointmentStartingSoon', { defaultValue: 'Starting soon' })
+                      : t('library.status.offline', { defaultValue: 'Offline' })}
+                </span>
+              )}
+              {stream.fanClubOnly && <FanClubExclusiveBadge compact />}
+            </span>
           </div>
         </div>
         <div className="gl-card-meta">

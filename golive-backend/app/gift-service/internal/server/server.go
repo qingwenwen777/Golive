@@ -20,6 +20,7 @@ type Deps struct {
 //
 //	GET  /gifts          public catalog
 //	POST /gifts/send     auth required
+//	POST /gifts/fan-clubs/join auth required
 //	GET  /gifts/fan-badges/me auth required
 //	POST /super-chats    auth required
 //	GET  /bets/latest    public current/latest room bet
@@ -40,6 +41,7 @@ func NewRouter(d Deps) *gin.Engine {
 	}
 	r.GET("/gifts/fan-badges/me", auth, d.Gift.FanBadges)
 	r.POST("/gifts/send", auth, d.Gift.Send)
+	r.POST("/gifts/fan-clubs/join", auth, d.Gift.JoinFanClub)
 	r.POST("/super-chats", auth, d.SuperChat.Send)
 	r.POST("/bets", auth, d.Bet.Open)
 	r.POST("/bets/:id/wagers", auth, d.Bet.Wager)

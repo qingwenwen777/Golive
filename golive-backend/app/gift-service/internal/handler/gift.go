@@ -55,6 +55,11 @@ type sendGiftBody struct {
 	RequestID string `json:"requestId"`
 }
 
+type joinFanClubBody struct {
+	CreatorID string `json:"creatorId"`
+	RequestID string `json:"requestId"`
+}
+
 // Send mirrors POST /api/gifts/send. Response shapes (must match
 // src/mocks/handlers/gift.ts):
 //
@@ -124,6 +129,70 @@ func (h *GiftHandler) Send(c *gin.Context) {
 	}
 
 	// 3) Render + cache.
+	switch {
+	case sErr == nil:
+		respondGift(c, http.StatusOK, order, replayed, h.idem, uid, requestID)
+	case errors.Is(sErr, service.ErrInsufficientCoin):
+		respondGiftFailure(c, order, h.idem, uid, requestID)
+	default:
+		errcode.Respond(c, sErr)
+	}
+}
+
+func (h *GiftHandler) JoinFanClub(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, errcode.New(401, "Unauthorized"))
+		return
+	}
+
+	var body joinFanClubBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		errcode.Respond(c, errcode.New(400, "Bad request"))
+		return
+	}
+	body.CreatorID = strings.TrimSpace(body.CreatorID)
+	if body.CreatorID == "" {
+		errcode.Respond(c, errcode.New(400, "Bad request"))
+		return
+	}
+	requestID := strings.TrimSpace(c.GetHeader(headerRequestID))
+	if requestID == "" {
+		requestID = strings.TrimSpace(body.RequestID)
+	}
+	if requestID == "" {
+		errcode.Respond(c, errcode.New(400, "Missing requestId"))
+		return
+	}
+	if cached, err := h.idem.Lookup(c.Request.Context(), uid, requestID); err == nil && cached != nil {
+		c.Writer.Header().Set(headerReplayed, "true")
+		c.Data(cached.Status, "application/json; charset=utf-8", cached.Body)
+		return
+	}
+
+	order, replayed, sErr := h.svc.JoinFanClub(c.Request.Context(), service.JoinFanClubReq{
+		UserID:    uid,
+		CreatorID: body.CreatorID,
+		RequestID: requestID,
+	})
+	if sErr != nil && errors.Is(sErr, service.ErrGiftNotFound) {
+		errcode.Respond(c, errcode.New(404, "Creator or fan light not found"))
+		return
+	}
+	if sErr != nil && errors.Is(sErr, service.ErrSelfFanClubJoin) {
+		errcode.Respond(c, errcode.New(409, "Cannot join your own fan club"))
+		return
+	}
+	var locked *service.GiftLevelLockedError
+	if sErr != nil && errors.As(sErr, &locked) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"message":       "Gift unlock level not reached",
+			"reason":        "gift_level_locked",
+			"requiredLevel": locked.RequiredLevel,
+			"userLevel":     locked.UserLevel,
+		})
+		return
+	}
 	switch {
 	case sErr == nil:
 		respondGift(c, http.StatusOK, order, replayed, h.idem, uid, requestID)

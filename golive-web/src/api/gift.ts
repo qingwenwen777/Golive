@@ -6,6 +6,7 @@ import type {
   GiftOrder,
   GiftSendPayload,
   FanBadge,
+  JoinFanClubPayload,
   SuperChatOrder,
   SuperChatPayload,
 } from '@/types/gift';
@@ -101,6 +102,35 @@ export function useSendGift() {
       };
       try {
         const { data } = await http.post<GiftOrder>('/gifts/send', body, {
+          headers: { 'X-Request-Id': requestId },
+        });
+        return data;
+      } catch (err) {
+        throw toGiftError(err);
+      }
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['me'] });
+      void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
+    },
+  });
+}
+
+export function useJoinFanClub() {
+  const qc = useQueryClient();
+  return useMutation<
+    GiftOrder,
+    GiftError,
+    Omit<JoinFanClubPayload, 'requestId'> & { requestId?: string }
+  >({
+    mutationFn: async (input) => {
+      const requestId = input.requestId ?? newRequestId();
+      const body: JoinFanClubPayload = {
+        creatorId: input.creatorId,
+        requestId,
+      };
+      try {
+        const { data } = await http.post<GiftOrder>('/gifts/fan-clubs/join', body, {
           headers: { 'X-Request-Id': requestId },
         });
         return data;
