@@ -1016,7 +1016,8 @@
       "disable": "Disable live",
       "confirmDisable": "Disable live permission for {{name}}?",
       "disabled": "Live permission disabled.",
-      "disableFailed": "Could not update permission."
+      "disableFailed": "Could not update permission.",
+      "disableFor": "Disable live permission for {{name}}"
     },
     "applications": {
       "eyebrow": "Application review",
@@ -1140,7 +1141,12 @@
       "copied": "Invite code copied.",
       "copyFailed": "Could not copy invite code.",
       "created": "Invite code {{code}} created.",
-      "createFailed": "Could not create invite code."
+      "createFailed": "Could not create invite code.",
+      "delete": "Delete",
+      "confirmDelete": "Delete unused invite code {{code}}?",
+      "deleted": "Invite code deleted.",
+      "deleteFailed": "Could not delete invite code.",
+      "deleteUsedHint": "Used invite codes cannot be deleted."
     },
     "scaffold": {
       "content": {
@@ -1221,7 +1227,8 @@
         "system": "System actions",
         "systemSub": "Configuration changes, service restarts, and policy updates"
       }
-    }
+    },
+    "exit": "Exit admin"
   },
   "upload": {
     "description": "Upload a JPG, PNG, WebP, or GIF image up to 5MB.",

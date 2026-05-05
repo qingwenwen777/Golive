@@ -164,3 +164,18 @@ export function useCreateInviteCode() {
     },
   });
 }
+
+export function useDeleteInviteCode() {
+  const qc = useQueryClient();
+  return useMutation<{ inviteCode: AdminInviteCode }, Error, { id: string }>({
+    mutationFn: async ({ id }) => {
+      const { data } = await http.delete<{ inviteCode: AdminInviteCode }>(
+        `/admin/invite-codes/${encodeURIComponent(id)}`,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-invite-codes'] });
+    },
+  });
+}

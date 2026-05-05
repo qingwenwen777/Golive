@@ -1017,7 +1017,8 @@
       "disable": "禁用直播",
       "confirmDisable": "确定禁用 {{name}} 的开播权限吗？",
       "disabled": "已禁用直播权限。",
-      "disableFailed": "无法更新权限。"
+      "disableFailed": "无法更新权限。",
+      "disableFor": "为 {{name}} 关闭开播权限"
     },
     "applications": {
       "eyebrow": "申请审核",
@@ -1141,7 +1142,12 @@
       "copied": "邀请码已复制。",
       "copyFailed": "无法复制邀请码。",
       "created": "邀请码 {{code}} 已创建。",
-      "createFailed": "无法创建邀请码。"
+      "createFailed": "无法创建邀请码。",
+      "delete": "删除",
+      "confirmDelete": "删除未使用的邀请码 {{code}} 吗？",
+      "deleted": "邀请码已删除。",
+      "deleteFailed": "无法删除邀请码。",
+      "deleteUsedHint": "已使用的邀请码不能删除。"
     },
     "scaffold": {
       "content": {
@@ -1222,7 +1228,8 @@
         "system": "系统操作",
         "systemSub": "配置变更、服务重启、策略调整"
       }
-    }
+    },
+    "exit": "退出后台"
   },
   "upload": {
     "description": "上传 JPG、PNG、WebP 或 GIF 图片，最大 5MB。",

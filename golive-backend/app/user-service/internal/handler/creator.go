@@ -110,6 +110,23 @@ func (h *AdminHandler) ListInviteCodes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
+func (h *AdminHandler) DeleteInviteCode(c *gin.Context) {
+	invite, err := h.users.DeleteUnusedInviteCode(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, repo.ErrInviteNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "invite code not found"))
+		return
+	}
+	if errors.Is(err, repo.ErrInviteUsed) {
+		errcode.Respond(c, errcode.New(http.StatusConflict, "used invite codes cannot be deleted"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"inviteCode": invite})
+}
+
 func (h *AdminHandler) ListCreatorApplications(c *gin.Context) {
 	items, err := h.users.ListCreatorApplications(c.Request.Context())
 	if err != nil {

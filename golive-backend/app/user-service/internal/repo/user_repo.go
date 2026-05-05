@@ -312,6 +312,28 @@ func (r *UserRepo) ListInviteCodes(ctx context.Context) ([]InviteCodeView, error
 	return rows, nil
 }
 
+func (r *UserRepo) DeleteUnusedInviteCode(ctx context.Context, id string) (*model.InviteCode, error) {
+	var invite model.InviteCode
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).
+			Take(&invite).Error; err != nil {
+			return err
+		}
+		if invite.UsedBy != "" || invite.UsedAt != nil {
+			return ErrInviteUsed
+		}
+		return tx.Delete(&invite).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrInviteNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &invite, nil
+}
+
 func (r *UserRepo) EnsureAdmin(ctx context.Context, username string) error {
 	return r.db.WithContext(ctx).Model(&model.User{}).
 		Where("username = ?", username).

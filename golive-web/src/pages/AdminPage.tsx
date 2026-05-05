@@ -11,6 +11,7 @@ import {
   Gauge,
   History,
   ListFilter,
+  LogOut,
   Plus,
   RefreshCw,
   Settings,
@@ -28,6 +29,7 @@ import {
   useAdminInviteCodes,
   useAdminLiveCreators,
   useCreateInviteCode,
+  useDeleteInviteCode,
   useReviewCreatorApplication,
   useUpdateLivePermission,
   type AdminInviteCode,
@@ -127,6 +129,7 @@ export default function AdminPage() {
   const reject = useReviewCreatorApplication('reject');
   const updatePermission = useUpdateLivePermission();
   const createInvite = useCreateInviteCode();
+  const deleteInvite = useDeleteInviteCode();
 
   const appItems = apps.data?.items ?? [];
   const creatorItems = creators.data?.items ?? [];
@@ -181,10 +184,16 @@ export default function AdminPage() {
               <h1>{currentText.label}</h1>
               <p>{currentText.subtitle}</p>
             </div>
-            <button type="button" className="gl-secondary-btn gl-admin-refresh" onClick={refresh}>
-              <RefreshCw size={16} />
-              {t('admin.refresh', { defaultValue: 'Refresh' })}
-            </button>
+            <div className="gl-admin-topbar-actions">
+              <button type="button" className="gl-secondary-btn gl-admin-refresh" onClick={refresh}>
+                <RefreshCw size={16} />
+                {t('admin.refresh', { defaultValue: 'Refresh' })}
+              </button>
+              <button type="button" className="gl-secondary-btn gl-admin-exit" onClick={() => navigate('/')}>
+                <LogOut size={16} />
+                {t('admin.exit', { defaultValue: 'Exit admin' })}
+              </button>
+            </div>
           </header>
 
           {currentModule === 'dashboard' && (
@@ -199,6 +208,7 @@ export default function AdminPage() {
               invitesLoading={invites.isLoading}
               invitesError={invites.isError}
               createBusy={createInvite.isPending}
+              deleteBusy={deleteInvite.isPending}
               onCreateInvite={() => {
                 createInvite.mutate(undefined, {
                   onSuccess: ({ inviteCode }) => {
@@ -217,6 +227,33 @@ export default function AdminPage() {
                         }),
                     ),
                 });
+              }}
+              onDeleteInvite={(item) => {
+                const ok = window.confirm(
+                  t('admin.invites.confirmDelete', {
+                    code: item.code,
+                    defaultValue: 'Delete unused invite code {{code}}?',
+                  }),
+                );
+                if (!ok) return;
+                deleteInvite.mutate(
+                  { id: item.id },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t('admin.invites.deleted', {
+                          defaultValue: 'Invite code deleted.',
+                        }),
+                      ),
+                    onError: (err) =>
+                      toast.error(
+                        err.message ||
+                          t('admin.invites.deleteFailed', {
+                            defaultValue: 'Could not delete invite code.',
+                          }),
+                      ),
+                  },
+                );
               }}
             />
           )}
@@ -446,13 +483,17 @@ function UsersPage({
   invitesLoading,
   invitesError,
   createBusy,
+  deleteBusy,
   onCreateInvite,
+  onDeleteInvite,
 }: {
   inviteItems: AdminInviteCode[];
   invitesLoading: boolean;
   invitesError: boolean;
   createBusy: boolean;
+  deleteBusy: boolean;
   onCreateInvite: () => void;
+  onDeleteInvite: (item: AdminInviteCode) => void;
 }) {
   const { t } = useTranslation('pages');
   return (
@@ -476,7 +517,9 @@ function UsersPage({
         loading={invitesLoading}
         error={invitesError}
         busy={createBusy}
+        deleteBusy={deleteBusy}
         onCreate={onCreateInvite}
+        onDelete={onDeleteInvite}
       />
       <StaticOperationsPanel
         eyebrow={t('admin.users.framework.eyebrow', { defaultValue: 'Users' })}
@@ -809,9 +852,19 @@ function PermissionPanel({
               />
               <span className="gl-admin-muted">{formatDate(item.updatedAt)}</span>
               <span className="gl-admin-status is-approved">{t('admin.status.approved', { defaultValue: 'Approved' })}</span>
-              <button type="button" className="gl-admin-danger-btn" disabled={busy} onClick={() => onDisable(item)}>
+              <button
+                type="button"
+                className="gl-admin-danger-btn"
+                aria-label={t('admin.permissions.disableFor', {
+                  name: item.displayName || item.username,
+                  defaultValue: 'Disable live permission for {{name}}',
+                })}
+                title={t('admin.permissions.disable', { defaultValue: 'Disable live' })}
+                disabled={busy}
+                onClick={() => onDisable(item)}
+              >
                 <Ban size={16} />
-                {t('admin.permissions.disable', { defaultValue: 'Disable live' })}
+                <span>{t('admin.permissions.disable', { defaultValue: 'Disable live' })}</span>
               </button>
             </div>
           ))}
@@ -949,13 +1002,17 @@ function InvitesPanel({
   loading,
   error,
   busy,
+  deleteBusy,
   onCreate,
+  onDelete,
 }: {
   items: AdminInviteCode[];
   loading: boolean;
   error: boolean;
   busy: boolean;
+  deleteBusy: boolean;
   onCreate: () => void;
+  onDelete: (item: AdminInviteCode) => void;
 }) {
   const { t } = useTranslation('pages');
 
@@ -1020,6 +1077,22 @@ function InvitesPanel({
               <button type="button" className="gl-admin-action-text" onClick={() => copyCode(item.code)}>
                 <Clipboard size={16} />
                 {t('admin.invites.copy', { defaultValue: 'Copy' })}
+              </button>
+              <button
+                type="button"
+                className="gl-admin-action-text reject"
+                disabled={item.used || deleteBusy}
+                title={
+                  item.used
+                    ? t('admin.invites.deleteUsedHint', {
+                        defaultValue: 'Used invite codes cannot be deleted.',
+                      })
+                    : t('admin.invites.delete', { defaultValue: 'Delete' })
+                }
+                onClick={() => onDelete(item)}
+              >
+                <X size={16} />
+                {t('admin.invites.delete', { defaultValue: 'Delete' })}
               </button>
             </article>
           ))}

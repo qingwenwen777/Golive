@@ -4648,6 +4648,10 @@ input:focus-visible,
   opacity: 0.55;
   cursor: not-allowed;
 }
+.gl-secondary-btn svg {
+  display: block;
+  flex: 0 0 auto;
+}
 .gl-admin-page {
   display: flex;
   flex-direction: column;
@@ -4755,6 +4759,9 @@ input:focus-visible,
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+.gl-admin-user > div {
   min-width: 0;
 }
 .gl-admin-user strong,
@@ -4868,11 +4875,27 @@ input:focus-visible,
 }
 .gl-admin-permission-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 140px 110px auto;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(84px, auto) 44px;
+  column-gap: 12px;
+  row-gap: 6px;
   align-items: center;
   padding: 14px 18px;
   border-top: 1px solid var(--gl-border);
+}
+.gl-admin-permission-row .gl-admin-user {
+  grid-row: 1 / span 2;
+  min-width: 0;
+}
+.gl-admin-permission-row .gl-admin-muted {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  white-space: nowrap;
+}
+.gl-admin-permission-row .gl-admin-status {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
 }
 .gl-admin-permission-row:first-child,
 .gl-admin-review-card:first-child {
@@ -4896,6 +4919,23 @@ input:focus-visible,
 }
 .gl-admin-danger-btn {
   color: var(--gl-red);
+}
+.gl-admin-danger-btn svg,
+.gl-admin-action-text svg {
+  display: block;
+  flex: 0 0 auto;
+}
+.gl-admin-permission-row .gl-admin-danger-btn {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+.gl-admin-permission-row .gl-admin-danger-btn span {
+  display: none;
 }
 .gl-admin-action-text.approve {
   color: #15803d;
@@ -4925,7 +4965,7 @@ input:focus-visible,
 }
 .gl-admin-invite-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 110px minmax(240px, 1.2fr) 160px auto;
+  grid-template-columns: minmax(160px, 0.85fr) 96px minmax(220px, 1.15fr) minmax(132px, auto) auto auto;
   gap: 12px;
   align-items: center;
   padding: 14px 18px;
@@ -5056,15 +5096,23 @@ input:focus-visible,
   border-bottom: 1px solid var(--gl-border);
 }
 .gl-admin-mark {
-  display: inline-flex;
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 34px;
   height: 34px;
-  align-items: center;
-  justify-content: center;
   border-radius: 8px;
   background: var(--gl-red);
   color: #fff;
   flex: 0 0 auto;
+  line-height: 0;
+}
+.gl-admin-mark svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  transform: translate(-50%, -50%);
 }
 .gl-admin-nav-brand strong,
 .gl-admin-nav-brand span {
@@ -5154,6 +5202,13 @@ input:focus-visible,
   border-bottom: 1px solid var(--gl-border);
   padding: 4px 0 18px;
 }
+.gl-admin-topbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
 .gl-admin-topbar h1 {
   margin: 7px 0 0;
   color: var(--gl-text);
@@ -5171,6 +5226,9 @@ input:focus-visible,
 .gl-admin-refresh {
   flex: 0 0 auto;
 }
+.gl-admin-exit {
+  flex: 0 0 auto;
+}
 .gl-admin-section-stack {
   display: flex;
   flex-direction: column;
@@ -5182,7 +5240,8 @@ input:focus-visible,
   gap: 12px;
 }
 .gl-admin-kpi {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
   min-width: 0;
   align-items: center;
   gap: 12px;
@@ -5193,15 +5252,23 @@ input:focus-visible,
   box-shadow: var(--gl-shadow);
 }
 .gl-admin-kpi-icon {
-  display: inline-flex;
-  width: 38px;
-  height: 38px;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   background: var(--gl-bg-hover);
   color: var(--gl-text);
   flex: 0 0 auto;
+  line-height: 0;
+}
+.gl-admin-kpi-icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  transform: translate(-50%, -50%);
 }
 .gl-admin-kpi.is-red .gl-admin-kpi-icon {
   background: rgba(255, 61, 92, 0.12);
@@ -9804,6 +9871,22 @@ button.gl-fan-badge-empty {
   .gl-admin-permission-row,
   .gl-admin-reject-form {
     grid-template-columns: 1fr;
+  }
+  .gl-admin-permission-row .gl-admin-user,
+  .gl-admin-permission-row .gl-admin-muted,
+  .gl-admin-permission-row .gl-admin-status,
+  .gl-admin-permission-row .gl-admin-danger-btn {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: start;
+  }
+  .gl-admin-permission-row .gl-admin-danger-btn {
+    width: fit-content;
+    min-width: 44px;
+    padding: 0 14px;
+  }
+  .gl-admin-permission-row .gl-admin-danger-btn span {
+    display: inline;
   }
   .gl-admin-invite-row {
     grid-template-columns: 1fr;

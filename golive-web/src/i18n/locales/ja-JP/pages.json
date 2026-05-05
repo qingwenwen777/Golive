@@ -1016,7 +1016,8 @@
       "disable": "配信を無効化",
       "confirmDisable": "{{name}} の配信権限を無効化しますか？",
       "disabled": "配信権限を無効化しました。",
-      "disableFailed": "権限を更新できませんでした。"
+      "disableFailed": "権限を更新できませんでした。",
+      "disableFor": "{{name}} の配信権限を無効にする"
     },
     "applications": {
       "eyebrow": "申請審査",
@@ -1140,7 +1141,12 @@
       "copied": "招待コードをコピーしました。",
       "copyFailed": "招待コードをコピーできませんでした。",
       "created": "招待コード {{code}} を作成しました。",
-      "createFailed": "招待コードを作成できませんでした。"
+      "createFailed": "招待コードを作成できませんでした。",
+      "delete": "削除",
+      "confirmDelete": "未使用の招待コード {{code}} を削除しますか？",
+      "deleted": "招待コードを削除しました。",
+      "deleteFailed": "招待コードを削除できませんでした。",
+      "deleteUsedHint": "使用済みの招待コードは削除できません。"
     },
     "scaffold": {
       "content": {
@@ -1221,7 +1227,8 @@
         "system": "システム操作",
         "systemSub": "設定変更、サービス再起動、ポリシー調整"
       }
-    }
+    },
+    "exit": "管理画面を終了"
   },
   "upload": {
     "description": "JPG、PNG、WebP、GIF 画像を最大 5MB までアップロードできます。",

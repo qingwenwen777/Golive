@@ -72,6 +72,7 @@ func NewRouter(d Deps) *gin.Engine {
 	{
 		admin.GET("/invite-codes", adminH.ListInviteCodes)
 		admin.POST("/invite-codes", adminH.CreateInviteCode)
+		admin.DELETE("/invite-codes/:id", adminH.DeleteInviteCode)
 		admin.GET("/live-creators", adminH.ListLiveCreators)
 		admin.POST("/users/:id/live-permission", adminH.UpdateLivePermission)
 		admin.GET("/creator-applications", adminH.ListCreatorApplications)
