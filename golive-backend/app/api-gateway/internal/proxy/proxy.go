@@ -71,17 +71,6 @@ func New(upstream *url.URL, opts Options) *httputil.ReverseProxy {
 			if req.URL.Path == "" {
 				req.URL.Path = "/"
 			}
-			// X-Forwarded-For: append client.
-			// httputil does this for us if we don't override Director, but
-			// since we did, do it manually.
-			if clientHost, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-				prior := req.Header.Get("X-Forwarded-For")
-				if prior != "" {
-					req.Header.Set("X-Forwarded-For", prior+", "+clientHost)
-				} else {
-					req.Header.Set("X-Forwarded-For", clientHost)
-				}
-			}
 		},
 		ModifyResponse: wrapUpstreamErrors,
 		ErrorHandler:   handleProxyError,
