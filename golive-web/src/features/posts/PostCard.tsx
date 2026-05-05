@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronDown,
   ChevronRight,
-  CheckCircle2,
   Flag,
   Globe2,
   Heart,
@@ -29,6 +28,7 @@ import {
   type PostVisibility,
 } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { LoadableImage } from '@/components/LoadableImage';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
@@ -195,7 +195,7 @@ export function PostCard({
         <div className="gl-post-author">
           <strong>
             {post.author.name}
-            {post.author.verified && <CheckCircle2 size={15} />}
+            {post.author.verified && <VerifiedBadge size={15} />}
           </strong>
           <span>{formatPostDate(post.createdAt, i18n.language)}</span>
         </div>

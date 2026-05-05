@@ -2468,6 +2468,17 @@ input:focus-visible,
   margin-top: 4px;
   min-width: 0;
 }
+.gl-platform-verified-badge {
+  flex: 0 0 auto;
+  color: #f5a400;
+  fill: #f5a400;
+  stroke: #fff;
+  stroke-width: 2.4;
+  filter: drop-shadow(0 1px 2px rgba(245, 164, 0, 0.24));
+}
+.gl-platform-verified-badge path:first-child {
+  stroke: #f5a400;
+}
 .gl-card-sub {
   margin-top: 2px;
 }
@@ -5149,6 +5160,13 @@ input:focus-visible,
   color: var(--gl-text);
   font-size: 18px;
   font-weight: 850;
+}
+.gl-admin-panel-head p {
+  max-width: 620px;
+  margin: 6px 0 0;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.45;
 }
 .gl-admin-denied {
   display: flex;
@@ -8551,7 +8569,7 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-actions-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
 }
 .gl-creator-action {
@@ -8569,6 +8587,17 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-action:hover {
   background: var(--gl-bg-hover);
+}
+.gl-creator-action:disabled {
+  cursor: default;
+  opacity: 0.78;
+}
+.gl-creator-action:disabled:hover {
+  background: var(--gl-bg);
+}
+.gl-creator-action.is-platform {
+  border-color: rgba(245, 164, 0, 0.42);
+  background: color-mix(in srgb, #f5a400 7%, var(--gl-bg));
 }
 .gl-creator-action > span {
   grid-row: span 2;
@@ -8592,6 +8621,50 @@ button.gl-fan-badge-empty {
   color: var(--gl-text-2);
   font-size: 12px;
   line-height: 1.35;
+}
+.gl-platform-join-dialog {
+  max-width: 540px;
+}
+.gl-platform-benefits {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.gl-platform-benefits span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--gl-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.gl-platform-benefits svg {
+  flex: 0 0 auto;
+  color: #f5a400;
+  margin-top: 1px;
+}
+.gl-platform-last-reject {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 61, 92, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 61, 92, 0.06);
+}
+.gl-platform-last-reject strong {
+  color: var(--gl-text);
+  font-size: 13px;
+}
+.gl-platform-last-reject p {
+  margin: 4px 0 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.gl-platform-join-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
 }
 .gl-creator-latest {
   display: flex;
@@ -11274,6 +11347,23 @@ button.gl-fan-badge-empty {
 .gl-coin-withdraw-lines strong {
   color: var(--gl-text);
   font-weight: 900;
+}
+.gl-coin-certified-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 164, 0, 0.32);
+  border-radius: 8px;
+  background: rgba(245, 164, 0, 0.08);
+  color: var(--gl-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.gl-coin-certified-note svg {
+  flex: 0 0 auto;
+  color: #f5a400;
 }
 @media (max-width: 1199px) {
   .gl-creator-kpis {

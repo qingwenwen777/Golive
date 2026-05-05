@@ -6,7 +6,6 @@ import {
   Bell,
   BarChart3,
   Camera,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CalendarDays,
@@ -40,6 +39,7 @@ import { useFanBadges, useSendGift } from '@/api/gift';
 import { useChannelPosts } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
@@ -342,7 +342,7 @@ export default function ChannelPage() {
               ) : (
                 <>
                   <span>{channelName}</span>
-                  {(profile?.verified || primary?.verified) && <CheckCircle2 size={22} />}
+                  {(profile?.verified || primary?.verified) && <VerifiedBadge size={24} />}
                   {profile?.levelInfo && <UserLevelBadge levelInfo={profile.levelInfo} />}
                 </>
               )}

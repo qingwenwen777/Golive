@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   BarChart3,
   CheckCircle2,
@@ -80,7 +80,7 @@ import {
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { AppointmentCard } from '@/components/AppointmentCard';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
@@ -164,10 +164,12 @@ export function CreatorStudioShell() {
   const hydrated = useAuthHydrated();
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
+  const location = useLocation();
   const { user, me } = useStudioUser();
   const apply = useSubmitCreatorApplication();
   const status = user?.livePermissionStatus ?? 'none';
   const approved = status === 'approved';
+  const overviewRoute = location.pathname === '/studio' || location.pathname === '/studio/overview';
 
   if (!hydrated || (isAuthed && me.isPending && !user)) {
     return <StudioLoading label={t('studio.loading', { defaultValue: 'Loading studio...' })} />;
@@ -188,7 +190,7 @@ export function CreatorStudioShell() {
     );
   }
 
-  if (!approved) {
+  if (!approved && !overviewRoute) {
     return (
       <StudioPermissionPage
         status={status}
@@ -225,10 +227,33 @@ export function CreatorStudioOverviewPage() {
   const { t } = useTranslation('pages');
   const navigate = useNavigate();
   const { user } = useStudioUser();
+  const apply = useSubmitCreatorApplication();
   const channelKey = currentChannelKey(user);
   const analytics = useCreatorAnalytics(channelKey, Boolean(channelKey));
   const data = analytics.data;
   const latest = data?.history[0];
+  const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
+  const platformStatus = user?.livePermissionStatus ?? 'none';
+  const platformApproved = platformStatus === 'approved';
+  const platformPending = platformStatus === 'pending';
+  const platformRejected = platformStatus === 'rejected';
+
+  const submitPlatformApplication = (reason: string) => {
+    apply.mutate(
+      { reason },
+      {
+        onSuccess: (resp) => {
+          toast.success(resp.message);
+          setPlatformDialogOpen(false);
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('studio.platform.applyFailed', { defaultValue: 'Application failed.' }),
+          ),
+      },
+    );
+  };
 
   return (
     <div className="gl-creator-overview">
@@ -295,6 +320,54 @@ export function CreatorStudioOverviewPage() {
               })}
               onClick={() => navigate(`/channel/${encodeURIComponent(channelKey)}`)}
             />
+            <StudioAction
+              icon={platformApproved ? <CheckCircle2 size={18} /> : <ShieldCheck size={18} />}
+              title={
+                platformApproved
+                  ? t('studio.actions.platformApproved', { defaultValue: 'Platform certified' })
+                  : platformPending
+                    ? t('studio.actions.platformPending', { defaultValue: 'Application pending' })
+                    : t('studio.actions.platform', { defaultValue: 'Join the platform' })
+              }
+              body={
+                platformApproved
+                  ? t('studio.actions.platformApprovedSub', {
+                      defaultValue: 'Certified creators get lower withdrawal fees and platform support.',
+                    })
+                  : platformPending
+                    ? t('studio.actions.platformPendingSub', {
+                        defaultValue: 'Admins are reviewing your platform creator application.',
+                      })
+                    : platformRejected
+                      ? t('studio.actions.platformRejectedSub', {
+                          defaultValue: 'Apply again after improving your channel profile.',
+                        })
+                      : t('studio.actions.platformSub', {
+                          defaultValue: 'Apply for certification, extra protection, and recommendation.',
+                        })
+              }
+              className="is-platform"
+              disabled={platformApproved || platformPending || apply.isPending}
+              onClick={() => {
+                if (platformApproved) {
+                  toast.info(
+                    t('studio.platform.alreadyApproved', {
+                      defaultValue: 'Your channel is already platform certified.',
+                    }),
+                  );
+                  return;
+                }
+                if (platformPending) {
+                  toast.info(
+                    t('studio.platform.alreadyPending', {
+                      defaultValue: 'Your application is already waiting for admin review.',
+                    }),
+                  );
+                  return;
+                }
+                setPlatformDialogOpen(true);
+              }}
+            />
           </div>
         </div>
 
@@ -337,6 +410,13 @@ export function CreatorStudioOverviewPage() {
           )}
         </div>
       </section>
+      <JoinPlatformDialog
+        open={platformDialogOpen}
+        pending={apply.isPending}
+        rejectReason={user?.livePermissionRejectReason}
+        onOpenChange={setPlatformDialogOpen}
+        onSubmit={submitPlatformApplication}
+      />
     </div>
   );
 }
@@ -2742,6 +2822,12 @@ function StudioPermissionPage({
         t('studio.permission.reviewTime', {
           defaultValue: 'Estimated review time: within 1 business day.',
         }),
+        t('studio.permission.platformFee', {
+          defaultValue: 'Certified creators pay 25% withdrawal fees instead of 35%.',
+        }),
+        t('studio.permission.platformProtection', {
+          defaultValue: 'Certified creators receive stronger platform protection and recommendations.',
+        }),
         t('studio.permission.notice', {
           defaultValue: 'Keep your channel name, avatar, and cover ready for review.',
         }),
@@ -2762,7 +2848,9 @@ function StudioPermissionPage({
       {!pending && (
         <label className="gl-creator-access-reason">
           <span>
-            {t('studio.permission.reasonLabel', { defaultValue: 'Why do you want to go live?' })}
+            {t('studio.permission.reasonLabel', {
+              defaultValue: 'Why do you want to join the platform?',
+            })}
           </span>
           <textarea
             value={reason}
@@ -2771,12 +2859,107 @@ function StudioPermissionPage({
             onChange={(event) => setReason(event.target.value)}
             placeholder={t('studio.permission.reasonPlaceholder', {
               defaultValue:
-                'Tell admins your live content plan and why this channel needs live access.',
+                'Tell admins your creator plan and why this channel should become platform certified.',
             })}
           />
         </label>
       )}
     </StudioAccessPage>
+  );
+}
+
+function JoinPlatformDialog({
+  open,
+  pending,
+  rejectReason,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  pending: boolean;
+  rejectReason?: string;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (reason: string) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setReason('');
+    }
+  }, [open]);
+
+  const benefits = [
+    t('studio.platform.benefits.badge', {
+      defaultValue: 'The orange platform certification badge appears on your channel.',
+    }),
+    t('studio.platform.benefits.fee', {
+      defaultValue: 'Withdrawal fees are reduced by 10 percentage points, from 35% to 25%.',
+    }),
+    t('studio.platform.benefits.protection', {
+      defaultValue: 'Certified creators receive stronger platform protection and recommendation.',
+    }),
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="gl-platform-join-dialog">
+        <DialogTitle>
+          {t('studio.platform.title', { defaultValue: 'Join the GoLive platform' })}
+        </DialogTitle>
+        <DialogDescription>
+          {t('studio.platform.description', {
+            defaultValue:
+              'Submit a platform creator application. An administrator will approve or reject it with a reason.',
+          })}
+        </DialogDescription>
+        <div className="gl-platform-benefits">
+          {benefits.map((item) => (
+            <span key={item}>
+              <ShieldCheck size={15} />
+              {item}
+            </span>
+          ))}
+        </div>
+        {rejectReason && (
+          <div className="gl-platform-last-reject">
+            <strong>{t('studio.platform.lastReject', { defaultValue: 'Last rejection' })}</strong>
+            <p>{rejectReason}</p>
+          </div>
+        )}
+        <label className="gl-creator-access-reason">
+          <span>
+            {t('studio.platform.reasonLabel', { defaultValue: 'Application note' })}
+          </span>
+          <textarea
+            rows={5}
+            maxLength={500}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder={t('studio.platform.reasonPlaceholder', {
+              defaultValue:
+                'Tell admins your creator direction, schedule, and why this channel should be certified.',
+            })}
+          />
+        </label>
+        <div className="gl-platform-join-actions">
+          <button type="button" className="gl-secondary-btn" onClick={() => onOpenChange(false)}>
+            {t('studio.platform.cancel', { defaultValue: 'Cancel' })}
+          </button>
+          <button
+            type="button"
+            className="gl-creator-primary"
+            disabled={pending || !reason.trim()}
+            onClick={() => onSubmit(reason.trim())}
+          >
+            {pending
+              ? t('studio.platform.submitting', { defaultValue: 'Submitting...' })
+              : t('studio.platform.submit', { defaultValue: 'Submit application' })}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2860,14 +3043,23 @@ function StudioAction({
   title,
   body,
   onClick,
+  className,
+  disabled,
 }: {
   icon: ReactNode;
   title: string;
   body: string;
   onClick: () => void;
+  className?: string;
+  disabled?: boolean;
 }) {
   return (
-    <button type="button" className="gl-creator-action" onClick={onClick}>
+    <button
+      type="button"
+      className={cn('gl-creator-action', className)}
+      disabled={disabled}
+      onClick={onClick}
+    >
       <span>{icon}</span>
       <strong>{title}</strong>
       <small>{body}</small>

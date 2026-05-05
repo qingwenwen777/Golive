@@ -713,9 +713,11 @@
     "permission": {
       "reviewTime": "Estimated review time: within 1 business day.",
       "notice": "Keep your channel name, avatar, and cover ready for review.",
+      "platformFee": "Certified creators pay 25% withdrawal fees instead of 35%.",
+      "platformProtection": "Certified creators receive stronger platform protection and recommendations.",
       "progress": "Progress: submitted -> manual review -> result.",
-      "reasonLabel": "Why do you want to go live?",
-      "reasonPlaceholder": "Tell admins your live content plan and why this channel needs live access.",
+      "reasonLabel": "Why do you want to join the platform?",
+      "reasonPlaceholder": "Tell admins your creator plan and why this channel should become platform certified.",
       "pending": {
         "title": "Application under review",
         "body": "We are checking your channel and account status.",
@@ -729,8 +731,8 @@
         "reasonFallback": "Channel readiness did not meet the current creator policy."
       },
       "none": {
-        "title": "Apply for creator access",
-        "body": "Creator access is required before opening the streaming workspace.",
+        "title": "Apply to join the platform",
+        "body": "Platform certification lights the creator badge and unlocks certified creator benefits.",
         "action": "Submit application"
       }
     },
@@ -759,7 +761,32 @@
       "analytics": "Review analytics",
       "analyticsSub": "Revenue, viewers, and finished live reports.",
       "channel": "View channel",
-      "channelSub": "Check how viewers see your creator page."
+      "channelSub": "Check how viewers see your creator page.",
+      "platform": "Join the platform",
+      "platformSub": "Apply for certification, recommendation, and stronger protection.",
+      "platformPending": "Application pending",
+      "platformPendingSub": "Admins are reviewing your platform creator application.",
+      "platformApproved": "Platform certified",
+      "platformApprovedSub": "Certified creators get lower withdrawal fees and platform support.",
+      "platformRejectedSub": "Apply again after improving your channel profile."
+    },
+    "platform": {
+      "title": "Join the GoLive platform",
+      "description": "Submit a platform creator application. An administrator will approve or reject it with a reason.",
+      "applyFailed": "Application failed.",
+      "alreadyApproved": "Your channel is already platform certified.",
+      "alreadyPending": "Your application is already waiting for admin review.",
+      "lastReject": "Last rejection",
+      "reasonLabel": "Application note",
+      "reasonPlaceholder": "Tell admins your creator direction, schedule, and why this channel should be certified.",
+      "cancel": "Cancel",
+      "submitting": "Submitting...",
+      "submit": "Submit application",
+      "benefits": {
+        "badge": "The orange platform certification badge appears on your channel.",
+        "fee": "Withdrawal fees are reduced by 10 percentage points, from 35% to 25%.",
+        "protection": "Certified creators receive stronger platform protection and recommendation."
+      }
     },
     "analytics": {
       "title": "Channel analytics",
@@ -1056,12 +1083,13 @@
       "disableFor": "Disable live permission for {{name}}"
     },
     "applications": {
-      "eyebrow": "Application review",
-      "title": "Creator applications",
+      "eyebrow": "Platform review",
+      "title": "Platform creator applications",
+      "platformHint": "Approving certifies the creator, enables the orange badge, and applies the lower withdrawal fee.",
       "loading": "Loading applications...",
       "error": "Could not load applications.",
       "empty": "No creator applications yet.",
-      "reason": "Live reason",
+      "reason": "Application note",
       "noReason": "No reason provided.",
       "rejectReason": "Reject reason",
       "approve": "Approve",
@@ -1494,11 +1522,14 @@
     "withdraw": {
       "title": "Withdrawal preview",
       "sub": "35% fee. Enabled after payment integration.",
+      "subCertified": "Platform certified rate: 25% fee. Enabled after payment integration.",
       "amount": "Withdrawal amount",
       "amountAria": "Withdrawal coin amount",
+      "rate": "Fee rate",
       "fee": "Fee",
       "net": "Estimated arrival",
       "rmb": "Approx. RMB",
+      "certifiedNote": "Platform certification reduced this fee by 10 percentage points.",
       "preview": "Preview withdrawal"
     },
     "task": {

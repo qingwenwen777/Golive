@@ -714,9 +714,11 @@
     "permission": {
       "reviewTime": "预计审核时间：1 个工作日内。",
       "notice": "请保持频道名、头像和封面信息完整，便于审核。",
+      "platformFee": "平台认证主播提现手续费从 35% 降至 25%。",
+      "platformProtection": "平台认证主播会获得更强的平台保护与推荐。",
       "progress": "审核进度：已提交 -> 人工审核 -> 给出结果。",
-      "reasonLabel": "为什么想开播？",
-      "reasonPlaceholder": "说明你的直播内容规划，以及这个频道为什么需要开播权限。",
+      "reasonLabel": "为什么想加入平台？",
+      "reasonPlaceholder": "说明你的创作规划，以及这个频道为什么适合成为平台认证主播。",
       "pending": {
         "title": "申请审核中",
         "body": "我们正在检查你的频道资料与账号状态。",
@@ -730,8 +732,8 @@
         "reasonFallback": "频道准备度暂未满足当前创作者策略。"
       },
       "none": {
-        "title": "申请主播权限",
-        "body": "进入开播工作区前需要先通过主播权限审核。",
+        "title": "申请加入平台",
+        "body": "加入平台并通过认证后，才会点亮认证标识并享受认证主播权益。",
         "action": "提交申请"
       }
     },
@@ -760,7 +762,32 @@
       "analytics": "查看数据复盘",
       "analyticsSub": "收益、观众与已结束直播报告。",
       "channel": "查看频道",
-      "channelSub": "确认观众看到的频道页面。"
+      "channelSub": "确认观众看到的频道页面。",
+      "platform": "加入平台",
+      "platformSub": "申请平台认证、推荐和更强保护。",
+      "platformPending": "申请审核中",
+      "platformPendingSub": "管理员正在审核你的平台主播申请。",
+      "platformApproved": "已完成平台认证",
+      "platformApprovedSub": "认证主播享有更低提现手续费和平台支持。",
+      "platformRejectedSub": "完善频道资料后可以重新提交申请。"
+    },
+    "platform": {
+      "title": "加入 GoLive 平台",
+      "description": "提交平台主播认证申请，管理员会进行审核；拒绝时会写明原因。",
+      "applyFailed": "申请提交失败。",
+      "alreadyApproved": "你的频道已经完成平台认证。",
+      "alreadyPending": "你的申请已经在等待管理员审核。",
+      "lastReject": "上次拒绝原因",
+      "reasonLabel": "申请说明",
+      "reasonPlaceholder": "告诉管理员你的创作方向、直播计划，以及这个频道为什么应该获得平台认证。",
+      "cancel": "取消",
+      "submitting": "提交中...",
+      "submit": "提交申请",
+      "benefits": {
+        "badge": "通过后频道会显示橙黄色平台认证标识。",
+        "fee": "提现手续费降低 10 个百分点：从 35% 降至 25%。",
+        "protection": "平台认证主播会获得更强的平台保护与推荐。"
+      }
     },
     "analytics": {
       "title": "频道数据分析",
@@ -1057,12 +1084,13 @@
       "disableFor": "为 {{name}} 关闭开播权限"
     },
     "applications": {
-      "eyebrow": "申请审核",
-      "title": "主播开播申请",
+      "eyebrow": "平台审核",
+      "title": "平台主播认证申请",
+      "platformHint": "同意后会认证该主播、点亮橙黄色标识，并应用更低提现手续费。",
       "loading": "正在加载申请...",
       "error": "无法加载申请列表。",
       "empty": "暂无主播申请。",
-      "reason": "开播理由",
+      "reason": "申请说明",
       "noReason": "未填写理由。",
       "rejectReason": "拒绝理由",
       "approve": "同意",
@@ -1495,11 +1523,14 @@
     "withdraw": {
       "title": "提现预留",
       "sub": "手续费 35%，支付接口接入后启用。",
+      "subCertified": "平台认证费率：手续费 25%，支付接口接入后启用。",
       "amount": "提现数量",
       "amountAria": "提现 coins 数量",
+      "rate": "手续费率",
       "fee": "手续费",
       "net": "预计到账",
       "rmb": "折合人民币",
+      "certifiedNote": "平台认证已为本次预览降低 10 个百分点手续费。",
       "preview": "预览提现"
     },
     "task": {

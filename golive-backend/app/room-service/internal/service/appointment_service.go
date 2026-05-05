@@ -137,6 +137,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 	roomID := "appt-" + ownerID + "-" + strconv.FormatInt(now.UnixNano(), 36)
 	channelID := "ch-" + ownerID
 	channelName := cleanDisplayName(payload.ChannelName, ownerID)
+	verified := s.ownerVerified(ctx, ownerID)
 	room := &model.Room{
 		ID:          roomID,
 		Title:       title,
@@ -145,7 +146,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 		Cover:       cover,
 		Channel:     channelName,
 		ChannelID:   channelID,
-		Verified:    false,
+		Verified:    verified,
 		Avatar:      cleanAvatar(payload.Avatar, channelName),
 		Viewers:     0,
 		PeakViewers: 0,
@@ -611,6 +612,7 @@ func (s *AppointmentService) listResp(ctx context.Context, items []model.LiveApp
 	now := s.now()
 	for _, item := range items {
 		room := rooms[item.RoomID]
+		s.applyOwnerVerification(ctx, item.OwnerID, &room)
 		out = append(out, s.dtoFrom(item, &room, counts[item.ID], reserved[item.ID], s.waitingCount(ctx, item.RoomID), now))
 	}
 	return &AppointmentListResp{Items: out, Total: total, Page: page, Size: size}, nil
@@ -625,7 +627,22 @@ func (s *AppointmentService) dto(ctx context.Context, appt model.LiveAppointment
 	if err != nil {
 		return nil, err
 	}
+	if room != nil {
+		s.applyOwnerVerification(ctx, appt.OwnerID, room)
+	}
 	return ptr(s.dtoFrom(appt, room, counts[appt.ID], reserved[appt.ID], s.waitingCount(ctx, appt.RoomID), s.now())), nil
+}
+
+func (s *AppointmentService) ownerVerified(ctx context.Context, ownerID string) bool {
+	profile, err := s.rooms.OwnerProfile(ctx, ownerID)
+	return err == nil && profile.Verified
+}
+
+func (s *AppointmentService) applyOwnerVerification(ctx context.Context, ownerID string, room *model.Room) {
+	if room == nil {
+		return
+	}
+	room.Verified = s.ownerVerified(ctx, ownerID)
 }
 
 func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Room, count int64, reserved bool, waitingCount int64, now time.Time) AppointmentDTO {

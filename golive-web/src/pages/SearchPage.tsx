@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
   CalendarClock,
-  CheckCircle2,
   CloudOff,
   Heart,
   Inbox,
@@ -19,6 +18,7 @@ import type { ChannelPost } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { LiveBadge } from '@/components/LiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
 import { streamChannelName, type Stream } from '@/types/stream';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -217,7 +217,7 @@ function CreatorResultRow({ creator }: { creator: SearchCreator }) {
       <div className="gl-search-result-main">
         <Link className="gl-search-title" to={channelPath}>
           {creator.name}
-          {creator.verified && <CheckCircle2 size={16} />}
+          {creator.verified && <VerifiedBadge size={16} />}
         </Link>
         <div className="gl-search-meta">
           {creator.username && <span>@{creator.username}</span>}
@@ -290,7 +290,7 @@ function StreamResultRow({ stream, kind }: { stream: Stream; kind: 'live' | 'rep
         >
           <Avatar name={channelName} src={stream.avatar} size={28} />
           <span>{channelName}</span>
-          {stream.verified && <CheckCircle2 size={14} />}
+          {stream.verified && <VerifiedBadge size={14} />}
         </Link>
         {stream.description && <p>{stream.description}</p>}
       </div>
@@ -328,7 +328,7 @@ function AppointmentResultRow({ appointment }: { appointment: AppointmentItem })
         >
           <Avatar name={appointment.channel} src={appointment.avatar} size={28} />
           <span>{appointment.channel}</span>
-          {appointment.verified && <CheckCircle2 size={14} />}
+          {appointment.verified && <VerifiedBadge size={14} />}
         </Link>
         {appointment.description && <p>{appointment.description}</p>}
       </div>
@@ -349,7 +349,7 @@ function PostResultRow({ post }: { post: ChannelPost }) {
       <div className="gl-search-result-main">
         <Link className="gl-search-channel-line is-post-author" to={channelPath}>
           <span>{post.author.name}</span>
-          {post.author.verified && <CheckCircle2 size={14} />}
+          {post.author.verified && <VerifiedBadge size={14} />}
           <small>{formatDate(post.createdAt, i18n.language)}</small>
         </Link>
         <Link className="gl-search-post-content" to={channelPath}>

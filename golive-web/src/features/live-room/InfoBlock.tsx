@@ -15,6 +15,7 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { Icons } from '@/components/Icons';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { useLangStore } from '@/stores/useLangStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -201,7 +202,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
             <div className="gl-info-chan-text">
               <div className="gl-info-chan-name">
                 <span className="truncate">{channelName}</span>
-                {stream.verified && <Icons.BadgeCheck size={14} className="text-text-secondary" />}
+                {stream.verified && <VerifiedBadge size={14} />}
                 <UserLevelBadge levelInfo={ownerLevelInfo} size="compact" />
               </div>
               <div className="gl-info-chan-subs">

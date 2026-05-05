@@ -70,6 +70,7 @@ import {
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { LoadableImage } from '@/components/LoadableImage';
 import { Avatar } from '@/components/Avatar';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
 import type { AppointmentItem } from '@/api/room';
 import { userDisplayName } from '@/types/user';
@@ -1429,7 +1430,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
           <div className="gl-info-chan-text">
             <div className="gl-info-chan-name">
               <span className="truncate">{channelName}</span>
-              {stream.verified && <CheckCircle2 size={14} className="text-text-secondary" />}
+              {stream.verified && <VerifiedBadge size={14} />}
             </div>
             <div className="gl-info-chan-subs">
               {endedAt

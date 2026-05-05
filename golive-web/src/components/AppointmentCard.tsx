@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Check, CheckCircle2, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
+import { Check, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useReserveAppointment, useUnreserveAppointment } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
 import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
@@ -188,7 +189,7 @@ export function AppointmentCard({
         <div className="gl-appointment-copy">
           <div className="gl-appointment-head">
             <h3>{appointment.title}</h3>
-            {appointment.verified && <CheckCircle2 size={15} />}
+            {appointment.verified && <VerifiedBadge size={15} />}
           </div>
           {showChannel && (
             <div className="gl-appointment-channel">

@@ -193,9 +193,24 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 func (s *RoomService) streamFromRoom(ctx context.Context, room *model.Room, now time.Time) model.Stream {
 	adjusted := *room
 	s.applyLiveViewerMetrics(ctx, &adjusted)
+	s.applyOwnerProfile(ctx, &adjusted)
 	st := adjusted.ToStream(now)
 	st.PlaybackURL = s.playbackURL(&adjusted)
 	return st
+}
+
+func (s *RoomService) applyOwnerProfile(ctx context.Context, room *model.Room) {
+	if room == nil || strings.TrimSpace(room.OwnerID) == "" {
+		return
+	}
+	profile, err := s.rooms.OwnerProfile(ctx, room.OwnerID)
+	if err != nil {
+		return
+	}
+	room.Verified = profile.Verified
+	if strings.TrimSpace(room.Avatar) == "" && strings.TrimSpace(profile.Avatar) != "" {
+		room.Avatar = profile.Avatar
+	}
 }
 
 func (s *RoomService) applyLiveViewerMetrics(ctx context.Context, room *model.Room) {

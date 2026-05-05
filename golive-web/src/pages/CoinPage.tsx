@@ -44,6 +44,7 @@ const COINS_PER_RMB = 10;
 const MIN_TOPUP_COINS = 10;
 const QUICK_TOPUPS = [10, 50, 100, 500] as const;
 const WITHDRAW_FEE_RATE = 0.35;
+const CERTIFIED_WITHDRAW_FEE_RATE = 0.25;
 const RECORD_PAGE_SIZE = 8;
 
 const DAILY_TASKS = [
@@ -171,7 +172,10 @@ export default function CoinPage() {
 
   const topupAmount = parseCoinInput(topupText);
   const withdrawAmount = parseCoinInput(withdrawText);
-  const withdrawFee = Math.floor(withdrawAmount * WITHDRAW_FEE_RATE);
+  const platformCertified =
+    currentUser?.verified === true && currentUser.livePermissionStatus === 'approved';
+  const withdrawFeeRate = platformCertified ? CERTIFIED_WITHDRAW_FEE_RATE : WITHDRAW_FEE_RATE;
+  const withdrawFee = Math.floor(withdrawAmount * withdrawFeeRate);
   const withdrawNet = Math.max(0, withdrawAmount - withdrawFee);
 
   const handleTopup = () => {
@@ -457,9 +461,14 @@ export default function CoinPage() {
               <div>
                 <h2>{t('coin.withdraw.title', { defaultValue: 'Withdrawal preview' })}</h2>
                 <p>
-                  {t('coin.withdraw.sub', {
-                    defaultValue: '35% fee. Enabled after payment integration.',
-                  })}
+                  {platformCertified
+                    ? t('coin.withdraw.subCertified', {
+                        defaultValue:
+                          'Platform certified rate: 25% fee. Enabled after payment integration.',
+                      })
+                    : t('coin.withdraw.sub', {
+                        defaultValue: '35% fee. Enabled after payment integration.',
+                      })}
                 </p>
               </div>
               <Wallet size={20} />
@@ -478,6 +487,10 @@ export default function CoinPage() {
             </label>
             <div className="gl-coin-withdraw-lines">
               <span>
+                {t('coin.withdraw.rate', { defaultValue: 'Fee rate' })}{' '}
+                <strong>{Math.round(withdrawFeeRate * 100)}%</strong>
+              </span>
+              <span>
                 {t('coin.withdraw.fee', { defaultValue: 'Fee' })}{' '}
                 <strong>{formatCoins(withdrawFee)}</strong>
               </span>
@@ -490,6 +503,14 @@ export default function CoinPage() {
                 <strong>{formatRmb(withdrawNet, i18n.language)}</strong>
               </span>
             </div>
+            {platformCertified && (
+              <div className="gl-coin-certified-note">
+                <Trophy size={15} />
+                {t('coin.withdraw.certifiedNote', {
+                  defaultValue: 'Platform certification reduced this fee by 10 percentage points.',
+                })}
+              </div>
+            )}
             <button
               type="button"
               className="gl-secondary-btn gl-coin-wide"

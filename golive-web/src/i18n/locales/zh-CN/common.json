@@ -65,6 +65,9 @@
     "signIn": "登录",
     "signOut": "退出登录"
   },
+  "badges": {
+    "platformVerified": "平台认证主播"
+  },
   "auth": {
     "liveAccount": "直播账号",
     "signInTitle": "登录 GoLive",

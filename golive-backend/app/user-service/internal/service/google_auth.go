@@ -315,7 +315,7 @@ func newGoogleUser(username, email, displayName, hash string, profile *GooglePro
 		PasswordHash:         hash,
 		Avatar:               avatar,
 		CoinBalance:          1200,
-		Verified:             true,
+		Verified:             false,
 		Role:                 model.RoleUser,
 		LivePermissionStatus: model.LivePermissionNone,
 	}

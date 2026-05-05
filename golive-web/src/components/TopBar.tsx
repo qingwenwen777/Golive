@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Coins, Plus, User as UserIcon, X } from 'lucide-react';
+import { Bell, Coins, Plus, User as UserIcon, X } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
 import {
   useMarkAllNotificationsRead,
@@ -11,6 +11,7 @@ import {
 } from '@/api/room';
 import { useSearchSuggestions } from '@/api/search';
 import { Avatar } from '@/components/Avatar';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
 import { Icons } from '@/components/Icons';
@@ -451,7 +452,7 @@ function NotificationBell() {
                   {notificationActorLabel(item) && (
                     <span className="gl-notification-actor">
                       {notificationActorLabel(item)}
-                      {item.actorVerified && <CheckCircle2 size={12} />}
+                      {item.actorVerified && <VerifiedBadge size={12} />}
                     </span>
                   )}
                   {item.body && <small>{item.body}</small>}

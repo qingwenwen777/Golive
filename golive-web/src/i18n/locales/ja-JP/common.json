@@ -65,6 +65,9 @@
     "signIn": "ログイン",
     "signOut": "ログアウト"
   },
+  "badges": {
+    "platformVerified": "プラットフォーム認定クリエイター"
+  },
   "auth": {
     "liveAccount": "ライブアカウント",
     "signInTitle": "GoLive にログイン",

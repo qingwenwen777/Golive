@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bell, CheckCircle2, CloudOff, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
+import { Bell, CloudOff, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
@@ -19,6 +19,7 @@ import {
   type RecommendedCreator,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
@@ -460,7 +461,7 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
           <div className="gl-home-rec-copy">
             <h3>
               <span>{creator.name}</span>
-              {creator.verified && <CheckCircle2 size={15} />}
+              {creator.verified && <VerifiedBadge size={15} />}
             </h3>
             <span>
               {t('home.recommendations.followers', {

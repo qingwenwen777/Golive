@@ -106,6 +106,7 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 	}
 	scored := make([]scoredRoom, 0, len(rooms))
 	for _, room := range rooms {
+		s.applyOwnerProfile(ctx, &room)
 		categoryKey := preferenceCategoryKey(room.Category)
 		viewers := maxInt64(room.Viewers, room.PeakViewers)
 		heatScore := normalized(commentCounts[room.ID], maxComments)*0.42 +
@@ -119,13 +120,18 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 		watchScore := normalized(watchCategoryScore[categoryKey], maxWatchScore)
 		subscriberScore := normalized(subscriberByChannel[room.ChannelID], maxSubscribers)
 		recencyScore := liveRecencyScore(now, room.StartedAt)
+		certifiedScore := 0.0
+		if room.Verified {
+			certifiedScore = 1
+		}
 
 		score := followScore*0.30 +
 			giftScore*0.18 +
 			watchScore*0.17 +
 			heatScore*0.25 +
 			subscriberScore*0.08 +
-			recencyScore*0.02
+			recencyScore*0.02 +
+			certifiedScore*0.06
 		scored = append(scored, scoredRoom{room: room, score: score})
 	}
 
@@ -141,8 +147,7 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 
 	items := make([]model.Stream, 0, len(scored))
 	for _, item := range scored {
-		st := item.room.ToStream(now)
-		st.PlaybackURL = s.playbackURL(&item.room)
+		st := s.streamFromRoom(ctx, &item.room, now)
 		st.SubscriberCount = subscriberByChannel[item.room.ChannelID]
 		items = append(items, st)
 	}

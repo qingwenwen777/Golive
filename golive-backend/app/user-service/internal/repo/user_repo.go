@@ -282,6 +282,17 @@ func (r *UserRepo) BackfillMissingEmails(ctx context.Context) error {
 	return nil
 }
 
+func (r *UserRepo) ReconcilePlatformVerification(ctx context.Context) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("1 = 1").Update(
+		"verified",
+		gorm.Expr(
+			"CASE WHEN role = ? OR live_permission_status = ? THEN TRUE ELSE FALSE END",
+			model.RoleAdmin,
+			model.LivePermissionApproved,
+		),
+	).Error
+}
+
 func (r *UserRepo) UpdateProfile(
 	ctx context.Context,
 	id string,
@@ -471,7 +482,11 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 					Status: model.LivePermissionPending,
 				}
 				created = true
-				return tx.Create(&app).Error
+				if err := tx.Create(&app).Error; err != nil {
+					return err
+				}
+				user.Verified = false
+				return tx.Model(&model.User{}).Where("id = ?", userID).Update("verified", false).Error
 			}
 			return err
 		case model.LivePermissionNone, model.LivePermissionRejected:
@@ -490,11 +505,13 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 				Updates(map[string]any{
 					"live_permission_status":        model.LivePermissionPending,
 					"live_permission_reject_reason": "",
+					"verified":                      false,
 				}).Error; err != nil {
 				return err
 			}
 			user.LivePermissionStatus = model.LivePermissionPending
 			user.LivePermissionRejectReason = ""
+			user.Verified = false
 			return nil
 		default:
 			return errors.New("invalid live permission status")
@@ -573,8 +590,10 @@ func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID,
 		}
 		if status == model.LivePermissionRejected {
 			userUpdates["live_permission_reject_reason"] = rejectReason
+			userUpdates["verified"] = false
 		} else {
 			userUpdates["live_permission_reject_reason"] = ""
+			userUpdates["verified"] = true
 		}
 		if err := tx.Model(&model.User{}).
 			Where("id = ?", app.UserID).
@@ -634,6 +653,7 @@ func (r *UserRepo) SetLivePermissionStatus(ctx context.Context, userID, status s
 		if err := tx.Model(&user).Updates(map[string]any{
 			"live_permission_status":        status,
 			"live_permission_reject_reason": rejectReason,
+			"verified":                      status == model.LivePermissionApproved,
 		}).Error; err != nil {
 			return err
 		}

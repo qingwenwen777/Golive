@@ -7,6 +7,7 @@ import { Icons } from '@/components/Icons';
 import { Avatar } from '@/components/Avatar';
 import { LiveBadge } from '@/components/LiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -176,9 +177,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
               ) : (
                 <span className="gl-card-chan-skeleton" aria-hidden="true" />
               )}
-              {stream.verified && (
-                <Icons.BadgeCheck size={14} className="shrink-0 text-text-secondary" />
-              )}
+              {stream.verified && <VerifiedBadge size={14} />}
             </div>
             <div className="gl-card-sub">
               <span>

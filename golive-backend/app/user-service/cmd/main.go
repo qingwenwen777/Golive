@@ -67,6 +67,9 @@ func main() {
 	if err := userRepo.BackfillMissingEmails(context.Background()); err != nil {
 		log.Warn("backfill user emails", zap.Error(err))
 	}
+	if err := userRepo.ReconcilePlatformVerification(context.Background()); err != nil {
+		log.Warn("reconcile platform verification", zap.Error(err))
+	}
 	if cfg.Bootstrap.DemoUser.Enabled {
 		if err := seedDemoUser(context.Background(), userRepo, cfg.Bootstrap.DemoUser); err != nil {
 			log.Warn("seed demo user", zap.Error(err))
@@ -201,7 +204,7 @@ func seedDemoUser(ctx context.Context, ur *repo.UserRepo, c config.DemoUserCfg) 
 		PasswordHash:         hash,
 		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
 		CoinBalance:          c.CoinBalance,
-		Verified:             true,
+		Verified:             false,
 		Role:                 model.RoleUser,
 		LivePermissionStatus: model.LivePermissionNone,
 	})

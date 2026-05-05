@@ -82,6 +82,7 @@ func TestGoogleRegisterAndLoginWithInvite(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &login))
 	require.Equal(t, "newcreator", login.User.Username)
 	require.True(t, login.User.GoogleLinked)
+	require.False(t, login.User.Verified)
 
 	loginReq := httptest.NewRequest(http.MethodPost, "/auth/google/login", bytes.NewBufferString(`{"credential":"google-credential"}`))
 	loginReq.Header.Set("Content-Type", "application/json")

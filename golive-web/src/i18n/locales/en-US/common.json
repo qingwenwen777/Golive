@@ -65,6 +65,9 @@
     "signIn": "Sign in",
     "signOut": "Sign out"
   },
+  "badges": {
+    "platformVerified": "Platform verified creator"
+  },
   "auth": {
     "liveAccount": "Live account",
     "signInTitle": "Sign in to GoLive",

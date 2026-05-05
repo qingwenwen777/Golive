@@ -125,6 +125,10 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	roomID := "live-" + ownerID + "-" + strconv.FormatInt(now.UnixNano(), 36)
 	channelID := "ch-" + ownerID
 	ownerName := cleanDisplayName(req.ChannelName, ownerID)
+	verified := false
+	if profile, err := s.rooms.OwnerProfile(ctx, ownerID); err == nil {
+		verified = profile.Verified
+	}
 	title := trimRunes(strings.TrimSpace(req.Title), 120)
 	if title == "" {
 		return nil, errcode.New(400, "title is required")
@@ -146,7 +150,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		Cover:               req.Cover,
 		Channel:             ownerName,
 		ChannelID:           channelID,
-		Verified:            false,
+		Verified:            verified,
 		Avatar:              cleanAvatar(req.Avatar, ownerName),
 		Viewers:             0,
 		PeakViewers:         0,

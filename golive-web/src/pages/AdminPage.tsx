@@ -2074,8 +2074,14 @@ function ApplicationsPanel({
     <section className="gl-admin-panel">
       <div className="gl-admin-panel-head">
         <div>
-          <span>{t('admin.applications.eyebrow', { defaultValue: 'Application review' })}</span>
-          <h2>{t('admin.applications.title', { defaultValue: 'Creator applications' })}</h2>
+          <span>{t('admin.applications.eyebrow', { defaultValue: 'Platform review' })}</span>
+          <h2>{t('admin.applications.title', { defaultValue: 'Platform creator applications' })}</h2>
+          <p>
+            {t('admin.applications.platformHint', {
+              defaultValue:
+                'Approving certifies the creator, enables the orange badge, and applies the lower withdrawal fee.',
+            })}
+          </p>
         </div>
       </div>
       {loading ? (
@@ -2112,7 +2118,7 @@ function ApplicationsPanel({
                   </div>
                 </div>
                 <div className="gl-admin-reason">
-                  <span>{t('admin.applications.reason', { defaultValue: 'Live reason' })}</span>
+                  <span>{t('admin.applications.reason', { defaultValue: 'Application note' })}</span>
                   <p>
                     {app.reason ||
                       t('admin.applications.noReason', { defaultValue: 'No reason provided.' })}
