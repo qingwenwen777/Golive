@@ -9,7 +9,7 @@ const LiveRoomPage = lazy(() => import('@/pages/LiveRoomPage'));
 const ChannelPage = lazy(() => import('@/pages/ChannelPage'));
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
 const CoinPage = lazy(() => import('@/pages/CoinPage'));
-const AdminApplicationsPage = lazy(() => import('@/pages/AdminApplicationsPage'));
+const AdminPage = lazy(() => import('@/pages/AdminPage'));
 const CreatorAnalyticsPage = lazy(() =>
   import('@/pages/CreatorAnalyticsPage').then((module) => ({
     default: module.CreatorAnalyticsPage,
@@ -135,9 +135,10 @@ export const router = createBrowserRouter([
       { path: 'watch-later', element: <WatchLaterPage /> },
       { path: 'liked', element: <LikedPage /> },
       { path: 'settings', element: <SettingsPage /> },
-      { path: 'admin', element: <Navigate to="/admin/applications" replace /> },
-      { path: 'admin/applications', element: <AdminApplicationsPage /> },
-      { path: 'admin/*', element: <AdminApplicationsPage /> },
+      { path: 'admin', element: <Navigate to="/admin/dashboard" replace /> },
+      { path: 'admin/applications', element: <Navigate to="/admin/creators" replace /> },
+      { path: 'admin/:section', element: <AdminPage /> },
+      { path: 'admin/*', element: <AdminPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

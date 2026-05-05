@@ -982,7 +982,7 @@
   },
   "admin": {
     "kicker": "Admin",
-    "title": "Creator permissions",
+    "title": "Admin",
     "refresh": "Refresh",
     "fallbackCreator": "Creator",
     "denied": {
@@ -993,7 +993,8 @@
     "tabs": {
       "label": "Admin creator sections",
       "permissions": "Permission users",
-      "applications": "Applications"
+      "applications": "Applications",
+      "invites": "Invite codes"
     },
     "status": {
       "pending": "Pending",
@@ -1029,6 +1030,192 @@
       "rejectReasonLabel": "Rejection reason",
       "rejectReasonPlaceholder": "Tell the creator what needs to be improved.",
       "confirmReject": "Confirm reject"
+    },
+    "nav": {
+      "aria": "Admin modules"
+    },
+    "brand": {
+      "controlCenter": "Control Center"
+    },
+    "modules": {
+      "dashboard": {
+        "label": "Dashboard",
+        "subtitle": "Core status"
+      },
+      "users": {
+        "label": "Users",
+        "subtitle": "Accounts and invite codes"
+      },
+      "creators": {
+        "label": "Creators",
+        "subtitle": "Applications and live permissions"
+      },
+      "content": {
+        "label": "Content review",
+        "subtitle": "Live rooms and posts"
+      },
+      "economy": {
+        "label": "Economy",
+        "subtitle": "Coins and revenue"
+      },
+      "system": {
+        "label": "System config",
+        "subtitle": "Policies and switches"
+      },
+      "logs": {
+        "label": "Operation logs",
+        "subtitle": "Audit trail"
+      }
+    },
+    "dashboard": {
+      "aria": "Admin overview",
+      "kpis": {
+        "pendingApplications": "Pending live applications",
+        "approvedCreators": "Approved creators",
+        "availableInvites": "Available invite codes",
+        "pendingContent": "Pending content"
+      },
+      "modules": {
+        "eyebrow": "Modules",
+        "title": "Admin modules"
+      },
+      "focus": {
+        "eyebrow": "Operations",
+        "title": "Current focus",
+        "applicationReview": "Live application review",
+        "applicationReviewValue": "{{pending}} pending / {{total}} total applications",
+        "permissionManagement": "Live permission management",
+        "permissionManagementValue": "{{count}} creators can go live",
+        "inviteManagement": "Invite code management",
+        "inviteManagementValue": "{{available}} available / {{total}} total"
+      }
+    },
+    "users": {
+      "aria": "User management summary",
+      "kpis": {
+        "availableInvites": "Available invite codes",
+        "usedInvites": "Used invite codes",
+        "accountDirectory": "Account directory",
+        "admins": "Admins"
+      },
+      "framework": {
+        "eyebrow": "Users",
+        "title": "User management framework",
+        "accounts": "Account list",
+        "accountsSub": "Profiles, roles, and status",
+        "groups": "Permission groups",
+        "groupsSub": "Regular users and admins",
+        "risk": "Risk status",
+        "riskSub": "Registration, login, and invite redemption"
+      }
+    },
+    "creators": {
+      "aria": "Creator management summary",
+      "kpis": {
+        "pendingApplications": "Pending applications",
+        "liveCreators": "Creators who can go live",
+        "approvedApplications": "Approved applications",
+        "rejectedApplications": "Rejected applications"
+      }
+    },
+    "invites": {
+      "eyebrow": "Registration access",
+      "title": "Invite codes",
+      "create": "Create invite",
+      "loading": "Loading invite codes...",
+      "error": "Could not load invite codes.",
+      "empty": "No invite codes have been created.",
+      "used": "Used",
+      "unused": "Unused",
+      "noUser": "No account yet",
+      "available": "Available for one registration",
+      "usedAt": "Used {{time}}",
+      "createdAt": "Created {{time}}",
+      "copy": "Copy",
+      "copied": "Invite code copied.",
+      "copyFailed": "Could not copy invite code.",
+      "created": "Invite code {{code}} created.",
+      "createFailed": "Could not create invite code."
+    },
+    "scaffold": {
+      "content": {
+        "eyebrow": "Content",
+        "title": "Content review framework",
+        "stats": {
+          "liveRooms": "Pending live rooms",
+          "posts": "Post review",
+          "reports": "Reports queue",
+          "keywords": "Keyword policies"
+        },
+        "rows": {
+          "liveRooms": "Live room review",
+          "liveRoomsSub": "Title, cover, category, and live state",
+          "posts": "Post content review",
+          "postsSub": "Posts, images, and comments",
+          "reports": "Report handling",
+          "reportsSub": "User reports and moderation results"
+        }
+      },
+      "economy": {
+        "eyebrow": "Economy",
+        "title": "Economy system framework",
+        "stats": {
+          "topup": "Today top-up",
+          "gifts": "Gift ledger",
+          "superChat": "SC ledger",
+          "withdrawals": "Withdrawal reserve"
+        },
+        "rows": {
+          "accounts": "Coins accounts",
+          "accountsSub": "Balance, top-up, and spending ledger",
+          "gifts": "Gifts and SuperChat",
+          "giftsSub": "Price, level, and revenue collection",
+          "revenue": "Creator revenue",
+          "revenueSub": "Split, withdrawal, and settlement state"
+        }
+      },
+      "system": {
+        "eyebrow": "System",
+        "title": "System configuration framework",
+        "stats": {
+          "registration": "Registration policy",
+          "liveReview": "Live review",
+          "contentPolicy": "Content policy",
+          "serviceStatus": "Service status"
+        },
+        "values": {
+          "inviteOnly": "Invite only",
+          "enabled": "Enabled",
+          "standard": "Standard"
+        },
+        "rows": {
+          "site": "Site configuration",
+          "siteSub": "Brand, domain, and base switches",
+          "review": "Review policies",
+          "reviewSub": "Live applications, content review, and report rules",
+          "services": "Service configuration",
+          "servicesSub": "RTMP, replays, and upload limits"
+        }
+      }
+    },
+    "logs": {
+      "aria": "Action logs summary",
+      "eyebrow": "Logs",
+      "title": "Operation log framework",
+      "kpis": {
+        "today": "Today actions",
+        "permissions": "Permission changes",
+        "reviews": "Review records",
+        "accounts": "Account actions"
+      },
+      "rows": {
+        "reviews": "Review actions",
+        "reviewsSub": "Live applications, content review, and report handling",
+        "permissions": "Permission actions",
+        "permissionsSub": "Admins, creator permissions, and ban states",
+        "system": "System actions",
+        "systemSub": "Configuration changes, service restarts, and policy updates"
+      }
     }
   },
   "upload": {
