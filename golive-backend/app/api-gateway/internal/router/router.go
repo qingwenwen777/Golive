@@ -115,8 +115,9 @@ func publicRoutes() []middleware.PublicRoute {
 		{Method: http.MethodGet, Path: "/api/rooms/channels/:channel/posts"},
 		{Method: http.MethodGet, Path: "/api/rooms/posts/:postID/comments"},
 		{Method: http.MethodGet, Path: "/api/appointments/*action"},
-		// Gifts catalog is public.
+		// Gifts catalog and fan-club public previews are public.
 		{Method: http.MethodGet, Path: "/api/gifts"},
+		{Method: http.MethodGet, Path: "/api/gifts/*action"},
 		{Method: http.MethodGet, Path: "/api/bets/*action"},
 		// Chat history is public for viewers entering a live room.
 		{Method: http.MethodGet, Path: "/api/chat/*action"},

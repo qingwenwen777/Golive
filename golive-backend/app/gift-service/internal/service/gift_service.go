@@ -55,6 +55,14 @@ func (s *GiftService) ListFanBadges(ctx context.Context, userID string) ([]model
 	return s.orders.ListFanBadges(ctx, userID)
 }
 
+func (s *GiftService) ListFanClubMembers(ctx context.Context, creatorID string, limit int) (*model.FanClubMembersResponse, error) {
+	items, total, err := s.orders.ListFanClubMembers(ctx, creatorID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return &model.FanClubMembersResponse{Items: items, Total: total}, nil
+}
+
 // Send is the canonical send path.
 //
 // Pre-conditions checked here (assumes HTTP-level validation already ran):

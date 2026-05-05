@@ -295,7 +295,7 @@ func TestAmountToTier(t *testing.T) {
 
 func TestFanBadgeLevelThresholds(t *testing.T) {
 	cases := map[int64]int{
-		0: 1, 9: 1, 10: 2, 29: 2, 30: 3, 59: 3, 60: 4,
+		0: 1, 999: 1, 1000: 1, 1999: 1, 2000: 2, 5000: 5, 99000: 99, 120000: 99,
 	}
 	for contribution, want := range cases {
 		require.Equalf(t, want, repo.FanBadgeLevel(contribution), "contribution=%d", contribution)
@@ -310,7 +310,7 @@ func TestListFanBadgesRecomputesLevels(t *testing.T) {
 			UserID:            "u-demo",
 			CreatorID:         "creator-low",
 			CreatorName:       "Low",
-			TotalContribution: 9,
+			TotalContribution: 999,
 			Level:             99,
 			UpdatedAt:         now.Add(time.Minute),
 		},
@@ -318,7 +318,7 @@ func TestListFanBadgesRecomputesLevels(t *testing.T) {
 			UserID:            "u-demo",
 			CreatorID:         "creator-high",
 			CreatorName:       "High",
-			TotalContribution: 30,
+			TotalContribution: 2500,
 			Level:             1,
 			UpdatedAt:         now,
 		},
@@ -328,9 +328,65 @@ func TestListFanBadgesRecomputesLevels(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, badges, 2)
 	require.Equal(t, "creator-high", badges[0].CreatorID)
-	require.Equal(t, 3, badges[0].Level)
+	require.Equal(t, 2, badges[0].Level)
 	require.Equal(t, "creator-low", badges[1].CreatorID)
 	require.Equal(t, 1, badges[1].Level)
+}
+
+func TestListFanClubMembersRanksByContribution(t *testing.T) {
+	db := newTestDB(t, 0)
+	require.NoError(t, db.Exec(
+		"INSERT INTO users (id, username, display_name, avatar, coin_balance) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)",
+		"fan-1", "fan1", "Fan One", "fan1.png", int64(0),
+		"fan-2", "fan2", "Fan Two", "fan2.png", int64(0),
+		"fan-3", "fan3", "Fan Three", "fan3.png", int64(0),
+	).Error)
+	now := time.Now()
+	require.NoError(t, db.Create(&[]model.FanBadge{
+		{
+			UserID:            "fan-1",
+			CreatorID:         "u-owner",
+			CreatorName:       "Streamer",
+			TotalContribution: 2000,
+			Level:             90,
+			UpdatedAt:         now.Add(-time.Minute),
+		},
+		{
+			UserID:            "fan-2",
+			CreatorID:         "u-owner",
+			CreatorName:       "Streamer",
+			TotalContribution: 5000,
+			Level:             1,
+			UpdatedAt:         now,
+		},
+		{
+			UserID:            "fan-3",
+			CreatorID:         "u-owner",
+			CreatorName:       "Streamer",
+			TotalContribution: 1000,
+			Level:             1,
+			UpdatedAt:         now.Add(-2 * time.Minute),
+		},
+		{
+			UserID:            "u-owner",
+			CreatorID:         "u-owner",
+			CreatorName:       "Streamer",
+			TotalContribution: 99000,
+			Level:             99,
+			UpdatedAt:         now,
+		},
+	}).Error)
+
+	members, total, err := repo.NewOrderRepo(db).ListFanClubMembers(context.Background(), "u-owner", 2)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, total)
+	require.Len(t, members, 2)
+	require.Equal(t, "fan-2", members[0].UserID)
+	require.Equal(t, "Fan Two", members[0].Name)
+	require.Equal(t, "fan2.png", members[0].Avatar)
+	require.Equal(t, 5, members[0].Level)
+	require.Equal(t, "fan-1", members[1].UserID)
+	require.Equal(t, 2, members[1].Level)
 }
 
 func TestListFanBadgesUsesCurrentCreatorProfile(t *testing.T) {

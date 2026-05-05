@@ -34,6 +34,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
 	r.GET("/gifts", d.Gift.List)
+	r.GET("/gifts/fan-clubs/:creatorID/members", d.Gift.FanClubMembers)
 	r.GET("/bets/latest", d.Bet.Latest)
 
 	auth := handler.AuthRequired(d.JWTSecret)

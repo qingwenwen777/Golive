@@ -6,6 +6,7 @@ import type {
   GiftOrder,
   GiftSendPayload,
   FanBadge,
+  FanClubMembersResponse,
   JoinFanClubPayload,
   SuperChatOrder,
   SuperChatPayload,
@@ -44,6 +45,28 @@ export function useFanBadges(enabled = true, userId?: string) {
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+  });
+}
+
+export function fanClubMembersQueryKey(creatorId?: string, limit = 5) {
+  return ['fan-club-members', creatorId ?? 'unknown', limit] as const;
+}
+
+export function useFanClubMembers(creatorId?: string, enabled = true, limit = 5) {
+  return useQuery<FanClubMembersResponse, Error>({
+    queryKey: fanClubMembersQueryKey(creatorId, limit),
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<FanClubMembersResponse>(
+        `/gifts/fan-clubs/${encodeURIComponent(creatorId ?? '')}/members`,
+        {
+          params: { limit },
+          signal,
+        },
+      );
+      return data;
+    },
+    enabled: enabled && Boolean(creatorId),
+    staleTime: 30_000,
   });
 }
 
@@ -114,6 +137,7 @@ export function useSendGift() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['me'] });
       void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
+      void qc.invalidateQueries({ queryKey: ['fan-club-members'] });
     },
   });
 }
@@ -143,6 +167,7 @@ export function useJoinFanClub() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['me'] });
       void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
+      void qc.invalidateQueries({ queryKey: ['fan-club-members'] });
     },
   });
 }
@@ -175,6 +200,7 @@ export function useSendSuperChat() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['me'] });
       void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
+      void qc.invalidateQueries({ queryKey: ['fan-club-members'] });
     },
   });
 }

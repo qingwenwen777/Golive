@@ -35,7 +35,7 @@ import {
   useUnfollow,
   type LiveHistoryItem,
 } from '@/api/room';
-import { useFanBadges, useJoinFanClub } from '@/api/gift';
+import { useFanBadges, useFanClubMembers, useJoinFanClub } from '@/api/gift';
 import { useChannelPosts } from '@/api/posts';
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
@@ -59,6 +59,7 @@ import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/Repor
 import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import type { FanClubMember } from '@/types/gift';
 import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
@@ -149,16 +150,12 @@ export default function ChannelPage() {
   const joinFanClub = useJoinFanClub();
   const fanBadges = useFanBadges(isAuthed, authUser?.id);
   const creatorId = profile?.id || primary?.ownerId || normalizeCreatorId(channelId);
+  const fanClubMembers = useFanClubMembers(creatorId, Boolean(creatorId), 5);
   const currentFanBadge =
     fanBadges.data?.find((badge) => creatorId && badge.creatorId === creatorId) ?? null;
   const fanPreviewItems = useMemo(
-    () =>
-      buildFanPreviewItems({
-        history: liveHistory.data?.items ?? [],
-        currentFanBadge,
-        currentUser: authUser,
-      }),
-    [authUser, currentFanBadge, liveHistory.data?.items],
+    () => buildFanPreviewItems({ members: fanClubMembers.data?.items ?? [] }),
+    [fanClubMembers.data?.items],
   );
 
   useEffect(() => {
@@ -441,6 +438,8 @@ export default function ChannelPage() {
           <FanClubBanner
             channelName={channelName}
             fanPreviewItems={fanPreviewItems}
+            memberCount={fanClubMembers.data?.total ?? 0}
+            pending={Boolean(creatorId) && fanClubMembers.isPending}
             hasFanBadge={Boolean(currentFanBadge)}
             isOwner={isOwner}
             onJoin={handleJoinFanClub}
@@ -891,18 +890,22 @@ interface FanPreviewItem {
 function FanClubBanner({
   channelName,
   fanPreviewItems,
+  memberCount,
+  pending,
   hasFanBadge,
   isOwner,
   onJoin,
 }: {
   channelName: string;
   fanPreviewItems: FanPreviewItem[];
+  memberCount: number;
+  pending: boolean;
   hasFanBadge: boolean;
   isOwner: boolean;
   onJoin: () => void;
 }) {
   const { t } = useTranslation('pages');
-  const preview = fanPreviewItems.slice(0, 7);
+  const preview = fanPreviewItems.slice(0, 5);
   return (
     <section
       className="gl-fan-club-banner"
@@ -920,20 +923,34 @@ function FanClubBanner({
         </p>
       </div>
       <div className="gl-fan-club-side">
-        <div
-          className="gl-fan-club-avatars"
-          aria-label={t('channel.fanClub.members', { defaultValue: '粉丝灯牌成员' })}
-        >
-          {preview.length ? (
-            preview.map((fan) => (
-              <div className="gl-fan-club-avatar-wrap" key={fan.id} title={fan.name}>
-                <Avatar name={fan.name} src={fan.avatar ?? ''} size={42} />
-                {fan.level && <span>Lv.{fan.level}</span>}
-              </div>
-            ))
-          ) : (
-            <span className="gl-fan-club-empty-avatars">
-              {t('channel.fanClub.emptyMembers', { defaultValue: '等待首位粉丝' })}
+        <div className="gl-fan-club-preview">
+          <div
+            className="gl-fan-club-avatars"
+            aria-label={t('channel.fanClub.members', { defaultValue: '粉丝灯牌成员' })}
+          >
+            {pending ? (
+              Array.from({ length: 3 }).map((_, index) => (
+                <span className="gl-fan-club-avatar-skeleton" key={index} />
+              ))
+            ) : preview.length ? (
+              preview.map((fan) => (
+                <div className="gl-fan-club-avatar-wrap" key={fan.id} title={fan.name}>
+                  <Avatar name={fan.name} src={fan.avatar ?? ''} size={42} />
+                  {fan.level && <span>Lv.{fan.level}</span>}
+                </div>
+              ))
+            ) : (
+              <span className="gl-fan-club-empty-avatars">
+                {t('channel.fanClub.emptyMembers', { defaultValue: '等待首位粉丝' })}
+              </span>
+            )}
+          </div>
+          {!pending && memberCount > 0 && (
+            <span className="gl-fan-club-member-count">
+              {t('channel.fanClub.memberCount', {
+                count: memberCount,
+                defaultValue: '{{count}} fans joined',
+              })}
             </span>
           )}
         </div>
@@ -1029,46 +1046,13 @@ function FanBadgeConfirmDialog({
   );
 }
 
-function buildFanPreviewItems({
-  history,
-  currentFanBadge,
-  currentUser,
-}: {
-  history: LiveHistoryItem[];
-  currentFanBadge: { creatorName: string; creatorAvatar?: string; level: number } | null;
-  currentUser: User | null;
-}): FanPreviewItem[] {
-  const items: FanPreviewItem[] = [];
-  const seen = new Set<string>();
-
-  if (currentFanBadge && currentUser) {
-    const key = currentUser.id || currentFanBadge.creatorName;
-    if (!seen.has(key)) {
-      seen.add(key);
-      items.push({
-        id: key,
-        name: currentUser.displayName || currentUser.username || currentFanBadge.creatorName,
-        avatar: currentUser.avatar || currentFanBadge.creatorAvatar || '',
-        level: currentFanBadge.level,
-      });
-    }
-  }
-
-  for (const record of history) {
-    const fan = record.topFan;
-    if (!fan) continue;
-    const key = fan.userId || fan.name;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    items.push({
-      id: key,
-      name: fan.name,
-      avatar: fan.avatar || '',
-    });
-    if (items.length >= 7) break;
-  }
-
-  return items;
+function buildFanPreviewItems({ members }: { members: FanClubMember[] }): FanPreviewItem[] {
+  return members.slice(0, 5).map((member) => ({
+    id: member.userId,
+    name: member.name || member.username || member.userId,
+    avatar: member.avatar || '',
+    level: member.level,
+  }));
 }
 
 function resolveProfile(

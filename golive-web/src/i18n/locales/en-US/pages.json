@@ -372,6 +372,7 @@
       "subtitle": "Thanks to every viewer who has lit a fan badge.",
       "members": "Fan badge members",
       "emptyMembers": "Waiting for the first fan",
+      "memberCount": "{{count}} fans joined",
       "join": "Join fan club",
       "lit": "Lit",
       "alreadyLit": "Fan badge already lit."

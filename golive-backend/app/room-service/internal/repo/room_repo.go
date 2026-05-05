@@ -663,15 +663,16 @@ func (r *RoomRepo) FanBadgeDistribution(ctx context.Context, creatorID string) (
 	err := r.db.WithContext(ctx).Raw(`
 SELECT
   CASE
-    WHEN level < 20 THEN 'under20'
-    WHEN level < 40 THEN 'level20To39'
-    WHEN level < 60 THEN 'level40To59'
-    ELSE 'level60Plus'
+    WHEN total_contribution >= 60000 THEN 'level60Plus'
+    WHEN total_contribution >= 40000 THEN 'level40To59'
+    WHEN total_contribution >= 20000 THEN 'level20To39'
+    WHEN total_contribution > 0 THEN 'under20'
+    ELSE 'under20'
   END AS bucket,
   COUNT(*) AS fan_count,
   COALESCE(SUM(total_contribution), 0) AS total_contribution
 FROM fan_badges
-WHERE creator_id = ?
+WHERE creator_id = ? AND total_contribution > 0
 GROUP BY bucket
 `, creatorID).Scan(&rows).Error
 	return rows, err

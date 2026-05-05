@@ -8564,11 +8564,24 @@ button.gl-fan-badge-empty {
   align-items: center;
   gap: 14px;
 }
+.gl-fan-club-preview {
+  display: grid;
+  min-width: 0;
+  justify-items: end;
+  gap: 4px;
+}
 .gl-fan-club-avatars {
   display: flex;
   align-items: center;
   gap: 10px;
   padding-bottom: 8px;
+}
+.gl-fan-club-avatar-skeleton {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gl-bg-soft), var(--gl-bg-hover), var(--gl-bg-soft));
+  animation: glBreathe 1.25s ease-in-out infinite;
 }
 .gl-fan-club-avatar-wrap {
   position: relative;
@@ -8603,6 +8616,13 @@ button.gl-fan-badge-empty {
   color: var(--gl-text-3);
   font-size: 12px;
   font-weight: 800;
+}
+.gl-fan-club-member-count {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .gl-fan-club-join {
   position: relative;

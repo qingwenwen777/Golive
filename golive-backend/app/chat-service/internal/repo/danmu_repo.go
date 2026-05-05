@@ -38,11 +38,11 @@ type SuperChatHistoryRow struct {
 }
 
 type fanBadgeHistoryRow struct {
-	UserID    string
-	Username  string
-	Name      string
-	CreatorID string
-	Level     int
+	UserID            string
+	Username          string
+	Name              string
+	CreatorID         string
+	TotalContribution int64
 }
 
 type FanBadgeLookup struct {
@@ -147,11 +147,11 @@ fb.user_id AS user_id,
 COALESCE(u.username, '') AS username,
 COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), fb.user_id) AS name,
 fb.creator_id AS creator_id,
-fb.level AS level
+fb.total_contribution AS total_contribution
 `).
 		Joins("JOIN rooms AS r ON r.owner_id = fb.creator_id").
 		Joins("LEFT JOIN users AS u ON u.id = fb.user_id").
-		Where("r.id = ? AND fb.level > 0", roomID)
+		Where("r.id = ? AND fb.total_contribution > 0", roomID)
 	clauses := make([]string, 0, 2)
 	args := make([]any, 0, 3)
 	if len(unique) > 0 {
@@ -175,12 +175,13 @@ fb.level AS level
 
 	out := empty
 	for _, row := range rows {
-		if row.UserID == "" || row.CreatorID == "" || row.Level <= 0 {
+		level := fanBadgeLevel(row.TotalContribution)
+		if row.UserID == "" || row.CreatorID == "" || level <= 0 {
 			continue
 		}
 		badge := &model.FanBadgePayload{
 			CreatorID: row.CreatorID,
-			Level:     row.Level,
+			Level:     level,
 		}
 		out.ByUserID[row.UserID] = badge
 		if row.Username != "" {
@@ -191,6 +192,20 @@ fb.level AS level
 		}
 	}
 	return out, nil
+}
+
+func fanBadgeLevel(totalContribution int64) int {
+	if totalContribution <= 0 {
+		return 1
+	}
+	level := int(totalContribution / 1000)
+	if level < 1 {
+		return 1
+	}
+	if level > 99 {
+		return 99
+	}
+	return level
 }
 
 func normalizeBadgeName(name string) string {

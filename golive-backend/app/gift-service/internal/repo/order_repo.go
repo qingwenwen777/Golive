@@ -160,11 +160,12 @@ func FanBadgeLevel(totalContribution int64) int {
 	if totalContribution <= 0 {
 		return 1
 	}
-	level := 1
-	threshold := int64(10)
-	for level < 99 && totalContribution >= threshold {
-		level++
-		threshold += int64(level) * 10
+	level := int(totalContribution / 1000)
+	if level < 1 {
+		return 1
+	}
+	if level > 99 {
+		return 99
 	}
 	return level
 }
@@ -194,6 +195,54 @@ func (r *OrderRepo) ListFanBadges(ctx context.Context, userID string) ([]model.F
 		return badges[i].UpdatedAt.After(badges[j].UpdatedAt)
 	})
 	return badges, nil
+}
+
+func (r *OrderRepo) ListFanClubMembers(ctx context.Context, creatorID string, limit int) ([]model.FanClubMember, int64, error) {
+	creatorID = strings.TrimSpace(creatorID)
+	if creatorID == "" {
+		return []model.FanClubMember{}, 0, nil
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	base := r.db.WithContext(ctx).
+		Table("fan_badges AS fb").
+		Joins("JOIN users AS u ON u.id = fb.user_id").
+		Where("fb.creator_id = ? AND fb.user_id <> ?", creatorID, creatorID)
+	var total int64
+	if err := base.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		if isMissingTable(err) {
+			return []model.FanClubMember{}, 0, nil
+		}
+		return nil, 0, err
+	}
+	var members []model.FanClubMember
+	err := base.Session(&gorm.Session{}).
+		Select(`
+fb.user_id,
+COALESCE(u.username, '') AS username,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), u.id) AS name,
+COALESCE(u.avatar, '') AS avatar,
+fb.total_contribution,
+fb.level,
+fb.updated_at
+`).
+		Order("fb.total_contribution DESC, fb.updated_at DESC, fb.user_id ASC").
+		Limit(limit).
+		Scan(&members).Error
+	if isMissingTable(err) {
+		return []model.FanClubMember{}, 0, nil
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range members {
+		members[i].Level = FanBadgeLevel(members[i].TotalContribution)
+	}
+	return members, total, nil
 }
 
 func (r *OrderRepo) refreshFanBadgeCreatorProfiles(ctx context.Context, badges []model.FanBadge) error {

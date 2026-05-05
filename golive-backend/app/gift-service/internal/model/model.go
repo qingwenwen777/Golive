@@ -120,6 +120,21 @@ type FanBadge struct {
 
 func (FanBadge) TableName() string { return "fan_badges" }
 
+type FanClubMember struct {
+	UserID            string    `json:"userId"`
+	Username          string    `json:"username,omitempty"`
+	Name              string    `json:"name"`
+	Avatar            string    `json:"avatar,omitempty"`
+	TotalContribution int64     `json:"totalContribution"`
+	Level             int       `json:"level"`
+	UpdatedAt         time.Time `json:"updatedAt"`
+}
+
+type FanClubMembersResponse struct {
+	Items []FanClubMember `json:"items"`
+	Total int64           `json:"total"`
+}
+
 // Outbox / "local message" topics.
 const (
 	OutboxTopicGift      = "gift"

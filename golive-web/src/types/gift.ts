@@ -37,6 +37,21 @@ export interface FanBadge {
   updatedAt: string;
 }
 
+export interface FanClubMember {
+  userId: string;
+  username?: string;
+  name: string;
+  avatar?: string;
+  totalContribution: number;
+  level: number;
+  updatedAt: string;
+}
+
+export interface FanClubMembersResponse {
+  items: FanClubMember[];
+  total: number;
+}
+
 export interface GiftSendPayload {
   roomId: string;
   giftId: string;

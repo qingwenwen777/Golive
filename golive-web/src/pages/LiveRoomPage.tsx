@@ -80,17 +80,14 @@ import type { FanBadge } from '@/types/gift';
 import type { Message } from '@/types/message';
 
 const LIVE_END_TRANSITION_MS = 3200;
-const FAN_BADGE_LEVEL_STEP_CONTRIBUTION = 10;
+const FAN_BADGE_LEVEL_STEP_CONTRIBUTION = 1000;
 
 function fanBadgeLevel(totalContribution: number): number {
-  if (totalContribution <= 0) return 1;
-  let level = 1;
-  let threshold = FAN_BADGE_LEVEL_STEP_CONTRIBUTION;
-  while (level < 99 && totalContribution >= threshold) {
-    level += 1;
-    threshold += level * FAN_BADGE_LEVEL_STEP_CONTRIBUTION;
-  }
-  return level;
+  if (!Number.isFinite(totalContribution) || totalContribution <= 0) return 1;
+  return Math.max(
+    1,
+    Math.min(99, Math.floor(totalContribution / FAN_BADGE_LEVEL_STEP_CONTRIBUTION)),
+  );
 }
 
 export default function LiveRoomPage() {

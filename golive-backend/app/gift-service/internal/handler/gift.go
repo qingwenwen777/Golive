@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,26 @@ func (h *GiftHandler) FanBadges(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, badges)
+}
+
+func (h *GiftHandler) FanClubMembers(c *gin.Context) {
+	creatorID := strings.TrimSpace(c.Param("creatorID"))
+	if creatorID == "" {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "Bad request"))
+		return
+	}
+	limit := 5
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
+		}
+	}
+	resp, err := h.svc.ListFanClubMembers(c.Request.Context(), creatorID, limit)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 type sendGiftBody struct {

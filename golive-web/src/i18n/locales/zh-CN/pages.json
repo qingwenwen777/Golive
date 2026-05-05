@@ -373,6 +373,7 @@
       "subtitle": "感谢每一位点亮粉丝灯牌的观众。",
       "members": "粉丝灯牌成员",
       "emptyMembers": "等待首位粉丝",
+      "memberCount": "{{count}} 位粉丝已加入",
       "join": "加入粉丝团",
       "lit": "已点亮",
       "alreadyLit": "粉丝灯牌已点亮。"
