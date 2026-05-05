@@ -2447,16 +2447,65 @@ input:focus-visible,
   gap: 12px;
 }
 .gl-home-rec-card {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 158px;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
   border: 1px solid var(--gl-border);
   border-radius: 10px;
   background: var(--gl-bg-card);
   box-shadow: var(--gl-shadow);
   padding: 14px;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.gl-home-rec-card::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--gl-red);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleY(0.38);
+  transform-origin: center;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+.gl-home-rec-card > * {
+  position: relative;
+}
+.gl-home-rec-card:not(.is-loading):hover,
+.gl-home-rec-card:not(.is-loading):focus-within {
+  border-color: color-mix(in srgb, var(--gl-border) 62%, var(--gl-text));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gl-bg-card) 74%, var(--gl-bg-hover)), var(--gl-bg-card));
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.12),
+    0 1px 0 color-mix(in srgb, var(--gl-bg-card) 80%, var(--gl-text));
+  transform: translateY(-3px);
+}
+.dark .gl-home-rec-card:not(.is-loading):hover,
+.dark .gl-home-rec-card:not(.is-loading):focus-within {
+  border-color: color-mix(in srgb, var(--gl-border) 50%, var(--gl-text-2));
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.36),
+    0 1px 0 color-mix(in srgb, var(--gl-bg-card) 70%, var(--gl-text-3));
+}
+.gl-home-rec-card:not(.is-loading):hover::before,
+.gl-home-rec-card:not(.is-loading):focus-within::before {
+  opacity: 1;
+  transform: scaleY(1);
 }
 .gl-home-rec-card.is-loading {
   position: relative;
@@ -2488,6 +2537,18 @@ input:focus-visible,
   gap: 12px;
   color: inherit;
 }
+.gl-home-rec-main .gl-avatar {
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.gl-home-rec-card:not(.is-loading):hover .gl-home-rec-main .gl-avatar,
+.gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-main .gl-avatar {
+  box-shadow:
+    0 0 0 3px var(--gl-bg-card),
+    0 0 0 5px color-mix(in srgb, var(--gl-red) 68%, transparent);
+  transform: scale(1.04);
+}
 .gl-home-rec-follow {
   display: inline-flex;
   width: 36px;
@@ -2502,6 +2563,7 @@ input:focus-visible,
   transition:
     background 0.15s ease,
     border-color 0.15s ease,
+    box-shadow 0.15s ease,
     color 0.15s ease,
     opacity 0.15s ease,
     transform 0.15s ease;
@@ -2509,6 +2571,11 @@ input:focus-visible,
 .gl-home-rec-follow:hover:not(:disabled) {
   background: var(--gl-btn-primary-hover);
   border-color: var(--gl-btn-primary-hover);
+  transform: translateY(-1px);
+}
+.gl-home-rec-card:not(.is-loading):hover .gl-home-rec-follow:not(:disabled):not(.is-following),
+.gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-follow:not(:disabled):not(.is-following) {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
   transform: translateY(-1px);
 }
 .gl-home-rec-follow.is-following {
@@ -2537,6 +2604,11 @@ input:focus-visible,
   font-size: 15px;
   font-weight: 850;
   line-height: 1.2;
+  transition: color 0.18s ease;
+}
+.gl-home-rec-card:not(.is-loading):hover .gl-home-rec-copy h3,
+.gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-copy h3 {
+  color: color-mix(in srgb, var(--gl-text) 82%, var(--gl-red));
 }
 .gl-home-rec-copy h3 span {
   overflow: hidden;
@@ -2567,6 +2639,11 @@ input:focus-visible,
 .gl-home-rec-meta svg {
   flex: 0 0 auto;
   color: var(--gl-text-3);
+  transition: color 0.18s ease;
+}
+.gl-home-rec-card:not(.is-loading):hover .gl-home-rec-meta svg,
+.gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-meta svg {
+  color: var(--gl-red);
 }
 .gl-home-rec-meta span {
   overflow: hidden;
@@ -2580,6 +2657,21 @@ input:focus-visible,
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-home-rec-card,
+  .gl-home-rec-card::before,
+  .gl-home-rec-main .gl-avatar,
+  .gl-home-rec-copy h3,
+  .gl-home-rec-meta svg {
+    transition: none;
+  }
+  .gl-home-rec-card:not(.is-loading):hover,
+  .gl-home-rec-card:not(.is-loading):focus-within,
+  .gl-home-rec-card:not(.is-loading):hover .gl-home-rec-main .gl-avatar,
+  .gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-main .gl-avatar {
+    transform: none;
+  }
 }
 .gl-home-hot-replays {
   display: flex;
