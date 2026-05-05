@@ -1102,10 +1102,11 @@
       "rejectReasonPlaceholder": "Tell the creator what needs to be improved.",
       "confirmReject": "Confirm reject",
       "liveHint": "Approving only enables Creator Studio and live streaming. Platform certification is reviewed separately."
-    },
-    "nav": {
-      "aria": "Admin modules"
-    },
+      },
+      "nav": {
+        "aria": "Admin modules",
+        "home": "Back to GoLive"
+      },
     "brand": {
       "controlCenter": "Control Center"
     },
@@ -1405,7 +1406,24 @@
         "blockedWordCreate": "Add blocked word",
         "blockedWordUpdate": "Update blocked word",
         "blockedWordDelete": "Delete blocked word",
-        "blockedWordImport": "Import blocked words"
+        "blockedWordImport": "Import blocked words",
+        "inviteCreate": "Create invite code",
+        "inviteDelete": "Delete invite code",
+        "userProfileUpdate": "Update user profile",
+        "userRoleUpdate": "Update user role",
+        "userBan": "Ban user",
+        "userUnban": "Unban user",
+        "coinsAdd": "Add Coins",
+        "coinsDeduct": "Deduct Coins",
+        "coinsFreeze": "Freeze Coins",
+        "coinsUnfreeze": "Unfreeze Coins",
+        "creatorApplicationApprove": "Approve live application",
+        "creatorApplicationReject": "Reject live application",
+        "platformApplicationApprove": "Approve certification application",
+        "platformApplicationReject": "Reject certification application",
+        "livePermissionApprove": "Enable live permission",
+        "livePermissionReject": "Disable live permission",
+        "adminCreate": "Create admin account"
       }
     },
     "exit": "Exit admin",

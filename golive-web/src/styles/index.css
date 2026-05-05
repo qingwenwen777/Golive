@@ -1237,7 +1237,7 @@ input:focus-visible,
   overflow: hidden;
   border: 1px solid var(--gl-border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--gl-bg-card) 94%, transparent);
+  background: #fff;
   box-shadow: 0 18px 52px rgba(15, 23, 42, 0.2);
   backdrop-filter: blur(18px);
 }
@@ -1428,8 +1428,10 @@ input:focus-visible,
   right: 0;
   bottom: 0;
   left: 0;
+  z-index: 5;
   border-top: 1px solid var(--gl-border);
-  background: var(--gl-bg-card);
+  background: #fff;
+  box-shadow: 0 -16px 28px rgba(15, 23, 42, 0.08);
   padding: 11px 14px 14px;
 }
 .gl-gift-counts {
@@ -1451,7 +1453,7 @@ input:focus-visible,
   justify-content: center;
   border: 0;
   border-radius: 999px;
-  background: var(--gl-bg-hover);
+  background: #f2f2f2;
   color: var(--gl-text-2);
   font-size: 12px;
   font-weight: 850;
@@ -1526,8 +1528,15 @@ input:focus-visible,
   color: var(--gl-text-2);
 }
 .dark .gl-gift-sheet {
-  background: color-mix(in srgb, var(--gl-bg-card) 94%, transparent);
+  background: #111827;
   box-shadow: 0 18px 52px rgba(0, 0, 0, 0.44);
+}
+.dark .gl-gift-sendbar {
+  background: #111827;
+  box-shadow: 0 -16px 30px rgba(0, 0, 0, 0.34);
+}
+.dark .gl-gift-count {
+  background: rgba(255, 255, 255, 0.1);
 }
 .dark .gl-gift-card.is-level-gift {
   border-color: rgba(129, 140, 248, 0.24);
@@ -5590,6 +5599,31 @@ input:focus-visible,
   gap: 10px;
   padding: 8px 8px 12px;
   border-bottom: 1px solid var(--gl-border);
+}
+.gl-admin-home-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 850;
+  text-decoration: none;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+.gl-admin-home-link:hover {
+  border-color: rgba(15, 15, 15, 0.2);
+  background: var(--gl-bg-hover);
+  transform: translateY(-1px);
+}
+.dark .gl-admin-home-link:hover {
+  border-color: rgba(255, 255, 255, 0.2);
 }
 .gl-admin-mark {
   position: relative;

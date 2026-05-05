@@ -45,7 +45,14 @@ func NewUserRepo(db *gorm.DB) *UserRepo { return &UserRepo{db: db} }
 
 // AutoMigrate creates / updates the users table.
 func (r *UserRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{})
+	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{}, &model.AdminAuditLog{})
+}
+
+func (r *UserRepo) CreateAdminAuditLog(ctx context.Context, log *model.AdminAuditLog) error {
+	if log == nil {
+		return nil
+	}
+	return r.db.WithContext(ctx).Create(log).Error
 }
 
 func (r *UserRepo) hydrateUserLevel(ctx context.Context, u *model.User) error {
@@ -1100,25 +1107,25 @@ type AdminLiveRecord struct {
 }
 
 type AdminReportRecord struct {
-	ID              string     `json:"id"`
-	TargetType      string     `json:"targetType"`
-	TargetID        string     `json:"targetId"`
-	Reason          string     `json:"reason"`
-	Status          string     `json:"status"`
-	ReporterID      string     `json:"reporterId"`
-	ReporterName    string     `json:"reporterName"`
-	TargetTitle     string     `json:"targetTitle,omitempty"`
-	TargetText      string     `json:"targetText,omitempty"`
-	ResolutionAction string    `json:"resolutionAction,omitempty"`
-	CreatedAt       time.Time  `json:"createdAt"`
+	ID               string     `json:"id"`
+	TargetType       string     `json:"targetType"`
+	TargetID         string     `json:"targetId"`
+	Reason           string     `json:"reason"`
+	Status           string     `json:"status"`
+	ReporterID       string     `json:"reporterId"`
+	ReporterName     string     `json:"reporterName"`
+	TargetTitle      string     `json:"targetTitle,omitempty"`
+	TargetText       string     `json:"targetText,omitempty"`
+	ResolutionAction string     `json:"resolutionAction,omitempty"`
+	CreatedAt        time.Time  `json:"createdAt"`
 	ResolvedAt       *time.Time `json:"resolvedAt,omitempty"`
 }
 
 type AdminUserDetail struct {
-	User             AdminUserView          `json:"user"`
+	User             AdminUserView           `json:"user"`
 	CoinTransactions []model.CoinTransaction `json:"coinTransactions"`
-	LiveRecords      []AdminLiveRecord      `json:"liveRecords"`
-	ReportRecords    []AdminReportRecord    `json:"reportRecords"`
+	LiveRecords      []AdminLiveRecord       `json:"liveRecords"`
+	ReportRecords    []AdminReportRecord     `json:"reportRecords"`
 }
 
 func normalizeAdminPage(page, size int) (int, int) {

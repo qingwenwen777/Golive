@@ -1103,10 +1103,11 @@
       "rejectReasonPlaceholder": "告诉主播需要补充或改进的内容。",
       "confirmReject": "确认拒绝",
       "liveHint": "同意后只会开启主播工作台和开播权限，平台认证/签约需要单独审核。"
-    },
-    "nav": {
-      "aria": "管理员模块"
-    },
+      },
+      "nav": {
+        "aria": "管理员模块",
+        "home": "返回主界面"
+      },
     "brand": {
       "controlCenter": "控制中心"
     },
@@ -1406,7 +1407,24 @@
         "blockedWordCreate": "添加屏蔽词",
         "blockedWordUpdate": "更新屏蔽词",
         "blockedWordDelete": "删除屏蔽词",
-        "blockedWordImport": "批量导入屏蔽词"
+        "blockedWordImport": "批量导入屏蔽词",
+        "inviteCreate": "创建邀请码",
+        "inviteDelete": "删除邀请码",
+        "userProfileUpdate": "修改用户资料",
+        "userRoleUpdate": "修改用户角色",
+        "userBan": "封禁用户",
+        "userUnban": "解封用户",
+        "coinsAdd": "增加 Coins",
+        "coinsDeduct": "扣减 Coins",
+        "coinsFreeze": "冻结 Coins",
+        "coinsUnfreeze": "解冻 Coins",
+        "creatorApplicationApprove": "通过开播申请",
+        "creatorApplicationReject": "拒绝开播申请",
+        "platformApplicationApprove": "通过认证申请",
+        "platformApplicationReject": "拒绝认证申请",
+        "livePermissionApprove": "开启开播权限",
+        "livePermissionReject": "关闭开播权限",
+        "adminCreate": "创建管理员账号"
       }
     },
     "exit": "退出后台",

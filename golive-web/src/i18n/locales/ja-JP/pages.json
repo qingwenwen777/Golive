@@ -1102,10 +1102,11 @@
       "rejectReasonPlaceholder": "改善が必要な内容を伝えてください。",
       "confirmReject": "却下を確定",
       "liveHint": "承認してもクリエイタースタジオと配信権限のみ有効になります。プラットフォーム認証は別途審査します。"
-    },
-    "nav": {
-      "aria": "管理モジュール"
-    },
+      },
+      "nav": {
+        "aria": "管理モジュール",
+        "home": "GoLive に戻る"
+      },
     "brand": {
       "controlCenter": "コントロールセンター"
     },
@@ -1405,7 +1406,24 @@
         "blockedWordCreate": "ブロックワード追加",
         "blockedWordUpdate": "ブロックワード更新",
         "blockedWordDelete": "ブロックワード削除",
-        "blockedWordImport": "ブロックワード一括インポート"
+        "blockedWordImport": "ブロックワード一括インポート",
+        "inviteCreate": "招待コード作成",
+        "inviteDelete": "招待コード削除",
+        "userProfileUpdate": "ユーザー情報更新",
+        "userRoleUpdate": "ユーザーロール更新",
+        "userBan": "ユーザー停止",
+        "userUnban": "停止解除",
+        "coinsAdd": "Coins 追加",
+        "coinsDeduct": "Coins 差し引き",
+        "coinsFreeze": "Coins 凍結",
+        "coinsUnfreeze": "Coins 凍結解除",
+        "creatorApplicationApprove": "配信申請を承認",
+        "creatorApplicationReject": "配信申請を却下",
+        "platformApplicationApprove": "認証申請を承認",
+        "platformApplicationReject": "認証申請を却下",
+        "livePermissionApprove": "配信権限を有効化",
+        "livePermissionReject": "配信権限を無効化",
+        "adminCreate": "管理者アカウント作成"
       }
     },
     "exit": "管理画面を終了",

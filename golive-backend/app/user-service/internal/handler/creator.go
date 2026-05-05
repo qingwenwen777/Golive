@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -155,6 +156,7 @@ func (h *AdminHandler) CreateInviteCode(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategorySystem, "invite_create", "invite_code", invite.ID, invite.Code, "", "", "created invite code")
 	c.JSON(http.StatusCreated, gin.H{"inviteCode": invite})
 }
 
@@ -181,6 +183,7 @@ func (h *AdminHandler) DeleteInviteCode(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategorySystem, "invite_delete", "invite_code", invite.ID, invite.Code, "", "", "deleted unused invite code")
 	c.JSON(http.StatusOK, gin.H{"inviteCode": invite})
 }
 
@@ -255,6 +258,7 @@ func (h *AdminHandler) UpdateUserProfile(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "user_profile_update", "user", u.ID, u.DisplayName, u.ID, u.DisplayName, "updated user profile")
 	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
 }
 
@@ -286,6 +290,7 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "user_role_update", "user", u.ID, u.DisplayName, u.ID, u.DisplayName, "role="+role)
 	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
 }
 
@@ -313,6 +318,11 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	action := "user_unban"
+	if req.Banned {
+		action = "user_ban"
+	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, action, "user", u.ID, u.DisplayName, u.ID, u.DisplayName, strings.TrimSpace(req.Reason))
 	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
 }
 
@@ -346,6 +356,13 @@ func (h *AdminHandler) AdjustUserCoins(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	note := strings.TrimSpace(req.Note)
+	if note == "" {
+		note = "amount=" + strconv.FormatInt(req.Amount, 10)
+	} else {
+		note = note + "; amount=" + strconv.FormatInt(req.Amount, 10)
+	}
+	h.logAdminAudit(c, model.AdminAuditCategorySystem, "coins_"+action, "user", u.ID, u.DisplayName, u.ID, u.DisplayName, note)
 	c.JSON(http.StatusOK, gin.H{"user": u.Public(), "transaction": coinTx})
 }
 
@@ -422,6 +439,7 @@ func (h *AdminHandler) reviewCreatorApplication(c *gin.Context, status string) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "creator_application_"+status, "creator_application", app.ID, user.DisplayName, user.ID, user.DisplayName, rejectReason)
 	c.JSON(http.StatusOK, gin.H{
 		"application": app,
 		"user":        user.Public(),
@@ -462,6 +480,7 @@ func (h *AdminHandler) reviewPlatformApplication(c *gin.Context, status string) 
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "platform_application_"+status, "platform_application", app.ID, user.DisplayName, user.ID, user.DisplayName, rejectReason)
 	c.JSON(http.StatusOK, gin.H{
 		"application": app,
 		"user":        user.Public(),
@@ -492,6 +511,7 @@ func (h *AdminHandler) UpdateLivePermission(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "live_permission_"+status, "user", user.ID, user.DisplayName, user.ID, user.DisplayName, "live permission="+status)
 	c.JSON(http.StatusOK, gin.H{"user": user.Public()})
 }
 
@@ -544,7 +564,47 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "admin_create", "user", u.ID, u.DisplayName, u.ID, u.DisplayName, "created admin account")
 	c.JSON(http.StatusCreated, gin.H{"user": u.Public()})
+}
+
+func (h *AdminHandler) logAdminAudit(c *gin.Context, category, action, targetType, targetID, targetTitle, targetUserID, targetUserName, note string) {
+	if h == nil || h.users == nil {
+		return
+	}
+	actorID := UserIDFromCtx(c)
+	if strings.TrimSpace(actorID) == "" {
+		return
+	}
+	_ = h.users.CreateAdminAuditLog(c.Request.Context(), &model.AdminAuditLog{
+		ID:             uuid.NewString(),
+		Category:       strings.TrimSpace(category),
+		Action:         strings.TrimSpace(action),
+		ActorID:        actorID,
+		TargetType:     strings.TrimSpace(targetType),
+		TargetID:       strings.TrimSpace(targetID),
+		TargetTitle:    trimAuditText(targetTitle, 240),
+		TargetUserID:   strings.TrimSpace(targetUserID),
+		TargetUserName: trimAuditText(targetUserName, 128),
+		Note:           strings.TrimSpace(note),
+		CreatedAt:      timeNowUTC(),
+	})
+}
+
+func trimAuditText(value string, max int) string {
+	value = strings.TrimSpace(value)
+	if max <= 0 {
+		return value
+	}
+	runes := []rune(value)
+	if len(runes) <= max {
+		return value
+	}
+	return string(runes[:max])
+}
+
+func timeNowUTC() time.Time {
+	return time.Now().UTC()
 }
 
 type InternalHandler struct {

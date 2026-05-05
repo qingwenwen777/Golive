@@ -505,6 +505,10 @@ function AdminNav({
           <span>{t('admin.brand.controlCenter', { defaultValue: 'Control Center' })}</span>
         </div>
       </div>
+      <Link className="gl-admin-home-link" to="/">
+        <LogOut size={18} />
+        <span>{t('admin.nav.home', { defaultValue: 'Back to GoLive' })}</span>
+      </Link>
       <nav className="gl-admin-nav-list">
         {ADMIN_MODULES.filter((module) => !limited || module.key === 'content').map((module) => {
           const Icon = module.icon;
@@ -2330,6 +2334,39 @@ function auditActionLabel(value: string, t: Translate) {
     blocked_word_import: t('admin.logs.actions.blockedWordImport', {
       defaultValue: 'Import blocked words',
     }),
+    invite_create: t('admin.logs.actions.inviteCreate', { defaultValue: 'Create invite code' }),
+    invite_delete: t('admin.logs.actions.inviteDelete', { defaultValue: 'Delete invite code' }),
+    user_profile_update: t('admin.logs.actions.userProfileUpdate', {
+      defaultValue: 'Update user profile',
+    }),
+    user_role_update: t('admin.logs.actions.userRoleUpdate', {
+      defaultValue: 'Update user role',
+    }),
+    user_ban: t('admin.logs.actions.userBan', { defaultValue: 'Ban user' }),
+    user_unban: t('admin.logs.actions.userUnban', { defaultValue: 'Unban user' }),
+    coins_add: t('admin.logs.actions.coinsAdd', { defaultValue: 'Add Coins' }),
+    coins_deduct: t('admin.logs.actions.coinsDeduct', { defaultValue: 'Deduct Coins' }),
+    coins_freeze: t('admin.logs.actions.coinsFreeze', { defaultValue: 'Freeze Coins' }),
+    coins_unfreeze: t('admin.logs.actions.coinsUnfreeze', { defaultValue: 'Unfreeze Coins' }),
+    creator_application_approved: t('admin.logs.actions.creatorApplicationApprove', {
+      defaultValue: 'Approve live application',
+    }),
+    creator_application_rejected: t('admin.logs.actions.creatorApplicationReject', {
+      defaultValue: 'Reject live application',
+    }),
+    platform_application_approved: t('admin.logs.actions.platformApplicationApprove', {
+      defaultValue: 'Approve certification application',
+    }),
+    platform_application_rejected: t('admin.logs.actions.platformApplicationReject', {
+      defaultValue: 'Reject certification application',
+    }),
+    live_permission_approved: t('admin.logs.actions.livePermissionApprove', {
+      defaultValue: 'Enable live permission',
+    }),
+    live_permission_rejected: t('admin.logs.actions.livePermissionReject', {
+      defaultValue: 'Disable live permission',
+    }),
+    admin_create: t('admin.logs.actions.adminCreate', { defaultValue: 'Create admin account' }),
   };
   return map[value] ?? value;
 }
