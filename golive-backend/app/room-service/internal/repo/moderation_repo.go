@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v9"
@@ -1237,15 +1240,7 @@ func (r *ModerationRepo) SyncBlockedWords(ctx context.Context) error {
 
 func (r *ModerationRepo) AdminDashboardMetrics(ctx context.Context, now time.Time) (AdminDashboardMetrics, error) {
 	metrics := AdminDashboardMetrics{
-		Health: []AdminHealthItem{
-			{Key: "room-service", Label: "room-service", Status: "ok", Detail: "HTTP service responding", Checked: true},
-			{Key: "api-gateway", Label: "api-gateway", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
-			{Key: "user-service", Label: "user-service", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
-			{Key: "gift-service", Label: "gift-service", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
-			{Key: "chat-service", Label: "chat-service", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
-			{Key: "im-gateway", Label: "im-gateway", Status: "unknown", Detail: "Health check not exposed to room-service", Checked: false},
-			{Key: "nsq", Label: "NSQ", Status: "unknown", Detail: "No NSQ probe configured", Checked: false},
-		},
+		Health: adminHTTPServiceHealth(ctx),
 	}
 	if sqlDB, err := r.db.DB(); err != nil {
 		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "mysql", Label: "MySQL", Status: "down", Detail: err.Error(), Checked: true})
@@ -1261,6 +1256,7 @@ func (r *ModerationRepo) AdminDashboardMetrics(ctx context.Context, now time.Tim
 	} else {
 		metrics.Health = append(metrics.Health, AdminHealthItem{Key: "redis", Label: "Redis", Status: "ok", Detail: "Connected", Checked: true})
 	}
+	metrics.Health = append(metrics.Health, adminTCPHealth(ctx, "kafka", "Kafka", "kafka:9092"))
 
 	type roomRow struct {
 		ID      string
@@ -1270,7 +1266,7 @@ func (r *ModerationRepo) AdminDashboardMetrics(ctx context.Context, now time.Tim
 	err := r.db.WithContext(ctx).
 		Table("rooms").
 		Select("id, viewers").
-		Where("status IN ?", []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Where("status = ?", model.StatusLive).
 		Scan(&rooms).Error
 	if err != nil && !isMissingTableName(err) {
 		return metrics, err
@@ -1302,6 +1298,76 @@ func (r *ModerationRepo) AdminDashboardMetrics(ctx context.Context, now time.Tim
 		return metrics, err
 	}
 	return metrics, nil
+}
+
+type adminHTTPHealthTarget struct {
+	Key   string
+	Label string
+	URL   string
+}
+
+func adminHTTPServiceHealth(ctx context.Context) []AdminHealthItem {
+	targets := []adminHTTPHealthTarget{
+		{Key: "room-service", Label: "room-service", URL: "http://127.0.0.1:8091/healthz"},
+		{Key: "api-gateway", Label: "api-gateway", URL: "http://api-gateway:8080/healthz"},
+		{Key: "user-service", Label: "user-service", URL: "http://user-service:8090/healthz"},
+		{Key: "gift-service", Label: "gift-service", URL: "http://gift-service:8092/healthz"},
+		{Key: "chat-service", Label: "chat-service", URL: "http://chat-service:8093/healthz"},
+		{Key: "im-gateway", Label: "im-gateway", URL: "http://im-gateway:8081/healthz"},
+	}
+	items := make([]AdminHealthItem, len(targets))
+	var wg sync.WaitGroup
+	for i, target := range targets {
+		i, target := i, target
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			items[i] = adminHTTPHealth(ctx, target)
+		}()
+	}
+	wg.Wait()
+	return items
+}
+
+func adminHTTPHealth(ctx context.Context, target adminHTTPHealthTarget) AdminHealthItem {
+	checkCtx, cancel := context.WithTimeout(ctx, 900*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(checkCtx, http.MethodGet, target.URL, nil)
+	if err != nil {
+		return AdminHealthItem{Key: target.Key, Label: target.Label, Status: "down", Detail: err.Error(), Checked: true}
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return AdminHealthItem{Key: target.Key, Label: target.Label, Status: "down", Detail: compactAdminHealthError(err), Checked: true}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusInternalServerError {
+		return AdminHealthItem{Key: target.Key, Label: target.Label, Status: "down", Detail: resp.Status, Checked: true}
+	}
+	return AdminHealthItem{Key: target.Key, Label: target.Label, Status: "ok", Detail: "HTTP /healthz responding", Checked: true}
+}
+
+func adminTCPHealth(ctx context.Context, key, label, addr string) AdminHealthItem {
+	checkCtx, cancel := context.WithTimeout(ctx, 900*time.Millisecond)
+	defer cancel()
+	conn, err := (&net.Dialer{}).DialContext(checkCtx, "tcp", addr)
+	if err != nil {
+		return AdminHealthItem{Key: key, Label: label, Status: "down", Detail: compactAdminHealthError(err), Checked: true}
+	}
+	_ = conn.Close()
+	return AdminHealthItem{Key: key, Label: label, Status: "ok", Detail: "TCP port reachable", Checked: true}
+}
+
+func compactAdminHealthError(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "Health check timed out"
+	}
+	msg := err.Error()
+	const maxLen = 160
+	if len(msg) > maxLen {
+		return msg[:maxLen] + "..."
+	}
+	return msg
 }
 
 func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {

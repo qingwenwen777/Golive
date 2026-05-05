@@ -847,6 +847,7 @@ function UsersPage({
               <span>
                 {t('admin.users.pagination.page', {
                   page,
+                  pages: totalPages,
                   total: totalPages,
                   defaultValue: '{{page}} / {{total}}',
                 })}
