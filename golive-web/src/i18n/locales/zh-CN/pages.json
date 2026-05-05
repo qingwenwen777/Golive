@@ -1229,12 +1229,12 @@
     "logs": {
       "aria": "操作日志概览",
       "eyebrow": "日志",
-      "title": "操作日志框架",
+      "title": "操作日志",
       "kpis": {
         "today": "今日操作",
         "permissions": "权限变更",
         "reviews": "审核记录",
-        "accounts": "账号操作"
+        "accounts": "系统操作"
       },
       "rows": {
         "reviews": "审核操作",
@@ -1243,6 +1243,31 @@
         "permissionsSub": "管理员、主播权限、封禁状态",
         "system": "系统操作",
         "systemSub": "配置变更、服务重启、策略调整"
+      },
+      "tabs": {
+        "review": "审核操作",
+        "permission": "权限操作",
+        "system": "系统操作"
+      },
+      "loading": "正在加载日志...",
+      "empty": "当前分类暂无操作记录。",
+      "actor": "操作人",
+      "note": "备注",
+      "noNote": "无备注",
+      "noTarget": "未记录目标",
+      "actions": {
+        "deleteContent": "删除内容",
+        "warnUser": "警告用户",
+        "warnRoom": "警告直播间",
+        "siteMute": "全站禁言",
+        "banUser": "封禁用户",
+        "forceEndLive": "强制结束直播",
+        "dismiss": "驳回举报",
+        "review": "标记处理中",
+        "blockedWordCreate": "添加屏蔽词",
+        "blockedWordUpdate": "更新屏蔽词",
+        "blockedWordDelete": "删除屏蔽词",
+        "blockedWordImport": "批量导入屏蔽词"
       }
     },
     "exit": "退出后台",
@@ -1305,7 +1330,10 @@
         "muteDuration": "禁言时长",
         "confirmAction": "确认处置",
         "updated": "举报状态已更新。",
-        "updateFailed": "无法更新举报。"
+        "updateFailed": "无法更新举报。",
+        "handledTitle": "举报已处理",
+        "handledBody": "已关闭的举报不能再次处置，新的举报会生成新的待处理记录。",
+        "alreadyHandled": "该举报已处理，不能重复处置。"
       },
       "actions": {
         "review": "标记处理中",
@@ -1334,9 +1362,24 @@
         "updateFailed": "无法更新屏蔽词。",
         "deleted": "屏蔽词已删除。",
         "deleteFailed": "无法删除屏蔽词。",
-        "confirmDelete": "确定删除 {{word}}？"
+        "confirmDelete": "确定删除 {{word}}？",
+        "import": "批量导入",
+        "importHint": "支持 TXT/CSV/TSV，每行一个屏蔽词；备注可写成：屏蔽词,备注。",
+        "importEmpty": "文件中没有可导入的屏蔽词。",
+        "imported": "已导入 {{created}} 个，跳过 {{skipped}} 个。",
+        "importFailed": "无法导入屏蔽词。"
+      },
+      "actionDescriptions": {
+        "dismiss": "确认无违规，关闭本次举报。",
+        "deleteContent": "从公开页面和回放中移除该内容。",
+        "warnUser": "向目标用户发送审核警告。",
+        "warnRoom": "向正在直播的直播间发送警告。",
+        "siteMute": "限制用户在全站发布互动内容。",
+        "banUser": "封禁账号的互动能力，并允许后续申诉。",
+        "forceEndLive": "立即结束违规直播间。"
       }
-    }
+    },
+    "refreshDone": "后台数据已刷新。"
   },
   "upload": {
     "description": "上传 JPG、PNG、WebP 或 GIF 图片，最大 5MB。",

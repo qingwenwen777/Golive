@@ -1228,12 +1228,12 @@
     "logs": {
       "aria": "操作ログ概要",
       "eyebrow": "ログ",
-      "title": "操作ログフレーム",
+      "title": "操作ログ",
       "kpis": {
         "today": "本日の操作",
         "permissions": "権限変更",
         "reviews": "審査記録",
-        "accounts": "アカウント操作"
+        "accounts": "システム操作"
       },
       "rows": {
         "reviews": "審査操作",
@@ -1242,6 +1242,31 @@
         "permissionsSub": "管理者、配信権限、禁止状態",
         "system": "システム操作",
         "systemSub": "設定変更、サービス再起動、ポリシー調整"
+      },
+      "tabs": {
+        "review": "審査操作",
+        "permission": "権限操作",
+        "system": "システム操作"
+      },
+      "loading": "ログを読み込み中...",
+      "empty": "この分類の操作記録はありません。",
+      "actor": "操作者",
+      "note": "メモ",
+      "noNote": "メモなし",
+      "noTarget": "対象記録なし",
+      "actions": {
+        "deleteContent": "コンテンツ削除",
+        "warnUser": "ユーザー警告",
+        "warnRoom": "配信ルーム警告",
+        "siteMute": "全体ミュート",
+        "banUser": "ユーザー停止",
+        "forceEndLive": "配信を強制終了",
+        "dismiss": "通報を却下",
+        "review": "対応中にする",
+        "blockedWordCreate": "ブロックワード追加",
+        "blockedWordUpdate": "ブロックワード更新",
+        "blockedWordDelete": "ブロックワード削除",
+        "blockedWordImport": "ブロックワード一括インポート"
       }
     },
     "exit": "管理画面を終了",
@@ -1304,7 +1329,10 @@
         "muteDuration": "ミュート時間",
         "confirmAction": "対応を確定",
         "updated": "通報ステータスを更新しました。",
-        "updateFailed": "通報を更新できませんでした。"
+        "updateFailed": "通報を更新できませんでした。",
+        "handledTitle": "対応済みの通報",
+        "handledBody": "終了した通報は再処理できません。新しい通報は新しい未対応項目になります。",
+        "alreadyHandled": "この通報はすでに処理済みです。"
       },
       "actions": {
         "review": "対応中にする",
@@ -1333,9 +1361,24 @@
         "updateFailed": "ブロックワードを更新できませんでした。",
         "deleted": "ブロックワードを削除しました。",
         "deleteFailed": "ブロックワードを削除できませんでした。",
-        "confirmDelete": "{{word}} を削除しますか？"
+        "confirmDelete": "{{word}} を削除しますか？",
+        "import": "一括インポート",
+        "importHint": "TXT/CSV/TSV 対応。1 行 1 ワード、メモは word,note 形式です。",
+        "importEmpty": "ファイル内に有効なブロックワードがありません。",
+        "imported": "{{created}} 件をインポートし、{{skipped}} 件をスキップしました。",
+        "importFailed": "ブロックワードをインポートできません。"
+      },
+      "actionDescriptions": {
+        "dismiss": "違反なしとしてこのケースを閉じます。",
+        "deleteContent": "公開画面とアーカイブからこの内容を削除します。",
+        "warnUser": "対象ユーザーへ審査警告を送信します。",
+        "warnRoom": "配信中のルームへ警告を送信します。",
+        "siteMute": "サイト全体での投稿やコメントを制限します。",
+        "banUser": "アカウントのインタラクション機能を停止し、後で異議申し立て可能にします。",
+        "forceEndLive": "違反しているライブ配信を直ちに終了します。"
       }
-    }
+    },
+    "refreshDone": "管理データを更新しました。"
   },
   "upload": {
     "description": "JPG、PNG、WebP、GIF 画像を最大 5MB までアップロードできます。",

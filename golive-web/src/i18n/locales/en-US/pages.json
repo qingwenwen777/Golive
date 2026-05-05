@@ -1228,12 +1228,12 @@
     "logs": {
       "aria": "Action logs summary",
       "eyebrow": "Logs",
-      "title": "Operation log framework",
+      "title": "Operation logs",
       "kpis": {
         "today": "Today actions",
         "permissions": "Permission changes",
         "reviews": "Review records",
-        "accounts": "Account actions"
+        "accounts": "System actions"
       },
       "rows": {
         "reviews": "Review actions",
@@ -1242,6 +1242,31 @@
         "permissionsSub": "Admins, creator permissions, and ban states",
         "system": "System actions",
         "systemSub": "Configuration changes, service restarts, and policy updates"
+      },
+      "tabs": {
+        "review": "Review actions",
+        "permission": "Permission actions",
+        "system": "System actions"
+      },
+      "loading": "Loading logs...",
+      "empty": "No operations in this category.",
+      "actor": "Actor",
+      "note": "Note",
+      "noNote": "No note",
+      "noTarget": "No target recorded",
+      "actions": {
+        "deleteContent": "Delete content",
+        "warnUser": "Warn user",
+        "warnRoom": "Warn live room",
+        "siteMute": "Site mute",
+        "banUser": "Ban user",
+        "forceEndLive": "Force end live",
+        "dismiss": "Dismiss report",
+        "review": "Mark reviewing",
+        "blockedWordCreate": "Add blocked word",
+        "blockedWordUpdate": "Update blocked word",
+        "blockedWordDelete": "Delete blocked word",
+        "blockedWordImport": "Import blocked words"
       }
     },
     "exit": "Exit admin",
@@ -1304,7 +1329,10 @@
         "muteDuration": "Mute duration",
         "confirmAction": "Confirm action",
         "updated": "Report status updated.",
-        "updateFailed": "Could not update report."
+        "updateFailed": "Could not update report.",
+        "handledTitle": "Handled report",
+        "handledBody": "Closed reports cannot be processed again. New reports create a new pending item.",
+        "alreadyHandled": "This report has already been handled."
       },
       "actions": {
         "review": "Mark reviewing",
@@ -1333,9 +1361,24 @@
         "updateFailed": "Could not update blocked word.",
         "deleted": "Blocked word deleted.",
         "deleteFailed": "Could not delete blocked word.",
-        "confirmDelete": "Delete blocked word {{word}}?"
+        "confirmDelete": "Delete blocked word {{word}}?",
+        "import": "Batch import",
+        "importHint": "TXT/CSV/TSV supported. One word per line; use word,note for remarks.",
+        "importEmpty": "No valid blocked words found in the file.",
+        "imported": "Imported {{created}} words, skipped {{skipped}}.",
+        "importFailed": "Could not import blocked words."
+      },
+      "actionDescriptions": {
+        "dismiss": "No violation found; close this case.",
+        "deleteContent": "Remove this content from public views and replays.",
+        "warnUser": "Send a moderation warning to the target user.",
+        "warnRoom": "Warn the active live room without ending it.",
+        "siteMute": "Restrict interactive posting across the site.",
+        "banUser": "Ban the account from interactive features and allow appeal later.",
+        "forceEndLive": "Immediately stop the violating live stream."
       }
-    }
+    },
+    "refreshDone": "Admin data refreshed."
   },
   "upload": {
     "description": "Upload a JPG, PNG, WebP, or GIF image up to 5MB.",

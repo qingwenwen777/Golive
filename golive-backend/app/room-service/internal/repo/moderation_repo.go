@@ -21,6 +21,7 @@ var ErrModeratorNotFound = errors.New("moderator not found")
 var (
 	ErrReportDuplicate     = errors.New("report duplicate within 24h")
 	ErrReportDailyLimit    = errors.New("daily report limit reached")
+	ErrReportAlreadyClosed = errors.New("report group already handled")
 	ErrBlockedWordExists   = errors.New("blocked word exists")
 	ErrBlockedWordNotFound = errors.New("blocked word not found")
 )
@@ -40,6 +41,7 @@ func (r *ModerationRepo) AutoMigrate() error {
 		&model.RoomMute{},
 		&model.ModeratorActionLog{},
 		&model.ContentReport{},
+		&model.AdminAuditLog{},
 		&model.UserModerationState{},
 		&model.UserSanctionLog{},
 		&model.UnbanAppeal{},
@@ -91,6 +93,7 @@ type ReportStats struct {
 
 type ReportGroupRow struct {
 	ID               string
+	GroupID          string
 	TargetType       string
 	TargetID         string
 	TargetURL        string
@@ -113,6 +116,29 @@ type ReportGroupRow struct {
 	UpdatedAt        time.Time
 	ReportCount      int64
 	RecentCount      int64
+}
+
+type AdminAuditLogRow struct {
+	ID             string
+	Category       string
+	Action         string
+	ActorID        string
+	ActorName      string
+	TargetType     string
+	TargetID       string
+	TargetTitle    string
+	TargetUserID   string
+	TargetUserName string
+	Note           string
+	Metadata       string
+	CreatedAt      time.Time
+}
+
+type AdminAuditStats struct {
+	Today      int64
+	Review     int64
+	Permission int64
+	System     int64
 }
 
 type UserRestriction struct {
@@ -431,8 +457,45 @@ func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.
 		if duplicate > 0 {
 			return ErrReportDuplicate
 		}
+		if strings.TrimSpace(report.GroupID) == "" {
+			groupID, err := r.openReportGroupID(ctx, tx, report.TargetType, report.TargetID)
+			if err != nil {
+				return err
+			}
+			if groupID == "" {
+				groupID = uuid.NewString()
+			}
+			report.GroupID = groupID
+		}
 		return tx.Create(report).Error
 	})
+}
+
+func (r *ModerationRepo) openReportGroupID(ctx context.Context, tx *gorm.DB, targetType, targetID string) (string, error) {
+	var existing model.ContentReport
+	err := tx.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
+			targetType, targetID, model.ReportStatusPending, model.ReportStatusReviewing).
+		Order("created_at DESC").
+		Limit(1).
+		Take(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	groupID := strings.TrimSpace(existing.GroupID)
+	if groupID == "" {
+		groupID = existing.ID
+		if err := tx.WithContext(ctx).Model(&model.ContentReport{}).
+			Where("target_type = ? AND target_id = ? AND group_id = '' AND (status = ? OR status = ?)",
+				targetType, targetID, model.ReportStatusPending, model.ReportStatusReviewing).
+			Update("group_id", groupID).Error; err != nil {
+			return "", err
+		}
+	}
+	return groupID, nil
 }
 
 func (r *ModerationRepo) ListContentReports(ctx context.Context, filter ReportListFilter) ([]model.ContentReport, int64, error) {
@@ -484,12 +547,13 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 	groups := make([]ReportGroupRow, 0, len(rows))
 	byKey := make(map[string]int, len(rows))
 	for _, row := range rows {
-		key := reportGroupKey(row.TargetType, row.TargetID)
+		key := reportGroupKey(row)
 		idx, ok := byKey[key]
 		if !ok {
 			byKey[key] = len(groups)
 			groups = append(groups, ReportGroupRow{
 				ID:               row.ID,
+				GroupID:          row.GroupID,
 				TargetType:       row.TargetType,
 				TargetID:         row.TargetID,
 				TargetURL:        row.TargetURL,
@@ -523,6 +587,7 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 		group.Status = mergeReportGroupStatus(group.Status, row.Status)
 		if row.CreatedAt.After(group.CreatedAt) {
 			group.ID = row.ID
+			group.GroupID = firstNonEmpty(row.GroupID, group.GroupID)
 			group.TargetURL = firstNonEmpty(row.TargetURL, group.TargetURL)
 			group.RoomID = firstNonEmpty(row.RoomID, group.RoomID)
 			group.ChannelID = firstNonEmpty(row.ChannelID, group.ChannelID)
@@ -572,12 +637,18 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 	return groups[start:end], total, stats, nil
 }
 
-func (r *ModerationRepo) ContentReportsForTarget(ctx context.Context, targetType, targetID string) ([]model.ContentReport, error) {
+func (r *ModerationRepo) ContentReportsForGroup(ctx context.Context, report model.ContentReport) ([]model.ContentReport, error) {
 	var rows []model.ContentReport
-	err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
-		Where("target_type = ? AND target_id = ?", targetType, targetID).
-		Order("created_at DESC").
-		Find(&rows).Error
+	q := r.db.WithContext(ctx).Model(&model.ContentReport{})
+	if report.GroupID != "" {
+		q = q.Where("group_id = ?", report.GroupID)
+	} else if report.Status == model.ReportStatusPending || report.Status == model.ReportStatusReviewing {
+		q = q.Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
+			report.TargetType, report.TargetID, model.ReportStatusPending, model.ReportStatusReviewing)
+	} else {
+		q = q.Where("id = ?", report.ID)
+	}
+	err := q.Order("created_at DESC").Find(&rows).Error
 	return rows, err
 }
 
@@ -623,8 +694,15 @@ func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, statu
 	if err != nil {
 		return nil, err
 	}
+	if report.Status == model.ReportStatusResolved || report.Status == model.ReportStatusDismissed {
+		return nil, ErrReportAlreadyClosed
+	}
+	if report.GroupID == "" {
+		report.GroupID = report.ID
+	}
 	updates := map[string]any{
 		"status":            status,
+		"group_id":          report.GroupID,
 		"reviewer_id":       reviewerID,
 		"resolution_action": action,
 		"duration_minutes":  durationMinutes,
@@ -636,10 +714,19 @@ func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, statu
 	} else {
 		updates["resolved_at"] = nil
 	}
-	if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
-		Where("target_type = ? AND target_id = ?", report.TargetType, report.TargetID).
-		Updates(updates).Error; err != nil {
-		return nil, err
+	q := r.db.WithContext(ctx).Model(&model.ContentReport{})
+	if report.GroupID != "" {
+		q = q.Where("group_id = ? AND (status = ? OR status = ?)", report.GroupID, model.ReportStatusPending, model.ReportStatusReviewing)
+	} else {
+		q = q.Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
+			report.TargetType, report.TargetID, model.ReportStatusPending, model.ReportStatusReviewing)
+	}
+	res := q.Updates(updates)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, ErrReportAlreadyClosed
 	}
 	return r.GetContentReport(ctx, id)
 }
@@ -793,6 +880,75 @@ func (r *ModerationRepo) CreateNotification(ctx context.Context, n model.Notific
 		return nil
 	}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&n).Error
+}
+
+func (r *ModerationRepo) CreateAdminAuditLog(ctx context.Context, log *model.AdminAuditLog) error {
+	if log == nil {
+		return nil
+	}
+	return r.db.WithContext(ctx).Create(log).Error
+}
+
+func (r *ModerationRepo) ListAdminAuditLogs(ctx context.Context, category string, page, size int, now time.Time) ([]AdminAuditLogRow, int64, AdminAuditStats, error) {
+	page, size = normalizeModerationPage(page, size)
+	q := r.db.WithContext(ctx).Model(&model.AdminAuditLog{})
+	if category := strings.TrimSpace(category); category != "" && category != "all" {
+		q = q.Where("category = ?", category)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, AdminAuditStats{}, err
+	}
+	var rows []AdminAuditLogRow
+	err := q.Select(`
+admin_audit_logs.id,
+admin_audit_logs.category,
+admin_audit_logs.action,
+admin_audit_logs.actor_id,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), admin_audit_logs.actor_id) AS actor_name,
+admin_audit_logs.target_type,
+admin_audit_logs.target_id,
+admin_audit_logs.target_title,
+admin_audit_logs.target_user_id,
+admin_audit_logs.target_user_name,
+admin_audit_logs.note,
+admin_audit_logs.metadata,
+admin_audit_logs.created_at
+`).
+		Joins("LEFT JOIN users AS u ON u.id = admin_audit_logs.actor_id").
+		Order("admin_audit_logs.created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, AdminAuditStats{}, err
+	}
+	stats, err := r.AdminAuditStats(ctx, now)
+	if err != nil {
+		return nil, 0, AdminAuditStats{}, err
+	}
+	return rows, total, stats, nil
+}
+
+func (r *ModerationRepo) AdminAuditStats(ctx context.Context, now time.Time) (AdminAuditStats, error) {
+	var stats AdminAuditStats
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if err := r.db.WithContext(ctx).Model(&model.AdminAuditLog{}).Where("created_at >= ?", dayStart).Count(&stats.Today).Error; err != nil {
+		return stats, err
+	}
+	for _, item := range []struct {
+		category string
+		out      *int64
+	}{
+		{model.AdminAuditCategoryReview, &stats.Review},
+		{model.AdminAuditCategoryPermission, &stats.Permission},
+		{model.AdminAuditCategorySystem, &stats.System},
+	} {
+		if err := r.db.WithContext(ctx).Model(&model.AdminAuditLog{}).Where("category = ?", item.category).Count(item.out).Error; err != nil {
+			return stats, err
+		}
+	}
+	return stats, nil
 }
 
 func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, targetName, operatorID, action, sourceReportID, note string, durationMinutes int, now time.Time) error {
@@ -1165,8 +1321,14 @@ func normalizeModerationPage(page, size int) (int, int) {
 	return page, size
 }
 
-func reportGroupKey(targetType, targetID string) string {
-	return strings.TrimSpace(targetType) + "\x00" + strings.TrimSpace(targetID)
+func reportGroupKey(row model.ContentReport) string {
+	if row.GroupID != "" {
+		return "group\x00" + row.GroupID
+	}
+	if row.Status == model.ReportStatusPending || row.Status == model.ReportStatusReviewing {
+		return "open\x00" + strings.TrimSpace(row.TargetType) + "\x00" + strings.TrimSpace(row.TargetID)
+	}
+	return "closed\x00" + row.ID
 }
 
 func mergeReportGroupStatus(current, next string) string {

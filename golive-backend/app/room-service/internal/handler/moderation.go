@@ -70,6 +70,16 @@ func (h *ModerationHandler) Logs(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *ModerationHandler) AdminAuditLogs(c *gin.Context) {
+	page, size := pageSize(c, 1, 20)
+	resp, err := h.svc.AdminAuditLogs(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), page, size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	var req service.CreateReportReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -154,6 +164,20 @@ func (h *ModerationHandler) CreateBlockedWord(c *gin.Context) {
 		return
 	}
 	resp, err := h.svc.CreateBlockedWord(c.Request.Context(), UserIDFromCtx(c), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) BulkImportBlockedWords(c *gin.Context) {
+	var req service.BulkImportBlockedWordsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	resp, err := h.svc.BulkImportBlockedWords(c.Request.Context(), UserIDFromCtx(c), req)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

@@ -48,6 +48,7 @@ export interface CreateReportPayload {
 
 export interface ContentReport {
   id: string;
+  groupId?: string;
   reporterId: string;
   reporterName: string;
   reporterAvatar?: string;
@@ -108,6 +109,49 @@ export interface BlockedWordListResp {
   total: number;
   page: number;
   size: number;
+}
+
+export interface BlockedWordImportItem {
+  word: string;
+  note?: string;
+}
+
+export interface BlockedWordImportResp {
+  created: number;
+  skipped: number;
+}
+
+export type AdminAuditCategory = 'all' | 'review' | 'permission' | 'system';
+
+export interface AdminAuditLog {
+  id: string;
+  category: AdminAuditCategory | string;
+  action: string;
+  actorId: string;
+  actorName: string;
+  targetType?: string;
+  targetId?: string;
+  targetTitle?: string;
+  targetUserId?: string;
+  targetUserName?: string;
+  note?: string;
+  metadata?: string;
+  createdAt: string;
+}
+
+export interface AdminAuditStats {
+  today: number;
+  review: number;
+  permission: number;
+  system: number;
+}
+
+export interface AdminAuditLogListResp {
+  items: AdminAuditLog[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AdminAuditStats;
 }
 
 export function useSubmitReport() {
@@ -171,6 +215,7 @@ export function useUpdateAdminReport() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-reports'] });
       void qc.invalidateQueries({ queryKey: ['admin-report-detail'] });
+      void qc.invalidateQueries({ queryKey: ['admin-audit-logs'] });
     },
   });
 }
@@ -217,6 +262,24 @@ export function useCreateBlockedWord() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-blocked-words'] });
+      void qc.invalidateQueries({ queryKey: ['admin-audit-logs'] });
+    },
+  });
+}
+
+export function useImportBlockedWords() {
+  const qc = useQueryClient();
+  return useMutation<BlockedWordImportResp, Error, { items: BlockedWordImportItem[] }>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<BlockedWordImportResp>(
+        '/rooms/admin/blocked-words/import',
+        payload,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-blocked-words'] });
+      void qc.invalidateQueries({ queryKey: ['admin-audit-logs'] });
     },
   });
 }
@@ -237,6 +300,7 @@ export function useUpdateBlockedWord() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-blocked-words'] });
+      void qc.invalidateQueries({ queryKey: ['admin-audit-logs'] });
     },
   });
 }
@@ -252,7 +316,24 @@ export function useDeleteBlockedWord() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-blocked-words'] });
+      void qc.invalidateQueries({ queryKey: ['admin-audit-logs'] });
     },
+  });
+}
+
+export function useAdminAuditLogs(category: AdminAuditCategory = 'review', page = 1, size = 20) {
+  return useQuery<AdminAuditLogListResp, Error>({
+    queryKey: ['admin-audit-logs', category, page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminAuditLogListResp>('/rooms/admin/audit-logs', {
+        params: { category, page, size },
+        signal,
+      });
+      return data;
+    },
+    staleTime: 10_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
   });
 }
 

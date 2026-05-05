@@ -195,6 +195,7 @@ type UpdateReportReq struct {
 
 type ContentReportDTO struct {
 	ID               string             `json:"id"`
+	GroupID          string             `json:"groupId,omitempty"`
 	ReporterID       string             `json:"reporterId"`
 	ReporterName     string             `json:"reporterName"`
 	ReporterAvatar   string             `json:"reporterAvatar,omitempty"`
@@ -245,6 +246,20 @@ type CreateBlockedWordReq struct {
 	Enabled *bool  `json:"enabled"`
 }
 
+type BulkBlockedWordItem struct {
+	Word string `json:"word"`
+	Note string `json:"note"`
+}
+
+type BulkImportBlockedWordsReq struct {
+	Items []BulkBlockedWordItem `json:"items"`
+}
+
+type BulkImportBlockedWordsResp struct {
+	Created int `json:"created"`
+	Skipped int `json:"skipped"`
+}
+
 type UpdateBlockedWordReq struct {
 	Word    *string `json:"word"`
 	Note    *string `json:"note"`
@@ -267,6 +282,37 @@ type BlockedWordListResp struct {
 	Total int64            `json:"total"`
 	Page  int              `json:"page"`
 	Size  int              `json:"size"`
+}
+
+type AdminAuditLogDTO struct {
+	ID             string `json:"id"`
+	Category       string `json:"category"`
+	Action         string `json:"action"`
+	ActorID        string `json:"actorId"`
+	ActorName      string `json:"actorName"`
+	TargetType     string `json:"targetType,omitempty"`
+	TargetID       string `json:"targetId,omitempty"`
+	TargetTitle    string `json:"targetTitle,omitempty"`
+	TargetUserID   string `json:"targetUserId,omitempty"`
+	TargetUserName string `json:"targetUserName,omitempty"`
+	Note           string `json:"note,omitempty"`
+	Metadata       string `json:"metadata,omitempty"`
+	CreatedAt      string `json:"createdAt"`
+}
+
+type AdminAuditStatsDTO struct {
+	Today      int64 `json:"today"`
+	Review     int64 `json:"review"`
+	Permission int64 `json:"permission"`
+	System     int64 `json:"system"`
+}
+
+type AdminAuditLogListResp struct {
+	Items []AdminAuditLogDTO `json:"items"`
+	Total int64              `json:"total"`
+	Page  int                `json:"page"`
+	Size  int                `json:"size"`
+	Stats AdminAuditStatsDTO `json:"stats"`
 }
 
 type CreateUnbanAppealReq struct {
@@ -372,6 +418,46 @@ func (s *ModerationService) Logs(ctx context.Context, ownerID string, page, size
 	return &ModerationLogListResp{Items: items, Total: total, Page: normalizePage(page), Size: normalizeSize(size)}, nil
 }
 
+func (s *ModerationService) AdminAuditLogs(ctx context.Context, adminID, category string, page, size int) (*AdminAuditLogListResp, error) {
+	if err := s.requireAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
+	rows, total, stats, err := s.moderation.ListAdminAuditLogs(ctx, category, page, size, s.now())
+	if err != nil {
+		return nil, err
+	}
+	items := make([]AdminAuditLogDTO, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, AdminAuditLogDTO{
+			ID:             row.ID,
+			Category:       row.Category,
+			Action:         row.Action,
+			ActorID:        row.ActorID,
+			ActorName:      row.ActorName,
+			TargetType:     row.TargetType,
+			TargetID:       row.TargetID,
+			TargetTitle:    row.TargetTitle,
+			TargetUserID:   row.TargetUserID,
+			TargetUserName: row.TargetUserName,
+			Note:           row.Note,
+			Metadata:       row.Metadata,
+			CreatedAt:      row.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	return &AdminAuditLogListResp{
+		Items: items,
+		Total: total,
+		Page:  normalizePage(page),
+		Size:  normalizeSize(size),
+		Stats: AdminAuditStatsDTO{
+			Today:      stats.Today,
+			Review:     stats.Review,
+			Permission: stats.Permission,
+			System:     stats.System,
+		},
+	}, nil
+}
+
 func (s *ModerationService) CreateReport(ctx context.Context, reporterID string, req CreateReportReq) (*ContentReportDTO, error) {
 	if reporterID == "" {
 		return nil, errcode.ErrUnauthorized
@@ -465,7 +551,7 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 	if err != nil {
 		return nil, err
 	}
-	children, err := s.moderation.ContentReportsForTarget(ctx, report.TargetType, report.TargetID)
+	children, err := s.moderation.ContentReportsForGroup(ctx, *report)
 	if err != nil {
 		return nil, err
 	}
@@ -486,6 +572,9 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	}
 	if err != nil {
 		return nil, err
+	}
+	if base.Status == model.ReportStatusResolved || base.Status == model.ReportStatusDismissed {
+		return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
 	}
 	action := strings.ToLower(strings.TrimSpace(req.Action))
 	status := strings.ToLower(strings.TrimSpace(req.Status))
@@ -514,9 +603,13 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
 	}
+	if errors.Is(err, repo.ErrReportAlreadyClosed) {
+		return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
+	}
 	if err != nil {
 		return nil, err
 	}
+	_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, action, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
 	dto := contentReportDTO(*report)
 	return &dto, nil
 }
@@ -621,6 +714,7 @@ func (s *ModerationService) CreateBlockedWord(ctx context.Context, adminID strin
 		}
 		return nil, err
 	}
+	_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, "blocked_word_create", adminID, "blocked_word", row.ID, row.Word, "", "", row.Note, now)
 	dto := blockedWordDTO(*row)
 	return &dto, nil
 }
@@ -658,6 +752,7 @@ func (s *ModerationService) UpdateBlockedWord(ctx context.Context, adminID, id s
 			return nil, err
 		}
 	}
+	_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, "blocked_word_update", adminID, "blocked_word", row.ID, row.Word, "", "", row.Note, s.now())
 	dto := blockedWordDTO(*row)
 	return &dto, nil
 }
@@ -672,7 +767,52 @@ func (s *ModerationService) DeleteBlockedWord(ctx context.Context, adminID, id s
 		}
 		return err
 	}
+	_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, "blocked_word_delete", adminID, "blocked_word", strings.TrimSpace(id), "", "", "", "", s.now())
 	return nil
+}
+
+func (s *ModerationService) BulkImportBlockedWords(ctx context.Context, adminID string, req BulkImportBlockedWordsReq) (*BulkImportBlockedWordsResp, error) {
+	if err := s.requireAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
+	if len(req.Items) == 0 {
+		return nil, errcode.New(http.StatusBadRequest, "no blocked words").WithReason("empty_import")
+	}
+	if len(req.Items) > 500 {
+		return nil, errcode.New(http.StatusBadRequest, "too many blocked words").WithReason("too_many_items")
+	}
+	now := s.now()
+	created := 0
+	skipped := 0
+	for _, item := range req.Items {
+		word := trimRunes(strings.TrimSpace(item.Word), 60)
+		normalized := contentpolicy.NormalizeWord(word)
+		if normalized == "" {
+			skipped++
+			continue
+		}
+		row := &model.BlockedWord{
+			ID:             uuid.NewString(),
+			Word:           word,
+			NormalizedWord: normalized,
+			Note:           trimRunes(strings.TrimSpace(item.Note), 120),
+			Enabled:        true,
+			CreatedBy:      adminID,
+			UpdatedBy:      adminID,
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		if err := s.moderation.CreateBlockedWord(ctx, row); err != nil {
+			if errors.Is(err, repo.ErrBlockedWordExists) {
+				skipped++
+				continue
+			}
+			return nil, err
+		}
+		created++
+	}
+	_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, "blocked_word_import", adminID, "blocked_word", "", "blocked words", "", "", "", now)
+	return &BulkImportBlockedWordsResp{Created: created, Skipped: skipped}, nil
 }
 
 func (s *ModerationService) EnsureTextAllowed(ctx context.Context, texts ...string) error {
@@ -990,6 +1130,7 @@ func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
 	for _, row := range rows {
 		out = append(out, ContentReportDTO{
 			ID:               row.ID,
+			GroupID:          row.GroupID,
 			TargetType:       row.TargetType,
 			TargetID:         row.TargetID,
 			TargetURL:        row.TargetURL,
@@ -1022,6 +1163,7 @@ func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
 func contentReportDTO(row model.ContentReport) ContentReportDTO {
 	dto := ContentReportDTO{
 		ID:               row.ID,
+		GroupID:          row.GroupID,
 		ReporterID:       row.ReporterID,
 		ReporterName:     row.ReporterName,
 		ReporterAvatar:   row.ReporterAvatar,
@@ -1161,6 +1303,25 @@ func (s *ModerationService) notifyModeration(ctx context.Context, userID, kind, 
 		ActorID:   adminID,
 		ActorName: "GoLive Admin",
 		CreatedAt: now,
+	})
+}
+
+func (s *ModerationService) logAdminAudit(ctx context.Context, category, action, actorID, targetType, targetID, targetTitle, targetUserID, targetUserName, note string, now time.Time) error {
+	if strings.TrimSpace(actorID) == "" {
+		return nil
+	}
+	return s.moderation.CreateAdminAuditLog(ctx, &model.AdminAuditLog{
+		ID:             uuid.NewString(),
+		Category:       category,
+		Action:         action,
+		ActorID:        actorID,
+		TargetType:     trimRunes(strings.TrimSpace(targetType), 32),
+		TargetID:       trimRunes(strings.TrimSpace(targetID), 128),
+		TargetTitle:    trimRunes(strings.TrimSpace(targetTitle), 240),
+		TargetUserID:   trimRunes(strings.TrimSpace(targetUserID), 36),
+		TargetUserName: trimRunes(strings.TrimSpace(targetUserName), 128),
+		Note:           trimRunes(strings.TrimSpace(note), 1000),
+		CreatedAt:      now,
 	})
 }
 

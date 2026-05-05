@@ -43,6 +43,10 @@ CREATE TABLE users (
 		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		"user-1", "reporter", "Reporter", "", false, "user", now,
 	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"user-2", "reporter2", "Reporter Two", "", false, "user", now,
+	).Error)
 
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -85,6 +89,57 @@ func TestModerationReportsDeduplicateAndLimit(t *testing.T) {
 	require.Equal(t, "report_daily_limit", appErr.Reason)
 }
 
+func TestHandledReportCannotBeProcessedAgainAndNewReportsCreateNewGroup(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	req := CreateReportReq{
+		TargetType:     "danmu",
+		TargetID:       "danmu-1",
+		RoomID:         "room-1",
+		TargetUserID:   "bad-user",
+		TargetUserName: "Bad User",
+		Reason:         "harassment",
+		TargetText:     "bad message",
+	}
+	first, err := svc.CreateReport(ctx, "user-1", req)
+	require.NoError(t, err)
+	second, err := svc.CreateReport(ctx, "user-2", req)
+	require.NoError(t, err)
+	require.Equal(t, first.GroupID, second.GroupID)
+
+	list, err := svc.ListReports(ctx, "admin-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	require.Equal(t, int64(2), list.Items[0].ReportCount)
+
+	_, err = svc.UpdateReport(ctx, "admin-1", first.ID, UpdateReportReq{Action: "dismiss", Note: "not a violation"})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "admin-1", first.ID, UpdateReportReq{Action: "dismiss"})
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr))
+	require.Equal(t, http.StatusConflict, appErr.HTTPStatus)
+	require.Equal(t, "report_already_handled", appErr.Reason)
+
+	logs, err := svc.AdminAuditLogs(ctx, "admin-1", "review", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, logs.Items, 1)
+	require.Equal(t, "dismiss", logs.Items[0].Action)
+
+	now = now.Add(25 * time.Hour)
+	third, err := svc.CreateReport(ctx, "user-1", req)
+	require.NoError(t, err)
+	require.NotEqual(t, first.GroupID, third.GroupID)
+
+	list, err = svc.ListReports(ctx, "admin-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 2)
+	require.Equal(t, int64(2), list.Stats.Total)
+	require.Equal(t, int64(1), list.Stats.Pending)
+}
+
 func TestBlockedWordsRejectTextAndSyncRedis(t *testing.T) {
 	ctx := context.Background()
 	svc, rdb := newModerationFixture(t)
@@ -101,6 +156,17 @@ func TestBlockedWordsRejectTextAndSyncRedis(t *testing.T) {
 	_, err = svc.UpdateBlockedWord(ctx, "admin-1", word.ID, UpdateBlockedWordReq{Enabled: boolPtr(false)})
 	require.NoError(t, err)
 	require.NoError(t, svc.EnsureTextAllowed(ctx, "hello bad word"))
+
+	importResp, err := svc.BulkImportBlockedWords(ctx, "admin-1", BulkImportBlockedWordsReq{
+		Items: []BulkBlockedWordItem{
+			{Word: "Spam", Note: "ads"},
+			{Word: "Bad Word", Note: "duplicate"},
+			{Word: ""},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, importResp.Created)
+	require.Equal(t, 2, importResp.Skipped)
 }
 
 func boolPtr(v bool) *bool { return &v }

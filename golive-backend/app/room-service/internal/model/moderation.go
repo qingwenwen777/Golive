@@ -40,6 +40,10 @@ const (
 	ReportActionBanUser       = "ban_user"
 	ReportActionForceEndLive  = "force_end_live"
 
+	AdminAuditCategoryReview     = "review"
+	AdminAuditCategoryPermission = "permission"
+	AdminAuditCategorySystem     = "system"
+
 	UserSanctionWarn     = "warn"
 	UserSanctionSiteMute = "site_mute"
 	UserSanctionBan      = "ban"
@@ -98,6 +102,7 @@ func (ModeratorActionLog) TableName() string { return "moderator_action_logs" }
 
 type ContentReport struct {
 	ID               string `gorm:"primaryKey;type:varchar(64)"`
+	GroupID          string `gorm:"type:varchar(64);not null;default:'';index"`
 	ReporterID       string `gorm:"type:varchar(36);not null;index:idx_content_reports_reporter_created"`
 	ReporterName     string `gorm:"type:varchar(128)"`
 	ReporterAvatar   string `gorm:"type:varchar(500)"`
@@ -125,6 +130,23 @@ type ContentReport struct {
 }
 
 func (ContentReport) TableName() string { return "content_reports" }
+
+type AdminAuditLog struct {
+	ID             string    `gorm:"primaryKey;type:varchar(64)"`
+	Category       string    `gorm:"type:varchar(32);not null;index"`
+	Action         string    `gorm:"type:varchar(64);not null;index"`
+	ActorID        string    `gorm:"type:varchar(36);not null;index"`
+	TargetType     string    `gorm:"type:varchar(32);index"`
+	TargetID       string    `gorm:"type:varchar(128);index"`
+	TargetTitle    string    `gorm:"type:varchar(240)"`
+	TargetUserID   string    `gorm:"type:varchar(36);index"`
+	TargetUserName string    `gorm:"type:varchar(128)"`
+	Note           string    `gorm:"type:text"`
+	Metadata       string    `gorm:"type:text"`
+	CreatedAt      time.Time `gorm:"index"`
+}
+
+func (AdminAuditLog) TableName() string { return "admin_audit_logs" }
 
 type UserModerationState struct {
 	UserID     string     `gorm:"primaryKey;type:varchar(36)"`
