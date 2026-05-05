@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import {
   BarChart3,
   CheckCircle2,
@@ -164,12 +164,10 @@ export function CreatorStudioShell() {
   const hydrated = useAuthHydrated();
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
-  const location = useLocation();
   const { user, me } = useStudioUser();
   const apply = useSubmitCreatorApplication();
   const status = user?.livePermissionStatus ?? 'none';
   const approved = status === 'approved';
-  const overviewRoute = location.pathname === '/studio' || location.pathname === '/studio/overview';
 
   if (!hydrated || (isAuthed && me.isPending && !user)) {
     return <StudioLoading label={t('studio.loading', { defaultValue: 'Loading studio...' })} />;
@@ -190,7 +188,7 @@ export function CreatorStudioShell() {
     );
   }
 
-  if (!approved && !overviewRoute) {
+  if (!approved) {
     return (
       <StudioPermissionPage
         status={status}

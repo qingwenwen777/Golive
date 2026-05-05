@@ -33,6 +33,11 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
   const activeLiveId = useActiveCreatorLiveId(me.data?.id);
   const isStudioActive = active.startsWith('studio');
   const canShowStudioSubnav = me.data?.livePermissionStatus === 'approved';
+  const studioRoute = canShowStudioSubnav
+    ? activeLiveId
+      ? `/studio/live/${activeLiveId}`
+      : '/studio/overview'
+    : '/studio/prepare';
   const [studioSubnavOpen, setStudioSubnavOpen] = useState(() => isStudioActive);
   const wasStudioActiveRef = useRef(isStudioActive);
   const wasCollapsedRef = useRef(collapsed);
@@ -82,7 +87,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
       icon: Icons.Live,
       label: t('nav.creatorStudio', { defaultValue: 'Creator Studio' }),
       chev: canShowStudioSubnav,
-      route: activeLiveId ? `/studio/live/${activeLiveId}` : '/studio/overview',
+      route: studioRoute,
     },
   ];
 
