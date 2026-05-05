@@ -5653,11 +5653,13 @@ input:focus-visible,
   padding: 14px 16px;
 }
 .gl-admin-content-filters label,
+.gl-admin-filter-select,
 .gl-admin-resolution-note,
 .gl-admin-word-form {
   min-width: 0;
 }
 .gl-admin-content-filters label,
+.gl-admin-filter-select,
 .gl-admin-resolution-note {
   display: flex;
   flex-direction: column;
@@ -5696,6 +5698,80 @@ input:focus-visible,
 .gl-admin-word-row input:focus,
 .gl-admin-resolution-note textarea:focus {
   border-color: var(--gl-text);
+}
+.gl-admin-filter-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  height: 42px;
+  min-width: 0;
+  gap: 10px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  outline: none;
+  padding: 0 12px;
+  text-align: left;
+}
+.gl-admin-filter-trigger:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-admin-filter-trigger:focus-visible,
+.gl-admin-filter-trigger[data-state='open'] {
+  border-color: var(--gl-text);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.04);
+}
+.gl-admin-filter-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-filter-trigger svg {
+  color: var(--gl-text-2);
+}
+.gl-admin-filter-menu {
+  width: var(--radix-dropdown-menu-trigger-width);
+  min-width: 180px;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  padding: 6px;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.14);
+}
+.gl-admin-filter-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  min-height: 36px;
+  border-radius: 8px;
+  color: var(--gl-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 10px;
+}
+.gl-admin-filter-option:hover,
+.gl-admin-filter-option:focus,
+.gl-admin-filter-option[data-highlighted],
+.gl-admin-filter-option.is-active {
+  background: var(--gl-bg-hover);
+}
+.gl-admin-filter-option.is-active {
+  color: var(--gl-text);
+}
+.gl-admin-filter-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-filter-option svg {
+  color: #15803d;
 }
 .gl-admin-content-search > div {
   display: grid;

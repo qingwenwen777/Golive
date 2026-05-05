@@ -5,6 +5,7 @@ import { Link, Navigate, NavLink, useLocation, useNavigate } from 'react-router-
 import {
   Ban,
   Check,
+  ChevronDown,
   Clipboard,
   Coins,
   Eye,
@@ -60,6 +61,12 @@ import {
 import { Avatar } from '@/components/Avatar';
 import { GoLiveLogo } from '@/components/Logo';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 type AdminModule = 'dashboard' | 'users' | 'creators' | 'content' | 'economy' | 'system' | 'logs';
@@ -904,48 +911,45 @@ function ContentPage() {
           </div>
         </div>
         <div className="gl-admin-content-filters">
-          <label>
-            <span>{t('admin.content.filters.status', { defaultValue: 'Status' })}</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              {['all', 'pending', 'reviewing', 'resolved', 'dismissed'].map((value) => (
-                <option key={value} value={value}>
-                  {reportStatusLabel(value, t)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>{t('admin.content.filters.target', { defaultValue: 'Target' })}</span>
-            <select value={targetType} onChange={(event) => setTargetType(event.target.value)}>
-              {['all', 'room', 'channel', 'danmu', 'post', 'post_comment', 'super_chat'].map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {reportTargetLabel(value, t)}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
-          <label>
-            <span>{t('admin.content.filters.reason', { defaultValue: 'Reason' })}</span>
-            <select value={reason} onChange={(event) => setReason(event.target.value)}>
-              {[
-                'all',
-                'spam',
-                'harassment',
-                'sexual',
-                'violence',
-                'hate',
-                'scam',
-                'illegal',
-                'other',
-              ].map((value) => (
-                <option key={value} value={value}>
-                  {reportReasonLabel(value, t)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AdminFilterSelect
+            label={t('admin.content.filters.status', { defaultValue: 'Status' })}
+            value={status}
+            options={['all', 'pending', 'reviewing', 'resolved', 'dismissed'].map((value) => ({
+              value,
+              label: reportStatusLabel(value, t),
+            }))}
+            onChange={setStatus}
+          />
+          <AdminFilterSelect
+            label={t('admin.content.filters.target', { defaultValue: 'Target' })}
+            value={targetType}
+            options={['all', 'room', 'channel', 'danmu', 'post', 'post_comment', 'super_chat'].map(
+              (value) => ({
+                value,
+                label: reportTargetLabel(value, t),
+              }),
+            )}
+            onChange={setTargetType}
+          />
+          <AdminFilterSelect
+            label={t('admin.content.filters.reason', { defaultValue: 'Reason' })}
+            value={reason}
+            options={[
+              'all',
+              'spam',
+              'harassment',
+              'sexual',
+              'violence',
+              'hate',
+              'scam',
+              'illegal',
+              'other',
+            ].map((value) => ({
+              value,
+              label: reportReasonLabel(value, t),
+            }))}
+            onChange={setReason}
+          />
           <label className="gl-admin-content-search">
             <span>{t('admin.content.filters.search', { defaultValue: 'Search' })}</span>
             <div>
@@ -1390,6 +1394,49 @@ function ContentPage() {
 
 function AdminEmptyState({ label }: { label: string }) {
   return <div className="gl-admin-empty-state">{label}</div>;
+}
+
+function AdminFilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  const selected = options.find((option) => option.value === value) ?? options[0];
+  return (
+    <div className="gl-admin-filter-select">
+      <span>{label}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="gl-admin-filter-trigger">
+            <span>{selected?.label ?? value}</span>
+            <ChevronDown size={15} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="gl-admin-filter-menu" sideOffset={6}>
+          {options.map((option) => (
+            <DropdownMenuItem
+              key={option.value}
+              className={
+                option.value === value
+                  ? 'gl-admin-filter-option is-active'
+                  : 'gl-admin-filter-option'
+              }
+              onSelect={() => onChange(option.value)}
+            >
+              <span>{option.label}</span>
+              {option.value === value && <Check size={14} />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 function reportStatusLabel(value: string, t: Translate) {
