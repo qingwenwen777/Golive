@@ -5896,8 +5896,10 @@ input:focus-visible,
 }
 .gl-admin-report-modal {
   display: flex;
-  max-height: min(86vh, 760px);
+  height: min(86vh, 760px);
+  max-height: calc(100vh - 32px);
   flex-direction: column;
+  overflow: hidden;
   background: var(--gl-bg-card);
 }
 .gl-admin-report-modal-head {
@@ -5935,7 +5937,9 @@ input:focus-visible,
 }
 .gl-admin-report-modal-grid {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 1fr) 310px;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -5951,10 +5955,12 @@ input:focus-visible,
 .gl-admin-report-modal-side {
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   gap: 12px;
   border-left: 1px solid var(--gl-border);
   background: var(--gl-bg);
+  overflow-y: auto;
   padding: 18px;
 }
 .gl-admin-report-snapshot.is-modal {
@@ -6228,19 +6234,22 @@ input:focus-visible,
   font-size: 12px;
   font-weight: 700;
 }
-.gl-admin-word-status {
+.gl-admin-word-row .gl-admin-word-status {
   display: inline-flex;
   width: fit-content;
   height: 26px;
   align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: var(--gl-bg-hover);
   color: var(--gl-text-2);
   font-size: 12px;
   font-weight: 900;
+  line-height: 1;
+  margin-top: 0;
   padding: 0 10px;
 }
-.gl-admin-word-status.is-on {
+.gl-admin-word-row .gl-admin-word-status.is-on {
   background: rgba(22, 163, 74, 0.1);
   color: #15803d;
 }
@@ -6248,6 +6257,10 @@ input:focus-visible,
   .gl-admin-content-filters,
   .gl-admin-report-modal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .gl-admin-report-modal-grid {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .gl-admin-report-list {
@@ -6277,7 +6290,7 @@ input:focus-visible,
 
   .gl-admin-report-modal-head {
     flex-direction: column;
-    padding: 18px;
+    padding: 18px 64px 18px 18px;
   }
 
   .gl-admin-report-modal-head h2 {
