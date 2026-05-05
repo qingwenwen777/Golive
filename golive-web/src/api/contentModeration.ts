@@ -201,14 +201,15 @@ export function useUpdateAdminReport() {
       id: string;
       status?: ReportStatus;
       action?: ReportAction;
+      actions?: ReportAction[];
       note?: string;
       durationMinutes?: number;
     }
   >({
-    mutationFn: async ({ id, status, action, note, durationMinutes }) => {
+    mutationFn: async ({ id, status, action, actions, note, durationMinutes }) => {
       const { data } = await http.patch<ContentReport>(
         `/rooms/admin/reports/${encodeURIComponent(id)}`,
-        { status, action, note, durationMinutes },
+        { status, action, actions, note, durationMinutes },
       );
       return data;
     },

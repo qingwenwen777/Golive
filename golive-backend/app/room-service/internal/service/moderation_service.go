@@ -187,10 +187,11 @@ type CreateReportReq struct {
 }
 
 type UpdateReportReq struct {
-	Status          string `json:"status"`
-	Action          string `json:"action"`
-	Note            string `json:"note"`
-	DurationMinutes int    `json:"durationMinutes"`
+	Status          string   `json:"status"`
+	Action          string   `json:"action"`
+	Actions         []string `json:"actions"`
+	Note            string   `json:"note"`
+	DurationMinutes int      `json:"durationMinutes"`
 }
 
 type ContentReportDTO struct {
@@ -576,30 +577,31 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if base.Status == model.ReportStatusResolved || base.Status == model.ReportStatusDismissed {
 		return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
 	}
-	action := strings.ToLower(strings.TrimSpace(req.Action))
 	status := strings.ToLower(strings.TrimSpace(req.Status))
-	if action != "" {
-		if _, ok := allowedReportActions[action]; !ok {
-			return nil, errcode.New(http.StatusBadRequest, "invalid report action").WithReason("invalid_action")
-		}
-		status = statusForReportAction(action)
+	actions, err := normalizeReportActions(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(actions) > 0 {
+		status = statusForReportActions(actions)
 	} else {
 		if _, ok := allowedReportStatuses[status]; !ok {
 			return nil, errcode.New(http.StatusBadRequest, "invalid report status").WithReason("invalid_status")
 		}
 		if status == model.ReportStatusReviewing {
-			action = model.ReportActionReview
+			actions = []string{model.ReportActionReview}
 		} else if status == model.ReportStatusDismissed {
-			action = model.ReportActionDismiss
+			actions = []string{model.ReportActionDismiss}
 		}
 	}
-	duration := normalizeSanctionDuration(action, req.DurationMinutes)
+	duration := normalizeSanctionDuration(actions, req.DurationMinutes)
 	note := trimRunes(strings.TrimSpace(req.Note), 1000)
-	if err := s.applyReportAction(ctx, adminID, base, action, note, duration); err != nil {
+	if err := s.applyReportActions(ctx, adminID, base, actions, note, duration); err != nil {
 		return nil, err
 	}
 	now := s.now()
-	report, err := s.moderation.UpdateContentReportGroup(ctx, strings.TrimSpace(id), status, action, adminID, note, duration, now)
+	resolutionAction := strings.Join(actions, ",")
+	report, err := s.moderation.UpdateContentReportGroup(ctx, strings.TrimSpace(id), status, resolutionAction, adminID, note, duration, now)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
 	}
@@ -609,9 +611,61 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if err != nil {
 		return nil, err
 	}
-	_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, action, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
+	if len(actions) == 0 {
+		_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, status, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
+	} else {
+		for _, action := range actions {
+			_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, action, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
+		}
+	}
 	dto := contentReportDTO(*report)
 	return &dto, nil
+}
+
+func normalizeReportActions(req UpdateReportReq) ([]string, error) {
+	raw := req.Actions
+	if len(raw) == 0 && strings.TrimSpace(req.Action) != "" {
+		raw = []string{req.Action}
+	}
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	seen := make(map[string]struct{}, len(raw))
+	actions := make([]string, 0, len(raw))
+	for _, item := range raw {
+		action := strings.ToLower(strings.TrimSpace(item))
+		if action == "" {
+			continue
+		}
+		if _, ok := allowedReportActions[action]; !ok {
+			return nil, errcode.New(http.StatusBadRequest, "invalid report action").WithReason("invalid_action")
+		}
+		if _, ok := seen[action]; ok {
+			continue
+		}
+		seen[action] = struct{}{}
+		actions = append(actions, action)
+	}
+	if len(actions) == 0 {
+		return nil, nil
+	}
+	if len(actions) > 1 {
+		for _, action := range actions {
+			if action == model.ReportActionDismiss || action == model.ReportActionReview {
+				return nil, errcode.New(http.StatusBadRequest, "exclusive report action").WithReason("exclusive_action")
+			}
+		}
+	}
+	return actions, nil
+}
+
+func (s *ModerationService) applyReportActions(ctx context.Context, adminID string, report *model.ContentReport, actions []string, note string, durationMinutes int) error {
+	for _, action := range actions {
+		if err := s.applyReportAction(ctx, adminID, report, action, note, durationMinutes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *ModerationService) applyReportAction(ctx context.Context, adminID string, report *model.ContentReport, action, note string, durationMinutes int) error {
@@ -1232,6 +1286,21 @@ func normalizeSize(size int) int {
 	return size
 }
 
+func statusForReportActions(actions []string) string {
+	if len(actions) == 0 {
+		return model.ReportStatusReviewing
+	}
+	if len(actions) == 1 {
+		switch actions[0] {
+		case model.ReportActionReview:
+			return model.ReportStatusReviewing
+		case model.ReportActionDismiss:
+			return model.ReportStatusDismissed
+		}
+	}
+	return model.ReportStatusResolved
+}
+
 func statusForReportAction(action string) string {
 	switch action {
 	case model.ReportActionReview:
@@ -1243,8 +1312,15 @@ func statusForReportAction(action string) string {
 	}
 }
 
-func normalizeSanctionDuration(action string, minutes int) int {
-	if action != model.ReportActionSiteMute {
+func normalizeSanctionDuration(actions []string, minutes int) int {
+	hasSiteMute := false
+	for _, action := range actions {
+		if action == model.ReportActionSiteMute {
+			hasSiteMute = true
+			break
+		}
+	}
+	if !hasSiteMute {
 		return 0
 	}
 	if _, ok := allowedSiteMuteDurations[minutes]; ok {

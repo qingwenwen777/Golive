@@ -140,6 +140,48 @@ func TestHandledReportCannotBeProcessedAgainAndNewReportsCreateNewGroup(t *testi
 	require.Equal(t, int64(1), list.Stats.Pending)
 }
 
+func TestReportCanApplyMultipleActionsAndDismissIsExclusive(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newModerationFixture(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{
+		TargetType:     "danmu",
+		TargetID:       "danmu-multi",
+		RoomID:         "room-1",
+		TargetUserID:   "bad-user",
+		TargetUserName: "Bad User",
+		Reason:         "harassment",
+		TargetText:     "bad message",
+	})
+	require.NoError(t, err)
+
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{
+		Actions: []string{"delete_content", "dismiss"},
+		Note:    "mixed action should fail",
+	})
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr))
+	require.Equal(t, http.StatusBadRequest, appErr.HTTPStatus)
+	require.Equal(t, "exclusive_action", appErr.Reason)
+
+	updated, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{
+		Actions:         []string{"delete_content", "site_mute"},
+		DurationMinutes: 120,
+		Note:            "remove and mute",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "resolved", updated.Status)
+	require.Equal(t, "delete_content,site_mute", updated.ResolutionAction)
+	require.Equal(t, 120, updated.DurationMinutes)
+
+	logs, err := svc.AdminAuditLogs(ctx, "admin-1", "review", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, logs.Items, 2)
+	actions := []string{logs.Items[0].Action, logs.Items[1].Action}
+	require.ElementsMatch(t, []string{"delete_content", "site_mute"}, actions)
+}
+
 func TestBlockedWordsRejectTextAndSyncRedis(t *testing.T) {
 	ctx := context.Background()
 	svc, rdb := newModerationFixture(t)

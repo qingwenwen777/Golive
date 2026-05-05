@@ -715,7 +715,7 @@ function ContentPage() {
   const [selectedId, setSelectedId] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<ReportAction>('delete_content');
+  const [selectedActions, setSelectedActions] = useState<ReportAction[]>([]);
   const [muteDuration, setMuteDuration] = useState(1440);
   const [word, setWord] = useState('');
   const [wordNote, setWordNote] = useState('');
@@ -742,9 +742,17 @@ function ContentPage() {
   const detail = reportDetail.data ?? selected;
   const stats = reports.data?.stats ?? { pending: 0, reviewing: 0, today: 0, total: 0 };
   const detailClosed = detail ? isReportClosed(detail.status) : false;
-  const detailActions = detail ? reportActionsForTarget(detail.targetType) : [];
+  const detailActions = detail
+    ? reportActionsForTarget(detail.targetType).filter((action) => !isExclusiveReportAction(action))
+    : [];
 
-  const submitReportAction = (nextAction = selectedAction) => {
+  const toggleReportAction = (action: ReportAction) => {
+    setSelectedActions((current) =>
+      current.includes(action) ? current.filter((item) => item !== action) : [...current, action],
+    );
+  };
+
+  const submitReportActions = (nextActions = selectedActions) => {
     if (!detail) return;
     if (isReportClosed(detail.status)) {
       toast.info(
@@ -754,17 +762,35 @@ function ContentPage() {
       );
       return;
     }
+    const actions = uniqueReportActions(nextActions);
+    if (actions.length === 0) {
+      toast.error(
+        t('admin.content.reports.actionRequired', {
+          defaultValue: 'Select at least one action before confirming.',
+        }),
+      );
+      return;
+    }
+    if (actions.length > 1 && actions.some((action) => isExclusiveReportAction(action))) {
+      toast.error(
+        t('admin.content.reports.exclusiveAction', {
+          defaultValue: 'Dismiss and review actions cannot be combined with penalties.',
+        }),
+      );
+      return;
+    }
     updateReport.mutate(
       {
         id: detail.id,
-        action: nextAction,
+        actions,
         note: resolutionNote,
-        durationMinutes: nextAction === 'site_mute' ? muteDuration : undefined,
+        durationMinutes: actions.includes('site_mute') ? muteDuration : undefined,
       },
       {
         onSuccess: (updated) => {
           setSelectedId(updated.id);
           setResolutionNote(updated.resolutionNote ?? '');
+          setSelectedActions([]);
           setDetailOpen(false);
           toast.success(
             t('admin.content.reports.updated', { defaultValue: 'Report status updated.' }),
@@ -990,7 +1016,7 @@ function ContentPage() {
                   onClick={() => {
                     setSelectedId(item.id);
                     setResolutionNote(item.resolutionNote ?? '');
-                    setSelectedAction(reportActionsForTarget(item.targetType)[0]);
+                    setSelectedActions([]);
                     setDetailOpen(true);
                   }}
                 >
@@ -1022,7 +1048,7 @@ function ContentPage() {
                     )}
                     {item.targetUserName && <span>{item.targetUserName}</span>}
                     {item.resolutionAction && (
-                      <span>{reportActionLabel(item.resolutionAction, t)}</span>
+                      <span>{reportActionLabels(item.resolutionAction, t)}</span>
                     )}
                   </div>
                 </button>
@@ -1119,7 +1145,7 @@ function ContentPage() {
                   <AdminDetailRow
                     label={t('admin.content.reports.result', { defaultValue: 'Result' })}
                     value={
-                      detail.resolutionAction ? reportActionLabel(detail.resolutionAction, t) : '-'
+                      detail.resolutionAction ? reportActionLabels(detail.resolutionAction, t) : '-'
                     }
                   />
                   {detailClosed && (
@@ -1154,27 +1180,40 @@ function ContentPage() {
                   </label>
                   {!detailClosed && (
                     <div className="gl-admin-action-select">
-                      <span>{t('admin.content.reports.action', { defaultValue: 'Action' })}</span>
+                      <div className="gl-admin-action-select-head">
+                        <span>{t('admin.content.reports.action', { defaultValue: 'Action' })}</span>
+                        <small>
+                          {t('admin.content.reports.actionMultiHint', {
+                            defaultValue:
+                              'Multiple penalties can be selected. Dismiss is separate.',
+                          })}
+                        </small>
+                      </div>
                       <div className="gl-admin-action-grid">
-                        {detailActions.map((action) => (
-                          <button
-                            type="button"
-                            key={action}
-                            className={
-                              selectedAction === action
-                                ? 'gl-admin-action-card is-active'
-                                : 'gl-admin-action-card'
-                            }
-                            onClick={() => setSelectedAction(action)}
-                          >
-                            <span>{reportActionLabel(action, t)}</span>
-                            <small>{reportActionDescription(action, t)}</small>
-                          </button>
-                        ))}
+                        {detailActions.map((action) => {
+                          const active = selectedActions.includes(action);
+                          return (
+                            <button
+                              type="button"
+                              key={action}
+                              className={
+                                active ? 'gl-admin-action-card is-active' : 'gl-admin-action-card'
+                              }
+                              aria-pressed={active}
+                              onClick={() => toggleReportAction(action)}
+                            >
+                              <span className="gl-admin-action-card-title">
+                                <span>{reportActionLabel(action, t)}</span>
+                                <i>{active && <Check size={13} />}</i>
+                              </span>
+                              <small>{reportActionDescription(action, t)}</small>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
-                  {!detailClosed && selectedAction === 'site_mute' && (
+                  {!detailClosed && selectedActions.includes('site_mute') && (
                     <div className="gl-admin-action-select">
                       <span>
                         {t('admin.content.reports.muteDuration', {
@@ -1203,8 +1242,10 @@ function ContentPage() {
                   <div className="gl-admin-report-actions-bar is-modal">
                     <button
                       type="button"
-                      onClick={() => submitReportAction()}
-                      disabled={updateReport.isPending || detailClosed}
+                      onClick={() => submitReportActions()}
+                      disabled={
+                        updateReport.isPending || detailClosed || selectedActions.length === 0
+                      }
                     >
                       <Check size={15} />
                       {t('admin.content.reports.confirmAction', {
@@ -1213,7 +1254,7 @@ function ContentPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => submitReportAction('dismiss')}
+                      onClick={() => submitReportActions(['dismiss'])}
                       disabled={updateReport.isPending || detailClosed}
                     >
                       <X size={15} />
@@ -1494,6 +1535,17 @@ function reportActionLabel(value: string, t: Translate) {
   return map[value] ?? value;
 }
 
+function reportActionLabels(value: string, t: Translate) {
+  return uniqueReportActions(
+    value
+      .split(',')
+      .map((action) => action.trim())
+      .filter(Boolean) as ReportAction[],
+  )
+    .map((action) => reportActionLabel(action, t))
+    .join(' / ');
+}
+
 function reportActionDescription(value: string, t: Translate) {
   const map: Record<string, string> = {
     dismiss: t('admin.content.actionDescriptions.dismiss', {
@@ -1529,6 +1581,21 @@ function reportActionsForTarget(targetType: string): ReportAction[] {
     return ['warn_user', 'site_mute', 'ban_user', 'dismiss'];
   }
   return ['delete_content', 'warn_user', 'site_mute', 'ban_user', 'dismiss'];
+}
+
+function isExclusiveReportAction(action: ReportAction) {
+  return action === 'dismiss' || action === 'review';
+}
+
+function uniqueReportActions(actions: ReportAction[]) {
+  const seen = new Set<ReportAction>();
+  const out: ReportAction[] = [];
+  actions.forEach((action) => {
+    if (!action || seen.has(action)) return;
+    seen.add(action);
+    out.push(action);
+  });
+  return out;
 }
 
 function isReportClosed(status: string) {

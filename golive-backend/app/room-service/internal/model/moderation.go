@@ -121,7 +121,7 @@ type ContentReport struct {
 	Description      string `gorm:"type:varchar(300)"`
 	Status           string `gorm:"type:varchar(24);not null;default:pending;index"`
 	ReviewerID       string `gorm:"type:varchar(36);index"`
-	ResolutionAction string `gorm:"type:varchar(32);index"`
+	ResolutionAction string `gorm:"type:varchar(160);index"`
 	DurationMinutes  int
 	ResolutionNote   string     `gorm:"type:text"`
 	ResolvedAt       *time.Time `gorm:"index"`
