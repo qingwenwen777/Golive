@@ -466,10 +466,7 @@
   align-items: center;
   gap: 12px;
   color: inherit;
-}
-.gl-info-chan-link:hover .gl-info-chan-name span {
-  color: var(--gl-text);
-  text-decoration: underline;
+  text-decoration: none;
 }
 .gl-info-chan-text {
   min-width: 0;

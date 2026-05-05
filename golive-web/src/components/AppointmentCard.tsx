@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Check, CheckCircle2, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { useReserveAppointment } from '@/api/room';
+import { useReserveAppointment, useUnreserveAppointment } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
 import { cn } from '@/lib/cn';
-import { isInLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
+import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
@@ -41,6 +41,7 @@ export function AppointmentCard({
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const reserveAppointment = useReserveAppointment(appointment.id);
+  const unreserveAppointment = useUnreserveAppointment(appointment.id);
   const [reserved, setReserved] = useState(appointment.reserved);
   const [waitingCount, setWaitingCount] = useState(
     appointment.waitingCount ?? appointment.reservationCount,
@@ -84,11 +85,12 @@ export function AppointmentCard({
     appointment.waitingCount,
   ]);
 
+  const reservationPending = reserveAppointment.isPending || unreserveAppointment.isPending;
   const reserveLabel = reserved
-    ? t('liveRoom.scheduledReservedByYou', { defaultValue: '你已预约' })
+    ? t('liveRoom.quickUnreserve', { defaultValue: '取消预约' })
     : t('liveRoom.quickReserve', { defaultValue: '快速预约' });
   const watchLaterLabel = savedLater
-    ? t('liveRoom.saved', { defaultValue: '已保存' })
+    ? t('liveRoom.quickRemoveWatchLater', { defaultValue: '从稍后观看移除' })
     : t('liveRoom.quickWatchLater', { defaultValue: '添加到稍后观看' });
   const waitingLabel = t('liveRoom.appointmentWaiting', {
     count: waitingCount,
@@ -106,9 +108,25 @@ export function AppointmentCard({
 
   const handleQuickReserve = (event: MouseEvent<HTMLButtonElement>) => {
     stopQuickAction(event);
-    if (reserved || reserveAppointment.isPending) return;
+    if (reservationPending) return;
     if (!isAuthed) {
       openLogin();
+      return;
+    }
+    if (reserved) {
+      unreserveAppointment.mutate(undefined, {
+        onSuccess: (next) => {
+          setReserved(false);
+          setWaitingCount(next.waitingCount ?? waitingCount);
+          toast.success(t('liveRoom.appointmentUnreserved', { defaultValue: '已取消预约。' }));
+        },
+        onError: (err) => {
+          toast.error(
+            err.message ||
+              t('liveRoom.appointmentReserveFailed', { defaultValue: '预约状态更新失败。' }),
+          );
+        },
+      });
       return;
     }
     reserveAppointment.mutate(undefined, {
@@ -128,7 +146,12 @@ export function AppointmentCard({
 
   const handleWatchLater = (event: MouseEvent<HTMLButtonElement>) => {
     stopQuickAction(event);
-    if (savedLater) return;
+    if (savedLater) {
+      removeFromLibrary(WATCH_LATER_KEY, appointment.roomId);
+      setSavedLater(false);
+      toast.success(t('liveRoom.removedWatchLater', { defaultValue: '已从稍后观看移除。' }));
+      return;
+    }
     saveToLibrary(WATCH_LATER_KEY, appointmentToStream(appointment, waitingCount));
     setSavedLater(true);
     toast.success(t('liveRoom.savedWatchLater', { defaultValue: '已保存到稍后观看。' }));
@@ -204,7 +227,7 @@ export function AppointmentCard({
           <button
             type="button"
             className={cn('gl-appointment-quick-btn', reserved && 'is-complete')}
-            disabled={reserveAppointment.isPending}
+            disabled={reservationPending}
             aria-label={reserveLabel}
             title={reserveLabel}
             onClick={handleQuickReserve}
