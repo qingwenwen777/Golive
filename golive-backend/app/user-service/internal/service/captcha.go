@@ -98,45 +98,44 @@ func renderCaptchaSVG(code string) (string, error) {
 	const width = 132
 	const height = 44
 	rng := &captchaRNG{}
-	filterSeed := rng.rangeInt(1, 9999)
 	var svg strings.Builder
 	fmt.Fprintf(&svg, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">`, width, height, width, height)
-	fmt.Fprintf(&svg, `<defs><filter id="warp"><feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="2" seed="%d"/><feDisplacementMap in="SourceGraphic" scale="1.8"/></filter></defs>`, filterSeed)
-	svg.WriteString(`<rect width="132" height="44" rx="8" fill="#f3f4f6"/>`)
+	svg.WriteString(`<defs><linearGradient id="captchaBg" x1="0" x2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#eef2ff"/></linearGradient></defs>`)
+	svg.WriteString(`<rect width="132" height="44" rx="8" fill="url(#captchaBg)"/>`)
 	svg.WriteString(`<rect x="1" y="1" width="130" height="42" rx="7" fill="none" stroke="#e5e7eb"/>`)
-	for i := 0; i < 42; i++ {
+	for i := 0; i < 18; i++ {
 		x := rng.rangeInt(2, width-3)
 		y := rng.rangeInt(2, height-3)
-		size := rng.rangeInt(1, 2)
-		opacity := rng.rangeInt(18, 42)
-		fmt.Fprintf(&svg, `<circle cx="%d" cy="%d" r="%d" fill="%s" opacity="0.%02d"/>`, x, y, size, rng.choice(captchaNoiseColors), opacity)
+		opacity := rng.rangeInt(14, 26)
+		fmt.Fprintf(&svg, `<circle cx="%d" cy="%d" r="1" fill="%s" opacity="0.%02d"/>`, x, y, rng.choice(captchaNoiseColors), opacity)
 	}
-	for i := 0; i < 7; i++ {
+	for i := 0; i < 3; i++ {
 		x1 := rng.rangeInt(-8, width/3)
 		y1 := rng.rangeInt(6, height-6)
 		c1x := rng.rangeInt(18, width/2)
-		c1y := rng.rangeInt(-6, height+6)
+		c1y := rng.rangeInt(2, height-2)
 		c2x := rng.rangeInt(width/2, width-18)
-		c2y := rng.rangeInt(-6, height+6)
+		c2y := rng.rangeInt(2, height-2)
 		x2 := rng.rangeInt((width*2)/3, width+8)
 		y2 := rng.rangeInt(6, height-6)
-		strokeWidth := rng.rangeInt(1, 3)
-		opacity := rng.rangeInt(32, 62)
+		strokeWidth := rng.rangeInt(1, 2)
+		opacity := rng.rangeInt(28, 44)
 		fmt.Fprintf(&svg, `<path d="M%d %d C%d %d,%d %d,%d %d" fill="none" stroke="%s" stroke-width="%d" stroke-linecap="round" opacity="0.%02d"/>`, x1, y1, c1x, c1y, c2x, c2y, x2, y2, rng.choice(captchaStrokeColors), strokeWidth, opacity)
 	}
 	runes := []rune(code)
 	for i, ch := range runes {
-		x := 4 + i*21 + rng.rangeInt(-1, 1)
-		y := 8 + rng.rangeInt(-1, 1)
-		rotate := rng.rangeInt(-18, 18)
-		fmt.Fprintf(&svg, `<g filter="url(#warp)" transform="rotate(%d %d %d)">`, rotate, x+9, y+14)
-		writeCaptchaGlyph(&svg, rng, ch, x, y)
+		x := 6 + i*20 + rng.rangeInt(-1, 1)
+		y := 7 + rng.rangeInt(-1, 1)
+		rotate := rng.rangeInt(-8, 8)
+		color := rng.choice(captchaTextColors)
+		fmt.Fprintf(&svg, `<g transform="rotate(%d %d %d)">`, rotate, x+10, y+15)
+		writeCaptchaGlyph(&svg, ch, x, y, color)
 		svg.WriteString(`</g>`)
 	}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1; i++ {
 		x := rng.rangeInt(0, width-20)
 		y := rng.rangeInt(10, height-12)
-		fmt.Fprintf(&svg, `<rect x="%d" y="%d" width="%d" height="2" rx="1" fill="%s" opacity="0.45" transform="rotate(%d %d %d)"/>`, x, y, rng.rangeInt(36, 68), rng.choice(captchaStrokeColors), rng.rangeInt(-12, 12), x, y)
+		fmt.Fprintf(&svg, `<rect x="%d" y="%d" width="%d" height="2" rx="1" fill="%s" opacity="0.34" transform="rotate(%d %d %d)"/>`, x, y, rng.rangeInt(42, 72), rng.choice(captchaStrokeColors), rng.rangeInt(-10, 10), x, y)
 	}
 	svg.WriteString(`</svg>`)
 	if rng.err != nil {
@@ -186,20 +185,28 @@ var captchaGlyphs = map[rune][7]string{
 	'Z': {"11111", "00001", "00010", "00100", "01000", "10000", "11111"},
 }
 
-func writeCaptchaGlyph(svg *strings.Builder, rng *captchaRNG, ch rune, originX, originY int) {
+func writeCaptchaGlyph(svg *strings.Builder, ch rune, originX, originY int, color string) {
 	pattern, ok := captchaGlyphs[ch]
 	if !ok {
 		return
 	}
 	for row, line := range pattern {
-		for col, bit := range line {
-			if bit != '1' {
+		runStart := -1
+		for col := 0; col <= len(line); col++ {
+			if col < len(line) && line[col] == '1' {
+				if runStart == -1 {
+					runStart = col
+				}
 				continue
 			}
-			x := originX + col*4 + rng.rangeInt(-1, 1)
-			y := originY + row*4 + rng.rangeInt(-1, 1)
-			rotate := rng.rangeInt(-9, 9)
-			fmt.Fprintf(svg, `<rect x="%d" y="%d" width="3.2" height="3.6" rx="0.8" fill="%s" transform="rotate(%d %d %d)"/>`, x, y, rng.choice(captchaTextColors), rotate, x+2, y+2)
+			if runStart == -1 {
+				continue
+			}
+			x := float64(originX + runStart*4)
+			y := float64(originY + row*4)
+			w := float64(col-runStart)*4 + 0.5
+			fmt.Fprintf(svg, `<rect x="%.1f" y="%.1f" width="%.1f" height="4.5" rx="1.2" fill="%s"/>`, x, y, w, color)
+			runStart = -1
 		}
 	}
 }
