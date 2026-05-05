@@ -8204,6 +8204,9 @@ button.gl-fan-badge-empty {
   font-weight: 800;
 }
 .gl-fan-club-join {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8211,22 +8214,56 @@ button.gl-fan-badge-empty {
   min-height: 40px;
   border: 0;
   border-radius: 999px;
-  background: var(--gl-text);
-  color: var(--gl-bg);
+  background: linear-gradient(135deg, #ff4fa3 0%, #ffbd45 33%, #25d6a2 64%, #6d5dfc 100%);
+  color: #fff;
   font-size: 13px;
   font-weight: 900;
   padding: 0 16px;
+  box-shadow:
+    0 12px 26px rgba(255, 79, 163, 0.24),
+    0 8px 18px rgba(37, 214, 162, 0.18);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+.gl-fan-club-join::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.2),
+    transparent 48%,
+    rgba(255, 255, 255, 0.16)
+  );
+}
+.gl-fan-club-join svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
 }
 .gl-fan-club-join:hover {
-  opacity: 0.92;
+  filter: saturate(1.08);
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 30px rgba(255, 79, 163, 0.28),
+    0 10px 22px rgba(109, 93, 252, 0.2);
 }
 .gl-fan-club-join:disabled,
 .gl-fan-club-join.is-lit {
   border: 1px solid var(--gl-border);
-  background: var(--gl-bg-hover);
-  color: var(--gl-text-2);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 79, 163, 0.14),
+    rgba(37, 214, 162, 0.16),
+    rgba(109, 93, 252, 0.14)
+  );
+  color: var(--gl-text);
   cursor: default;
   opacity: 1;
+  box-shadow: none;
+  transform: none;
 }
 .gl-fan-badge-dialog {
   width: min(460px, calc(100vw - 32px));

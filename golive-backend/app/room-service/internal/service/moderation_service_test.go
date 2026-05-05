@@ -18,7 +18,7 @@ import (
 	"github.com/qingwenwen777/golive/pkg/errcode"
 )
 
-func newModerationFixture(t *testing.T) (*ModerationService, *redis.Client) {
+func newModerationFixture(t *testing.T) (*ModerationService, *gorm.DB, *redis.Client) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
@@ -33,6 +33,18 @@ CREATE TABLE users (
 	verified boolean,
 	role varchar(16),
 	updated_at datetime
+)`).Error)
+	require.NoError(t, db.Exec(`
+CREATE TABLE fan_badges (
+	user_id varchar(36),
+	creator_id varchar(36),
+	creator_name varchar(64),
+	creator_avatar varchar(500),
+	total_contribution integer,
+	level integer,
+	created_at datetime,
+	updated_at datetime,
+	primary key (user_id, creator_id)
 )`).Error)
 	now := time.Now()
 	require.NoError(t, db.Exec(
@@ -54,12 +66,47 @@ CREATE TABLE users (
 
 	moderation := repo.NewModerationRepo(db, rdb)
 	require.NoError(t, moderation.AutoMigrate())
-	return NewModerationService(moderation, rooms, repo.NewSocialRepo(rdb)), rdb
+	return NewModerationService(moderation, rooms, repo.NewSocialRepo(rdb)), db, rdb
+}
+
+func TestRoomModeratorsMustBeFanClubMembers(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 6, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	_, err := svc.AddModerator(ctx, "admin-1", "user-1")
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr))
+	require.Equal(t, http.StatusConflict, appErr.HTTPStatus)
+	require.Equal(t, "not_fan_club_member", appErr.Reason)
+
+	require.NoError(t, db.Exec(
+		`INSERT INTO fan_badges (user_id, creator_id, creator_name, creator_avatar, total_contribution, level, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"user-1", "admin-1", "Admin", "", 100, 1, now, now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO fan_badges (user_id, creator_id, creator_name, creator_avatar, total_contribution, level, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"user-2", "other-creator", "Other", "", 100, 1, now, now,
+	).Error)
+
+	members, err := svc.ListFollowers(ctx, "admin-1", "", 1, 10)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), members.Total)
+	require.Len(t, members.Items, 1)
+	require.Equal(t, "user-1", members.Items[0].ID)
+
+	added, err := svc.AddModerator(ctx, "admin-1", "user-1")
+	require.NoError(t, err)
+	require.True(t, added.Moderator)
+	require.Equal(t, "user-1", added.ID)
 }
 
 func TestModerationReportsDeduplicateAndLimit(t *testing.T) {
 	ctx := context.Background()
-	svc, _ := newModerationFixture(t)
+	svc, _, _ := newModerationFixture(t)
 	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
 
 	req := CreateReportReq{
@@ -91,7 +138,7 @@ func TestModerationReportsDeduplicateAndLimit(t *testing.T) {
 
 func TestHandledReportCannotBeProcessedAgainAndNewReportsCreateNewGroup(t *testing.T) {
 	ctx := context.Background()
-	svc, _ := newModerationFixture(t)
+	svc, _, _ := newModerationFixture(t)
 	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
 
@@ -142,7 +189,7 @@ func TestHandledReportCannotBeProcessedAgainAndNewReportsCreateNewGroup(t *testi
 
 func TestReportCanApplyMultipleActionsAndDismissIsExclusive(t *testing.T) {
 	ctx := context.Background()
-	svc, _ := newModerationFixture(t)
+	svc, _, _ := newModerationFixture(t)
 	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
 
 	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{
@@ -184,7 +231,7 @@ func TestReportCanApplyMultipleActionsAndDismissIsExclusive(t *testing.T) {
 
 func TestBlockedWordsRejectTextAndSyncRedis(t *testing.T) {
 	ctx := context.Background()
-	svc, rdb := newModerationFixture(t)
+	svc, _, rdb := newModerationFixture(t)
 
 	word, err := svc.CreateBlockedWord(ctx, "admin-1", CreateBlockedWordReq{Word: "Bad Word"})
 	require.NoError(t, err)

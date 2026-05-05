@@ -1790,10 +1790,7 @@ export function CreatorRoomModeratorsPage() {
             defaultValue: `${target.name} 已成为房间房管。`,
           }),
         ),
-      onError: (err) =>
-        toast.error(
-          err.message || t('studio.moderators.addFailed', { defaultValue: '添加房管失败。' }),
-        ),
+      onError: (err) => toast.error(moderatorAddErrorMessage(err, t)),
     });
   };
 
@@ -1823,10 +1820,10 @@ export function CreatorRoomModeratorsPage() {
           sub={t('studio.moderators.activeSub', { defaultValue: '当前有效' })}
         />
         <StudioKpi
-          icon={<Users size={18} />}
-          label={t('studio.moderators.followers', { defaultValue: '可选粉丝' })}
+          icon={<Crown size={18} />}
+          label={t('studio.moderators.followers', { defaultValue: '可选粉丝团成员' })}
           value={(followers.data?.total ?? 0).toLocaleString()}
-          sub={t('studio.moderators.followersSub', { defaultValue: '按用户名搜索' })}
+          sub={t('studio.moderators.followersSub', { defaultValue: '仅已加入粉丝团' })}
         />
         <StudioKpi
           icon={<Clock3 size={18} />}
@@ -2004,6 +2001,21 @@ function ModerationUserRow({
         {actionLabel}
       </button>
     </div>
+  );
+}
+
+function moderatorAddErrorMessage(err: unknown, t: TFunction<'pages'>): string {
+  const response = (err as { response?: { data?: { reason?: string; message?: string } } })
+    .response;
+  if (response?.data?.reason === 'not_fan_club_member') {
+    return t('studio.moderators.fanClubOnlyError', {
+      defaultValue: '只能添加粉丝团成员为房管。',
+    });
+  }
+  return (
+    response?.data?.message ||
+    (err instanceof Error ? err.message : '') ||
+    t('studio.moderators.addFailed', { defaultValue: '添加房管失败。' })
   );
 }
 

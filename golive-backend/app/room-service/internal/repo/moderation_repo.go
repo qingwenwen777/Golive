@@ -170,13 +170,15 @@ type AdminHealthItem struct {
 	Checked bool
 }
 
-func (r *ModerationRepo) ListFollowers(ctx context.Context, ownerID, query string, page, size int, followerIDs []string) ([]ModerationUser, int64, error) {
+func (r *ModerationRepo) ListFanClubMembers(ctx context.Context, ownerID, query string, page, size int) ([]ModerationUser, int64, error) {
 	page, size = normalizeModerationPage(page, size)
-	if len(followerIDs) == 0 {
+	ownerID = strings.TrimSpace(ownerID)
+	if ownerID == "" {
 		return []ModerationUser{}, 0, nil
 	}
 	q := r.db.WithContext(ctx).
-		Table("users AS u").
+		Table("fan_badges AS fb").
+		Joins("JOIN users AS u ON u.id = fb.user_id").
 		Select(`
 u.id,
 COALESCE(u.username, '') AS username,
@@ -188,7 +190,7 @@ CASE WHEN rm.user_id IS NULL THEN false ELSE true END AS moderator,
 rm.created_at AS created_at
 `).
 		Joins("LEFT JOIN room_moderators AS rm ON rm.owner_id = ? AND rm.user_id = u.id AND rm.revoked_at IS NULL", ownerID).
-		Where("u.id IN ?", followerIDs)
+		Where("fb.creator_id = ? AND fb.user_id <> ?", ownerID, ownerID)
 	query = strings.ToLower(strings.TrimSpace(query))
 	if query != "" {
 		like := "%" + query + "%"
@@ -196,14 +198,40 @@ rm.created_at AS created_at
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
+		if isMissingTableName(err) {
+			return []ModerationUser{}, 0, nil
+		}
 		return nil, 0, err
 	}
 	var rows []ModerationUser
-	err := q.Order("moderator DESC, u.updated_at DESC").
+	err := q.Order("moderator DESC, fb.updated_at DESC, u.updated_at DESC").
 		Offset((page - 1) * size).
 		Limit(size).
 		Scan(&rows).Error
+	if isMissingTableName(err) {
+		return []ModerationUser{}, 0, nil
+	}
 	return rows, total, err
+}
+
+func (r *ModerationRepo) IsFanClubMember(ctx context.Context, userID, creatorID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	creatorID = strings.TrimSpace(creatorID)
+	if userID == "" || creatorID == "" {
+		return false, nil
+	}
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("fan_badges").
+		Where("user_id = ? AND creator_id = ?", userID, creatorID).
+		Count(&count).Error
+	if isMissingTableName(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *ModerationRepo) ListModerators(ctx context.Context, ownerID string, page, size int) ([]ModerationUser, int64, error) {

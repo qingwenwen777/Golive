@@ -337,12 +337,7 @@ type CreateUnbanAppealReq struct {
 }
 
 func (s *ModerationService) ListFollowers(ctx context.Context, ownerID, query string, page, size int) (*ModerationUserListResp, error) {
-	followerIDs, err := s.social.Followers(ctx, "ch-"+ownerID)
-	if err != nil {
-		return nil, err
-	}
-	followerIDs = excludeUserID(followerIDs, ownerID)
-	items, total, err := s.moderation.ListFollowers(ctx, ownerID, query, page, size, followerIDs)
+	items, total, err := s.moderation.ListFanClubMembers(ctx, ownerID, query, page, size)
 	if err != nil {
 		return nil, err
 	}
@@ -372,12 +367,12 @@ func (s *ModerationService) AddModerator(ctx context.Context, ownerID, targetUse
 	if targetUserID == "" || targetUserID == ownerID {
 		return nil, errcode.New(400, "invalid moderator")
 	}
-	following, err := s.social.IsFollowing(ctx, targetUserID, "ch-"+ownerID)
+	member, err := s.moderation.IsFanClubMember(ctx, targetUserID, ownerID)
 	if err != nil {
 		return nil, err
 	}
-	if !following {
-		return nil, errcode.New(409, "moderator must be selected from your followers").WithReason("not_follower")
+	if !member {
+		return nil, errcode.New(409, "moderator must be selected from your fan club members").WithReason("not_fan_club_member")
 	}
 	now := s.now()
 	if err := s.moderation.AddModerator(ctx, ownerID, ownerID, targetUserID, now); err != nil {
