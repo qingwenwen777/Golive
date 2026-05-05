@@ -88,6 +88,7 @@ func main() {
 		UploadTimeout:   cfg.Replay.UploadTimeout,
 	})
 	roomSvc.SetReplayService(replaySvc)
+	roomSvc.SetLiveRepo(liveRepo)
 	liveSvc.SetReplayService(replaySvc)
 	liveSvc.SetAppointmentRepo(appointmentRepo)
 	liveSvc.SetModerationRepo(moderationRepo)

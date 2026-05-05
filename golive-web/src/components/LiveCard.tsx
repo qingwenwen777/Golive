@@ -152,13 +152,6 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             </span>
           )}
         </div>
-        <div className="gl-card-bottom">
-          <span className="gl-view-pill">
-            <Icons.Eye size={14} />
-            <span>{stream.viewers.toLocaleString()}</span>
-          </span>
-          <span className="gl-dur-pill">{stream.duration}</span>
-        </div>
       </div>
       <div className="gl-card-meta">
         <Avatar name={channelName} src={stream.avatar} size={44} />

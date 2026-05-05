@@ -17,6 +17,7 @@ var ErrRoomNotFound = errcode.New(404, "Not found")
 type RoomService struct {
 	rooms   *repo.RoomRepo
 	social  *repo.SocialRepo
+	live    *repo.LiveRepo
 	replay  *ReplayService
 	flvBase string
 	now     func() time.Time
@@ -35,6 +36,10 @@ func NewRoomService(rooms *repo.RoomRepo, flvBase string, social ...*repo.Social
 
 func (s *RoomService) SetReplayService(replay *ReplayService) {
 	s.replay = replay
+}
+
+func (s *RoomService) SetLiveRepo(live *repo.LiveRepo) {
+	s.live = live
 }
 
 // playbackURL builds the public HTTP-FLV URL for a live room. Viewers receive
@@ -78,8 +83,7 @@ func (s *RoomService) List(ctx context.Context, rawCategory string, page, size i
 	now := s.now()
 	items := make([]model.Stream, 0, len(rooms))
 	for i := range rooms {
-		st := rooms[i].ToStream(now)
-		st.PlaybackURL = s.playbackURL(&rooms[i])
+		st := s.streamFromRoom(ctx, &rooms[i], now)
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
 		}
@@ -106,8 +110,7 @@ func (s *RoomService) SearchLive(ctx context.Context, query string, limit int) (
 	now := s.now()
 	items := make([]model.Stream, 0, len(rooms))
 	for i := range rooms {
-		st := rooms[i].ToStream(now)
-		st.PlaybackURL = s.playbackURL(&rooms[i])
+		st := s.streamFromRoom(ctx, &rooms[i], now)
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
 		}
@@ -176,8 +179,7 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 	if r.Status != model.StatusLive && !isPublicScheduled && !isPublicAppointmentStarting && !(isOwner && r.Status == model.StatusPublishing) && !replayVisible {
 		return nil, ErrRoomNotFound
 	}
-	st := r.ToStream(s.now())
-	st.PlaybackURL = s.playbackURL(r)
+	st := s.streamFromRoom(ctx, r, s.now())
 	st.Replay = replay
 	if err := s.addSubscriberCount(ctx, &st); err != nil {
 		return nil, err
@@ -186,6 +188,31 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 		st.StreamKey = r.StreamKey
 	}
 	return &st, nil
+}
+
+func (s *RoomService) streamFromRoom(ctx context.Context, room *model.Room, now time.Time) model.Stream {
+	adjusted := *room
+	s.applyLiveViewerMetrics(ctx, &adjusted)
+	st := adjusted.ToStream(now)
+	st.PlaybackURL = s.playbackURL(&adjusted)
+	return st
+}
+
+func (s *RoomService) applyLiveViewerMetrics(ctx context.Context, room *model.Room) {
+	if s.live == nil || room == nil || room.Status != model.StatusLive {
+		return
+	}
+	metrics, err := s.live.ViewerMetrics(ctx, room.ID)
+	if err != nil || metrics == nil {
+		return
+	}
+	room.Viewers = metrics.Viewers
+	if metrics.Peak > room.PeakViewers {
+		room.PeakViewers = metrics.Peak
+	}
+	if room.PeakViewers < room.Viewers {
+		room.PeakViewers = room.Viewers
+	}
 }
 
 func sortRoomsBySearch(rooms []model.Room, phrase repo.SearchPhrase) {

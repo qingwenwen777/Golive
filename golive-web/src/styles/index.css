@@ -2259,6 +2259,19 @@ input:focus-visible,
   left: 8px;
   z-index: 3;
 }
+.gl-card.is-replay .gl-card-top {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.gl-card.is-replay:hover .gl-card-top,
+.gl-card.is-replay:focus-within .gl-card-top {
+  opacity: 1;
+  transform: translateY(0);
+}
 .gl-card-bottom {
   position: absolute;
   right: 8px;
@@ -2680,6 +2693,17 @@ input:focus-visible,
 .gl-home-replay-badge {
   top: 8px;
   left: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.gl-home-replay-card:hover .gl-home-replay-badge,
+.gl-home-replay-card:focus-within .gl-home-replay-badge {
+  opacity: 1;
+  transform: translateY(0);
 }
 .gl-home-replay-duration {
   right: 8px;
@@ -9876,12 +9900,6 @@ button.gl-fan-badge-empty {
   .gl-icon-btn {
     width: 38px;
     height: 38px;
-  }
-
-  .gl-card-bottom {
-    left: 8px;
-    right: 8px;
-    justify-content: space-between;
   }
 
   .gl-view-pill,

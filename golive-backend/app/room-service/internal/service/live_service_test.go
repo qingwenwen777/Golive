@@ -84,6 +84,39 @@ func TestGoLiveCreatesPublishingSessionOnly(t *testing.T) {
 	require.Equal(t, model.StatusPublishing, room.Status)
 }
 
+func TestRoomServiceListUsesRealtimeViewerMetrics(t *testing.T) {
+	ctx := context.Background()
+	_, rooms, live, rdb := newLiveServiceTestDepsWithRedis(t)
+	startedAt := time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC)
+
+	require.NoError(t, rooms.Upsert(ctx, &model.Room{
+		ID:          "live-metrics",
+		Title:       "Viewer count check",
+		Channel:     "kabun",
+		ChannelID:   "ch-owner-metrics",
+		Category:    "Gaming",
+		Cover:       "/uploads/covers/live.webp",
+		Viewers:     0,
+		PeakViewers: 1,
+		StartedAt:   startedAt,
+		Status:      model.StatusLive,
+		OwnerID:     "owner-metrics",
+		StreamKey:   "lk_metrics",
+	}))
+	require.NoError(t, rdb.HSet(ctx, "roommetrics:live-metrics", "viewers", "7", "peak", "9").Err())
+
+	roomSvc := NewRoomService(rooms, "http://srs/live")
+	roomSvc.SetLiveRepo(live)
+	roomSvc.now = func() time.Time { return startedAt.Add(3 * time.Minute) }
+
+	resp, err := roomSvc.List(ctx, "", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Equal(t, int64(7), resp.Items[0].Viewers)
+	require.Equal(t, int64(9), resp.Items[0].PeakViewers)
+	require.Equal(t, "http://srs/live/lk_metrics.flv", resp.Items[0].PlaybackURL)
+}
+
 func TestUpdateLiveMetadataEditsActiveRoomAndBroadcasts(t *testing.T) {
 	ctx := context.Background()
 	svc, rooms, _, rdb := newLiveServiceTestDepsWithRedis(t)

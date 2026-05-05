@@ -38,6 +38,9 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 	}
 
 	now := s.now()
+	for i := range rooms {
+		s.applyLiveViewerMetrics(ctx, &rooms[i])
+	}
 	roomIDs := make([]string, 0, len(rooms))
 	for _, room := range rooms {
 		roomIDs = append(roomIDs, room.ID)

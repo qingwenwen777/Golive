@@ -79,6 +79,9 @@ func (r *LiveRepo) ViewerMetrics(ctx context.Context, roomID string) (*ViewerMet
 	if err != nil {
 		return nil, err
 	}
+	if len(values) >= 2 && values[0] == nil && values[1] == nil {
+		return nil, nil
+	}
 	viewers := parseRedisInt(values[0])
 	peak := parseRedisInt(values[1])
 	if peak < viewers {

@@ -40,7 +40,8 @@ export function useRooms(params: RoomsQuery = {}) {
       const { data } = await http.get<PaginatedRooms>('/rooms', { params: search, signal });
       return data;
     },
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 10_000,
     placeholderData: keepPreviousData,
     retry: 1,
   });
@@ -64,7 +65,8 @@ export function useInfiniteRooms(params: RoomsQuery = {}) {
       const nextPage = lastPage.page + 1;
       return lastPage.page * lastPage.size < lastPage.total ? nextPage : undefined;
     },
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 10_000,
     retry: 1,
   });
 }
@@ -84,7 +86,8 @@ export function useRecommendedRooms(params: RoomsQuery = {}) {
       });
       return data;
     },
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 10_000,
     placeholderData: keepPreviousData,
     retry: 1,
   });
