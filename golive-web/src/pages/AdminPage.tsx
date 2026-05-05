@@ -37,6 +37,7 @@ import {
   type LiveCreator,
 } from '@/api/creator';
 import { Avatar } from '@/components/Avatar';
+import { GoLiveLogo } from '@/components/Logo';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 type AdminModule = 'dashboard' | 'users' | 'creators' | 'content' | 'economy' | 'system' | 'logs';
@@ -359,7 +360,7 @@ function AdminNav({ currentModule, metrics }: { currentModule: AdminModule; metr
     <aside className="gl-admin-nav" aria-label={t('admin.nav.aria', { defaultValue: 'Admin modules' })}>
       <div className="gl-admin-nav-brand">
         <span className="gl-admin-mark" aria-hidden="true">
-          <Video size={16} />
+          <GoLiveLogo variant="mark" height={34} />
         </span>
         <div>
           <strong>GoLive Admin</strong>

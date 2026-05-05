@@ -5099,15 +5099,14 @@ input:focus-visible,
   position: relative;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--gl-red);
-  color: #fff;
+  width: 36px;
+  height: 36px;
+  color: var(--gl-red);
   flex: 0 0 auto;
   line-height: 0;
 }
-.gl-admin-mark svg {
+.gl-admin-mark svg,
+.gl-admin-mark img {
   position: absolute;
   top: 50%;
   left: 50%;
