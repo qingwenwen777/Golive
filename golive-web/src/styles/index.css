@@ -1431,7 +1431,6 @@ input:focus-visible,
   z-index: 5;
   border-top: 1px solid var(--gl-border);
   background: #fff;
-  box-shadow: 0 -16px 28px rgba(15, 23, 42, 0.08);
   padding: 11px 14px 14px;
 }
 .gl-gift-counts {
@@ -1533,7 +1532,6 @@ input:focus-visible,
 }
 .dark .gl-gift-sendbar {
   background: #111827;
-  box-shadow: 0 -16px 30px rgba(0, 0, 0, 0.34);
 }
 .dark .gl-gift-count {
   background: rgba(255, 255, 255, 0.1);
