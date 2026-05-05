@@ -102,6 +102,7 @@
     "cancelGoogleLink": "キャンセル",
     "errors": {
       "invalidCredentials": "ユーザー名またはパスワードが正しくありません。",
+      "loginCooldown": "パスワードの入力失敗が続いたため、1分後にもう一度お試しください。",
       "usernameTaken": "そのユーザー名はすでに使用されています。",
       "badFields": "入力内容を確認してもう一度お試しください。",
       "signInFailed": "ログインに失敗しました。もう一度お試しください。",

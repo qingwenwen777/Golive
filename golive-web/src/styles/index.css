@@ -12867,6 +12867,12 @@ button.gl-fan-badge-empty {
   white-space: nowrap;
 }
 
+.gl-appointment-channel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .gl-appointment-meta {
   margin-top: 2px;
   display: flex;

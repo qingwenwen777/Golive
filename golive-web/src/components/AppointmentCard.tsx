@@ -190,16 +190,16 @@ export function AppointmentCard({
           <div className="gl-appointment-head">
             <h3>
               <span>{appointment.title}</span>
-              {appointment.verified && <VerifiedBadge size={15} />}
             </h3>
           </div>
           {showChannel && (
             <div className="gl-appointment-channel">
               {hasChannelName ? (
-                channelName
+                <span className="truncate">{channelName}</span>
               ) : (
                 <span className="gl-card-chan-skeleton" aria-hidden="true" />
               )}
+              {appointment.verified && <VerifiedBadge size={14} />}
             </div>
           )}
           <div className="gl-appointment-meta">

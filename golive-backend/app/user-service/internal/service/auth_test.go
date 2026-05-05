@@ -122,6 +122,31 @@ func TestLogin_NoSuchUser(t *testing.T) {
 	require.ErrorIs(t, err, service.ErrInvalidCredentials)
 }
 
+func TestLogin_FiveFailuresTriggerCooldown(t *testing.T) {
+	svc, mock, mr := newSvc(t)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("demo"), bcrypt.MinCost)
+
+	for i := 0; i < 4; i++ {
+		expectFindByUsername(mock, "demo", string(hash))
+		_, err := svc.Login(context.Background(), "demo", "wrong")
+		require.ErrorIs(t, err, service.ErrInvalidCredentials)
+	}
+
+	expectFindByUsername(mock, "demo", string(hash))
+	_, err := svc.Login(context.Background(), "demo", "wrong")
+	require.ErrorIs(t, err, service.ErrLoginCooldown)
+
+	_, err = svc.Login(context.Background(), "demo", "demo")
+	require.ErrorIs(t, err, service.ErrLoginCooldown)
+
+	mr.FastForward(time.Minute + time.Second)
+	expectFindByUsername(mock, "demo", string(hash))
+	resp, err := svc.Login(context.Background(), "demo", "demo")
+	require.NoError(t, err)
+	require.Equal(t, "demo", resp.User.Username)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestRegister_Success(t *testing.T) {
 	svc, mock, mr := newSvc(t)
 	expectFindByUsernameNotFound(mock, "kabun")

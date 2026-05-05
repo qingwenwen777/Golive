@@ -102,6 +102,7 @@
     "cancelGoogleLink": "Cancel",
     "errors": {
       "invalidCredentials": "Invalid username or password.",
+      "loginCooldown": "Too many failed password attempts. Try again in 1 minute.",
       "usernameTaken": "That username is already taken.",
       "badFields": "Check the fields and try again.",
       "signInFailed": "Sign-in failed. Please try again.",

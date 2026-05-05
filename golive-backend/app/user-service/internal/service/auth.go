@@ -41,6 +41,13 @@ var (
 	ErrGoogleAlreadyLinked     = errcode.New(http.StatusConflict, "This Google account is already linked").WithReason("google_already_linked")
 	ErrGoogleNotLinked         = errcode.New(http.StatusBadRequest, "This account is not linked to Google").WithReason("google_not_linked")
 	ErrUserBanned              = errcode.New(http.StatusForbidden, "This account has been banned").WithReason("user_banned")
+	ErrLoginCooldown           = errcode.New(http.StatusTooManyRequests, "Too many failed password attempts. Please wait 1 minute before trying again").WithReason("login_cooldown")
+)
+
+const (
+	loginFailureLimit   = 5
+	loginFailureWindow  = 5 * time.Minute
+	loginCooldownPeriod = time.Minute
 )
 
 type UserStore interface {
@@ -83,9 +90,16 @@ type TokenStore interface {
 	Rotate(ctx context.Context, oldToken, newToken, userID string, ttl time.Duration) error
 }
 
+type LoginAttemptStore interface {
+	LoginCooldown(ctx context.Context, username string) (time.Duration, bool, error)
+	RecordLoginFailure(ctx context.Context, username string, window, cooldown time.Duration, maxAttempts int) (time.Duration, bool, error)
+	ClearLoginFailures(ctx context.Context, username string) error
+}
+
 type AuthService struct {
 	users          UserStore
 	tokens         TokenStore
+	loginAttempts  LoginAttemptStore
 	jwtKeys        *jwtauth.KeySet
 	accessTTL      time.Duration
 	refreshTTL     time.Duration
@@ -112,9 +126,11 @@ func NewAuthService(users UserStore, tokens TokenStore, opts Options) *AuthServi
 			panic("auth service jwt key set: " + err.Error())
 		}
 	}
+	loginAttempts, _ := tokens.(LoginAttemptStore)
 	return &AuthService{
 		users:          users,
 		tokens:         tokens,
+		loginAttempts:  loginAttempts,
 		jwtKeys:        keys,
 		accessTTL:      opts.AccessTTL,
 		refreshTTL:     opts.RefreshTTL,
@@ -133,15 +149,22 @@ type LoginResp struct {
 
 // Login validates credentials and issues an access+refresh pair.
 func (s *AuthService) Login(ctx context.Context, username, password string) (*LoginResp, error) {
+	username = strings.TrimSpace(username)
+	if err := s.ensureLoginAllowed(ctx, username); err != nil {
+		return nil, err
+	}
 	u, err := s.users.FindByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, repo.ErrUserNotFound) {
-			return nil, ErrInvalidCredentials
+			return nil, s.recordLoginFailure(ctx, username)
 		}
 		return nil, fmt.Errorf("find user: %w", err)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, s.recordLoginFailure(ctx, username)
+	}
+	if err := s.clearLoginFailures(ctx, username); err != nil {
+		return nil, err
 	}
 	if u.Banned {
 		return nil, ErrUserBanned
@@ -160,6 +183,40 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*Lo
 		RefreshToken: refresh,
 		User:         u.Public(),
 	}, nil
+}
+
+func (s *AuthService) ensureLoginAllowed(ctx context.Context, username string) error {
+	if s.loginAttempts == nil {
+		return nil
+	}
+	if _, locked, err := s.loginAttempts.LoginCooldown(ctx, username); err != nil {
+		return fmt.Errorf("check login cooldown: %w", err)
+	} else if locked {
+		return ErrLoginCooldown
+	}
+	return nil
+}
+
+func (s *AuthService) recordLoginFailure(ctx context.Context, username string) error {
+	if s.loginAttempts == nil {
+		return ErrInvalidCredentials
+	}
+	if _, locked, err := s.loginAttempts.RecordLoginFailure(ctx, username, loginFailureWindow, loginCooldownPeriod, loginFailureLimit); err != nil {
+		return fmt.Errorf("record login failure: %w", err)
+	} else if locked {
+		return ErrLoginCooldown
+	}
+	return ErrInvalidCredentials
+}
+
+func (s *AuthService) clearLoginFailures(ctx context.Context, username string) error {
+	if s.loginAttempts == nil {
+		return nil
+	}
+	if err := s.loginAttempts.ClearLoginFailures(ctx, username); err != nil {
+		return fmt.Errorf("clear login failures: %w", err)
+	}
+	return nil
 }
 
 // Register creates a local preview account and returns the same login payload

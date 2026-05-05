@@ -443,7 +443,7 @@ function NotificationBell() {
             {items.map((item) => (
               <DropdownMenuItem
                 key={item.id}
-                className={`gl-notification-item${item.readAt ? '' : 'is-unread'}`}
+                className={item.readAt ? 'gl-notification-item' : 'gl-notification-item is-unread'}
                 onClick={() => openNotification(item)}
               >
                 <span className="gl-notification-dot" aria-hidden="true" />

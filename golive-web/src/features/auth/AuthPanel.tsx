@@ -44,6 +44,11 @@ function authErrorMessage(
     if (reason === 'invalid_captcha') {
       return t('auth.errors.invalidCaptcha', { defaultValue: 'Captcha is incorrect or expired.' });
     }
+    if (reason === 'login_cooldown') {
+      return t('auth.errors.loginCooldown', {
+        defaultValue: 'Too many failed password attempts. Try again in 1 minute.',
+      });
+    }
     if (reason === 'email_taken') {
       return t('auth.errors.emailTaken', {
         defaultValue: 'This email is already bound to another account.',
@@ -605,7 +610,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={isSigningUp ? t('auth.usernamePlaceholder') : 'demo'}
+                  placeholder={t('auth.usernamePlaceholder')}
                   minLength={3}
                   required
                 />
@@ -622,7 +627,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   autoComplete={isSigningUp ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSigningUp ? PASSWORD_RULE_TEXT : 'demo'}
+                  placeholder={isSigningUp ? PASSWORD_RULE_TEXT : t('auth.passwordPlaceholder')}
                   minLength={isSigningUp ? 8 : 3}
                   pattern={isSigningUp ? PASSWORD_PATTERN : undefined}
                   title={isSigningUp ? PASSWORD_RULE_TEXT : undefined}

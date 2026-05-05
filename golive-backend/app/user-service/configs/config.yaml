@@ -40,9 +40,9 @@ bootstrap:
     username: admin
     password: admin
     display_name: GoLive Admin
-  # Auto-create + seed the demo user on startup. Frontend E2E depends on it.
+  # Auto-create + seed the demo user on startup. Keep disabled for production.
   demo_user:
-    enabled: true
+    enabled: false
     username: demo
     password: demo
     coin_balance: 100000
