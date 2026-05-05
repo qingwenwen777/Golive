@@ -14,6 +14,7 @@ export function TopProgressBar() {
   const [progress, setProgress] = useState(0);
   const activeRef = useRef(false);
   const fetchingRef = useRef(fetchingCount);
+  const lastLocationKeyRef = useRef(location.key);
   const startedAtRef = useRef(0);
   const timersRef = useRef<number[]>([]);
   const trickleRef = useRef<number | null>(null);
@@ -76,6 +77,10 @@ export function TopProgressBar() {
   };
 
   useEffect(() => {
+    if (lastLocationKeyRef.current === location.key) {
+      return;
+    }
+    lastLocationKeyRef.current = location.key;
     begin();
     if (fetchingRef.current > 0) {
       ensureTrickle();
@@ -88,16 +93,11 @@ export function TopProgressBar() {
 
   useEffect(() => {
     fetchingRef.current = fetchingCount;
+    if (!activeRef.current) {
+      return;
+    }
     if (fetchingCount > 0) {
-      if (!activeRef.current) {
-        schedule(() => {
-          if (fetchingRef.current <= 0 || activeRef.current) return;
-          begin();
-          ensureTrickle();
-        }, 120);
-      } else {
-        ensureTrickle();
-      }
+      ensureTrickle();
       return;
     }
     finish();

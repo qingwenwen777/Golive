@@ -51,7 +51,8 @@
   --gl-chip-bg-active: #0f0f0f;
   --gl-chip-text-active: #ffffff;
   --gl-red: #ff3d5c;
-  --gl-progress: #ff0033;
+  --gl-progress: rgba(255, 0, 51, 0.18);
+  --gl-progress-glow: rgba(255, 0, 51, 0.08);
   --gl-skeleton-base: #e5e5e5;
   --gl-skeleton-shine: rgba(255, 255, 255, 0.64);
   --gl-avatar-placeholder: #e5e5e5;
@@ -1074,7 +1075,8 @@
   --gl-chip-bg-active: #ffffff;
   --gl-chip-text-active: #0f0f0f;
   --gl-red: #ff3d5c;
-  --gl-progress: #ff3d5c;
+  --gl-progress: rgba(255, 112, 136, 0.22);
+  --gl-progress-glow: rgba(255, 112, 136, 0.1);
   --gl-skeleton-base: #3f3f3f;
   --gl-skeleton-shine: rgba(255, 255, 255, 0.12);
   --gl-avatar-placeholder: #3f3f3f;
@@ -2087,7 +2089,7 @@ input:focus-visible,
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 3px;
+  height: 2px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
@@ -2101,7 +2103,7 @@ input:focus-visible,
   height: 100%;
   transform-origin: 0 50%;
   background: var(--gl-progress);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--gl-progress) 70%, transparent);
+  box-shadow: 0 0 8px var(--gl-progress-glow);
   transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
 }
 .gl-top-progress.is-settling span {
