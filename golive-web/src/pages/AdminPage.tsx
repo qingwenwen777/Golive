@@ -4,14 +4,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Ban,
+  BarChart3,
   Check,
   ChevronDown,
+  CircleDollarSign,
   Clipboard,
   Coins,
   Database,
   Eye,
   FileCheck2,
   FileText,
+  Gift as GiftIcon,
   Gauge,
   History,
   ListFilter,
@@ -26,7 +29,10 @@ import {
   Shield,
   SlidersHorizontal,
   Ticket,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
+  Trophy,
   Upload,
   UserCheck,
   UserCog,
@@ -69,14 +75,29 @@ import {
 } from '@/api/contentModeration';
 import {
   useAdminAdjustUserCoins,
+  useAdminBetRounds,
+  useAdminCancelBet,
+  useAdminCoinLedger,
+  useAdminEconomyGifts,
+  useAdminEconomyOrders,
+  useAdminEconomySummary,
   useAdminOverview,
+  useAdminRevenueReports,
   useAdminSetUserBan,
+  useAdminSettleBet,
+  useAdminUpdateGift,
   useAdminReviewUnbanAppeal,
   useAdminUpdateUserProfile,
   useAdminUpdateUserRole,
   useAdminUserDetail,
   useAdminUsers,
   type AdminOverview,
+  type AdminBetRoundRecord,
+  type AdminOrderType,
+  type AdminReportPeriod,
+  type AdminRevenueReportRow,
+  type AdminEconomyOrderRecord,
+  type AdminCoinRecord,
   type AdminUnbanAppealRecord,
   type AdminUserRole,
   type AdminUserStatus,
@@ -479,7 +500,7 @@ export default function AdminPage() {
             />
           )}
           {currentModule === 'content' && <ContentPage />}
-          {currentModule === 'economy' && <ScaffoldModulePage module="economy" />}
+          {currentModule === 'economy' && <EconomyPage />}
           {currentModule === 'system' && <ScaffoldModulePage module="system" />}
           {currentModule === 'logs' && <LogsPage />}
         </main>
@@ -609,7 +630,9 @@ function DashboardPage({
         <div className="gl-admin-panel-head">
           <div>
             <span>{t('admin.dashboard.health.eyebrow', { defaultValue: 'Health' })}</span>
-            <h2>{t('admin.dashboard.health.title', { defaultValue: 'Service and storage status' })}</h2>
+            <h2>
+              {t('admin.dashboard.health.title', { defaultValue: 'Service and storage status' })}
+            </h2>
           </div>
         </div>
         <div className="gl-admin-health-grid">
@@ -859,10 +882,12 @@ function UsersPage({
                   <em className={`gl-admin-user-role is-${item.role}`}>
                     {userRoleLabel(item.role, t)}
                   </em>
-                  <em className={item.banned ? 'gl-admin-user-state is-banned' : 'gl-admin-user-state'}>
-                    {item.banned
-                      ? userStatusLabel('banned', t)
-                      : userStatusLabel('active', t)}
+                  <em
+                    className={
+                      item.banned ? 'gl-admin-user-state is-banned' : 'gl-admin-user-state'
+                    }
+                  >
+                    {item.banned ? userStatusLabel('banned', t) : userStatusLabel('active', t)}
                   </em>
                   {(item.pendingAppeals ?? 0) > 0 && (
                     <em className="gl-admin-user-state is-appeal">
@@ -915,9 +940,7 @@ function UsersPage({
 
 function AdminUserDetailPanel({ userId }: { userId: string }) {
   const { t } = useTranslation('pages');
-  const [tab, setTab] = useState<'profile' | 'coins' | 'lives' | 'reports' | 'appeals'>(
-    'profile',
-  );
+  const [tab, setTab] = useState<'profile' | 'coins' | 'lives' | 'reports' | 'appeals'>('profile');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [banReason, setBanReason] = useState('');
@@ -1061,10 +1084,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
             </label>
             <label>
               <span>{t('admin.users.detail.displayName', { defaultValue: 'Display name' })}</span>
-              <input
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-              />
+              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
             </label>
             <button type="button" onClick={submitProfile} disabled={updateProfile.isPending}>
               <Save size={15} />
@@ -2522,6 +2542,945 @@ function auditActionLabel(value: string, t: Translate) {
     admin_create: t('admin.logs.actions.adminCreate', { defaultValue: 'Create admin account' }),
   };
   return map[value] ?? value;
+}
+
+type EconomyTab = 'gifts' | 'orders' | 'coins' | 'bets' | 'reports';
+
+function EconomyPage() {
+  const { t } = useTranslation('pages');
+  const [tab, setTab] = useState<EconomyTab>('gifts');
+  const summary = useAdminEconomySummary();
+  const data = summary.data;
+
+  return (
+    <div className="gl-admin-section-stack">
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.economy.aria', { defaultValue: 'Economy overview' })}
+      >
+        <AdminKpi
+          icon={GiftIcon}
+          label={t('admin.economy.kpis.todayGiftRevenue', {
+            defaultValue: 'Today gift revenue',
+          })}
+          value={summary.isLoading ? '-' : formatCoins(data?.todayGiftRevenue)}
+          tone="red"
+        />
+        <AdminKpi
+          icon={CircleDollarSign}
+          label={t('admin.economy.kpis.todaySuperChatRevenue', {
+            defaultValue: 'Today SuperChat revenue',
+          })}
+          value={summary.isLoading ? '-' : formatCoins(data?.todaySuperChatRevenue)}
+        />
+        <AdminKpi
+          icon={Wallet}
+          label={t('admin.economy.kpis.coinBalance', { defaultValue: 'Total Coin balance' })}
+          value={summary.isLoading ? '-' : formatCoins(data?.totalCoinBalance)}
+        />
+        <AdminKpi
+          icon={Coins}
+          label={t('admin.economy.kpis.frozenCoins', { defaultValue: 'Frozen Coins' })}
+          value={summary.isLoading ? '-' : formatCoins(data?.totalFrozenCoins)}
+        />
+        <AdminKpi
+          icon={Trophy}
+          label={t('admin.economy.kpis.unsettledBets', {
+            defaultValue: 'Unsettled bet rounds',
+          })}
+          value={summary.isLoading ? '-' : (data?.unsettledBetRounds ?? 0)}
+        />
+      </section>
+
+      <section className="gl-admin-panel gl-admin-economy-panel">
+        <div className="gl-admin-panel-head">
+          <div>
+            <span>{t('admin.economy.eyebrow', { defaultValue: 'Economy operations' })}</span>
+            <h2>{t('admin.economy.title', { defaultValue: 'Revenue, ledger, and settlement' })}</h2>
+            <p>
+              {t('admin.economy.subtitle', {
+                defaultValue:
+                  'Manage the gift catalog, review order ledgers, audit Coin movement, settle bets, and reconcile revenue.',
+              })}
+            </p>
+          </div>
+        </div>
+        <div className="gl-admin-economy-tabs" role="tablist">
+          {(
+            [
+              ['gifts', GiftIcon, t('admin.economy.tabs.gifts', { defaultValue: 'Gifts' })],
+              ['orders', FileText, t('admin.economy.tabs.orders', { defaultValue: 'Orders' })],
+              ['coins', Coins, t('admin.economy.tabs.coins', { defaultValue: 'Coin ledger' })],
+              ['bets', Trophy, t('admin.economy.tabs.bets', { defaultValue: 'Bets' })],
+              ['reports', BarChart3, t('admin.economy.tabs.reports', { defaultValue: 'Reports' })],
+            ] as [EconomyTab, AdminIcon, string][]
+          ).map(([key, Icon, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              className={tab === key ? 'is-active' : undefined}
+              onClick={() => setTab(key)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+        {tab === 'gifts' && <EconomyGiftsPanel />}
+        {tab === 'orders' && <EconomyOrdersPanel />}
+        {tab === 'coins' && <EconomyCoinsPanel />}
+        {tab === 'bets' && <EconomyBetsPanel />}
+        {tab === 'reports' && <EconomyReportsPanel />}
+      </section>
+    </div>
+  );
+}
+
+function EconomyGiftsPanel() {
+  const { t } = useTranslation('pages');
+  const gifts = useAdminEconomyGifts();
+  const updateGift = useAdminUpdateGift();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const items = gifts.data?.items ?? [];
+  const stats = gifts.data?.stats;
+
+  const priceValue = (id: string, price: number) => draft[id] ?? String(price);
+  const savePrice = (id: string, price: number) => {
+    const nextPrice = Number.parseInt(priceValue(id, price), 10);
+    if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+      toast.error(
+        t('admin.economy.gifts.invalidPrice', { defaultValue: 'Price must be positive.' }),
+      );
+      return;
+    }
+    updateGift.mutate(
+      { id, priceCoin: nextPrice },
+      {
+        onSuccess: () => {
+          setDraft((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+          toast.success(t('admin.economy.gifts.priceSaved', { defaultValue: 'Gift price saved.' }));
+        },
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
+
+  return (
+    <div className="gl-admin-economy-body">
+      <div className="gl-admin-economy-metrics">
+        <AdminMiniMetric
+          icon={GiftIcon}
+          label={t('admin.economy.gifts.total', { defaultValue: 'Total gifts' })}
+          value={stats?.total ?? '-'}
+        />
+        <AdminMiniMetric
+          icon={ToggleRight}
+          label={t('admin.economy.gifts.enabled', { defaultValue: 'On shelf' })}
+          value={stats?.enabled ?? '-'}
+        />
+        <AdminMiniMetric
+          icon={ToggleLeft}
+          label={t('admin.economy.gifts.disabled', { defaultValue: 'Off shelf' })}
+          value={stats?.disabled ?? '-'}
+        />
+        <AdminMiniMetric
+          icon={Coins}
+          label={t('admin.economy.gifts.catalogValue', { defaultValue: 'Catalog value' })}
+          value={formatCoins(stats?.catalogValue)}
+        />
+      </div>
+      <div className="gl-admin-economy-table" aria-busy={gifts.isFetching}>
+        {gifts.isLoading ? (
+          <AdminEmptyState
+            label={t('admin.economy.gifts.loading', { defaultValue: 'Loading gifts...' })}
+          />
+        ) : items.length === 0 ? (
+          <AdminEmptyState
+            label={t('admin.economy.gifts.empty', { defaultValue: 'No gifts configured.' })}
+          />
+        ) : (
+          items.map((item) => {
+            const enabled = item.enabled !== false;
+            const changed = priceValue(item.id, item.priceCoin) !== String(item.priceCoin);
+            return (
+              <article className="gl-admin-gift-row" key={item.id}>
+                <div className="gl-admin-gift-main">
+                  <span className="gl-admin-gift-icon">{item.icon}</span>
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>
+                      {item.id} / {item.category} / Lv.{item.unlockLevel ?? 1}
+                    </span>
+                  </div>
+                </div>
+                <label className="gl-admin-price-edit">
+                  <span>{t('admin.economy.gifts.price', { defaultValue: 'Price' })}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={priceValue(item.id, item.priceCoin)}
+                    onChange={(event) =>
+                      setDraft((prev) => ({ ...prev, [item.id]: event.target.value }))
+                    }
+                  />
+                </label>
+                <span className={`gl-admin-status is-${enabled ? 'approved' : 'rejected'}`}>
+                  {enabled
+                    ? t('admin.economy.gifts.onShelf', { defaultValue: 'On shelf' })
+                    : t('admin.economy.gifts.offShelf', { defaultValue: 'Off shelf' })}
+                </span>
+                <div className="gl-admin-economy-actions">
+                  <button
+                    type="button"
+                    className="gl-admin-action-text"
+                    disabled={!changed || updateGift.isPending}
+                    onClick={() => savePrice(item.id, item.priceCoin)}
+                  >
+                    <Save size={15} />
+                    {t('admin.economy.gifts.save', { defaultValue: 'Save' })}
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      enabled ? 'gl-admin-action-text reject' : 'gl-admin-action-text approve'
+                    }
+                    disabled={updateGift.isPending}
+                    onClick={() =>
+                      updateGift.mutate(
+                        { id: item.id, enabled: !enabled },
+                        {
+                          onSuccess: () =>
+                            toast.success(
+                              enabled
+                                ? t('admin.economy.gifts.disabledDone', {
+                                    defaultValue: 'Gift removed from shelf.',
+                                  })
+                                : t('admin.economy.gifts.enabledDone', {
+                                    defaultValue: 'Gift put on shelf.',
+                                  }),
+                            ),
+                          onError: (err) => toast.error(err.message),
+                        },
+                      )
+                    }
+                  >
+                    {enabled ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
+                    {enabled
+                      ? t('admin.economy.gifts.disable', { defaultValue: 'Off shelf' })
+                      : t('admin.economy.gifts.enable', { defaultValue: 'On shelf' })}
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EconomyOrdersPanel() {
+  const { t } = useTranslation('pages');
+  const [type, setType] = useState<AdminOrderType>('all');
+  const [status, setStatus] = useState('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
+  const orders = useAdminEconomyOrders({
+    type,
+    status,
+    q: query.trim() || undefined,
+    page,
+    size: pageSize,
+  });
+  const items = orders.data?.items ?? [];
+  const total = orders.data?.total ?? 0;
+
+  return (
+    <div className="gl-admin-economy-body">
+      <div className="gl-admin-content-filters gl-admin-economy-filters">
+        <AdminFilterSelect
+          label={t('admin.economy.orders.type', { defaultValue: 'Order type' })}
+          value={type}
+          onChange={(value) => {
+            setType(value as AdminOrderType);
+            setPage(1);
+          }}
+          options={[
+            { value: 'all', label: t('admin.economy.orders.allTypes', { defaultValue: 'All' }) },
+            { value: 'gift', label: t('admin.economy.orders.gift', { defaultValue: 'Gift' }) },
+            {
+              value: 'super_chat',
+              label: t('admin.economy.orders.superChat', { defaultValue: 'SuperChat' }),
+            },
+            { value: 'bet', label: t('admin.economy.orders.bet', { defaultValue: 'Bet' }) },
+          ]}
+        />
+        <AdminFilterSelect
+          label={t('admin.economy.orders.status', { defaultValue: 'Status' })}
+          value={status}
+          onChange={(value) => {
+            setStatus(value);
+            setPage(1);
+          }}
+          options={[
+            { value: 'all', label: t('admin.economy.orders.allStatus', { defaultValue: 'All' }) },
+            { value: 'success', label: economyStatusLabel('success', t) },
+            {
+              value: 'failed',
+              label: t('admin.economy.status.failed', { defaultValue: 'Failed' }),
+            },
+            {
+              value: 'locked',
+              label: t('admin.economy.status.locked', { defaultValue: 'Locked' }),
+            },
+            { value: 'won', label: t('admin.economy.status.won', { defaultValue: 'Won' }) },
+            { value: 'lost', label: t('admin.economy.status.lost', { defaultValue: 'Lost' }) },
+            {
+              value: 'refunded',
+              label: t('admin.economy.status.refunded', { defaultValue: 'Refunded' }),
+            },
+          ]}
+        />
+        <label className="gl-admin-content-search">
+          <span>{t('admin.economy.orders.search', { defaultValue: 'Search' })}</span>
+          <div>
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder={t('admin.economy.orders.searchPlaceholder', {
+                defaultValue: 'Order, user, room, or item',
+              })}
+            />
+          </div>
+        </label>
+      </div>
+      <div className="gl-admin-economy-table" aria-busy={orders.isFetching}>
+        {orders.isLoading ? (
+          <AdminEmptyState
+            label={t('admin.economy.orders.loading', { defaultValue: 'Loading orders...' })}
+          />
+        ) : items.length === 0 ? (
+          <AdminEmptyState
+            label={t('admin.economy.orders.empty', { defaultValue: 'No orders matched.' })}
+          />
+        ) : (
+          items.map((item) => <EconomyOrderRow item={item} key={`${item.type}-${item.orderId}`} />)
+        )}
+      </div>
+      <AdminPager page={page} pageSize={pageSize} total={total} onPage={setPage} />
+    </div>
+  );
+}
+
+function EconomyOrderRow({ item }: { item: AdminEconomyOrderRecord }) {
+  const { t } = useTranslation('pages');
+  return (
+    <article className="gl-admin-ledger-row">
+      <span className="gl-admin-ledger-icon">
+        {item.type === 'gift' ? (
+          <GiftIcon size={17} />
+        ) : item.type === 'bet' ? (
+          <Trophy size={17} />
+        ) : (
+          <CircleDollarSign size={17} />
+        )}
+      </span>
+      <div className="gl-admin-ledger-main">
+        <strong>{item.itemName}</strong>
+        <span>
+          {orderTypeLabel(item.type, t)} / {item.orderId}
+        </span>
+      </div>
+      <div className="gl-admin-ledger-side">
+        <strong>{formatCoins(item.amount)} Coins</strong>
+        <span>
+          {item.count > 1 ? `x${item.count} / ` : ''}
+          {formatDate(item.createdAt)}
+        </span>
+      </div>
+      <div className="gl-admin-ledger-user">
+        <strong>{item.userName || item.userId}</strong>
+        <span>{item.roomTitle || item.roomId || '-'}</span>
+      </div>
+      <span className={`gl-admin-status is-${statusTone(item.status)}`}>
+        {economyStatusLabel(item.status, t)}
+      </span>
+    </article>
+  );
+}
+
+function EconomyCoinsPanel() {
+  const { t } = useTranslation('pages');
+  const [type, setType] = useState('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
+  const coins = useAdminCoinLedger({
+    type,
+    q: query.trim() || undefined,
+    page,
+    size: pageSize,
+  });
+  const items = coins.data?.items ?? [];
+  const stats = coins.data?.stats;
+  const total = coins.data?.total ?? 0;
+
+  return (
+    <div className="gl-admin-economy-body">
+      <div className="gl-admin-economy-metrics">
+        <AdminMiniMetric
+          icon={CircleDollarSign}
+          label={t('admin.economy.coins.totalTopup', { defaultValue: 'Total top-up' })}
+          value={formatCoins(stats?.totalTopupCoins)}
+        />
+        <AdminMiniMetric
+          icon={Coins}
+          label={t('admin.economy.coins.totalSpend', { defaultValue: 'Total spend' })}
+          value={formatCoins(stats?.totalSpendCoins)}
+        />
+        <AdminMiniMetric
+          icon={Wallet}
+          label={t('admin.economy.coins.balance', { defaultValue: 'Balances' })}
+          value={formatCoins(stats?.totalBalanceCoins)}
+        />
+        <AdminMiniMetric
+          icon={Ban}
+          label={t('admin.economy.coins.frozen', { defaultValue: 'Frozen' })}
+          value={formatCoins(stats?.totalFrozenCoins)}
+        />
+      </div>
+      <div className="gl-admin-content-filters gl-admin-economy-filters">
+        <AdminFilterSelect
+          label={t('admin.economy.coins.type', { defaultValue: 'Flow type' })}
+          value={type}
+          onChange={(value) => {
+            setType(value);
+            setPage(1);
+          }}
+          options={[
+            { value: 'all', label: t('admin.economy.coins.allTypes', { defaultValue: 'All' }) },
+            { value: 'topup', label: t('admin.economy.coins.topup', { defaultValue: 'Top-up' }) },
+            {
+              value: 'gift_spend',
+              label: t('admin.economy.coins.giftSpend', { defaultValue: 'Gift spend' }),
+            },
+            {
+              value: 'super_chat_spend',
+              label: t('admin.economy.coins.scSpend', { defaultValue: 'SuperChat spend' }),
+            },
+            {
+              value: 'bet_wager',
+              label: t('admin.economy.coins.betWager', { defaultValue: 'Bet wager' }),
+            },
+            {
+              value: 'bet_payout',
+              label: t('admin.economy.coins.betPayout', { defaultValue: 'Bet payout' }),
+            },
+            {
+              value: 'bet_refund',
+              label: t('admin.economy.coins.betRefund', { defaultValue: 'Bet refund' }),
+            },
+            {
+              value: 'admin_freeze',
+              label: t('admin.economy.coins.adminFreeze', { defaultValue: 'Admin freeze' }),
+            },
+            {
+              value: 'admin_unfreeze',
+              label: t('admin.economy.coins.adminUnfreeze', { defaultValue: 'Admin unfreeze' }),
+            },
+          ]}
+        />
+        <label className="gl-admin-content-search">
+          <span>{t('admin.economy.coins.search', { defaultValue: 'Search' })}</span>
+          <div>
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder={t('admin.economy.coins.searchPlaceholder', {
+                defaultValue: 'Transaction, user, title, or source',
+              })}
+            />
+          </div>
+        </label>
+      </div>
+      <div className="gl-admin-economy-table" aria-busy={coins.isFetching}>
+        {coins.isLoading ? (
+          <AdminEmptyState
+            label={t('admin.economy.coins.loading', { defaultValue: 'Loading Coin ledger...' })}
+          />
+        ) : items.length === 0 ? (
+          <AdminEmptyState
+            label={t('admin.economy.coins.empty', { defaultValue: 'No Coin records matched.' })}
+          />
+        ) : (
+          items.map((item) => <EconomyCoinRow item={item} key={item.id} />)
+        )}
+      </div>
+      <AdminPager page={page} pageSize={pageSize} total={total} onPage={setPage} />
+    </div>
+  );
+}
+
+function EconomyCoinRow({ item }: { item: AdminCoinRecord }) {
+  const { t } = useTranslation('pages');
+  const positive = item.amount >= 0;
+  return (
+    <article className="gl-admin-ledger-row">
+      <span
+        className={
+          positive ? 'gl-admin-ledger-icon is-positive' : 'gl-admin-ledger-icon is-negative'
+        }
+      >
+        <Coins size={17} />
+      </span>
+      <div className="gl-admin-ledger-main">
+        <strong>{coinTypeLabel(item.type, t)}</strong>
+        <span>{item.title || item.id}</span>
+      </div>
+      <div className="gl-admin-ledger-side">
+        <strong className={positive ? 'is-positive' : 'is-negative'}>
+          {signedCoins(item.amount)}
+        </strong>
+        <span>
+          {t('admin.economy.coins.balanceAfter', { defaultValue: 'Balance' })}:{' '}
+          {formatCoins(item.balanceAfter)}
+        </span>
+      </div>
+      <div className="gl-admin-ledger-user">
+        <strong>{item.userName || item.userId}</strong>
+        <span>
+          {item.sourceType || '-'} {item.sourceId || ''}
+        </span>
+      </div>
+      <time className="gl-admin-muted">{formatDate(item.createdAt)}</time>
+    </article>
+  );
+}
+
+function EconomyBetsPanel() {
+  const { t } = useTranslation('pages');
+  const [status, setStatus] = useState('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const bets = useAdminBetRounds({
+    status,
+    q: query.trim() || undefined,
+    page,
+    size: pageSize,
+  });
+  const settle = useAdminSettleBet();
+  const cancel = useAdminCancelBet();
+  const stats = bets.data?.stats;
+  const items = bets.data?.items ?? [];
+  const total = bets.data?.total ?? 0;
+  const busy = settle.isPending || cancel.isPending;
+
+  const settleRound = (item: AdminBetRoundRecord, option: 'win' | 'lose') => {
+    settle.mutate(
+      { id: item.id, option },
+      {
+        onSuccess: () =>
+          toast.success(t('admin.economy.bets.settled', { defaultValue: 'Bet round settled.' })),
+        onError: (err) => toast.error(err.message),
+      },
+    );
+  };
+
+  return (
+    <div className="gl-admin-economy-body">
+      <div className="gl-admin-economy-metrics">
+        <AdminMiniMetric
+          icon={Trophy}
+          label={t('admin.economy.bets.total', { defaultValue: 'Total rounds' })}
+          value={stats?.total ?? '-'}
+        />
+        <AdminMiniMetric
+          icon={RefreshCw}
+          label={t('admin.economy.bets.open', { defaultValue: 'Open' })}
+          value={stats?.open ?? '-'}
+        />
+        <AdminMiniMetric
+          icon={FileCheck2}
+          label={t('admin.economy.bets.settledCount', { defaultValue: 'Settled' })}
+          value={stats?.settled ?? '-'}
+        />
+        <AdminMiniMetric
+          icon={Coins}
+          label={t('admin.economy.bets.lockedCoins', { defaultValue: 'Locked Coins' })}
+          value={formatCoins(stats?.lockedCoins)}
+        />
+      </div>
+      <div className="gl-admin-content-filters gl-admin-economy-filters">
+        <AdminFilterSelect
+          label={t('admin.economy.bets.status', { defaultValue: 'Round status' })}
+          value={status}
+          onChange={(value) => {
+            setStatus(value);
+            setPage(1);
+          }}
+          options={[
+            { value: 'all', label: t('admin.economy.bets.allStatus', { defaultValue: 'All' }) },
+            { value: 'open', label: t('admin.economy.bets.openStatus', { defaultValue: 'Open' }) },
+            {
+              value: 'closed',
+              label: t('admin.economy.bets.closedStatus', { defaultValue: 'Closed' }),
+            },
+            {
+              value: 'settled',
+              label: t('admin.economy.bets.settledStatus', { defaultValue: 'Settled' }),
+            },
+            {
+              value: 'cancelled',
+              label: t('admin.economy.bets.cancelledStatus', { defaultValue: 'Cancelled' }),
+            },
+          ]}
+        />
+        <label className="gl-admin-content-search">
+          <span>{t('admin.economy.bets.search', { defaultValue: 'Search' })}</span>
+          <div>
+            <Search size={15} />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder={t('admin.economy.bets.searchPlaceholder', {
+                defaultValue: 'Round, room, owner, or question',
+              })}
+            />
+          </div>
+        </label>
+      </div>
+      <div className="gl-admin-economy-table" aria-busy={bets.isFetching}>
+        {bets.isLoading ? (
+          <AdminEmptyState
+            label={t('admin.economy.bets.loading', { defaultValue: 'Loading bet rounds...' })}
+          />
+        ) : items.length === 0 ? (
+          <AdminEmptyState
+            label={t('admin.economy.bets.empty', { defaultValue: 'No bet rounds matched.' })}
+          />
+        ) : (
+          items.map((item) => {
+            const manageable = item.status === 'open' || item.status === 'closed';
+            return (
+              <article className="gl-admin-bet-row" key={item.id}>
+                <div className="gl-admin-bet-main">
+                  <strong>{item.question}</strong>
+                  <span>
+                    {item.roomTitle || item.roomId} / {item.ownerName}
+                  </span>
+                </div>
+                <div className="gl-admin-bet-pool">
+                  <strong>{formatCoins(item.totalPool)} Coins</strong>
+                  <span>
+                    Win {item.winCount} ({formatCoins(item.winPool)}) / Lose {item.loseCount} (
+                    {formatCoins(item.losePool)})
+                  </span>
+                </div>
+                <span className={`gl-admin-status is-${statusTone(item.status)}`}>
+                  {economyStatusLabel(item.status, t)}
+                  {item.winningOption ? ` / ${item.winningOption}` : ''}
+                </span>
+                <div className="gl-admin-economy-actions">
+                  <button
+                    type="button"
+                    className="gl-admin-action-text approve"
+                    disabled={!manageable || item.winCount <= 0 || busy}
+                    onClick={() => settleRound(item, 'win')}
+                  >
+                    <Check size={15} />
+                    Win
+                  </button>
+                  <button
+                    type="button"
+                    className="gl-admin-action-text approve"
+                    disabled={!manageable || item.loseCount <= 0 || busy}
+                    onClick={() => settleRound(item, 'lose')}
+                  >
+                    <Check size={15} />
+                    Lose
+                  </button>
+                  <button
+                    type="button"
+                    className="gl-admin-action-text reject"
+                    disabled={!manageable || busy}
+                    onClick={() =>
+                      cancel.mutate(
+                        { id: item.id },
+                        {
+                          onSuccess: () =>
+                            toast.success(
+                              t('admin.economy.bets.cancelled', {
+                                defaultValue: 'Bet round cancelled and refunded.',
+                              }),
+                            ),
+                          onError: (err) => toast.error(err.message),
+                        },
+                      )
+                    }
+                  >
+                    <X size={15} />
+                    {t('admin.economy.bets.cancel', { defaultValue: 'Cancel' })}
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+      <AdminPager page={page} pageSize={pageSize} total={total} onPage={setPage} />
+    </div>
+  );
+}
+
+function EconomyReportsPanel() {
+  const { t } = useTranslation('pages');
+  const [period, setPeriod] = useState<AdminReportPeriod>('day');
+  const reports = useAdminRevenueReports({ period });
+  const items = reports.data?.items ?? [];
+  const totals = useMemo(
+    () =>
+      items.reduce(
+        (acc, row) => ({
+          topupCoins: acc.topupCoins + row.topupCoins,
+          revenueCoins: acc.revenueCoins + row.revenueCoins,
+          betWagerCoins: acc.betWagerCoins + row.betWagerCoins,
+          netBetCoins: acc.netBetCoins + row.netBetCoins,
+        }),
+        { topupCoins: 0, revenueCoins: 0, betWagerCoins: 0, netBetCoins: 0 },
+      ),
+    [items],
+  );
+
+  return (
+    <div className="gl-admin-economy-body">
+      <div className="gl-admin-economy-periods" role="tablist">
+        {(['day', 'week', 'month'] as AdminReportPeriod[]).map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={period === item ? 'is-active' : undefined}
+            onClick={() => setPeriod(item)}
+          >
+            {reportPeriodLabel(item, t)}
+          </button>
+        ))}
+      </div>
+      <div className="gl-admin-economy-metrics">
+        <AdminMiniMetric
+          icon={CircleDollarSign}
+          label={t('admin.economy.reports.topup', { defaultValue: 'Top-up in period' })}
+          value={formatCoins(totals.topupCoins)}
+        />
+        <AdminMiniMetric
+          icon={BarChart3}
+          label={t('admin.economy.reports.revenue', { defaultValue: 'Gift + SuperChat' })}
+          value={formatCoins(totals.revenueCoins)}
+        />
+        <AdminMiniMetric
+          icon={Trophy}
+          label={t('admin.economy.reports.betTurnover', { defaultValue: 'Bet turnover' })}
+          value={formatCoins(totals.betWagerCoins)}
+        />
+        <AdminMiniMetric
+          icon={Coins}
+          label={t('admin.economy.reports.netBet', { defaultValue: 'Bet net delta' })}
+          value={signedCoins(totals.netBetCoins)}
+        />
+      </div>
+      <div className="gl-admin-report-ledger" aria-busy={reports.isFetching}>
+        {reports.isLoading ? (
+          <AdminEmptyState
+            label={t('admin.economy.reports.loading', { defaultValue: 'Loading reports...' })}
+          />
+        ) : (
+          items.map((item) => (
+            <EconomyReportRow item={item} period={period} key={item.periodStart} />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EconomyReportRow({
+  item,
+  period,
+}: {
+  item: AdminRevenueReportRow;
+  period: AdminReportPeriod;
+}) {
+  const { t } = useTranslation('pages');
+  return (
+    <article className="gl-admin-report-ledger-row">
+      <strong>{formatReportPeriod(item, period)}</strong>
+      <span>
+        {t('admin.economy.reports.topupShort', { defaultValue: 'Top-up' })}:{' '}
+        {formatCoins(item.topupCoins)}
+      </span>
+      <span>
+        {t('admin.economy.reports.giftShort', { defaultValue: 'Gifts' })}:{' '}
+        {formatCoins(item.giftCoins)}
+      </span>
+      <span>SC: {formatCoins(item.superChatCoins)}</span>
+      <span>
+        {t('admin.economy.reports.betShort', { defaultValue: 'Bets' })}:{' '}
+        {formatCoins(item.betWagerCoins)}
+      </span>
+      <em>{formatCoins(item.revenueCoins)} Coins</em>
+    </article>
+  );
+}
+
+function AdminMiniMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: AdminIcon;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="gl-admin-mini-metric">
+      <span>
+        <Icon size={16} />
+      </span>
+      <div>
+        <strong>{value}</strong>
+        <small>{label}</small>
+      </div>
+    </div>
+  );
+}
+
+function AdminPager({
+  page,
+  pageSize,
+  total,
+  onPage,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
+}) {
+  const { t } = useTranslation('pages');
+  const maxPage = Math.max(1, Math.ceil(total / pageSize));
+  return (
+    <div className="gl-admin-pagination gl-admin-economy-pager">
+      <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        {t('admin.pagination.prev', { defaultValue: 'Previous' })}
+      </button>
+      <span>
+        {page} / {maxPage} · {total}
+      </span>
+      <button type="button" disabled={page >= maxPage} onClick={() => onPage(page + 1)}>
+        {t('admin.pagination.next', { defaultValue: 'Next' })}
+      </button>
+    </div>
+  );
+}
+
+function formatCoins(value?: number) {
+  if (value === undefined || value === null) return '-';
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+}
+
+function signedCoins(value: number) {
+  const prefix = value > 0 ? '+' : '';
+  return `${prefix}${formatCoins(value)} Coins`;
+}
+
+function orderTypeLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    gift: t('admin.economy.orders.gift', { defaultValue: 'Gift' }),
+    super_chat: t('admin.economy.orders.superChat', { defaultValue: 'SuperChat' }),
+    bet: t('admin.economy.orders.bet', { defaultValue: 'Bet' }),
+  };
+  return map[value] ?? value;
+}
+
+function economyStatusLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    open: t('admin.economy.status.open', { defaultValue: 'Open' }),
+    closed: t('admin.economy.status.closed', { defaultValue: 'Closed' }),
+    settled: t('admin.economy.status.settled', { defaultValue: 'Settled' }),
+    cancelled: t('admin.economy.status.cancelled', { defaultValue: 'Cancelled' }),
+    success: t('admin.economy.status.success', { defaultValue: 'Success' }),
+    failed: t('admin.economy.status.failed', { defaultValue: 'Failed' }),
+    locked: t('admin.economy.status.locked', { defaultValue: 'Locked' }),
+    won: t('admin.economy.status.won', { defaultValue: 'Won' }),
+    lost: t('admin.economy.status.lost', { defaultValue: 'Lost' }),
+    refunded: t('admin.economy.status.refunded', { defaultValue: 'Refunded' }),
+  };
+  return map[value] ?? value;
+}
+
+function statusTone(value: string) {
+  if (value === 'success' || value === 'settled' || value === 'won') return 'approved';
+  if (value === 'failed' || value === 'cancelled' || value === 'lost') return 'rejected';
+  return 'pending';
+}
+
+function coinTypeLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    topup: t('admin.economy.coins.topup', { defaultValue: 'Top-up' }),
+    daily_task: t('admin.economy.coins.dailyTask', { defaultValue: 'Daily task' }),
+    gift_spend: t('admin.economy.coins.giftSpend', { defaultValue: 'Gift spend' }),
+    super_chat_spend: t('admin.economy.coins.scSpend', { defaultValue: 'SuperChat spend' }),
+    bet_wager: t('admin.economy.coins.betWager', { defaultValue: 'Bet wager' }),
+    bet_payout: t('admin.economy.coins.betPayout', { defaultValue: 'Bet payout' }),
+    bet_refund: t('admin.economy.coins.betRefund', { defaultValue: 'Bet refund' }),
+    creator_gift_income: t('admin.economy.coins.giftIncome', { defaultValue: 'Gift income' }),
+    creator_super_chat_income: t('admin.economy.coins.scIncome', {
+      defaultValue: 'SuperChat income',
+    }),
+    admin_adjust: t('admin.economy.coins.adminAdjust', { defaultValue: 'Admin adjust' }),
+    admin_freeze: t('admin.economy.coins.adminFreeze', { defaultValue: 'Admin freeze' }),
+    admin_unfreeze: t('admin.economy.coins.adminUnfreeze', {
+      defaultValue: 'Admin unfreeze',
+    }),
+  };
+  return map[value] ?? value;
+}
+
+function reportPeriodLabel(value: AdminReportPeriod, t: Translate) {
+  const map: Record<AdminReportPeriod, string> = {
+    day: t('admin.economy.reports.day', { defaultValue: 'Daily' }),
+    week: t('admin.economy.reports.week', { defaultValue: 'Weekly' }),
+    month: t('admin.economy.reports.month', { defaultValue: 'Monthly' }),
+  };
+  return map[value];
+}
+
+function formatReportPeriod(item: AdminRevenueReportRow, period: AdminReportPeriod) {
+  const start = new Date(item.periodStart);
+  if (period === 'month') {
+    return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short' }).format(start);
+  }
+  if (period === 'week') {
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(start);
+  }
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(start);
 }
 
 function ScaffoldModulePage({

@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
+import type { Gift } from '@/types/gift';
 import type { User } from '@/types/user';
 import type { AdminAuditLog } from '@/api/contentModeration';
 
@@ -114,6 +115,153 @@ export interface AdminUserDetail {
   appealRecords: AdminUnbanAppealRecord[];
 }
 
+export interface AdminEconomySummary {
+  giftCount: number;
+  enabledGiftCount: number;
+  todayGiftRevenue: number;
+  todaySuperChatRevenue: number;
+  todayTopupCoins: number;
+  todaySpendCoins: number;
+  todayBetTurnover: number;
+  totalCoinBalance: number;
+  totalFrozenCoins: number;
+  openBetRounds: number;
+  unsettledBetRounds: number;
+  pendingSettlementCoins: number;
+}
+
+export interface AdminGiftStats {
+  total: number;
+  enabled: number;
+  disabled: number;
+  catalogValue: number;
+}
+
+export interface AdminGiftListResp {
+  items: Gift[];
+  stats: AdminGiftStats;
+}
+
+export type AdminOrderType = 'all' | 'gift' | 'super_chat' | 'bet';
+
+export interface AdminEconomyOrderRecord {
+  type: 'gift' | 'super_chat' | 'bet';
+  orderId: string;
+  userId: string;
+  userName: string;
+  roomId?: string;
+  roomTitle?: string;
+  itemId: string;
+  itemName: string;
+  count: number;
+  amount: number;
+  status: string;
+  failReason?: string;
+  option?: string;
+  result?: string;
+  createdAt: string;
+}
+
+export interface AdminEconomyOrderResp {
+  items: AdminEconomyOrderRecord[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface AdminCoinStats {
+  totalTopupCoins: number;
+  totalSpendCoins: number;
+  totalBalanceCoins: number;
+  totalFrozenCoins: number;
+  todayTopupCoins: number;
+  todaySpendCoins: number;
+  userCount: number;
+}
+
+export interface AdminCoinRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  title: string;
+  description?: string;
+  sourceType?: string;
+  sourceId?: string;
+  roomId?: string;
+  counterpartyId?: string;
+  createdAt: string;
+}
+
+export interface AdminCoinLedgerResp {
+  items: AdminCoinRecord[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AdminCoinStats;
+}
+
+export interface AdminBetStats {
+  total: number;
+  open: number;
+  closed: number;
+  settled: number;
+  cancelled: number;
+  lockedCoins: number;
+}
+
+export interface AdminBetRoundRecord {
+  id: string;
+  roomId: string;
+  roomTitle?: string;
+  ownerId: string;
+  ownerName: string;
+  question: string;
+  amount: number;
+  status: string;
+  winningOption?: string;
+  closeAt: string;
+  settledAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  wagerCount: number;
+  totalPool: number;
+  winCount: number;
+  loseCount: number;
+  winPool: number;
+  losePool: number;
+}
+
+export interface AdminBetListResp {
+  items: AdminBetRoundRecord[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AdminBetStats;
+}
+
+export type AdminReportPeriod = 'day' | 'week' | 'month';
+
+export interface AdminRevenueReportRow {
+  periodStart: string;
+  periodEnd: string;
+  topupCoins: number;
+  giftCoins: number;
+  superChatCoins: number;
+  revenueCoins: number;
+  betWagerCoins: number;
+  betPayoutCoins: number;
+  betRefundCoins: number;
+  netBetCoins: number;
+}
+
+export interface AdminRevenueReportResp {
+  period: AdminReportPeriod;
+  items: AdminRevenueReportRow[];
+}
+
 export function useAdminOverview(enabled = true) {
   return useQuery<AdminOverview, Error>({
     queryKey: ['admin-overview'],
@@ -225,6 +373,199 @@ export function useAdminAdjustUserCoins(id: string) {
   }>(async (payload) => {
     const { data } = await http.post(`/admin/users/${encodeURIComponent(id)}/coins`, payload);
     return data;
+  });
+}
+
+export function useAdminEconomySummary(enabled = true) {
+  return useQuery<AdminEconomySummary, Error>({
+    queryKey: ['admin-economy-summary'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminEconomySummary>('/admin/economy/summary', { signal });
+      return data;
+    },
+    enabled,
+    staleTime: 8_000,
+    retry: 1,
+  });
+}
+
+export function useAdminEconomyGifts(enabled = true) {
+  return useQuery<AdminGiftListResp, Error>({
+    queryKey: ['admin-economy-gifts'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminGiftListResp>('/admin/economy/gifts', { signal });
+      return data;
+    },
+    enabled,
+    staleTime: 10_000,
+    retry: 1,
+  });
+}
+
+export function useAdminUpdateGift() {
+  const qc = useQueryClient();
+  return useMutation<
+    Gift,
+    Error,
+    {
+      id: string;
+      priceCoin?: number;
+      enabled?: boolean;
+    }
+  >({
+    mutationFn: async ({ id, ...payload }) => {
+      const { data } = await http.patch<Gift>(
+        `/admin/economy/gifts/${encodeURIComponent(id)}`,
+        payload,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-economy-summary'] });
+      void qc.invalidateQueries({ queryKey: ['admin-economy-gifts'] });
+      void qc.invalidateQueries({ queryKey: ['gifts'] });
+    },
+  });
+}
+
+export function useAdminEconomyOrders(
+  params: {
+    type?: AdminOrderType;
+    status?: string;
+    q?: string;
+    page?: number;
+    size?: number;
+  },
+  enabled = true,
+) {
+  const page = params.page ?? 1;
+  const size = params.size ?? 20;
+  return useQuery<AdminEconomyOrderResp, Error>({
+    queryKey: ['admin-economy-orders', { ...params, page, size }],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminEconomyOrderResp>('/admin/economy/orders', {
+        params: { ...params, page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 8_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useAdminCoinLedger(
+  params: {
+    type?: string;
+    q?: string;
+    page?: number;
+    size?: number;
+  },
+  enabled = true,
+) {
+  const page = params.page ?? 1;
+  const size = params.size ?? 20;
+  return useQuery<AdminCoinLedgerResp, Error>({
+    queryKey: ['admin-economy-coins', { ...params, page, size }],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminCoinLedgerResp>('/admin/economy/coins', {
+        params: { ...params, page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 8_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+export function useAdminBetRounds(
+  params: {
+    status?: string;
+    q?: string;
+    page?: number;
+    size?: number;
+  },
+  enabled = true,
+) {
+  const page = params.page ?? 1;
+  const size = params.size ?? 20;
+  return useQuery<AdminBetListResp, Error>({
+    queryKey: ['admin-economy-bets', { ...params, page, size }],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminBetListResp>('/admin/economy/bets', {
+        params: { ...params, page, size },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 8_000,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
+}
+
+function useAdminBetMutation<TPayload extends object>(
+  fn: (payload: TPayload) => Promise<AdminBetRoundRecord>,
+) {
+  const qc = useQueryClient();
+  return useMutation<AdminBetRoundRecord, Error, TPayload>({
+    mutationFn: fn,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-economy-summary'] });
+      void qc.invalidateQueries({ queryKey: ['admin-economy-bets'] });
+      void qc.invalidateQueries({ queryKey: ['admin-economy-orders'] });
+      void qc.invalidateQueries({ queryKey: ['admin-economy-coins'] });
+      void qc.invalidateQueries({ queryKey: ['admin-economy-reports'] });
+    },
+  });
+}
+
+export function useAdminSettleBet() {
+  return useAdminBetMutation<{ id: string; option: 'win' | 'lose' }>(async ({ id, option }) => {
+    const { data } = await http.post<AdminBetRoundRecord>(
+      `/admin/economy/bets/${encodeURIComponent(id)}/settle`,
+      { option },
+    );
+    return data;
+  });
+}
+
+export function useAdminCancelBet() {
+  return useAdminBetMutation<{ id: string }>(async ({ id }) => {
+    const { data } = await http.post<AdminBetRoundRecord>(
+      `/admin/economy/bets/${encodeURIComponent(id)}/cancel`,
+    );
+    return data;
+  });
+}
+
+export function useAdminRevenueReports(
+  params: {
+    period?: AdminReportPeriod;
+    limit?: number;
+  },
+  enabled = true,
+) {
+  const period = params.period ?? 'day';
+  const limit = params.limit ?? (period === 'day' ? 14 : period === 'week' ? 8 : 6);
+  return useQuery<AdminRevenueReportResp, Error>({
+    queryKey: ['admin-economy-reports', { period, limit }],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminRevenueReportResp>('/admin/economy/reports', {
+        params: { period, limit },
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 15_000,
+    retry: 1,
   });
 }
 

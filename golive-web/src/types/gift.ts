@@ -12,6 +12,7 @@ export interface Gift {
   animation?: 'fly' | 'explode' | 'rain';
   tier: 0 | 1 | 2 | 3;
   unlockLevel?: number;
+  enabled?: boolean;
 }
 
 export interface GiftOrder {

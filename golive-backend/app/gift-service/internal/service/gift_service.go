@@ -107,6 +107,9 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 		}
 		return nil, false, fmt.Errorf("get gift: %w", err)
 	}
+	if !gift.Enabled {
+		return nil, false, ErrGiftNotFound
+	}
 	userLevel, err := s.orders.UserLevel(ctx, req.UserID)
 	if err != nil {
 		return nil, false, fmt.Errorf("user level: %w", err)
@@ -210,6 +213,9 @@ func (s *GiftService) JoinFanClub(ctx context.Context, req JoinFanClubReq) (*mod
 			return nil, false, ErrGiftNotFound
 		}
 		return nil, false, fmt.Errorf("get fan light: %w", err)
+	}
+	if !gift.Enabled {
+		return nil, false, ErrGiftNotFound
 	}
 	userLevel, err := s.orders.UserLevel(ctx, req.UserID)
 	if err != nil {

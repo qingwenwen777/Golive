@@ -13,6 +13,7 @@ type Gift struct {
 	Animation   string `gorm:"type:varchar(16)"                 json:"animation,omitempty"`
 	Tier        int    `gorm:"not null;default:0"               json:"tier"`
 	UnlockLevel int    `gorm:"not null;default:1"               json:"unlockLevel"`
+	Enabled     bool   `gorm:"not null;default:true;index"      json:"enabled"`
 }
 
 func (Gift) TableName() string { return "gifts" }

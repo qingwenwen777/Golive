@@ -74,7 +74,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		api.Any("/auth/*action", gin.WrapH(userProxy))
 		api.Any("/users/*action", gin.WrapH(userProxy))
 		api.Any("/creator/*action", gin.WrapH(userProxy))
-		api.Any("/admin/*action", gin.WrapH(userProxy))
+		api.Any("/admin/*action", adminProxy(userProxy, giftProxy))
 
 		// room-service
 		api.Any("/rooms", gin.WrapH(roomProxy))
@@ -125,6 +125,16 @@ func publicRoutes() []middleware.PublicRoute {
 		// Uploaded live covers and avatars are public assets.
 		{Method: http.MethodGet, Path: "/api/uploads/*action"},
 		{Method: http.MethodHead, Path: "/api/uploads/*action"},
+	}
+}
+
+func adminProxy(userProxy, giftProxy http.Handler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.HasPrefix(c.Param("action"), "/economy") {
+			giftProxy.ServeHTTP(c.Writer, c.Request)
+			return
+		}
+		userProxy.ServeHTTP(c.Writer, c.Request)
 	}
 }
 

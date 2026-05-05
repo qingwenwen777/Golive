@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 )
@@ -19,7 +20,7 @@ func (r *GiftRepo) AutoMigrate() error { return r.db.AutoMigrate(&model.Gift{}) 
 
 func (r *GiftRepo) List(ctx context.Context) ([]model.Gift, error) {
 	var out []model.Gift
-	err := r.db.WithContext(ctx).Order("price_coin ASC").Find(&out).Error
+	err := r.db.WithContext(ctx).Where("enabled = ?", true).Order("price_coin ASC").Find(&out).Error
 	return out, err
 }
 
@@ -37,5 +38,16 @@ func (r *GiftRepo) Get(ctx context.Context, id string) (*model.Gift, error) {
 
 // Upsert is used by the seeder.
 func (r *GiftRepo) Upsert(ctx context.Context, g *model.Gift) error {
-	return r.db.WithContext(ctx).Save(g).Error
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"name",
+			"name_ja",
+			"icon",
+			"category",
+			"animation",
+			"tier",
+			"unlock_level",
+		}),
+	}).Create(g).Error
 }

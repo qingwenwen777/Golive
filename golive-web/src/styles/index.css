@@ -7272,10 +7272,338 @@ html[lang='zh'] .gl-admin-action-select-head small {
   background: rgba(22, 163, 74, 0.1);
   color: #15803d;
 }
+.gl-admin-economy-panel {
+  min-width: 0;
+}
+.gl-admin-economy-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 10px 14px;
+}
+.gl-admin-economy-tabs button,
+.gl-admin-economy-periods button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.gl-admin-economy-tabs button:hover,
+.gl-admin-economy-periods button:hover {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-admin-economy-tabs button.is-active,
+.gl-admin-economy-periods button.is-active {
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+.gl-admin-economy-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+.gl-admin-economy-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.gl-admin-mini-metric {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 11px;
+}
+.gl-admin-mini-metric > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-admin-mini-metric strong,
+.gl-admin-mini-metric small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-mini-metric strong {
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+.gl-admin-mini-metric small {
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-admin-economy-filters {
+  grid-template-columns: minmax(150px, 0.75fr) minmax(150px, 0.75fr) minmax(260px, 1.5fr);
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 12px;
+}
+.gl-admin-economy-filters .gl-admin-content-search:last-child {
+  grid-column: auto;
+}
+.gl-admin-economy-table,
+.gl-admin-report-ledger {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-card);
+}
+.gl-admin-gift-row,
+.gl-admin-ledger-row,
+.gl-admin-bet-row,
+.gl-admin-report-ledger-row {
+  min-width: 0;
+  border-top: 1px solid var(--gl-border);
+  padding: 13px 14px;
+}
+.gl-admin-gift-row:first-child,
+.gl-admin-ledger-row:first-child,
+.gl-admin-bet-row:first-child,
+.gl-admin-report-ledger-row:first-child {
+  border-top: 0;
+}
+.gl-admin-gift-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(150px, 0.45fr) auto auto;
+  gap: 12px;
+  align-items: center;
+}
+.gl-admin-gift-main,
+.gl-admin-ledger-main,
+.gl-admin-ledger-user,
+.gl-admin-bet-main,
+.gl-admin-bet-pool {
+  min-width: 0;
+}
+.gl-admin-gift-main {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+}
+.gl-admin-gift-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+  font-size: 22px;
+}
+.gl-admin-gift-main strong,
+.gl-admin-gift-main span,
+.gl-admin-ledger-main strong,
+.gl-admin-ledger-main span,
+.gl-admin-ledger-user strong,
+.gl-admin-ledger-user span,
+.gl-admin-bet-main strong,
+.gl-admin-bet-main span,
+.gl-admin-bet-pool strong,
+.gl-admin-bet-pool span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-gift-main strong,
+.gl-admin-ledger-main strong,
+.gl-admin-bet-main strong,
+.gl-admin-bet-pool strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+.gl-admin-gift-main span,
+.gl-admin-ledger-main span,
+.gl-admin-ledger-user span,
+.gl-admin-bet-main span,
+.gl-admin-bet-pool span {
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+.gl-admin-ledger-user strong {
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+}
+.gl-admin-price-edit {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.gl-admin-price-edit span {
+  color: var(--gl-text-2);
+  font-size: 11px;
+  font-weight: 850;
+}
+.gl-admin-price-edit input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  outline: 0;
+  padding: 0 10px;
+}
+.gl-admin-price-edit input:focus {
+  border-color: var(--gl-text);
+}
+.gl-admin-economy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.gl-admin-ledger-row {
+  display: grid;
+  grid-template-columns: 38px minmax(180px, 1fr) minmax(150px, 0.65fr) minmax(170px, 0.75fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.gl-admin-ledger-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-admin-ledger-icon.is-positive {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+.gl-admin-ledger-icon.is-negative {
+  background: rgba(255, 61, 92, 0.12);
+  color: var(--gl-red);
+}
+.gl-admin-ledger-side {
+  min-width: 0;
+  text-align: right;
+}
+.gl-admin-ledger-side strong,
+.gl-admin-ledger-side span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-ledger-side strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+.gl-admin-ledger-side strong.is-positive {
+  color: #15803d;
+}
+.gl-admin-ledger-side strong.is-negative {
+  color: var(--gl-red);
+}
+.gl-admin-ledger-side span {
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+.gl-admin-bet-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(220px, 0.8fr) auto minmax(250px, auto);
+  gap: 12px;
+  align-items: center;
+}
+.gl-admin-report-ledger-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) repeat(4, minmax(100px, 1fr)) minmax(110px, auto);
+  gap: 10px;
+  align-items: center;
+}
+.gl-admin-report-ledger-row strong,
+.gl-admin-report-ledger-row span,
+.gl-admin-report-ledger-row em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-report-ledger-row strong {
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 950;
+}
+.gl-admin-report-ledger-row span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-admin-report-ledger-row em {
+  justify-self: end;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 950;
+}
+.gl-admin-economy-periods {
+  display: inline-flex;
+  width: fit-content;
+  gap: 4px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 4px;
+}
+.gl-admin-economy-pager {
+  align-self: flex-end;
+  padding: 0;
+}
 @media (max-width: 980px) {
   .gl-admin-content-filters,
   .gl-admin-user-filters,
   .gl-admin-user-manager,
+  .gl-admin-economy-filters,
+  .gl-admin-gift-row,
+  .gl-admin-ledger-row,
+  .gl-admin-bet-row,
+  .gl-admin-report-ledger-row,
   .gl-admin-report-modal-grid {
     grid-template-columns: 1fr;
   }
@@ -7310,6 +7638,12 @@ html[lang='zh'] .gl-admin-action-select-head small {
 
   .gl-admin-log-meta {
     align-items: flex-start;
+    text-align: left;
+  }
+
+  .gl-admin-ledger-side,
+  .gl-admin-report-ledger-row em {
+    justify-self: start;
     text-align: left;
   }
 

@@ -76,6 +76,8 @@ func main() {
 	giftSvc := service.NewGiftService(giftRepo, orderRepo)
 	scSvc := service.NewSuperChatService(orderRepo, rdb)
 	betSvc := service.NewBetService(orderRepo)
+	adminRepo := repo.NewAdminRepo(db)
+	adminSvc := service.NewAdminService(adminRepo, orderRepo)
 
 	var prod producer.Producer
 	if cfg.Kafka.Enabled {
@@ -98,6 +100,7 @@ func main() {
 	giftH := handler.NewGiftHandler(giftSvc, idem)
 	scH := handler.NewSuperChatHandler(scSvc, idem)
 	betH := handler.NewBetHandler(betSvc)
+	adminH := handler.NewAdminHandler(adminSvc)
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {
 		log.Fatal("jwt config", zap.Error(err))
@@ -109,6 +112,7 @@ func main() {
 		Gift:      giftH,
 		SuperChat: scH,
 		Bet:       betH,
+		Admin:     adminH,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 

@@ -430,6 +430,14 @@ func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, ou
 }
 
 func (r *OrderRepo) SettleBetRound(ctx context.Context, roundID, ownerID, winningOption string, outboxPayload []byte) (*model.BetRound, []model.BetWager, error) {
+	return r.settleBetRound(ctx, roundID, ownerID, winningOption, outboxPayload, true)
+}
+
+func (r *OrderRepo) AdminSettleBetRound(ctx context.Context, roundID, winningOption string, outboxPayload []byte) (*model.BetRound, []model.BetWager, error) {
+	return r.settleBetRound(ctx, roundID, "", winningOption, outboxPayload, false)
+}
+
+func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winningOption string, outboxPayload []byte, requireOwner bool) (*model.BetRound, []model.BetWager, error) {
 	var settledRound model.BetRound
 	var settledWagers []model.BetWager
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -441,7 +449,7 @@ func (r *OrderRepo) SettleBetRound(ctx context.Context, roundID, ownerID, winnin
 			}
 			return err
 		}
-		if round.OwnerID != ownerID {
+		if requireOwner && round.OwnerID != ownerID {
 			return ErrBetUnauthorized
 		}
 		if round.Status != model.BetRoundOpen && round.Status != model.BetRoundClosed {
@@ -553,6 +561,14 @@ func (r *OrderRepo) SettleBetRound(ctx context.Context, roundID, ownerID, winnin
 }
 
 func (r *OrderRepo) CancelBetRound(ctx context.Context, roundID, ownerID string, outboxPayload []byte) (*model.BetRound, []model.BetWager, error) {
+	return r.cancelBetRound(ctx, roundID, ownerID, outboxPayload, true)
+}
+
+func (r *OrderRepo) AdminCancelBetRound(ctx context.Context, roundID string, outboxPayload []byte) (*model.BetRound, []model.BetWager, error) {
+	return r.cancelBetRound(ctx, roundID, "", outboxPayload, false)
+}
+
+func (r *OrderRepo) cancelBetRound(ctx context.Context, roundID, ownerID string, outboxPayload []byte, requireOwner bool) (*model.BetRound, []model.BetWager, error) {
 	var cancelledRound model.BetRound
 	var refunded []model.BetWager
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -564,7 +580,7 @@ func (r *OrderRepo) CancelBetRound(ctx context.Context, roundID, ownerID string,
 			}
 			return err
 		}
-		if round.OwnerID != ownerID {
+		if requireOwner && round.OwnerID != ownerID {
 			return ErrBetUnauthorized
 		}
 		if round.Status != model.BetRoundOpen && round.Status != model.BetRoundClosed {

@@ -14,6 +14,7 @@ type Deps struct {
 	Gift      *handler.GiftHandler
 	SuperChat *handler.SuperChatHandler
 	Bet       *handler.BetHandler
+	Admin     *handler.AdminHandler
 }
 
 // NewRouter mounts gift-service routes. /api prefix stripped by api-gateway.
@@ -47,6 +48,16 @@ func NewRouter(d Deps) *gin.Engine {
 	r.POST("/bets/:id/wagers", auth, d.Bet.Wager)
 	r.POST("/bets/:id/settle", auth, d.Bet.Settle)
 	r.POST("/bets/:id/cancel", auth, d.Bet.Cancel)
+	admin := r.Group("/admin/economy", auth, handler.AdminRequired(d.Admin))
+	admin.GET("/summary", d.Admin.Summary)
+	admin.GET("/gifts", d.Admin.Gifts)
+	admin.PATCH("/gifts/:id", d.Admin.UpdateGift)
+	admin.GET("/orders", d.Admin.Orders)
+	admin.GET("/coins", d.Admin.Coins)
+	admin.GET("/bets", d.Admin.Bets)
+	admin.POST("/bets/:id/settle", d.Admin.SettleBet)
+	admin.POST("/bets/:id/cancel", d.Admin.CancelBet)
+	admin.GET("/reports", d.Admin.Reports)
 
 	return r
 }

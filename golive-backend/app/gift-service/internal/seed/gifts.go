@@ -40,6 +40,7 @@ func SeedGifts(ctx context.Context, r *repo.GiftRepo) error {
 		if defaults[i].UnlockLevel <= 0 {
 			defaults[i].UnlockLevel = 1
 		}
+		defaults[i].Enabled = true
 		if err := r.Upsert(ctx, &defaults[i]); err != nil {
 			return err
 		}
