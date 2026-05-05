@@ -18,6 +18,7 @@ export interface User {
   coinBalance: number;
   levelInfo?: UserLevelInfo;
   verified?: boolean;
+  googleLinked?: boolean;
   role: 'user' | 'admin';
   livePermissionStatus: 'none' | 'pending' | 'approved' | 'rejected';
   livePermissionRejectReason?: string;

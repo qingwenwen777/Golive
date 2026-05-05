@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_WS_BASE: string;
   readonly VITE_FLV_BASE: string;
   readonly VITE_RTMP_BASE: string;
+  readonly VITE_GOOGLE_CLIENT_ID: string;
 }
 
 interface ImportMeta {

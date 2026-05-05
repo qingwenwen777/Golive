@@ -22,6 +22,8 @@ type User struct {
 	ID                         string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	Username                   string     `gorm:"uniqueIndex;type:varchar(64);not null" json:"username"`
 	Email                      string     `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
+	GoogleSub                  *string    `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
+	GoogleLinkedAt             *time.Time `gorm:"index" json:"-"`
 	DisplayName                string     `gorm:"type:varchar(64)" json:"displayName,omitempty"`
 	PasswordHash               string     `gorm:"type:varchar(100);not null" json:"-"`
 	UsernameUpdatedAt          *time.Time `gorm:"index" json:"-"`
@@ -82,6 +84,7 @@ type PublicUser struct {
 	Role                       string             `json:"role"`
 	LivePermissionStatus       string             `json:"livePermissionStatus"`
 	LivePermissionRejectReason string             `json:"livePermissionRejectReason,omitempty"`
+	GoogleLinked               bool               `json:"googleLinked,omitempty"`
 }
 
 func (u *User) Public() PublicUser {
@@ -105,6 +108,7 @@ func (u *User) Public() PublicUser {
 		Role:                       role,
 		LivePermissionStatus:       liveStatus,
 		LivePermissionRejectReason: u.LivePermissionRejectReason,
+		GoogleLinked:               u.GoogleSub != nil && *u.GoogleSub != "",
 	}
 	if u.UsernameUpdatedAt != nil {
 		pu.UsernameUpdatedAt = u.UsernameUpdatedAt.UTC().Format(time.RFC3339)

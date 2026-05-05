@@ -24,16 +24,21 @@ import (
 
 // Errors surfaced by AuthService. Handlers should map these to errcode.AppError.
 var (
-	ErrInvalidCredentials = errcode.New(401, "Invalid username or password")
-	ErrInvalidRefresh     = errcode.New(401, "Invalid refresh token")
-	ErrUnauthorized       = errcode.New(401, "Unauthorized")
-	ErrInvalidRegister    = errcode.New(http.StatusBadRequest, "Invalid registration details")
-	ErrUsernameTaken      = errcode.New(http.StatusConflict, "Username already exists")
-	ErrEmailTaken         = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
-	ErrEmailNotFound      = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
-	ErrInvalidInvite      = errcode.New(http.StatusBadRequest, "Invalid invite code").WithReason("invalid_invite")
-	ErrInviteUsed         = errcode.New(http.StatusConflict, "Invite code already used").WithReason("invite_used")
-	ErrInvalidPassword    = errcode.New(http.StatusBadRequest, "Password must be at least 8 characters and include letters and numbers").WithReason("invalid_password")
+	ErrInvalidCredentials      = errcode.New(401, "Invalid username or password")
+	ErrInvalidRefresh          = errcode.New(401, "Invalid refresh token")
+	ErrUnauthorized            = errcode.New(401, "Unauthorized")
+	ErrInvalidRegister         = errcode.New(http.StatusBadRequest, "Invalid registration details")
+	ErrUsernameTaken           = errcode.New(http.StatusConflict, "Username already exists")
+	ErrEmailTaken              = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
+	ErrEmailNotFound           = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
+	ErrInvalidInvite           = errcode.New(http.StatusBadRequest, "Invalid invite code").WithReason("invalid_invite")
+	ErrInviteUsed              = errcode.New(http.StatusConflict, "Invite code already used").WithReason("invite_used")
+	ErrInvalidPassword         = errcode.New(http.StatusBadRequest, "Password must be at least 8 characters and include letters and numbers").WithReason("invalid_password")
+	ErrGoogleNotConfigured     = errcode.New(http.StatusServiceUnavailable, "Google sign-in is not configured").WithReason("google_not_configured")
+	ErrInvalidGoogleCredential = errcode.New(http.StatusUnauthorized, "Invalid Google credential").WithReason("invalid_google_credential")
+	ErrGoogleAccountNotFound   = errcode.New(http.StatusNotFound, "Google account is not linked to a GoLive account").WithReason("google_account_not_found")
+	ErrGoogleEmailTaken        = errcode.New(http.StatusConflict, "This Google email is already used by another account").WithReason("google_email_exists")
+	ErrGoogleAlreadyLinked     = errcode.New(http.StatusConflict, "This Google account is already linked").WithReason("google_already_linked")
 )
 
 type UserStore interface {
@@ -49,6 +54,18 @@ type inviteRegistrar interface {
 	RegisterWithInvite(ctx context.Context, u *model.User, inviteCode string) error
 }
 
+type emailFinder interface {
+	FindByEmail(ctx context.Context, email string) (*model.User, error)
+}
+
+type googleSubFinder interface {
+	FindByGoogleSub(ctx context.Context, sub string) (*model.User, error)
+}
+
+type googleLinker interface {
+	LinkGoogleAccount(ctx context.Context, id, googleSub, googleEmail string, linkedAt time.Time) (*model.User, error)
+}
+
 type passwordResetter interface {
 	ResetPasswordByEmail(ctx context.Context, email, hash string) error
 }
@@ -61,19 +78,23 @@ type TokenStore interface {
 }
 
 type AuthService struct {
-	users      UserStore
-	tokens     TokenStore
-	jwtKeys    *jwtauth.KeySet
-	accessTTL  time.Duration
-	refreshTTL time.Duration
-	now        func() time.Time // injectable for tests
+	users          UserStore
+	tokens         TokenStore
+	jwtKeys        *jwtauth.KeySet
+	accessTTL      time.Duration
+	refreshTTL     time.Duration
+	googleClientID string
+	googleVerifier GoogleCredentialVerifier
+	now            func() time.Time // injectable for tests
 }
 
 type Options struct {
-	JWTSecret  string
-	JWTKeys    *jwtauth.KeySet
-	AccessTTL  time.Duration
-	RefreshTTL time.Duration
+	JWTSecret      string
+	JWTKeys        *jwtauth.KeySet
+	AccessTTL      time.Duration
+	RefreshTTL     time.Duration
+	GoogleClientID string
+	GoogleVerifier GoogleCredentialVerifier
 }
 
 func NewAuthService(users UserStore, tokens TokenStore, opts Options) *AuthService {
@@ -86,12 +107,14 @@ func NewAuthService(users UserStore, tokens TokenStore, opts Options) *AuthServi
 		}
 	}
 	return &AuthService{
-		users:      users,
-		tokens:     tokens,
-		jwtKeys:    keys,
-		accessTTL:  opts.AccessTTL,
-		refreshTTL: opts.RefreshTTL,
-		now:        time.Now,
+		users:          users,
+		tokens:         tokens,
+		jwtKeys:        keys,
+		accessTTL:      opts.AccessTTL,
+		refreshTTL:     opts.RefreshTTL,
+		googleClientID: strings.TrimSpace(opts.GoogleClientID),
+		googleVerifier: opts.GoogleVerifier,
+		now:            time.Now,
 	}
 }
 
@@ -336,6 +359,10 @@ func HashPassword(plain string) (string, error) {
 		return "", err
 	}
 	return string(h), nil
+}
+
+func ComparePassword(hash, plain string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain))
 }
 
 func ValidatePasswordPolicy(password string) error {

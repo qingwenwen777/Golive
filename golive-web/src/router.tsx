@@ -8,6 +8,16 @@ const SearchPage = lazy(() => import('@/pages/SearchPage'));
 const LiveRoomPage = lazy(() => import('@/pages/LiveRoomPage'));
 const ChannelPage = lazy(() => import('@/pages/ChannelPage'));
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
+const PrivacyPage = lazy(() =>
+  import('@/pages/LegalPages').then((module) => ({
+    default: module.PrivacyPage,
+  })),
+);
+const TermsPage = lazy(() =>
+  import('@/pages/LegalPages').then((module) => ({
+    default: module.TermsPage,
+  })),
+);
 const CoinPage = lazy(() => import('@/pages/CoinPage'));
 const AdminPage = lazy(() => import('@/pages/AdminPage'));
 const CreatorAnalyticsPage = lazy(() =>
@@ -135,6 +145,8 @@ export const router = createBrowserRouter([
       { path: 'watch-later', element: <WatchLaterPage /> },
       { path: 'liked', element: <LikedPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'privacy', element: <PrivacyPage /> },
+      { path: 'terms', element: <TermsPage /> },
       { path: 'admin', element: <Navigate to="/admin/dashboard" replace /> },
       { path: 'admin/applications', element: <Navigate to="/admin/creators" replace /> },
       { path: 'admin/:section', element: <AdminPage /> },

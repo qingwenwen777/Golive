@@ -17,6 +17,7 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 var ErrUsernameTaken = errors.New("username already exists")
 var ErrEmailTaken = errors.New("email already exists")
+var ErrGoogleAlreadyLinked = errors.New("google account already linked")
 var ErrInviteNotFound = errors.New("invite code not found")
 var ErrInviteUsed = errors.New("invite code already used")
 var ErrUsernameCooldown = errors.New("username change cooldown")
@@ -76,6 +77,21 @@ func (r *UserRepo) FindByUsername(ctx context.Context, username string) (*model.
 func (r *UserRepo) FindByEmail(ctx context.Context, email string) (*model.User, error) {
 	var u model.User
 	err := r.db.WithContext(ctx).Where("email = ?", email).Take(&u).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (r *UserRepo) FindByGoogleSub(ctx context.Context, sub string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Where("google_sub = ?", sub).Take(&u).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrUserNotFound
 	}
@@ -162,6 +178,56 @@ func (r *UserRepo) ResetPasswordByEmail(ctx context.Context, email, hash string)
 		return ErrUserNotFound
 	}
 	return nil
+}
+
+func (r *UserRepo) LinkGoogleAccount(ctx context.Context, id, googleSub, googleEmail string, linkedAt time.Time) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).
+			Take(&u).Error; err != nil {
+			return err
+		}
+
+		var existing model.User
+		err := tx.Where("google_sub = ? AND id <> ?", googleSub, id).Take(&existing).Error
+		if err == nil {
+			return ErrGoogleAlreadyLinked
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		updates := map[string]any{
+			"google_sub":       googleSub,
+			"google_linked_at": linkedAt,
+		}
+		if googleEmail != "" && googleEmail != u.Email {
+			err := tx.Where("email = ? AND id <> ?", googleEmail, id).Take(&existing).Error
+			if err == nil {
+				return ErrEmailTaken
+			}
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			updates["email"] = googleEmail
+		}
+
+		if err := tx.Model(&u).Updates(updates).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", id).Take(&u).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 func (r *UserRepo) BackfillMissingEmails(ctx context.Context) error {

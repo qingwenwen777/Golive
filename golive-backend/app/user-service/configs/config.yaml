@@ -25,6 +25,9 @@ jwt:
   access_ttl: 2h
   refresh_ttl: 168h   # 7 days
 
+google:
+  client_id: "89585115085-rgjj5j27tfiis9oml9ls1oct9u20bjuc.apps.googleusercontent.com"
+
 upload:
   avatar_dir: "./uploads/avatars"
   avatar_public_url: "/api/uploads/avatars"

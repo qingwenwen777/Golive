@@ -31,7 +31,12 @@ function shouldResetSessionAfterRefreshFailure(err: unknown): boolean {
 
 function isAuthEndpoint(url: string | undefined): boolean {
   if (!url) return false;
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout');
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/google/') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout')
+  );
 }
 
 http.interceptors.response.use(
@@ -44,12 +49,7 @@ http.interceptors.response.use(
       console.error('[api]', config?.url, error.message);
     }
 
-    if (
-      status === 401 &&
-      config &&
-      !config._retry &&
-      !isAuthEndpoint(config.url)
-    ) {
+    if (status === 401 && config && !config._retry && !isAuthEndpoint(config.url)) {
       try {
         const newToken = await doRefresh();
         config._retry = true;

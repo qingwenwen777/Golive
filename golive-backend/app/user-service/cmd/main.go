@@ -85,10 +85,11 @@ func main() {
 	tokenRepo := repo.NewTokenRepo(rdb)
 	captcha := service.NewCaptchaService(rdb, 5*time.Minute)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
-		JWTSecret:  cfg.JWT.Secret,
-		JWTKeys:    jwtKeys,
-		AccessTTL:  cfg.JWT.AccessTTL,
-		RefreshTTL: cfg.JWT.RefreshTTL,
+		JWTSecret:      cfg.JWT.Secret,
+		JWTKeys:        jwtKeys,
+		AccessTTL:      cfg.JWT.AccessTTL,
+		RefreshTTL:     cfg.JWT.RefreshTTL,
+		GoogleClientID: cfg.Google.ClientID,
 	})
 
 	r := server.NewRouter(server.Deps{

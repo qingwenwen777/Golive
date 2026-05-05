@@ -567,7 +567,12 @@
         "appealSending": "提交中...",
         "appealSubmitted": "申诉已提交，我们会尽快复核。",
         "appealFailed": "无法提交申诉。",
-        "appealReasonRequired": "请至少输入 10 个字。"
+        "appealReasonRequired": "请至少输入 10 个字。",
+        "googleTitle": "Google 账号",
+        "googleSub": "绑定后可以更快登录当前账号。",
+        "googleBind": "绑定 Google",
+        "googleLinked": "已绑定 Google 账号。",
+        "googleUnavailable": "Google 登录尚未配置完成。"
       },
       "preferences": {
         "displayTitle": "显示偏好",
@@ -588,7 +593,12 @@
         "usernameCooldown": "用户名冷却中，{{date}} 后可再次修改。",
         "usernameCooldownUnknown": "用户名修改仍在冷却期。",
         "invalidCurrentPassword": "当前密码不正确。",
-        "failed": "操作失败，请稍后重试。"
+        "failed": "操作失败，请稍后重试。",
+        "googleLoadFailed": "无法加载 Google 登录。",
+        "googleEmailExists": "这个 Google 邮箱已经属于另一个 GoLive 账号。",
+        "googleAlreadyLinked": "这个 Google 账号已经被绑定。",
+        "invalidGoogleCredential": "无法验证 Google 登录。",
+        "googleNotConfigured": "Google 登录尚未配置完成。"
       }
     }
   },

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -14,6 +15,7 @@ type Config struct {
 	MySQL     MySQLCfg     `mapstructure:"mysql"`
 	Redis     RedisCfg     `mapstructure:"redis"`
 	JWT       JWTCfg       `mapstructure:"jwt"`
+	Google    GoogleCfg    `mapstructure:"google"`
 	Upload    UploadCfg    `mapstructure:"upload"`
 	Bootstrap BootstrapCfg `mapstructure:"bootstrap"`
 }
@@ -50,6 +52,10 @@ type JWTKeyCfg = jwtauth.KeyConfig
 
 func (c JWTCfg) KeySet() (*jwtauth.KeySet, error) {
 	return jwtauth.NewKeySet(c.Secret, c.ActiveKID, c.Secrets)
+}
+
+type GoogleCfg struct {
+	ClientID string `mapstructure:"client_id"`
 }
 
 type UploadCfg struct {
@@ -91,6 +97,8 @@ func Load(path string) (*Config, error) {
 	}
 	v.AutomaticEnv()
 	v.SetEnvPrefix("USERSVC")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	_ = v.BindEnv("google.client_id")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

@@ -28,7 +28,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
+import { useBindGoogleAccount, useChangePassword, useMe, useUpdateProfile } from '@/api/auth';
 import { useCreateUnbanAppeal } from '@/api/contentModeration';
 import { useFanBadges } from '@/api/gift';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
@@ -51,6 +51,7 @@ import { cn } from '@/lib/cn';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import { http } from '@/lib/axios';
 import { levelProgressRatio, normalizeLevelInfo } from '@/lib/userLevel';
+import { GoogleIdentityButton, isGoogleConfigured } from '@/lib/googleIdentity';
 import {
   LIKED_STREAMS_KEY,
   WATCH_HISTORY_KEY,
@@ -728,6 +729,7 @@ export function SettingsPage() {
   const me = useMe();
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const bindGoogle = useBindGoogleAccount();
   const createUnbanAppeal = useCreateUnbanAppeal();
   const [tab, setTab] = useState<SettingsTab>('profile');
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -844,6 +846,21 @@ export function SettingsPage() {
     );
   };
 
+  const handleGoogleBind = (credential: string) => {
+    bindGoogle.mutate(
+      { credential },
+      {
+        onSuccess: () =>
+          toast.success(
+            t('library.settings.security.googleLinked', {
+              defaultValue: 'Google account connected.',
+            }),
+          ),
+        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
+      },
+    );
+  };
+
   return (
     <div className="gl-page gl-library-page gl-settings-page">
       <header className="gl-settings-hero">
@@ -905,6 +922,8 @@ export function SettingsPage() {
               newPassword={newPassword}
               confirmPassword={confirmPassword}
               pending={changePassword.isPending}
+              googleLinked={Boolean(currentUser?.googleLinked)}
+              googlePending={bindGoogle.isPending}
               usernameAvailableAt={usernameAvailableAt}
               unbanReason={unbanReason}
               appealPending={createUnbanAppeal.isPending}
@@ -913,6 +932,14 @@ export function SettingsPage() {
               onConfirmPasswordChange={setConfirmPassword}
               onUnbanReasonChange={setUnbanReason}
               onSubmit={submitPassword}
+              onGoogleCredential={handleGoogleBind}
+              onGoogleUnavailable={() =>
+                toast.error(
+                  t('library.settings.errors.googleLoadFailed', {
+                    defaultValue: 'Could not load Google sign-in.',
+                  }),
+                )
+              }
               onAppealSubmit={submitUnbanAppeal}
             />
           ) : (
@@ -1071,6 +1098,8 @@ function SecuritySettings({
   newPassword,
   confirmPassword,
   pending,
+  googleLinked,
+  googlePending,
   usernameAvailableAt,
   unbanReason,
   appealPending,
@@ -1079,12 +1108,16 @@ function SecuritySettings({
   onConfirmPasswordChange,
   onUnbanReasonChange,
   onSubmit,
+  onGoogleCredential,
+  onGoogleUnavailable,
   onAppealSubmit,
 }: {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
   pending: boolean;
+  googleLinked: boolean;
+  googlePending: boolean;
   usernameAvailableAt: Date | null;
   unbanReason: string;
   appealPending: boolean;
@@ -1093,6 +1126,8 @@ function SecuritySettings({
   onConfirmPasswordChange: (value: string) => void;
   onUnbanReasonChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onGoogleCredential: (credential: string) => void;
+  onGoogleUnavailable: () => void;
   onAppealSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t, i18n } = useTranslation('pages');
@@ -1152,6 +1187,48 @@ function SecuritySettings({
           </button>
         </div>
       </form>
+
+      <section className="gl-settings-card gl-settings-form">
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <ShieldCheck size={18} />
+          </span>
+          <div>
+            <h2>
+              {t('library.settings.security.googleTitle', { defaultValue: 'Google account' })}
+            </h2>
+            <p>
+              {t('library.settings.security.googleSub', {
+                defaultValue: 'Link Google so you can sign in without a password next time.',
+              })}
+            </p>
+          </div>
+        </div>
+        {googleLinked ? (
+          <div className="gl-settings-provider-state">
+            <ShieldCheck size={16} />
+            <span>
+              {t('library.settings.security.googleLinked', {
+                defaultValue: 'Google account connected.',
+              })}
+            </span>
+          </div>
+        ) : (
+          <GoogleIdentityButton
+            text="continue_with"
+            disabled={googlePending}
+            fallbackLabel={
+              isGoogleConfigured()
+                ? t('library.settings.security.googleBind', { defaultValue: 'Link Google account' })
+                : t('library.settings.security.googleUnavailable', {
+                    defaultValue: 'Google sign-in is not configured',
+                  })
+            }
+            onCredential={onGoogleCredential}
+            onUnavailable={onGoogleUnavailable}
+          />
+        )}
+      </section>
 
       <section className="gl-settings-card gl-settings-note">
         <span className="gl-settings-card-icon">
@@ -1323,6 +1400,26 @@ function settingsErrorMessage(
     }
     if (data?.reason === 'invalid_current_password') {
       return t('library.settings.errors.invalidCurrentPassword');
+    }
+    if (data?.reason === 'google_email_exists') {
+      return t('library.settings.errors.googleEmailExists', {
+        defaultValue: 'This Google email is already used by another account.',
+      });
+    }
+    if (data?.reason === 'google_already_linked') {
+      return t('library.settings.errors.googleAlreadyLinked', {
+        defaultValue: 'This Google account is already linked to another account.',
+      });
+    }
+    if (data?.reason === 'invalid_google_credential') {
+      return t('library.settings.errors.invalidGoogleCredential', {
+        defaultValue: 'Google sign-in could not be verified.',
+      });
+    }
+    if (data?.reason === 'google_not_configured') {
+      return t('library.settings.errors.googleNotConfigured', {
+        defaultValue: 'Google sign-in is not configured yet.',
+      });
     }
     if (data?.message) return data.message;
   }

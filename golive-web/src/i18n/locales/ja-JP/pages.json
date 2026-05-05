@@ -566,7 +566,12 @@
         "appealSending": "送信中...",
         "appealSubmitted": "申し立てを送信しました。できるだけ早く確認します。",
         "appealFailed": "申し立てを送信できませんでした。",
-        "appealReasonRequired": "10 文字以上入力してください。"
+        "appealReasonRequired": "10 文字以上入力してください。",
+        "googleTitle": "Google アカウント",
+        "googleSub": "このアカウントに Google を連携して、よりすばやくログインできます。",
+        "googleBind": "Google を連携",
+        "googleLinked": "Google アカウントを連携済みです。",
+        "googleUnavailable": "Google ログインはまだ設定されていません。"
       },
       "preferences": {
         "displayTitle": "表示設定",
@@ -587,7 +592,12 @@
         "usernameCooldown": "ユーザー名はクールダウン中です。{{date}} 以降に再変更できます。",
         "usernameCooldownUnknown": "ユーザー名の変更はまだクールダウン中です。",
         "invalidCurrentPassword": "現在のパスワードが正しくありません。",
-        "failed": "操作に失敗しました。時間をおいて再度お試しください。"
+        "failed": "操作に失敗しました。時間をおいて再度お試しください。",
+        "googleLoadFailed": "Google ログインを読み込めませんでした。",
+        "googleEmailExists": "この Google メールは別の GoLive アカウントで使用されています。",
+        "googleAlreadyLinked": "この Google アカウントはすでに連携されています。",
+        "invalidGoogleCredential": "Google ログインを確認できませんでした。",
+        "googleNotConfigured": "Google ログインはまだ設定されていません。"
       }
     }
   },

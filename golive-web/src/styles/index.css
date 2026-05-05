@@ -3899,6 +3899,64 @@ input:focus-visible,
   font-size: 14px;
   font-weight: 700;
 }
+.gl-google-button-shell {
+  position: relative;
+  min-height: 42px;
+  width: 100%;
+}
+.gl-google-button,
+.gl-google-button > div,
+.gl-google-button iframe {
+  width: 100% !important;
+}
+.gl-google-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  width: 100%;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+  font-size: 14px;
+  font-weight: 750;
+}
+.gl-google-button-shell .gl-google-fallback {
+  position: absolute;
+  inset: 0;
+}
+.gl-auth-google-link {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid rgba(28, 98, 185, 0.24);
+  border-radius: 8px;
+  background: rgba(28, 98, 185, 0.07);
+  padding: 12px;
+}
+.gl-auth-google-link strong {
+  color: var(--gl-text);
+  font-size: 14px;
+}
+.gl-auth-google-link p {
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.gl-auth-google-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.gl-auth-google-link-actions .gl-auth-submit {
+  min-width: 140px;
+  border: 0;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+  padding: 0 16px;
+}
 .gl-auth-submit {
   margin-top: 4px;
   border: 0;
@@ -10377,6 +10435,20 @@ button.gl-fan-badge-empty {
   opacity: 0.55;
 }
 
+.gl-settings-provider-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  border: 1px solid rgba(21, 128, 61, 0.24);
+  border-radius: 999px;
+  background: rgba(21, 128, 61, 0.08);
+  color: #15803d;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
 .gl-settings-form {
   display: flex;
   flex-direction: column;
@@ -10473,6 +10545,63 @@ button.gl-fan-badge-empty {
   display: flex;
   gap: 12px;
   align-items: flex-start;
+}
+
+.gl-legal-page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 48px 32px 72px;
+}
+
+.gl-legal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid var(--gl-border);
+  padding-bottom: 24px;
+}
+
+.gl-legal-brand {
+  width: fit-content;
+  color: var(--gl-red);
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.gl-legal-head h1 {
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.gl-legal-head p {
+  color: var(--gl-text-2);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.gl-legal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-top: 28px;
+}
+
+.gl-legal-section h2 {
+  margin-bottom: 10px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.gl-legal-section p {
+  color: var(--gl-text-2);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.gl-legal-section p + p {
+  margin-top: 10px;
 }
 
 .gl-settings-shortcuts {

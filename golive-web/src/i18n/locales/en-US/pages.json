@@ -566,7 +566,12 @@
         "appealSending": "Submitting...",
         "appealSubmitted": "Appeal submitted. We will review it as soon as possible.",
         "appealFailed": "Could not submit appeal.",
-        "appealReasonRequired": "Please enter at least 10 characters."
+        "appealReasonRequired": "Please enter at least 10 characters.",
+        "googleTitle": "Google account",
+        "googleSub": "Use Google as a faster sign-in method for this account.",
+        "googleBind": "Connect Google",
+        "googleLinked": "Google account connected.",
+        "googleUnavailable": "Google sign-in is not configured yet."
       },
       "preferences": {
         "displayTitle": "Display preferences",
@@ -587,7 +592,12 @@
         "usernameCooldown": "Username is cooling down. You can change it again after {{date}}.",
         "usernameCooldownUnknown": "Username changes are still in cooldown.",
         "invalidCurrentPassword": "Current password is incorrect.",
-        "failed": "Action failed. Please try again later."
+        "failed": "Action failed. Please try again later.",
+        "googleLoadFailed": "Could not load Google sign-in.",
+        "googleEmailExists": "That Google email is already used by another GoLive account.",
+        "googleAlreadyLinked": "That Google account is already connected.",
+        "invalidGoogleCredential": "Google sign-in could not be verified.",
+        "googleNotConfigured": "Google sign-in is not configured yet."
       }
     }
   },

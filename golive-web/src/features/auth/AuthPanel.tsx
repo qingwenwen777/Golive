@@ -2,24 +2,23 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AxiosError } from 'axios';
-import {
-  BadgeCheck,
-  KeyRound,
-  Mail,
-  PlayCircle,
-  Radio,
-  RefreshCw,
-  Ticket,
-  UserRound,
-} from 'lucide-react';
+import { BadgeCheck, KeyRound, Mail, PlayCircle, RefreshCw, Ticket, UserRound } from 'lucide-react';
 import {
   fetchCaptcha,
+  useGoogleLinkExistingMutation,
+  useGoogleLoginMutation,
+  useGoogleRegisterMutation,
   useLoginMutation,
   useRegisterMutation,
   useResetPasswordMutation,
 } from '@/api/auth';
 import { GoLiveLogo } from '@/components/Logo';
 import { cn } from '@/lib/cn';
+import {
+  GoogleIdentityButton,
+  decodeGoogleCredentialEmail,
+  isGoogleConfigured,
+} from '@/lib/googleIdentity';
 import type { LoginResp } from '@/types/user';
 
 type AuthMode = 'signin' | 'signup' | 'reset';
@@ -44,7 +43,9 @@ function authErrorMessage(
       return t('auth.errors.invalidCaptcha', { defaultValue: 'Captcha is incorrect or expired.' });
     }
     if (reason === 'email_taken') {
-      return t('auth.errors.emailTaken', { defaultValue: 'This email is already bound to another account.' });
+      return t('auth.errors.emailTaken', {
+        defaultValue: 'This email is already bound to another account.',
+      });
     }
     if (reason === 'invalid_email') {
       return t('auth.errors.invalidEmail', { defaultValue: 'Enter a valid email address.' });
@@ -61,16 +62,41 @@ function authErrorMessage(
     if (reason === 'invalid_password') {
       return t('auth.errors.invalidPassword', { defaultValue: PASSWORD_RULE_TEXT });
     }
+    if (reason === 'google_not_configured') {
+      return t('auth.errors.googleNotConfigured', {
+        defaultValue: 'Google sign-in is not configured yet.',
+      });
+    }
+    if (reason === 'invalid_google_credential') {
+      return t('auth.errors.invalidGoogleCredential', {
+        defaultValue: 'Google sign-in could not be verified.',
+      });
+    }
+    if (reason === 'google_account_not_found') {
+      return t('auth.errors.googleAccountNotFound', {
+        defaultValue: 'Use Register with an invite code before signing in with Google.',
+      });
+    }
+    if (reason === 'google_already_linked') {
+      return t('auth.errors.googleAlreadyLinked', {
+        defaultValue: 'This Google account is already linked.',
+      });
+    }
+    if (reason === 'google_email_exists') {
+      return t('auth.errors.googleEmailExists', {
+        defaultValue: 'This Google email already belongs to an existing GoLive account.',
+      });
+    }
     if (err.response?.status === 401) return t('auth.errors.invalidCredentials');
     if (err.response?.status === 409) return t('auth.errors.usernameTaken');
     if (err.response?.status === 400) return t('auth.errors.badFields');
   }
   if (mode === 'reset') {
-    return t('auth.errors.resetFailed', { defaultValue: 'Password reset failed, please try again.' });
+    return t('auth.errors.resetFailed', {
+      defaultValue: 'Password reset failed, please try again.',
+    });
   }
-  return mode === 'signin'
-    ? t('auth.errors.signInFailed')
-    : t('auth.errors.signUpFailed');
+  return mode === 'signin' ? t('auth.errors.signInFailed') : t('auth.errors.signUpFailed');
 }
 
 export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
@@ -89,6 +115,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const [captchaId, setCaptchaId] = useState('');
   const [captchaImage, setCaptchaImage] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
+  const [googleLinkCredential, setGoogleLinkCredential] = useState('');
+  const [googleLinkEmail, setGoogleLinkEmail] = useState('');
+  const [googleLinkPassword, setGoogleLinkPassword] = useState('');
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -96,13 +125,16 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const loginMut = useLoginMutation();
   const registerMut = useRegisterMutation();
   const resetPasswordMut = useResetPasswordMutation();
+  const googleLoginMut = useGoogleLoginMutation();
+  const googleRegisterMut = useGoogleRegisterMutation();
+  const googleLinkExistingMut = useGoogleLinkExistingMutation();
   const isSigningUp = mode === 'signup';
   const isResetting = mode === 'reset';
   const isPending = isResetting
     ? resetPasswordMut.isPending
     : isSigningUp
-      ? registerMut.isPending
-      : loginMut.isPending;
+      ? registerMut.isPending || googleRegisterMut.isPending || googleLinkExistingMut.isPending
+      : loginMut.isPending || googleLoginMut.isPending || googleLinkExistingMut.isPending;
   const displayNameId = `${id}-display-name`;
   const usernameId = `${id}-username`;
   const emailId = `${id}-email`;
@@ -136,8 +168,14 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     loginMut.reset();
     registerMut.reset();
     resetPasswordMut.reset();
+    googleLoginMut.reset();
+    googleRegisterMut.reset();
+    googleLinkExistingMut.reset();
     setConfirmPassword('');
     setResetConfirmPassword('');
+    setGoogleLinkCredential('');
+    setGoogleLinkEmail('');
+    setGoogleLinkPassword('');
     if (mode === 'reset') {
       setCaptchaId('');
       setCaptchaImage('');
@@ -166,7 +204,11 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         { email: resetEmail.trim(), newPassword: resetPassword },
         {
           onSuccess: () => {
-            setSuccess(t('auth.resetSuccess', { defaultValue: 'Password has been reset. You can sign in now.' }));
+            setSuccess(
+              t('auth.resetSuccess', {
+                defaultValue: 'Password has been reset. You can sign in now.',
+              }),
+            );
             setMode('signin');
             setPassword('');
             setResetPassword('');
@@ -187,7 +229,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     const cleanCaptcha = captchaCode.trim();
 
     if (!captchaId || !cleanCaptcha) {
-      setError(t('auth.errors.captchaRequired', { defaultValue: 'Enter the captcha to continue.' }));
+      setError(
+        t('auth.errors.captchaRequired', { defaultValue: 'Enter the captcha to continue.' }),
+      );
       return;
     }
 
@@ -231,19 +275,139 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     }
   };
 
+  const showGoogleLinkPrompt = useCallback((credential: string, err: Error): boolean => {
+    if (!(err instanceof AxiosError)) return false;
+    const data = err.response?.data as { reason?: string; email?: string } | undefined;
+    if (data?.reason !== 'google_email_exists') return false;
+    setGoogleLinkCredential(credential);
+    setGoogleLinkEmail(data.email || decodeGoogleCredentialEmail(credential));
+    setGoogleLinkPassword('');
+    setError(null);
+    setSuccess(null);
+    return true;
+  }, []);
+
+  const handleGoogleCredential = useCallback(
+    (credential: string) => {
+      if (isResetting) return;
+      setError(null);
+      setSuccess(null);
+      setGoogleLinkCredential('');
+      setGoogleLinkPassword('');
+
+      const callbacks = {
+        onSuccess: (resp: LoginResp) => {
+          onAuthenticated?.(resp);
+        },
+        onError: (err: Error) => {
+          if (showGoogleLinkPrompt(credential, err)) return;
+          setError(authErrorMessage(err, mode, t));
+        },
+      };
+
+      if (isSigningUp) {
+        const cleanUsername = username.trim();
+        const cleanDisplayName = displayName.trim();
+        const cleanInviteCode = inviteCode.trim();
+        if (!cleanInviteCode) {
+          setError(
+            t('auth.errors.inviteRequired', {
+              defaultValue: 'Enter an invite code before continuing with Google.',
+            }),
+          );
+          return;
+        }
+        if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$/.test(cleanUsername)) {
+          setError(
+            t('auth.errors.invalidUsername', {
+              defaultValue: 'Choose a valid username before continuing with Google.',
+            }),
+          );
+          return;
+        }
+        googleRegisterMut.mutate(
+          {
+            credential,
+            username: cleanUsername,
+            displayName: cleanDisplayName,
+            inviteCode: cleanInviteCode,
+          },
+          callbacks,
+        );
+        return;
+      }
+
+      googleLoginMut.mutate({ credential }, callbacks);
+    },
+    [
+      displayName,
+      googleLoginMut,
+      googleRegisterMut,
+      inviteCode,
+      isResetting,
+      isSigningUp,
+      mode,
+      onAuthenticated,
+      showGoogleLinkPrompt,
+      t,
+      username,
+    ],
+  );
+
+  const handleGoogleLinkExisting = () => {
+    if (!googleLinkCredential) return;
+    if (!googleLinkPassword) {
+      setError(
+        t('auth.errors.passwordRequired', {
+          defaultValue: 'Enter the existing account password to link Google.',
+        }),
+      );
+      return;
+    }
+    setError(null);
+    googleLinkExistingMut.mutate(
+      { credential: googleLinkCredential, password: googleLinkPassword },
+      {
+        onSuccess: (resp) => {
+          setGoogleLinkCredential('');
+          setGoogleLinkPassword('');
+          onAuthenticated?.(resp);
+        },
+        onError: (err: Error) => setError(authErrorMessage(err, mode, t)),
+      },
+    );
+  };
+
+  const handleGoogleUnavailable = useCallback(
+    () =>
+      setError(
+        t('auth.errors.googleLoadFailed', { defaultValue: 'Could not load Google sign-in.' }),
+      ),
+    [t],
+  );
+
   const title = isResetting
     ? t('auth.resetTitle', { defaultValue: 'Reset password' })
     : isSigningUp
       ? t('auth.signUpTitle')
       : t('auth.signInTitle');
   const sub = isResetting
-    ? t('auth.resetSub', { defaultValue: 'Use the email bound to your account to set a new password.' })
+    ? t('auth.resetSub', {
+        defaultValue: 'Use the email bound to your account to set a new password.',
+      })
     : isSigningUp
       ? t('auth.signUpSub')
       : t('auth.signInSub');
 
   return (
-    <section className={cn('gl-auth-panel', isSigningUp && 'is-signup', isResetting && 'is-reset', className)}>
+    <section
+      className={cn(
+        'gl-auth-panel',
+        isSigningUp && 'is-signup',
+        isResetting && 'is-reset',
+        className,
+      )}
+    >
       <div className="gl-auth-head">
         <div className="gl-auth-brand" aria-hidden="true">
           <GoLiveLogo height={26} />
@@ -302,7 +466,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
               </span>
             </label>
             <label className="gl-auth-field" htmlFor={resetPasswordId}>
-              <span className="gl-auth-label">{t('auth.newPassword', { defaultValue: 'New password' })}</span>
+              <span className="gl-auth-label">
+                {t('auth.newPassword', { defaultValue: 'New password' })}
+              </span>
               <span className="gl-auth-input-wrap">
                 <KeyRound size={18} />
                 <input
@@ -358,7 +524,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   </span>
                 </label>
                 <label className="gl-auth-field" htmlFor={emailId}>
-                  <span className="gl-auth-label">{t('auth.email', { defaultValue: 'Email' })}</span>
+                  <span className="gl-auth-label">
+                    {t('auth.email', { defaultValue: 'Email' })}
+                  </span>
                   <span className="gl-auth-input-wrap">
                     <Mail size={18} />
                     <input
@@ -373,7 +541,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   </span>
                 </label>
                 <label className="gl-auth-field" htmlFor={inviteCodeId}>
-                  <span className="gl-auth-label">{t('auth.inviteCode', { defaultValue: 'Invite code' })}</span>
+                  <span className="gl-auth-label">
+                    {t('auth.inviteCode', { defaultValue: 'Invite code' })}
+                  </span>
                   <span className="gl-auth-input-wrap">
                     <Ticket size={18} />
                     <input
@@ -382,7 +552,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                       autoComplete="one-time-code"
                       value={inviteCode}
                       onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                      placeholder={t('auth.inviteCodePlaceholder', { defaultValue: 'Enter invite code' })}
+                      placeholder={t('auth.inviteCodePlaceholder', {
+                        defaultValue: 'Enter invite code',
+                      })}
                       required
                     />
                   </span>
@@ -448,7 +620,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
             )}
 
             <label className="gl-auth-field" htmlFor={captchaIdAttr}>
-              <span className="gl-auth-label">{t('auth.captcha', { defaultValue: 'Captcha' })}</span>
+              <span className="gl-auth-label">
+                {t('auth.captcha', { defaultValue: 'Captcha' })}
+              </span>
               <span className="gl-auth-captcha-row">
                 <span className="gl-auth-input-wrap">
                   <input
@@ -490,6 +664,58 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           </div>
         )}
 
+        {googleLinkCredential && (
+          <div className="gl-auth-google-link" role="status">
+            <strong>
+              {t('auth.googleLinkExistingTitle', { defaultValue: 'Google email already exists' })}
+            </strong>
+            <p>
+              {t('auth.googleLinkExistingSub', {
+                email: googleLinkEmail,
+                defaultValue:
+                  '{{email}} is already used by a GoLive account. Enter that account password to link Google, or cancel.',
+              })}
+            </p>
+            <label className="gl-auth-field">
+              <span className="gl-auth-label">
+                {t('auth.existingPassword', { defaultValue: 'Existing account password' })}
+              </span>
+              <span className="gl-auth-input-wrap">
+                <KeyRound size={18} />
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={googleLinkPassword}
+                  onChange={(event) => setGoogleLinkPassword(event.target.value)}
+                  placeholder={t('auth.password')}
+                />
+              </span>
+            </label>
+            <div className="gl-auth-google-link-actions">
+              <button
+                type="button"
+                className="gl-auth-submit"
+                disabled={googleLinkExistingMut.isPending}
+                onClick={handleGoogleLinkExisting}
+              >
+                {googleLinkExistingMut.isPending
+                  ? t('auth.linkingGoogle', { defaultValue: 'Linking...' })
+                  : t('auth.linkGoogle', { defaultValue: 'Link Google' })}
+              </button>
+              <button
+                type="button"
+                className="gl-auth-link-btn"
+                onClick={() => {
+                  setGoogleLinkCredential('');
+                  setGoogleLinkPassword('');
+                }}
+              >
+                {t('auth.cancelGoogleLink', { defaultValue: 'Cancel' })}
+              </button>
+            </div>
+          </div>
+        )}
+
         <button type="submit" disabled={isPending} className="gl-auth-submit">
           <PlayCircle size={18} />
           <span>
@@ -526,15 +752,15 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
             <span>{t('auth.backToSignIn', { defaultValue: 'Back to sign in' })}</span>
           </button>
         ) : (
-          <button
-            type="button"
-            disabled
-            className="gl-auth-secondary"
-            title={t('auth.socialUnavailable')}
-          >
-            <Radio size={18} />
-            <span>{t('auth.continueGoogle')}</span>
-          </button>
+          <GoogleIdentityButton
+            text={isSigningUp ? 'signup_with' : 'continue_with'}
+            disabled={isPending}
+            fallbackLabel={
+              isGoogleConfigured() ? t('auth.continueGoogle') : t('auth.socialUnavailable')
+            }
+            onCredential={handleGoogleCredential}
+            onUnavailable={handleGoogleUnavailable}
+          />
         )}
       </form>
     </section>

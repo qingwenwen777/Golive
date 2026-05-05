@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,22 @@ type registerReq struct {
 type resetPasswordReq struct {
 	Email       string `json:"email" binding:"required"`
 	NewPassword string `json:"newPassword" binding:"required"`
+}
+
+type googleLoginReq struct {
+	Credential string `json:"credential" binding:"required"`
+}
+
+type googleRegisterReq struct {
+	Credential  string `json:"credential" binding:"required"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	InviteCode  string `json:"inviteCode" binding:"required"`
+}
+
+type googleLinkReq struct {
+	Credential string `json:"credential" binding:"required"`
+	Password   string `json:"password" binding:"required"`
 }
 
 func (h *AuthHandler) Captcha(c *gin.Context) {
@@ -101,6 +118,86 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	var req googleLoginReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidGoogleCredential)
+		return
+	}
+	resp, err := h.svc.GoogleLogin(c.Request.Context(), req.Credential)
+	if err != nil {
+		if respondGoogleEmailTaken(c, err) {
+			return
+		}
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *AuthHandler) GoogleRegister(c *gin.Context) {
+	var req googleRegisterReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister)
+		return
+	}
+	resp, err := h.svc.GoogleRegisterWithInvite(c.Request.Context(), req.Credential, req.Username, req.DisplayName, req.InviteCode)
+	if err != nil {
+		if respondGoogleEmailTaken(c, err) {
+			return
+		}
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, resp)
+}
+
+func (h *AuthHandler) GoogleLinkExisting(c *gin.Context) {
+	var req googleLinkReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister)
+		return
+	}
+	resp, err := h.svc.GoogleLinkByPassword(c.Request.Context(), req.Credential, req.Password)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func respondGoogleEmailTaken(c *gin.Context, err error) bool {
+	var emailTaken *service.GoogleEmailTakenError
+	if !errors.As(err, &emailTaken) {
+		return false
+	}
+	c.AbortWithStatusJSON(http.StatusConflict, gin.H{
+		"message": "This Google email is already used by another account",
+		"reason":  "google_email_exists",
+		"email":   emailTaken.Email,
+	})
+	return true
+}
+
+func (h *AuthHandler) GoogleBind(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req googleLoginReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidGoogleCredential)
+		return
+	}
+	user, err := h.svc.GoogleLinkCurrentUser(c.Request.Context(), uid, req.Credential)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }
 
 type refreshReq struct {

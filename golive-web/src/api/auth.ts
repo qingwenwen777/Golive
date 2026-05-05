@@ -33,6 +33,20 @@ export interface ResetPasswordPayload {
   newPassword: string;
 }
 
+export interface GoogleCredentialPayload {
+  credential: string;
+}
+
+export interface GoogleRegisterPayload extends GoogleCredentialPayload {
+  username: string;
+  displayName: string;
+  inviteCode: string;
+}
+
+export interface GoogleLinkExistingPayload extends GoogleCredentialPayload {
+  password: string;
+}
+
 export interface UpdateProfilePayload {
   username: string;
   displayName: string;
@@ -73,6 +87,54 @@ export function useRegisterMutation() {
       login(data);
       void qc.invalidateQueries({ queryKey: ['me'] });
       scheduleAuthPageRefresh();
+    },
+  });
+}
+
+export function useGoogleLoginMutation() {
+  const login = useAuthStore((s) => s.login);
+  const qc = useQueryClient();
+
+  return useMutation<LoginResp, Error, GoogleCredentialPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<LoginResp>('/auth/google/login', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      login(data);
+      void qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useGoogleRegisterMutation() {
+  const login = useAuthStore((s) => s.login);
+  const qc = useQueryClient();
+
+  return useMutation<LoginResp, Error, GoogleRegisterPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<LoginResp>('/auth/google/register', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      login(data);
+      void qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useGoogleLinkExistingMutation() {
+  const login = useAuthStore((s) => s.login);
+  const qc = useQueryClient();
+
+  return useMutation<LoginResp, Error, GoogleLinkExistingPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<LoginResp>('/auth/google/link-existing', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      login(data);
+      void qc.invalidateQueries({ queryKey: ['me'] });
     },
   });
 }
@@ -165,6 +227,20 @@ export function useChangePassword() {
     mutationFn: async (payload) => {
       const { data } = await http.post<{ ok: boolean }>('/users/me/password', payload);
       return data;
+    },
+  });
+}
+
+export function useBindGoogleAccount() {
+  const qc = useQueryClient();
+  return useMutation<User, Error, GoogleCredentialPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<User>('/auth/google/bind', payload);
+      return data;
+    },
+    onSuccess: (user) => {
+      qc.setQueryData(['me'], user);
+      useAuthStore.getState().setUser(user);
     },
   });
 }
