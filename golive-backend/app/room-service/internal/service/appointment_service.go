@@ -62,6 +62,7 @@ type AppointmentDTO struct {
 	StartedAt        string `json:"startedAt,omitempty"`
 	EndedAt          string `json:"endedAt,omitempty"`
 	ReservationCount int64  `json:"reservationCount"`
+	WaitingCount     int64  `json:"waitingCount"`
 	Reserved         bool   `json:"reserved"`
 	CanStart         bool   `json:"canStart"`
 }
@@ -610,7 +611,7 @@ func (s *AppointmentService) listResp(ctx context.Context, items []model.LiveApp
 	now := s.now()
 	for _, item := range items {
 		room := rooms[item.RoomID]
-		out = append(out, s.dtoFrom(item, &room, counts[item.ID], reserved[item.ID], now))
+		out = append(out, s.dtoFrom(item, &room, counts[item.ID], reserved[item.ID], s.waitingCount(ctx, item.RoomID), now))
 	}
 	return &AppointmentListResp{Items: out, Total: total, Page: page, Size: size}, nil
 }
@@ -624,10 +625,10 @@ func (s *AppointmentService) dto(ctx context.Context, appt model.LiveAppointment
 	if err != nil {
 		return nil, err
 	}
-	return ptr(s.dtoFrom(appt, room, counts[appt.ID], reserved[appt.ID], s.now())), nil
+	return ptr(s.dtoFrom(appt, room, counts[appt.ID], reserved[appt.ID], s.waitingCount(ctx, appt.RoomID), s.now())), nil
 }
 
-func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Room, count int64, reserved bool, now time.Time) AppointmentDTO {
+func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Room, count int64, reserved bool, waitingCount int64, now time.Time) AppointmentDTO {
 	dto := AppointmentDTO{
 		ID:               appt.ID,
 		RoomID:           appt.RoomID,
@@ -639,6 +640,7 @@ func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Roo
 		ScheduledAt:      appt.ScheduledAt.UTC().Format(time.RFC3339),
 		Status:           appt.Status,
 		ReservationCount: count,
+		WaitingCount:     waitingCount,
 		Reserved:         reserved,
 		CanStart:         appt.Status == model.AppointmentScheduled && !now.Before(appt.ScheduledAt.Add(-startLead)) && !now.After(appt.ScheduledAt.Add(startGrace)),
 	}
@@ -663,6 +665,17 @@ func (s *AppointmentService) dtoFrom(appt model.LiveAppointment, room *model.Roo
 		dto.Category = defaultAppointmentCategory
 	}
 	return dto
+}
+
+func (s *AppointmentService) waitingCount(ctx context.Context, roomID string) int64 {
+	if s.live == nil || s.live.live == nil || roomID == "" {
+		return 0
+	}
+	metrics, err := s.live.live.ViewerMetrics(ctx, roomID)
+	if err != nil || metrics == nil {
+		return 0
+	}
+	return metrics.Viewers
 }
 
 func (s *AppointmentService) isPubliclyActive(appt model.LiveAppointment) bool {

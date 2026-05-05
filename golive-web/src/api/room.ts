@@ -495,6 +495,7 @@ export interface AppointmentItem {
   startedAt?: string;
   endedAt?: string;
   reservationCount: number;
+  waitingCount?: number;
   reserved: boolean;
   canStart: boolean;
 }

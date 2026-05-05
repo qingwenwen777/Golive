@@ -1,12 +1,18 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Clock3, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
+import { Check, CheckCircle2, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { useReserveAppointment } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
 import { cn } from '@/lib/cn';
+import { isInLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
+import { useAuthModalStore } from '@/stores/useAuthModalStore';
+import { useIsAuthed } from '@/stores/useAuthStore';
 import type { AppointmentItem } from '@/api/room';
+import type { Stream } from '@/types/stream';
 
 export interface AppointmentCardProps {
   appointment: AppointmentItem;
@@ -32,10 +38,21 @@ export function AppointmentCard({
   managementMode = false,
 }: AppointmentCardProps) {
   const { t, i18n } = useTranslation('pages');
+  const isAuthed = useIsAuthed();
+  const openLogin = useAuthModalStore((s) => s.openLogin);
+  const reserveAppointment = useReserveAppointment(appointment.id);
+  const [reserved, setReserved] = useState(appointment.reserved);
+  const [waitingCount, setWaitingCount] = useState(
+    appointment.waitingCount ?? appointment.reservationCount,
+  );
+  const [savedLater, setSavedLater] = useState(() =>
+    isInLibrary(WATCH_LATER_KEY, appointment.roomId),
+  );
   const scheduled = useMemo(
     () =>
       new Intl.DateTimeFormat(i18n.language, {
-        month: 'short',
+        year: 'numeric',
+        month: 'numeric',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
@@ -56,6 +73,67 @@ export function AppointmentCard({
     channelName || appointment.title || appointment.id,
   );
 
+  useEffect(() => {
+    setReserved(appointment.reserved);
+    setWaitingCount(appointment.waitingCount ?? appointment.reservationCount);
+    setSavedLater(isInLibrary(WATCH_LATER_KEY, appointment.roomId));
+  }, [
+    appointment.reserved,
+    appointment.reservationCount,
+    appointment.roomId,
+    appointment.waitingCount,
+  ]);
+
+  const reserveLabel = reserved
+    ? t('liveRoom.scheduledReservedByYou', { defaultValue: '你已预约' })
+    : t('liveRoom.quickReserve', { defaultValue: '快速预约' });
+  const watchLaterLabel = savedLater
+    ? t('liveRoom.saved', { defaultValue: '已保存' })
+    : t('liveRoom.quickWatchLater', { defaultValue: '添加到稍后观看' });
+  const waitingLabel = t('liveRoom.appointmentWaiting', {
+    count: waitingCount,
+    defaultValue: '{{count}} 人正在等待',
+  });
+  const premiereLabel = t('liveRoom.appointmentPremiereTime', {
+    time: scheduled,
+    defaultValue: '首播时间：{{time}}',
+  });
+
+  const stopQuickAction = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleQuickReserve = (event: MouseEvent<HTMLButtonElement>) => {
+    stopQuickAction(event);
+    if (reserved || reserveAppointment.isPending) return;
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    reserveAppointment.mutate(undefined, {
+      onSuccess: (next) => {
+        setReserved(true);
+        setWaitingCount(next.waitingCount ?? waitingCount);
+        toast.success(t('liveRoom.appointmentReserved', { defaultValue: '已预约直播。' }));
+      },
+      onError: (err) => {
+        toast.error(
+          err.message ||
+            t('liveRoom.appointmentReserveFailed', { defaultValue: '预约状态更新失败。' }),
+        );
+      },
+    });
+  };
+
+  const handleWatchLater = (event: MouseEvent<HTMLButtonElement>) => {
+    stopQuickAction(event);
+    if (savedLater) return;
+    saveToLibrary(WATCH_LATER_KEY, appointmentToStream(appointment, waitingCount));
+    setSavedLater(true);
+    toast.success(t('liveRoom.savedWatchLater', { defaultValue: '已保存到稍后观看。' }));
+  };
+
   const main = (
     <>
       <div className={cn('gl-appointment-cover', appointment.cover && 'has-image')}>
@@ -64,10 +142,18 @@ export function AppointmentCard({
         ) : (
           <span>{channelName.slice(0, 1).toUpperCase()}</span>
         )}
-        <div className="gl-appointment-scheduled">
-          <Clock3 size={13} />
-          {scheduled}
-        </div>
+        {!managementMode && (
+          <div className="gl-appointment-starting-badge">
+            <Clock3 size={12} />
+            {t('liveRoom.appointmentStartingSoon', { defaultValue: '即将开始' })}
+          </div>
+        )}
+        {managementMode && (
+          <div className="gl-appointment-scheduled">
+            <Clock3 size={13} />
+            {scheduled}
+          </div>
+        )}
       </div>
       <div className="gl-appointment-body">
         {showChannel && <Avatar name={channelName} src={appointment.avatar} size={44} />}
@@ -78,7 +164,17 @@ export function AppointmentCard({
           </div>
           {showChannel && <div className="gl-appointment-channel">{channelName}</div>}
           <div className="gl-appointment-meta">
-            {appointmentLabel} · {categoryLabel}
+            {managementMode ? (
+              <>
+                {appointmentLabel} · {categoryLabel}
+              </>
+            ) : (
+              <>
+                <span>{waitingLabel}</span>
+                <span>·</span>
+                <span>{premiereLabel}</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -103,6 +199,29 @@ export function AppointmentCard({
       style={managementMode ? undefined : hoverStyle}
     >
       {content}
+      {!managementMode && (
+        <div className="gl-appointment-quick-actions" aria-hidden={false}>
+          <button
+            type="button"
+            className={cn('gl-appointment-quick-btn', reserved && 'is-complete')}
+            disabled={reserveAppointment.isPending}
+            aria-label={reserveLabel}
+            title={reserveLabel}
+            onClick={handleQuickReserve}
+          >
+            {reserved ? <Check size={20} /> : <Clock3 size={20} />}
+          </button>
+          <button
+            type="button"
+            className={cn('gl-appointment-quick-btn', savedLater && 'is-complete')}
+            aria-label={watchLaterLabel}
+            title={watchLaterLabel}
+            onClick={handleWatchLater}
+          >
+            {savedLater ? <Check size={20} /> : <ListPlus size={21} />}
+          </button>
+        </div>
+      )}
       {managementMode && (
         <div className="gl-appointment-actions">
           {appointment.canStart && (
@@ -143,4 +262,27 @@ export function AppointmentCard({
 
 function categoryKey(category: string): string {
   return category.toLowerCase().replace(/\s+/g, '');
+}
+
+function appointmentToStream(appointment: AppointmentItem, waitingCount: number): Stream {
+  return {
+    id: appointment.roomId,
+    title: appointment.title,
+    description: appointment.description,
+    channel: appointment.channel,
+    channelId: appointment.channelId,
+    verified: appointment.verified,
+    avatar: appointment.avatar,
+    cover: appointment.cover,
+    viewers: waitingCount,
+    duration: '',
+    category: appointment.category,
+    categoryJa: appointment.categoryJa,
+    startedAt: appointment.scheduledAt,
+    endedAt: appointment.endedAt,
+    isLive: false,
+    ownerId: appointment.ownerId,
+    status: appointment.status,
+    subscriberCount: appointment.reservationCount,
+  };
 }

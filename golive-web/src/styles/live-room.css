@@ -460,6 +460,17 @@
   flex: 1;
   min-width: 0;
 }
+.gl-info-chan-link {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+}
+.gl-info-chan-link:hover .gl-info-chan-name span {
+  color: var(--gl-text);
+  text-decoration: underline;
+}
 .gl-info-chan-text {
   min-width: 0;
 }

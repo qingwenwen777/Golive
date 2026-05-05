@@ -51,7 +51,8 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const channelName = streamChannelName(stream);
   const isLive = stream.isLive === true || stream.status === 'live';
   const hasReplay = stream.status === 'ended' && Boolean(stream.replay?.canWatch);
-  const canOpen = isLive || hasReplay;
+  const isScheduled = stream.status === 'scheduled' || stream.status === 'publishing';
+  const canOpen = isLive || hasReplay || isScheduled;
   const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
   const hoverStyle = useCoverHoverStyle(stream.cover, channelName || title || stream.id);
 
@@ -148,7 +149,9 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
             <span className="gl-dur-pill">
               {hasReplay
                 ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
-                : t('library.status.offline', { defaultValue: 'Offline' })}
+                : isScheduled
+                  ? t('liveRoom.appointmentStartingSoon', { defaultValue: '即将开始' })
+                  : t('library.status.offline', { defaultValue: 'Offline' })}
             </span>
           )}
         </div>
@@ -171,7 +174,12 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
                 ? t('home.watching', { count: stream.viewers, defaultValue: '{{count}} watching' })
                 : hasReplay
                   ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
-                  : t('library.status.offline', { defaultValue: 'Offline' })}
+                  : isScheduled
+                    ? t('liveRoom.appointmentWaiting', {
+                        count: stream.viewers,
+                        defaultValue: '{{count}} 人正在等待',
+                      })
+                    : t('library.status.offline', { defaultValue: 'Offline' })}
             </span>
             <span>·</span>
             <span className="truncate">{category}</span>

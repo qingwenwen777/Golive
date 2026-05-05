@@ -90,10 +90,7 @@ export default function HomePage() {
             </div>
           </div>
         ) : (
-          <div
-            className="gl-grid"
-            style={{ opacity: recommended.isFetching ? 0.7 : 1, transition: 'opacity .15s' }}
-          >
+          <div className="gl-grid">
             {recommendedItems.map((s, i) => (
               <LiveCard key={s.id} stream={s} priority={i < 4} />
             ))}

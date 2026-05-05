@@ -1357,9 +1357,8 @@ input:focus-visible,
   bottom: 0;
   left: 0;
   border-top: 1px solid var(--gl-border);
-  background: color-mix(in srgb, var(--gl-bg-card) 96%, transparent);
+  background: var(--gl-bg-card);
   padding: 11px 14px 14px;
-  backdrop-filter: blur(14px);
 }
 .gl-gift-counts {
   display: flex;
@@ -2126,6 +2125,16 @@ input:focus-visible,
     var(--gl-bg-hover) 70%
   );
   background-size: 220% 100%;
+}
+@supports selector(:has(*)) {
+  .gl-card-cover.has-image:has(.gl-loadable-img.is-loaded)::before,
+  .gl-channel-cover.has-cover:has(.gl-loadable-img.is-loaded)::before,
+  .gl-history-thumb.has-image:has(.gl-loadable-img.is-loaded)::before,
+  .gl-history-cover.has-image:has(.gl-loadable-img.is-loaded)::before,
+  .gl-creator-latest-cover.has-image:has(.gl-loadable-img.is-loaded)::before {
+    opacity: 0;
+    animation: none;
+  }
 }
 .gl-card-cover .gl-loadable-img {
   position: absolute;
@@ -10703,6 +10712,7 @@ button.gl-fan-badge-empty {
 }
 
 .gl-appointment-card {
+  position: relative;
   display: block;
   min-width: 0;
   color: inherit;
@@ -10750,6 +10760,25 @@ button.gl-fan-badge-empty {
   font-weight: 850;
 }
 
+.gl-appointment-starting-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.74);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 7px;
+  pointer-events: none;
+}
+
 .gl-appointment-scheduled {
   position: absolute;
   z-index: 2;
@@ -10775,10 +10804,65 @@ button.gl-fan-badge-empty {
     transform 0.15s ease;
 }
 
-.gl-appointment-card:hover .gl-appointment-scheduled,
-.gl-appointment-card:focus-within .gl-appointment-scheduled {
+.gl-appointment-card.is-management:hover .gl-appointment-scheduled,
+.gl-appointment-card.is-management:focus-within .gl-appointment-scheduled {
   opacity: 1;
   transform: translateY(0);
+}
+
+.gl-appointment-quick-actions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.gl-appointment-card:not(.is-management):hover .gl-appointment-quick-actions,
+.gl-appointment-card:not(.is-management):focus-within .gl-appointment-quick-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.gl-appointment-quick-btn {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(31, 31, 31, 0.76);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px);
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.gl-appointment-quick-btn:hover:not(:disabled) {
+  background: rgba(15, 15, 15, 0.88);
+  transform: scale(1.04);
+}
+
+.gl-appointment-quick-btn:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.gl-appointment-quick-btn.is-complete {
+  background: rgba(71, 71, 71, 0.84);
 }
 
 .gl-appointment-body {
@@ -10834,6 +10918,16 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-meta {
   margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gl-appointment-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gl-appointment-actions {

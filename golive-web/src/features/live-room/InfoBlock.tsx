@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ThumbsUp, ThumbsDown, Share2, Bookmark, Bell, Gift } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
@@ -67,8 +68,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
   }, [stream.id]);
 
   const subscribed = followState.data?.following ?? false;
-  const subscriberCount =
-    followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
+  const subscriberCount = followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
   const displaySubscriberCount = followState.isPending
     ? (stream.subscriberCount ?? subscriberCount)
     : subscriberCount;
@@ -139,7 +139,9 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
     try {
       const method = await copyText(window.location.href, t('liveRoom.copyTarget'));
       if (method === 'manual') {
-        toast.info(t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }));
+        toast.info(
+          t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }),
+        );
       } else {
         toast.success(t('liveRoom.copySuccess', { defaultValue: 'Live room link copied.' }));
       }
@@ -150,6 +152,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
 
   const title = lang === 'ja' ? (stream.titleJa ?? stream.title) : stream.title;
   const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
+  const channelPath = `/channel/${encodeURIComponent(channelId || stream.ownerId || channelName)}`;
 
   const description = stream.description?.trim() ?? '';
 
@@ -159,17 +162,19 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
 
       <div className="gl-info-row">
         <div className="gl-info-chan">
-          <Avatar name={channelName} src={stream.avatar} size={40} />
-          <div className="gl-info-chan-text">
-            <div className="gl-info-chan-name">
-              <span className="truncate">{channelName}</span>
-              {stream.verified && <Icons.BadgeCheck size={14} className="text-text-secondary" />}
-              <UserLevelBadge levelInfo={ownerLevelInfo} size="compact" />
+          <Link className="gl-info-chan-link" to={channelPath} aria-label={channelName}>
+            <Avatar name={channelName} src={stream.avatar} size={40} />
+            <div className="gl-info-chan-text">
+              <div className="gl-info-chan-name">
+                <span className="truncate">{channelName}</span>
+                {stream.verified && <Icons.BadgeCheck size={14} className="text-text-secondary" />}
+                <UserLevelBadge levelInfo={ownerLevelInfo} size="compact" />
+              </div>
+              <div className="gl-info-chan-subs">
+                {t('liveRoom.subscribers', { count: displaySubscriberCount })}
+              </div>
             </div>
-            <div className="gl-info-chan-subs">
-              {t('liveRoom.subscribers', { count: displaySubscriberCount })}
-            </div>
-          </div>
+          </Link>
           {!isOwnChannel && (
             <button
               className={cn('gl-sub-btn', subscribed && 'is-on')}
@@ -238,9 +243,7 @@ export function InfoBlock({ stream, viewerCount, onOpenGifts }: InfoBlockProps) 
         <div className="gl-desc-meta">
           <span>{t('liveRoom.watching', { count: viewerCount ?? stream.viewers })}</span>
           <span>·</span>
-          <span>
-            {t('liveRoom.startedAt', { time: timeAgo(stream.startedAt, t) })}
-          </span>
+          <span>{t('liveRoom.startedAt', { time: timeAgo(stream.startedAt, t) })}</span>
           <span>·</span>
           <span className="gl-desc-tag">#{category.replace(/\s+/g, '')}</span>
         </div>
