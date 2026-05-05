@@ -170,10 +170,10 @@ export function useMe() {
   });
 
   useEffect(() => {
-    if (query.data) {
+    if (isAuthed && query.data) {
       useAuthStore.getState().setUser(query.data);
     }
-  }, [query.data]);
+  }, [isAuthed, query.data]);
 
   return query;
 }

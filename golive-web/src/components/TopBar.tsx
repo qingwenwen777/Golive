@@ -52,9 +52,9 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
   const searchRef = useRef<HTMLFormElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const currentUser = me.data ?? user;
-  const balance = me.data?.coinBalance ?? user?.coinBalance ?? 0;
-  const isBanned = Boolean(currentUser?.banned);
+  const currentUser = isAuthed ? (me.data ?? user) : null;
+  const balance = isAuthed ? (me.data?.coinBalance ?? user?.coinBalance ?? 0) : 0;
+  const isBanned = isAuthed && Boolean(currentUser?.banned);
   const activeLiveId = useActiveCreatorLiveId(isBanned ? undefined : currentUser?.id);
   const trimmedSearch = search.trim();
   const suggestions = useSearchSuggestions(trimmedSearch, suggestionsOpen);

@@ -7,7 +7,7 @@ import { TopProgressBar } from '@/components/TopProgressBar';
 import { Toaster } from '@/components/ui/sonner';
 import { LoginModal } from '@/features/auth/LoginModal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useAuthHydrated, useAuthStore } from '@/stores/useAuthStore';
+import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 
 export default function App() {
   const location = useLocation();
@@ -15,6 +15,7 @@ export default function App() {
   const isNarrow = useMediaQuery('(max-width: 767px)');
   const [userCollapsed, setUserCollapsed] = useState(false);
   const authHydrated = useAuthHydrated();
+  const isAuthed = useIsAuthed();
   const user = useAuthStore((s) => s.user);
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   const isBannedRoute = location.pathname === '/account-banned';
@@ -22,12 +23,12 @@ export default function App() {
 
   useEffect(() => {
     if (!authHydrated) return;
-    if (user?.banned && !isBannedRoute) {
+    if (isAuthed && user?.banned && !isBannedRoute) {
       navigate('/account-banned', { replace: true });
-    } else if (!user?.banned && isBannedRoute) {
+    } else if (isAuthed && user && !user.banned && isBannedRoute) {
       navigate('/', { replace: true });
     }
-  }, [authHydrated, isBannedRoute, navigate, user?.banned]);
+  }, [authHydrated, isAuthed, isBannedRoute, navigate, user]);
 
   return (
     <div className="min-h-screen bg-bg text-text">

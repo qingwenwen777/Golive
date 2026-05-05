@@ -14,7 +14,7 @@ export default function BannedAccountPage() {
   const isAuthed = useIsAuthed();
   const storedUser = useAuthStore((s) => s.user);
   const me = useMe();
-  const user = me.data ?? storedUser;
+  const user = isAuthed ? (me.data ?? storedUser) : null;
   const createAppeal = useCreateUnbanAppeal();
   const [reason, setReason] = useState('');
 
@@ -124,7 +124,7 @@ export default function BannedAccountPage() {
               className="gl-settings-button"
               type="button"
               onClick={() => {
-                void doLogout();
+                void doLogout().finally(() => navigate('/login', { replace: true }));
               }}
             >
               <LogOut size={15} />
