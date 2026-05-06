@@ -180,7 +180,6 @@ func respondGoogleEmailTaken(c *gin.Context, err error) bool {
 	c.AbortWithStatusJSON(http.StatusConflict, gin.H{
 		"message": "This Google email is already used by another account",
 		"reason":  "google_email_exists",
-		"email":   emailTaken.Email,
 	})
 	return true
 }

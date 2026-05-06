@@ -121,12 +121,12 @@ func TestGoogleRegisterCanLinkExistingEmailByPassword(t *testing.T) {
 
 	require.Equal(t, http.StatusConflict, rec.Code)
 	var conflict struct {
-		Reason string `json:"reason"`
-		Email  string `json:"email"`
+		Reason string          `json:"reason"`
+		Email  json.RawMessage `json:"email"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &conflict))
 	require.Equal(t, "google_email_exists", conflict.Reason)
-	require.Equal(t, "manual@example.com", conflict.Email)
+	require.Empty(t, conflict.Email)
 
 	linkReq := httptest.NewRequest(http.MethodPost, "/auth/google/link-existing", bytes.NewBufferString(`{
 		"credential":"existing-google",
