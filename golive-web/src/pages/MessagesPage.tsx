@@ -9,7 +9,7 @@ import {
   type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Ban,
   Bell,
@@ -180,6 +180,7 @@ function PrivateMessages({
   draftCreatorId: string;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, i18n } = useTranslation('pages');
   const userId = currentUser.id;
   const threads = useDirectThreads(true, 1, 50);
@@ -193,6 +194,7 @@ function PrivateMessages({
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const [entryUnread, setEntryUnread] = useState(0);
   const directInputRef = useRef<HTMLInputElement | null>(null);
+  const noticeEntry = useMemo(() => parseNoticeEntry(location.search), [location.search]);
   const sendDirect = useSendDirect();
   const markDirectThreadReadLocal = useMarkDirectThreadReadLocal();
   const markFanGroupReadLocal = useMarkFanGroupReadLocal();
@@ -235,11 +237,11 @@ function PrivateMessages({
   );
 
   useEffect(() => {
-    setSelectedGroupId('');
+    setSelectedGroupId(noticeEntry.groupId);
     setSelectedId('');
     setContent('');
-    setEntryUnread(0);
-  }, [draftCreatorId]);
+    setEntryUnread(noticeEntry.unread);
+  }, [draftCreatorId, noticeEntry.groupId, noticeEntry.unread]);
 
   useEffect(() => {
     if (!selectedId && !selectedGroupId && threadByDraft?.id) setSelectedId(threadByDraft.id);
@@ -516,9 +518,11 @@ function PrivateMessages({
                       )}
                       <ChatMessageRow
                         sender={sender}
+                        messageId={item.id}
                         body={item.body}
                         currentUserId={userId}
                         fanBadge={sender.fanBadge}
+                        highlighted={directScroll.highlightedId === item.id}
                         anchorRef={
                           directScroll.newNotice?.targetId === item.id
                             ? directScroll.firstNewRef
@@ -666,17 +670,24 @@ function useChatScroll<T extends { id: string }>(
 ) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const firstNewRef = useRef<HTMLDivElement | null>(null);
+  const itemsRef = useRef(items);
   const previousLastIdRef = useRef('');
   const nearBottomRef = useRef(true);
   const loadingOlderRef = useRef(false);
   const previousScrollHeightRef = useRef(0);
   const requestedOlderRef = useRef(false);
   const newNoticeModeRef = useRef<ChatNewNoticeMode | null>(null);
+  const newNoticeRef = useRef<ChatNewNotice | null>(null);
+  const pendingJumpRef = useRef(false);
+  const highlightTimerRef = useRef<number | null>(null);
+  const consumedEntryNoticeKeyRef = useRef('');
   const pendingLiveNewCountRef = useRef(0);
   const pendingLiveTargetIdRef = useRef('');
   const [newNotice, setNewNotice] = useState<ChatNewNotice | null>(null);
+  const [highlightedId, setHighlightedId] = useState('');
   const setChatNewNotice = (notice: ChatNewNotice | null) => {
     newNoticeModeRef.current = notice?.mode ?? null;
+    newNoticeRef.current = notice;
     setNewNotice(notice);
   };
   const updateChatNewNotice = (
@@ -685,12 +696,97 @@ function useChatScroll<T extends { id: string }>(
     setNewNotice((current) => {
       const next = updater(current);
       newNoticeModeRef.current = next?.mode ?? null;
+      newNoticeRef.current = next;
       return next;
     });
   };
   const resetPendingLiveNewNotice = () => {
     pendingLiveNewCountRef.current = 0;
     pendingLiveTargetIdRef.current = '';
+  };
+  const highlightMessage = (id: string) => {
+    if (!id) return;
+    if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    setHighlightedId(id);
+    highlightTimerRef.current = window.setTimeout(() => {
+      setHighlightedId('');
+      highlightTimerRef.current = null;
+    }, 1700);
+  };
+  const syncEntryNoticeTarget = (nextItems = itemsRef.current) => {
+    const notice = newNoticeRef.current;
+    if (!notice || notice.mode !== 'entry') return;
+    const targetId = firstUnreadTargetId(nextItems, notice.count) || notice.targetId;
+    if (targetId && targetId !== notice.targetId) {
+      setChatNewNotice({ ...notice, targetId });
+    }
+  };
+  const needsOlderMessagesForJump = () => {
+    const notice = newNoticeRef.current;
+    return Boolean(
+      notice &&
+      notice.mode === 'entry' &&
+      notice.count > itemsRef.current.length &&
+      options.hasNextPage,
+    );
+  };
+  const fetchOlderForPendingJump = () => {
+    if (!needsOlderMessagesForJump() || options.isFetchingNextPage || requestedOlderRef.current) {
+      return false;
+    }
+    requestedOlderRef.current = true;
+    void options.fetchNextPage().finally(() => {
+      requestedOlderRef.current = false;
+    });
+    return true;
+  };
+  const scrollToNewTarget = () => {
+    const notice = newNoticeRef.current;
+    if (!notice) return;
+    syncEntryNoticeTarget();
+    const targetId = newNoticeRef.current?.targetId || notice.targetId;
+    window.requestAnimationFrame(() => {
+      const targetNode =
+        listRef.current?.querySelector<HTMLElement>(`[data-chat-message-id="${targetId}"]`) ??
+        firstNewRef.current;
+      targetNode?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      highlightMessage(targetId);
+      pendingJumpRef.current = false;
+      resetPendingLiveNewNotice();
+      setChatNewNotice(null);
+    });
+  };
+  const continuePendingJump = (nextItems = itemsRef.current) => {
+    if (!pendingJumpRef.current) return;
+    syncEntryNoticeTarget(nextItems);
+    if (needsOlderMessagesForJump()) {
+      void fetchOlderForPendingJump();
+      return;
+    }
+    scrollToNewTarget();
+  };
+  const showEntryNoticeIfNeeded = (nextItems = itemsRef.current) => {
+    const node = listRef.current;
+    const lastId = nextItems.at(-1)?.id ?? '';
+    const entryUnread = Math.max(0, options.entryUnread ?? 0);
+    if (!node || !lastId || entryUnread <= 0) return false;
+
+    const noticeKey = `${options.activeKey}:${entryUnread}:${lastId}`;
+    if (consumedEntryNoticeKeyRef.current === noticeKey) return false;
+
+    const overflowing = node.scrollHeight > node.clientHeight + 12;
+    if (overflowing && entryUnread >= CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT) {
+      setChatNewNotice({
+        count: entryUnread,
+        targetId: firstUnreadTargetId(nextItems, entryUnread) || lastId,
+        mode: 'entry',
+      });
+    } else {
+      setChatNewNotice(null);
+    }
+    consumedEntryNoticeKeyRef.current = noticeKey;
+    options.onEntryNoticeConsumed?.();
+    return true;
   };
 
   useEffect(() => {
@@ -699,9 +795,18 @@ function useChatScroll<T extends { id: string }>(
     loadingOlderRef.current = false;
     previousScrollHeightRef.current = 0;
     requestedOlderRef.current = false;
+    pendingJumpRef.current = false;
+    consumedEntryNoticeKeyRef.current = '';
     resetPendingLiveNewNotice();
+    setHighlightedId('');
     setChatNewNotice(null);
   }, [options.activeKey]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!options.isFetchingNextPage) requestedOlderRef.current = false;
@@ -731,6 +836,7 @@ function useChatScroll<T extends { id: string }>(
   };
 
   useEffect(() => {
+    itemsRef.current = items;
     const node = listRef.current;
     const lastId = items.at(-1)?.id ?? '';
     if (!node || !lastId) {
@@ -751,26 +857,14 @@ function useChatScroll<T extends { id: string }>(
       loadingOlderRef.current = false;
       previousScrollHeightRef.current = 0;
       previousLastIdRef.current = lastId;
+      syncEntryNoticeTarget(items);
+      continuePendingJump(items);
       return;
     }
 
     const previousLastId = previousLastIdRef.current;
     if (!previousLastId) {
-      const entryUnread = Math.max(0, options.entryUnread ?? 0);
-      if (entryUnread > 0) {
-        const overflowing = node.scrollHeight > node.clientHeight + 12;
-        if (overflowing && entryUnread >= CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT) {
-          const firstUnreadIndex = Math.max(0, items.length - entryUnread);
-          setChatNewNotice({
-            count: entryUnread,
-            targetId: items[firstUnreadIndex]?.id ?? lastId,
-            mode: 'entry',
-          });
-        } else {
-          setChatNewNotice(null);
-        }
-        options.onEntryNoticeConsumed?.();
-      }
+      showEntryNoticeIfNeeded(items);
       window.requestAnimationFrame(() => {
         const nextNode = listRef.current;
         if (nextNode) nextNode.scrollTop = nextNode.scrollHeight;
@@ -811,20 +905,39 @@ function useChatScroll<T extends { id: string }>(
         });
       }
     }
+    syncEntryNoticeTarget(items);
+    continuePendingJump(items);
     previousLastIdRef.current = lastId;
   }, [items, options.activeKey]);
 
+  useEffect(() => {
+    if (!previousLastIdRef.current || Math.max(0, options.entryUnread ?? 0) <= 0) return;
+    window.requestAnimationFrame(() => {
+      showEntryNoticeIfNeeded(itemsRef.current);
+    });
+  }, [options.entryUnread, options.activeKey]);
+
   const jumpToNew = () => {
-    firstNewRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    resetPendingLiveNewNotice();
-    setChatNewNotice(null);
+    if (!newNoticeRef.current) return;
+    pendingJumpRef.current = true;
+    if (needsOlderMessagesForJump()) {
+      void fetchOlderForPendingJump();
+      return;
+    }
+    scrollToNewTarget();
   };
 
-  return { listRef, firstNewRef, newNotice, onScroll, jumpToNew };
+  return { listRef, firstNewRef, highlightedId, newNotice, onScroll, jumpToNew };
 }
 
 function distanceFromBottom(node: HTMLElement) {
   return node.scrollHeight - node.scrollTop - node.clientHeight;
+}
+
+function firstUnreadTargetId<T extends { id: string }>(items: T[], unreadCount: number): string {
+  if (!items.length) return '';
+  const firstUnreadIndex = Math.max(0, items.length - unreadCount);
+  return items[firstUnreadIndex]?.id ?? items[0].id;
 }
 
 function ThreadButton({
@@ -1089,12 +1202,14 @@ function FanGroupChatView({
                 )}
                 <ChatMessageRow
                   sender={item.sender}
+                  messageId={item.id}
                   body={item.body}
                   currentUserId={userId}
                   role={item.role}
                   fanBadge={item.fanBadge ?? item.sender.fanBadge}
                   muted={member?.muted}
                   canManage={canManageMember}
+                  highlighted={groupScroll.highlightedId === item.id}
                   anchorRef={
                     groupScroll.newNotice?.targetId === item.id
                       ? groupScroll.firstNewRef
@@ -1177,24 +1292,28 @@ function FanGroupChatView({
 
 function ChatMessageRow({
   sender,
+  messageId,
   body,
   currentUserId,
   role,
   fanBadge,
   muted,
   canManage,
+  highlighted,
   anchorRef,
   onAvatarClick,
   avatarTitle,
   avatarActions,
 }: {
   sender: MessageUser;
+  messageId: string;
   body: string;
   currentUserId: string;
   role?: string;
   fanBadge?: MessageFanBadge;
   muted?: boolean;
   canManage?: boolean;
+  highlighted?: boolean;
   anchorRef?: Ref<HTMLDivElement>;
   onAvatarClick?: () => void;
   avatarTitle?: string;
@@ -1248,7 +1367,11 @@ function ChatMessageRow({
   );
 
   return (
-    <div ref={anchorRef} className={cn('gl-chat-message-row', isMine && 'is-me')}>
+    <div
+      ref={anchorRef}
+      data-chat-message-id={messageId}
+      className={cn('gl-chat-message-row', isMine && 'is-me', highlighted && 'is-highlighted')}
+    >
       {!isMine && avatar}
       <div className="gl-chat-message-stack">
         <div className="gl-chat-message-meta">
@@ -1777,6 +1900,17 @@ function normalizeSection(value: string | undefined): MessageSection {
     return value;
   }
   return 'private';
+}
+
+function parseNoticeEntry(search: string): { groupId: string; unread: number } {
+  const params = new URLSearchParams(search);
+  const rawUnread = Number(params.get('unread') ?? 0);
+  const unread =
+    params.get('from') === 'notice' && Number.isFinite(rawUnread) ? Math.max(0, rawUnread) : 0;
+  return {
+    groupId: params.get('group') ?? '',
+    unread,
+  };
 }
 
 function shouldShowChatTimeSeparator(value: string, previousValue?: string): boolean {

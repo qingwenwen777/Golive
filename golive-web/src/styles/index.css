@@ -15869,6 +15869,24 @@ button.gl-fan-badge-empty {
   background: color-mix(in srgb, var(--gl-bg-hover) 92%, var(--gl-bg));
 }
 
+.gl-chat-message-row.is-highlighted .gl-chat-message-bubble {
+  animation: gl-chat-message-highlight 1.65s ease-out;
+}
+
+@keyframes gl-chat-message-highlight {
+  0%,
+  55% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--gl-border) 72%, transparent),
+      inset 0 0 0 999px color-mix(in srgb, #9ca3af 18%, transparent),
+      0 4px 14px rgba(15, 23, 42, 0.12);
+  }
+
+  100% {
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  }
+}
+
 .gl-chat-message-bubble p {
   margin: 0;
   overflow-wrap: anywhere;

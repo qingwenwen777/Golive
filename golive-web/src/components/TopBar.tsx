@@ -425,6 +425,7 @@ function suggestionTypeLabel(type: string): string {
 function NotificationBell() {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const notifications = useNotifications(true, 1, 8);
   const directThreads = useDirectThreads(true, 1, 50);
   const fanGroups = useJoinedFanGroups(true);
@@ -461,11 +462,12 @@ function NotificationBell() {
 
   const openNotification = (item: NotificationMenuNotice) => {
     if (item.notification && !item.notification.readAt) markRead.mutate(item.notification.id);
+    setOpen(false);
     navigate(item.link);
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -499,6 +501,7 @@ function NotificationBell() {
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
+                setOpen(false);
                 navigate(
                   messageUnread > 0 && unread === 0 ? '/messages/private' : '/messages/system',
                 );
@@ -593,7 +596,7 @@ function directThreadNotice(
       defaultValue: '{{name}} 发来 {{count}} 条私信',
     }),
     body: thread.lastMessagePreview,
-    link: `/messages/direct/${encodeURIComponent(thread.creatorId)}`,
+    link: `/messages/direct/${encodeURIComponent(thread.creatorId)}?from=notice&unread=${count}`,
     actorName: thread.peer.name,
     actorLabel: thread.peer.username ? `@${thread.peer.username}` : thread.peer.name,
     actorAvatar: thread.peer.avatar,
@@ -621,7 +624,7 @@ function fanGroupNotice(
       count: group.memberCount,
       defaultValue: '{{count}}/200 人 · 粉丝团群聊',
     }),
-    link: '/messages/private',
+    link: `/messages/private?group=${encodeURIComponent(group.id)}&from=notice&unread=${count}`,
     actorName: group.name,
     actorLabel: owner?.user.name || group.name,
     actorAvatar: owner?.user.avatar,
