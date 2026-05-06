@@ -206,3 +206,13 @@ type BlockedWord struct {
 }
 
 func (BlockedWord) TableName() string { return "blocked_words" }
+
+type SystemSetting struct {
+	Key       string `gorm:"primaryKey;type:varchar(96)"`
+	Value     string `gorm:"type:text;not null"`
+	UpdatedBy string `gorm:"type:varchar(36);index"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (SystemSetting) TableName() string { return "system_settings" }

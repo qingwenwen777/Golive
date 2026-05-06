@@ -86,6 +86,8 @@ import {
   useAdminRevenueReports,
   useAdminSetUserBan,
   useAdminSettleBet,
+  useAdminSystemSettings,
+  useUpdateAdminSystemSettings,
   useAdminUpdateGift,
   useAdminReviewUnbanAppeal,
   useAdminUpdateUserProfile,
@@ -502,7 +504,15 @@ export default function AdminPage() {
           )}
           {currentModule === 'content' && <ContentPage />}
           {currentModule === 'economy' && <EconomyPage />}
-          {currentModule === 'system' && <ScaffoldModulePage module="system" />}
+          {currentModule === 'system' && (
+            <SystemPage
+              overview={overview.data}
+              overviewLoading={overview.isLoading}
+              metrics={metrics}
+              inviteItems={inviteItems}
+              loading={apps.isLoading || platformApps.isLoading || creators.isLoading || invites.isLoading}
+            />
+          )}
           {currentModule === 'logs' && <LogsPage />}
         </main>
       </div>
@@ -2362,6 +2372,102 @@ function healthStatusLabel(value: string, t: Translate) {
   return map[value] ?? value;
 }
 
+function registrationPolicyLabel(value: string | undefined, t: Translate) {
+  const map: Record<string, string> = {
+    invite_only: t('admin.system.policy.inviteOnly', { defaultValue: '邀请制' }),
+    public: t('admin.system.policy.public', { defaultValue: '公开注册' }),
+    closed: t('admin.system.policy.closed', { defaultValue: '关闭注册' }),
+  };
+  return value ? (map[value] ?? value) : '-';
+}
+
+function contentPolicyLabel(value: string | undefined, t: Translate) {
+  const map: Record<string, string> = {
+    strict: t('admin.system.policy.strict', { defaultValue: '严格' }),
+    standard: t('admin.system.policy.standard', { defaultValue: '标准' }),
+    relaxed: t('admin.system.policy.relaxed', { defaultValue: '宽松' }),
+  };
+  return value ? (map[value] ?? value) : '-';
+}
+
+function muteDurationLabel(value: number | undefined, t: Translate) {
+  if (!value) return '-';
+  if (value >= 1440) {
+    const days = value / 1440;
+    return t('admin.system.policy.days', {
+      count: days,
+      defaultValue: '{{count}} 天',
+    });
+  }
+  if (value >= 60) {
+    const hours = value / 60;
+    return t('admin.system.policy.hours', {
+      count: hours,
+      defaultValue: '{{count}} 小时',
+    });
+  }
+  return t('admin.system.policy.minutes', {
+    count: value,
+    defaultValue: '{{count}} 分钟',
+  });
+}
+
+function systemRuntimeLabel(key: string, fallback: string, t: Translate) {
+  const map: Record<string, string> = {
+    service: t('admin.system.runtime.service', { defaultValue: '服务' }),
+    log_level: t('admin.system.runtime.logLevel', { defaultValue: '日志级别' }),
+    flv_base: t('admin.system.runtime.flvBase', { defaultValue: 'HTTP-FLV 地址' }),
+    stream_key_ttl: t('admin.system.runtime.streamKeyTtl', { defaultValue: '推流密钥有效期' }),
+    replay_record_dir: t('admin.system.runtime.replayRecordDir', { defaultValue: '回放录制目录' }),
+    replay_upload_timeout: t('admin.system.runtime.replayUploadTimeout', {
+      defaultValue: '回放上传超时',
+    }),
+    bunny_stream: t('admin.system.runtime.bunnyStream', { defaultValue: 'Bunny Stream' }),
+    cover_public_url: t('admin.system.runtime.coverPublicUrl', { defaultValue: '封面公开路径' }),
+    post_public_url: t('admin.system.runtime.postPublicUrl', { defaultValue: '动态图片路径' }),
+  };
+  return map[key] ?? fallback;
+}
+
+function systemRuntimeDescription(key: string, fallback: string | undefined, t: Translate) {
+  const map: Record<string, string> = {
+    service: t('admin.system.runtime.serviceDesc', { defaultValue: '承载审核与系统策略的后端服务。' }),
+    log_level: t('admin.system.runtime.logLevelDesc', { defaultValue: '来自服务配置文件的运行日志级别。' }),
+    flv_base: t('admin.system.runtime.flvBaseDesc', { defaultValue: '直播间播放地址前缀。' }),
+    stream_key_ttl: t('admin.system.runtime.streamKeyTtlDesc', {
+      defaultValue: '主播推流密钥的有效窗口。',
+    }),
+    replay_record_dir: t('admin.system.runtime.replayRecordDirDesc', {
+      defaultValue: '服务端生成回放文件的位置。',
+    }),
+    replay_upload_timeout: t('admin.system.runtime.replayUploadTimeoutDesc', {
+      defaultValue: '回放上传到外部存储的最大等待时间。',
+    }),
+    bunny_stream: t('admin.system.runtime.bunnyStreamDesc', {
+      defaultValue: '只展示是否配置，密钥不会在后台暴露。',
+    }),
+    cover_public_url: t('admin.system.runtime.coverPublicUrlDesc', {
+      defaultValue: '直播封面上传后的公开访问前缀。',
+    }),
+    post_public_url: t('admin.system.runtime.postPublicUrlDesc', {
+      defaultValue: '动态图片上传后的公开访问前缀。',
+    }),
+  };
+  return map[key] ?? fallback ?? '';
+}
+
+function systemRuntimeValue(key: string, value: string, t: Translate) {
+  if (key === 'bunny_stream') {
+    if (value === 'configured') {
+      return t('admin.system.runtime.configured', { defaultValue: '已配置' });
+    }
+    if (value === 'not configured') {
+      return t('admin.system.runtime.notConfigured', { defaultValue: '未配置' });
+    }
+  }
+  return value || '-';
+}
+
 function userRoleLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
     all: t('admin.users.roles.all', { defaultValue: 'All roles' }),
@@ -2720,6 +2826,9 @@ function auditActionLabel(value: string, t: Translate) {
       defaultValue: 'Disable live permission',
     }),
     admin_create: t('admin.logs.actions.adminCreate', { defaultValue: 'Create admin account' }),
+    system_settings_update: t('admin.logs.actions.systemSettingsUpdate', {
+      defaultValue: 'Update system settings',
+    }),
   };
   return map[value] ?? value;
 }
@@ -3698,130 +3807,529 @@ function formatReportPeriod(item: AdminRevenueReportRow, period: AdminReportPeri
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(start);
 }
 
-function ScaffoldModulePage({
-  module,
+type SystemTab = 'overview' | 'access' | 'review' | 'services' | 'runtime' | 'logs';
+
+function SystemPage({
+  overview,
+  overviewLoading,
+  metrics,
+  inviteItems,
+  loading,
 }: {
-  module: Exclude<AdminModule, 'dashboard' | 'users' | 'creators' | 'logs'>;
+  overview?: AdminOverview;
+  overviewLoading: boolean;
+  metrics: AdminMetrics;
+  inviteItems: AdminInviteCode[];
+  loading: boolean;
 }) {
   const { t } = useTranslation('pages');
-  const config = {
-    content: {
-      eyebrow: t('admin.scaffold.content.eyebrow', { defaultValue: 'Content' }),
-      title: t('admin.scaffold.content.title', { defaultValue: 'Content review framework' }),
-      icon: FileCheck2,
-      stats: [
-        [t('admin.scaffold.content.stats.liveRooms', { defaultValue: 'Pending live rooms' }), '0'],
-        [t('admin.scaffold.content.stats.posts', { defaultValue: 'Post review' }), '0'],
-        [t('admin.scaffold.content.stats.reports', { defaultValue: 'Reports queue' }), '0'],
-        [t('admin.scaffold.content.stats.keywords', { defaultValue: 'Keyword policies' }), '0'],
-      ] as [string, string][],
-      rows: [
-        [
-          t('admin.scaffold.content.rows.liveRooms', { defaultValue: 'Live room review' }),
-          t('admin.scaffold.content.rows.liveRoomsSub', {
-            defaultValue: 'Title, cover, category, and live state',
-          }),
-        ],
-        [
-          t('admin.scaffold.content.rows.posts', { defaultValue: 'Post content review' }),
-          t('admin.scaffold.content.rows.postsSub', {
-            defaultValue: 'Posts, images, and comments',
-          }),
-        ],
-        [
-          t('admin.scaffold.content.rows.reports', { defaultValue: 'Report handling' }),
-          t('admin.scaffold.content.rows.reportsSub', {
-            defaultValue: 'User reports and moderation results',
-          }),
-        ],
-      ] as [string, string][],
-    },
-    economy: {
-      eyebrow: t('admin.scaffold.economy.eyebrow', { defaultValue: 'Economy' }),
-      title: t('admin.scaffold.economy.title', { defaultValue: 'Economy system framework' }),
-      icon: Coins,
-      stats: [
-        [t('admin.scaffold.economy.stats.topup', { defaultValue: 'Today top-up' }), '-'],
-        [t('admin.scaffold.economy.stats.gifts', { defaultValue: 'Gift ledger' }), '-'],
-        [t('admin.scaffold.economy.stats.superChat', { defaultValue: 'SC ledger' }), '-'],
-        [
-          t('admin.scaffold.economy.stats.withdrawals', { defaultValue: 'Withdrawal reserve' }),
-          '-',
-        ],
-      ] as [string, string][],
-      rows: [
-        [
-          t('admin.scaffold.economy.rows.accounts', { defaultValue: 'Coins accounts' }),
-          t('admin.scaffold.economy.rows.accountsSub', {
-            defaultValue: 'Balance, top-up, and spending ledger',
-          }),
-        ],
-        [
-          t('admin.scaffold.economy.rows.gifts', { defaultValue: 'Gifts and SuperChat' }),
-          t('admin.scaffold.economy.rows.giftsSub', {
-            defaultValue: 'Price, level, and revenue collection',
-          }),
-        ],
-        [
-          t('admin.scaffold.economy.rows.revenue', { defaultValue: 'Creator revenue' }),
-          t('admin.scaffold.economy.rows.revenueSub', {
-            defaultValue: 'Split, withdrawal, and settlement state',
-          }),
-        ],
-      ] as [string, string][],
-    },
-    system: {
-      eyebrow: t('admin.scaffold.system.eyebrow', { defaultValue: 'System' }),
-      title: t('admin.scaffold.system.title', { defaultValue: 'System configuration framework' }),
-      icon: Settings,
-      stats: [
-        [
-          t('admin.scaffold.system.stats.registration', { defaultValue: 'Registration policy' }),
-          t('admin.scaffold.system.values.inviteOnly', { defaultValue: 'Invite only' }),
-        ],
-        [
-          t('admin.scaffold.system.stats.liveReview', { defaultValue: 'Live review' }),
-          t('admin.scaffold.system.values.enabled', { defaultValue: 'Enabled' }),
-        ],
-        [
-          t('admin.scaffold.system.stats.contentPolicy', { defaultValue: 'Content policy' }),
-          t('admin.scaffold.system.values.standard', { defaultValue: 'Standard' }),
-        ],
-        [t('admin.scaffold.system.stats.serviceStatus', { defaultValue: 'Service status' }), '-'],
-      ] as [string, string][],
-      rows: [
-        [
-          t('admin.scaffold.system.rows.site', { defaultValue: 'Site configuration' }),
-          t('admin.scaffold.system.rows.siteSub', {
-            defaultValue: 'Brand, domain, and base switches',
-          }),
-        ],
-        [
-          t('admin.scaffold.system.rows.review', { defaultValue: 'Review policies' }),
-          t('admin.scaffold.system.rows.reviewSub', {
-            defaultValue: 'Live applications, content review, and report rules',
-          }),
-        ],
-        [
-          t('admin.scaffold.system.rows.services', { defaultValue: 'Service configuration' }),
-          t('admin.scaffold.system.rows.servicesSub', {
-            defaultValue: 'RTMP, replays, and upload limits',
-          }),
-        ],
-      ] as [string, string][],
-    },
-  }[module];
-  const Icon = config.icon;
+  const [tab, setTab] = useState<SystemTab>('overview');
+  const settings = useAdminSystemSettings();
+  const updateSettings = useUpdateAdminSystemSettings();
+  const systemLogs = useAdminAuditLogs('system', 1, 6);
+  const data = settings.data;
+  const [reviewTimeout, setReviewTimeout] = useState('30');
+  const [defaultMute, setDefaultMute] = useState('1440');
+  const [changeNote, setChangeNote] = useState('');
+
+  useEffect(() => {
+    if (!data) return;
+    setReviewTimeout(String(data.reportReviewTimeoutMinutes));
+    setDefaultMute(String(data.defaultSiteMuteMinutes));
+    setChangeNote('');
+  }, [data?.reportReviewTimeoutMinutes, data?.defaultSiteMuteMinutes]);
+
+  const healthItems = overview?.health ?? [];
+  const healthOk = healthItems.filter((item) => item.status === 'ok').length;
+  const healthDown = healthItems.filter((item) => item.status === 'down').length;
+  const healthTotal = healthItems.length;
+  const availableInvites = inviteItems.filter((item) => !item.used).length;
+  const reviewTimeoutNumber = Number(reviewTimeout);
+  const defaultMuteNumber = Number(defaultMute);
+  const dirty = Boolean(
+    data &&
+      (reviewTimeoutNumber !== data.reportReviewTimeoutMinutes ||
+        defaultMuteNumber !== data.defaultSiteMuteMinutes),
+  );
+
+  const saveReviewPolicy = () => {
+    if (!data) return;
+    if (!Number.isFinite(reviewTimeoutNumber) || !Number.isFinite(defaultMuteNumber)) {
+      toast.error(t('admin.system.review.invalid', { defaultValue: '配置值无效。' }));
+      return;
+    }
+    if (!dirty) {
+      toast.error(t('admin.system.review.noChange', { defaultValue: '没有需要保存的变更。' }));
+      return;
+    }
+    const ok = window.confirm(
+      t('admin.system.review.confirm', {
+        defaultValue: '保存审核策略变更？该配置会立即影响新的举报领取和处置默认值。',
+      }),
+    );
+    if (!ok) return;
+    updateSettings.mutate(
+      {
+        reportReviewTimeoutMinutes: reviewTimeoutNumber,
+        defaultSiteMuteMinutes: defaultMuteNumber,
+        note: changeNote.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setChangeNote('');
+          toast.success(t('admin.system.review.saved', { defaultValue: '系统策略已更新。' }));
+        },
+        onError: () =>
+          toast.error(t('admin.system.review.saveFailed', { defaultValue: '系统策略更新失败。' })),
+      },
+    );
+  };
+
+  const tabs: [SystemTab, AdminIcon, string][] = [
+    ['overview', Gauge, t('admin.system.tabs.overview', { defaultValue: '概览' })],
+    ['access', Ticket, t('admin.system.tabs.access', { defaultValue: '访问策略' })],
+    ['review', FileCheck2, t('admin.system.tabs.review', { defaultValue: '审核策略' })],
+    ['services', Server, t('admin.system.tabs.services', { defaultValue: '服务状态' })],
+    ['runtime', Database, t('admin.system.tabs.runtime', { defaultValue: '运行配置' })],
+    ['logs', History, t('admin.system.tabs.logs', { defaultValue: '系统日志' })],
+  ];
 
   return (
     <div className="gl-admin-section-stack">
-      <section className="gl-admin-kpi-grid" aria-label={`${config.title} summary`}>
-        {config.stats.map(([label, value]) => (
-          <AdminKpi key={label} icon={Icon} label={label} value={value} />
-        ))}
+      <section
+        className="gl-admin-kpi-grid"
+        aria-label={t('admin.system.aria', { defaultValue: '系统配置概览' })}
+      >
+        <AdminKpi
+          icon={Ticket}
+          label={t('admin.system.kpis.registration', { defaultValue: '注册策略' })}
+          value={settings.isLoading ? '-' : registrationPolicyLabel(data?.registrationPolicy, t)}
+        />
+        <AdminKpi
+          icon={Video}
+          label={t('admin.system.kpis.liveReview', { defaultValue: '开播审核' })}
+          value={
+            settings.isLoading
+              ? '-'
+              : data?.liveReviewEnabled
+                ? t('admin.system.values.enabled', { defaultValue: '启用' })
+                : t('admin.system.values.disabled', { defaultValue: '停用' })
+          }
+          tone={metrics.pendingApplications > 0 ? 'red' : undefined}
+        />
+        <AdminKpi
+          icon={Shield}
+          label={t('admin.system.kpis.contentPolicy', { defaultValue: '内容策略' })}
+          value={settings.isLoading ? '-' : contentPolicyLabel(data?.contentPolicyLevel, t)}
+        />
+        <AdminKpi
+          icon={Server}
+          label={t('admin.system.kpis.serviceStatus', { defaultValue: '服务状态' })}
+          value={overviewLoading ? '-' : `${healthOk}/${healthTotal || 0}`}
+          tone={healthDown > 0 ? 'red' : undefined}
+        />
       </section>
-      <StaticOperationsPanel eyebrow={config.eyebrow} title={config.title} rows={config.rows} />
+
+      <section className="gl-admin-panel gl-admin-system-panel">
+        <div className="gl-admin-panel-head">
+          <div>
+            <span>{t('admin.system.eyebrow', { defaultValue: 'System control' })}</span>
+            <h2>{t('admin.system.title', { defaultValue: '策略、服务与运行配置' })}</h2>
+            <p>
+              {t('admin.system.subtitle', {
+                defaultValue:
+                  '集中查看平台开关，调整真正会即时生效的审核策略，并跳转到已有业务后台处理细项。',
+              })}
+            </p>
+          </div>
+        </div>
+        <div className="gl-admin-economy-tabs gl-admin-system-tabs" role="tablist">
+          {tabs.map(([key, Icon, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              className={tab === key ? 'is-active' : undefined}
+              onClick={() => setTab(key)}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {tab === 'overview' && (
+          <div className="gl-admin-system-body">
+            <div className="gl-admin-system-grid">
+              <SystemPolicyCard
+                icon={Ticket}
+                title={t('admin.system.cards.registration.title', { defaultValue: '注册访问' })}
+                value={registrationPolicyLabel(data?.registrationPolicy, t)}
+                description={t('admin.system.cards.registration.desc', {
+                  defaultValue: '注册接口当前要求邀请码，邀请码的创建和回收仍由用户管理承接。',
+                })}
+                meta={t('admin.system.cards.registration.meta', {
+                  available: loading ? '-' : availableInvites,
+                  total: loading ? '-' : inviteItems.length,
+                  defaultValue: '{{available}} 可用 / {{total}} 总邀请码',
+                })}
+                to="/admin/users"
+                action={t('admin.system.cards.registration.action', { defaultValue: '管理邀请码' })}
+              />
+              <SystemPolicyCard
+                icon={Video}
+                title={t('admin.system.cards.live.title', { defaultValue: '主播权限' })}
+                value={
+                  settings.isLoading
+                    ? '-'
+                    : data?.liveReviewEnabled
+                      ? t('admin.system.values.enabled', { defaultValue: '启用' })
+                      : t('admin.system.values.disabled', { defaultValue: '停用' })
+                }
+                description={t('admin.system.cards.live.desc', {
+                  defaultValue: '开播权限通过主播申请和平台认证流转，避免后台一键绕过审核链路。',
+                })}
+                meta={t('admin.system.cards.live.meta', {
+                  pending: loading ? '-' : metrics.pendingApplications,
+                  approved: loading ? '-' : metrics.approvedCreators,
+                  defaultValue: '{{pending}} 待审核 / {{approved}} 已授权',
+                })}
+                to="/admin/creators"
+                action={t('admin.system.cards.live.action', { defaultValue: '处理申请' })}
+                tone={metrics.pendingApplications > 0 ? 'danger' : undefined}
+              />
+              <SystemPolicyCard
+                icon={FileCheck2}
+                title={t('admin.system.cards.review.title', { defaultValue: '内容审核' })}
+                value={contentPolicyLabel(data?.contentPolicyLevel, t)}
+                description={t('admin.system.cards.review.desc', {
+                  defaultValue: '举报领取、处置动作、敏感词和全站禁言都已接入审计记录。',
+                })}
+                meta={t('admin.system.cards.review.meta', {
+                  timeout: data?.reportReviewTimeoutMinutes ?? '-',
+                  mute: muteDurationLabel(data?.defaultSiteMuteMinutes, t),
+                  defaultValue: '领取锁定 {{timeout}} 分钟 / 默认禁言 {{mute}}',
+                })}
+                to="/admin/content"
+                action={t('admin.system.cards.review.action', { defaultValue: '进入审核' })}
+              />
+              <SystemPolicyCard
+                icon={Server}
+                title={t('admin.system.cards.services.title', { defaultValue: '服务健康' })}
+                value={overviewLoading ? '-' : `${healthOk}/${healthTotal || 0}`}
+                description={t('admin.system.cards.services.desc', {
+                  defaultValue:
+                    '服务健康来自后端实时探测，包含网关、房间、用户、礼物、聊天、IM 与存储依赖。',
+                })}
+                meta={
+                  healthDown > 0
+                    ? t('admin.system.cards.services.down', {
+                        count: healthDown,
+                        defaultValue: '{{count}} 个服务异常',
+                      })
+                    : t('admin.system.cards.services.ok', { defaultValue: '当前无异常服务' })
+                }
+                to="/admin/dashboard"
+                action={t('admin.system.cards.services.action', { defaultValue: '查看总览' })}
+                tone={healthDown > 0 ? 'danger' : undefined}
+              />
+            </div>
+          </div>
+        )}
+
+        {tab === 'access' && (
+          <div className="gl-admin-system-body">
+            <div className="gl-admin-detail-list">
+              <AdminDetailRow
+                label={t('admin.system.access.registration', { defaultValue: '注册策略' })}
+                value={t('admin.system.access.registrationValue', {
+                  value: registrationPolicyLabel(data?.registrationPolicy, t),
+                  defaultValue: '{{value}}，注册与 Google 注册都要求邀请码。',
+                })}
+              />
+              <AdminDetailRow
+                label={t('admin.system.access.invites', { defaultValue: '邀请码池' })}
+                value={t('admin.system.access.invitesValue', {
+                  available: loading ? '-' : availableInvites,
+                  total: loading ? '-' : inviteItems.length,
+                  defaultValue: '{{available}} 可用，{{total}} 总计。',
+                })}
+              />
+              <AdminDetailRow
+                label={t('admin.system.access.liveReview', { defaultValue: '开播审核' })}
+                value={t('admin.system.access.liveReviewValue', {
+                  pending: loading ? '-' : metrics.pendingApplications,
+                  approved: loading ? '-' : metrics.approvedCreators,
+                  defaultValue: '{{pending}} 个待审核申请，{{approved}} 位主播已授权。',
+                })}
+              />
+            </div>
+            <div className="gl-admin-system-actions">
+              <Link to="/admin/users">
+                <Ticket size={16} />
+                {t('admin.system.actions.invites', { defaultValue: '管理邀请码' })}
+              </Link>
+              <Link to="/admin/creators">
+                <Video size={16} />
+                {t('admin.system.actions.creators', { defaultValue: '管理主播权限' })}
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {tab === 'review' && (
+          <div className="gl-admin-system-body">
+            <div className="gl-admin-system-review-grid">
+              <div className="gl-admin-system-form">
+                <div>
+                  <span>
+                    {t('admin.system.review.eyebrow', { defaultValue: 'Moderation policy' })}
+                  </span>
+                  <h3>{t('admin.system.review.title', { defaultValue: '可即时生效的审核策略' })}</h3>
+                  <p>
+                    {t('admin.system.review.body', {
+                      defaultValue:
+                        '这里只放真正接入后端逻辑的配置，保存后会写入系统日志并影响新的审核操作。',
+                    })}
+                  </p>
+                </div>
+                <div className="gl-admin-system-form-grid">
+                  <label>
+                    <span>
+                      {t('admin.system.review.timeout', { defaultValue: '举报领取锁定时长' })}
+                    </span>
+                    <select
+                      value={reviewTimeout}
+                      onChange={(event) => setReviewTimeout(event.target.value)}
+                      disabled={settings.isLoading || updateSettings.isPending}
+                    >
+                      {[10, 15, 30, 45, 60].map((value) => (
+                        <option value={value} key={value}>
+                          {t('admin.system.review.minutes', {
+                            count: value,
+                            defaultValue: '{{count}} 分钟',
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>
+                      {t('admin.system.review.defaultMute', { defaultValue: '默认全站禁言' })}
+                    </span>
+                    <select
+                      value={defaultMute}
+                      onChange={(event) => setDefaultMute(event.target.value)}
+                      disabled={settings.isLoading || updateSettings.isPending}
+                    >
+                      {(data?.siteMuteDurations ?? [30, 120, 1440, 10080]).map((value) => (
+                        <option value={value} key={value}>
+                          {muteDurationLabel(value, t)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="gl-admin-system-note">
+                  <span>{t('admin.system.review.note', { defaultValue: '变更说明' })}</span>
+                  <textarea
+                    value={changeNote}
+                    maxLength={240}
+                    onChange={(event) => setChangeNote(event.target.value)}
+                    placeholder={t('admin.system.review.notePlaceholder', {
+                      defaultValue: '可选，写给系统日志看的说明',
+                    })}
+                    disabled={updateSettings.isPending}
+                  />
+                </label>
+                <div className="gl-admin-system-save-row">
+                  <button
+                    type="button"
+                    onClick={saveReviewPolicy}
+                    disabled={
+                      settings.isLoading ||
+                      updateSettings.isPending ||
+                      !dirty
+                    }
+                  >
+                    <Save size={16} />
+                    {updateSettings.isPending
+                      ? t('admin.system.review.saving', { defaultValue: '保存中' })
+                      : t('admin.system.review.save', { defaultValue: '保存策略' })}
+                  </button>
+                  <span>
+                    {data?.updatedAt
+                      ? t('admin.system.review.updatedAt', {
+                          time: formatDate(data.updatedAt),
+                          defaultValue: '最近更新 {{time}}',
+                        })
+                      : t('admin.system.review.defaultState', { defaultValue: '当前使用默认策略' })}
+                  </span>
+                </div>
+              </div>
+              <div className="gl-admin-system-side">
+                <AdminDetailRow
+                  label={t('admin.system.review.contentPolicy', { defaultValue: '内容策略等级' })}
+                  value={contentPolicyLabel(data?.contentPolicyLevel, t)}
+                />
+                <AdminDetailRow
+                  label={t('admin.system.review.actions', { defaultValue: '举报处置动作' })}
+                  value={t('admin.system.review.actionsValue', {
+                    defaultValue:
+                      '领取、驳回、删除内容、警告用户、警告直播间、全站禁言、封禁用户、强制下播。',
+                  })}
+                />
+                <AdminDetailRow
+                  label={t('admin.system.review.audit', { defaultValue: '审计记录' })}
+                  value={t('admin.system.review.auditValue', {
+                    defaultValue: '策略保存和审核处置都会写入操作日志。',
+                  })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'services' && (
+          <div className="gl-admin-system-body">
+            <div className="gl-admin-health-grid">
+              {overviewLoading ? (
+                <AdminEmptyState
+                  label={t('admin.system.services.loading', { defaultValue: '正在加载服务状态...' })}
+                />
+              ) : healthItems.length === 0 ? (
+                <AdminEmptyState
+                  label={t('admin.system.services.empty', { defaultValue: '暂无服务健康数据。' })}
+                />
+              ) : (
+                healthItems.map((item) => (
+                  <div className={`gl-admin-health-card is-${item.status}`} key={item.key}>
+                    <span>
+                      {item.key === 'mysql' || item.key === 'redis' || item.key === 'kafka' ? (
+                        <Database size={17} />
+                      ) : (
+                        <Server size={17} />
+                      )}
+                    </span>
+                    <div>
+                      <strong>{item.label}</strong>
+                      <small>{healthStatusLabel(item.status, t)}</small>
+                      {item.detail && <p>{item.detail}</p>}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'runtime' && (
+          <div className="gl-admin-system-body">
+            <div className="gl-admin-system-runtime">
+              {settings.isLoading ? (
+                <AdminEmptyState
+                  label={t('admin.system.runtime.loading', { defaultValue: '正在加载运行配置...' })}
+                />
+              ) : (
+                (data?.runtime ?? []).map((item) => (
+                <div className="gl-admin-system-runtime-row" key={item.key}>
+                  <div>
+                    <strong>{systemRuntimeLabel(item.key, item.label, t)}</strong>
+                    <span>{systemRuntimeDescription(item.key, item.description, t)}</span>
+                  </div>
+                  <code>{systemRuntimeValue(item.key, item.value, t)}</code>
+                </div>
+                ))
+              )}
+              {!settings.isLoading && (data?.runtime ?? []).length === 0 && (
+                <AdminEmptyState
+                  label={t('admin.system.runtime.empty', { defaultValue: '暂无运行配置。' })}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'logs' && (
+          <div className="gl-admin-system-body">
+            <div className="gl-admin-log-table" aria-busy={systemLogs.isFetching}>
+              {systemLogs.isLoading ? (
+                <AdminEmptyState
+                  label={t('admin.system.logs.loading', { defaultValue: '正在加载系统日志...' })}
+                />
+              ) : (systemLogs.data?.items ?? []).length === 0 ? (
+                <AdminEmptyState
+                  label={t('admin.system.logs.empty', { defaultValue: '暂无系统配置日志。' })}
+                />
+              ) : (
+                (systemLogs.data?.items ?? []).map((item) => (
+                  <article className="gl-admin-log-row" key={item.id}>
+                    <div>
+                      <span>{auditCategoryLabel(item.category, t)}</span>
+                      <strong>{auditActionLabel(item.action, t)}</strong>
+                      <p>{item.targetTitle || item.targetId || '-'}</p>
+                    </div>
+                    <div className="gl-admin-log-meta">
+                      <span>
+                        {t('admin.logs.actor', { defaultValue: '操作人' })}: {item.actorName || '-'}
+                      </span>
+                      <span>
+                        {t('admin.logs.note', { defaultValue: '备注' })}:{' '}
+                        {item.note || t('admin.logs.noNote', { defaultValue: '无备注' })}
+                      </span>
+                      <time>{formatDate(item.createdAt)}</time>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </section>
     </div>
+  );
+}
+
+function SystemPolicyCard({
+  icon: Icon,
+  title,
+  value,
+  description,
+  meta,
+  to,
+  action,
+  tone,
+}: {
+  icon: AdminIcon;
+  title: string;
+  value: string | number;
+  description: string;
+  meta: string;
+  to: string;
+  action: string;
+  tone?: 'danger';
+}) {
+  return (
+    <article
+      className={tone === 'danger' ? 'gl-admin-system-card is-danger' : 'gl-admin-system-card'}
+    >
+      <div className="gl-admin-system-card-head">
+        <span>
+          <Icon size={17} />
+        </span>
+        <div>
+          <strong>{title}</strong>
+          <em>{value}</em>
+        </div>
+      </div>
+      <p>{description}</p>
+      <small>{meta}</small>
+      <Link to={to}>
+        {action}
+        <ChevronDown size={15} />
+      </Link>
+    </article>
   );
 }
 
@@ -3941,32 +4449,6 @@ function AdminKpi({
         <span>{label}</span>
       </div>
     </article>
-  );
-}
-
-function StaticOperationsPanel({
-  eyebrow,
-  title,
-  rows,
-}: {
-  eyebrow: string;
-  title: string;
-  rows: [string, string][];
-}) {
-  return (
-    <section className="gl-admin-panel">
-      <div className="gl-admin-panel-head">
-        <div>
-          <span>{eyebrow}</span>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      <div className="gl-admin-detail-list">
-        {rows.map(([label, value]) => (
-          <AdminDetailRow key={label} label={label} value={value} />
-        ))}
-      </div>
-    </section>
   );
 }
 

@@ -89,6 +89,29 @@ func (h *ModerationHandler) AdminOverview(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *ModerationHandler) AdminSystemSettings(c *gin.Context) {
+	resp, err := h.svc.AdminSystemSettings(c.Request.Context(), UserIDFromCtx(c))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *ModerationHandler) UpdateAdminSystemSettings(c *gin.Context) {
+	var req service.UpdateAdminSystemSettingsReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "bad request"))
+		return
+	}
+	resp, err := h.svc.UpdateAdminSystemSettings(c.Request.Context(), UserIDFromCtx(c), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *ModerationHandler) CreateReport(c *gin.Context) {
 	var req service.CreateReportReq
 	if err := c.ShouldBindJSON(&req); err != nil {

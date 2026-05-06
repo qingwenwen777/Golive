@@ -95,6 +95,17 @@ func main() {
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
 	moderationSvc.SetLiveService(liveSvc)
+	moderationSvc.SetSystemRuntimeConfig(service.SystemRuntimeConfig{
+		ServiceName:         cfg.Service.Name,
+		LogLevel:            cfg.Service.LogLevel,
+		LiveFLVBase:         cfg.Live.FlvBase,
+		StreamKeyTTL:        cfg.Live.StreamKeyTTL,
+		ReplayRecordDir:     cfg.Replay.RecordDir,
+		ReplayBunnyEnabled:  cfg.Replay.BunnyLibraryID != "" && cfg.Replay.BunnyAPIKey != "",
+		ReplayUploadTimeout: cfg.Replay.UploadTimeout,
+		CoverPublicURL:      cfg.Upload.CoverPublicURL,
+		PostPublicURL:       cfg.Upload.PostPublicURL,
+	})
 	liveSvc.SetTextPolicy(moderationSvc)
 	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL)
 	if err != nil {

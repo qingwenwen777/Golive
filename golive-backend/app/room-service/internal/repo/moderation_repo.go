@@ -51,6 +51,7 @@ func (r *ModerationRepo) AutoMigrate() error {
 		&model.UserSanctionLog{},
 		&model.UnbanAppeal{},
 		&model.BlockedWord{},
+		&model.SystemSetting{},
 	)
 }
 
@@ -172,6 +173,43 @@ type AdminHealthItem struct {
 	Status  string
 	Detail  string
 	Checked bool
+}
+
+func (r *ModerationRepo) ListSystemSettings(ctx context.Context) ([]model.SystemSetting, error) {
+	var rows []model.SystemSetting
+	err := r.db.WithContext(ctx).Order("updated_at DESC").Find(&rows).Error
+	return rows, err
+}
+
+func (r *ModerationRepo) UpsertSystemSettings(ctx context.Context, values map[string]string, updatedBy string, now time.Time) error {
+	if len(values) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for key, value := range values {
+			row := model.SystemSetting{
+				Key:       strings.TrimSpace(key),
+				Value:     strings.TrimSpace(value),
+				UpdatedBy: strings.TrimSpace(updatedBy),
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			if row.Key == "" {
+				continue
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "key"}},
+				DoUpdates: clause.Assignments(map[string]any{
+					"value":      row.Value,
+					"updated_by": row.UpdatedBy,
+					"updated_at": row.UpdatedAt,
+				}),
+			}).Create(&row).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *ModerationRepo) ListFanClubMembers(ctx context.Context, ownerID, query string, page, size int) ([]ModerationUser, int64, error) {

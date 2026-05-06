@@ -92,6 +92,8 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.POST("/moderation/unban-appeals", auth, moderationH.CreateUnbanAppeal)
 		rooms.POST("/reports", auth, moderationH.CreateReport)
 		rooms.GET("/admin/dashboard", auth, moderationH.AdminOverview)
+		rooms.GET("/admin/system-settings", auth, moderationH.AdminSystemSettings)
+		rooms.PATCH("/admin/system-settings", auth, moderationH.UpdateAdminSystemSettings)
 		rooms.GET("/admin/audit-logs", auth, moderationH.AdminAuditLogs)
 		rooms.GET("/admin/reports", auth, moderationH.ListReports)
 		rooms.GET("/admin/reports/:id", auth, moderationH.ReportDetail)

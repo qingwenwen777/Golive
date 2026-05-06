@@ -31,6 +31,31 @@ export interface AdminOverview {
   health: AdminHealthItem[];
 }
 
+export interface AdminSystemRuntimeItem {
+  key: string;
+  label: string;
+  value: string;
+  description?: string;
+}
+
+export interface AdminSystemSettings {
+  registrationPolicy: 'invite_only' | string;
+  liveReviewEnabled: boolean;
+  contentPolicyLevel: 'standard' | 'strict' | 'relaxed' | string;
+  reportReviewTimeoutMinutes: number;
+  siteMuteDurations: number[];
+  defaultSiteMuteMinutes: number;
+  runtime: AdminSystemRuntimeItem[];
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateAdminSystemSettingsPayload {
+  reportReviewTimeoutMinutes?: number;
+  defaultSiteMuteMinutes?: number;
+  note?: string;
+}
+
 export interface AdminUserListItem extends User {
   email?: string;
   frozenCoins: number;
@@ -272,6 +297,38 @@ export function useAdminOverview(enabled = true) {
     enabled,
     staleTime: 8_000,
     retry: 1,
+  });
+}
+
+export function useAdminSystemSettings(enabled = true) {
+  return useQuery<AdminSystemSettings, Error>({
+    queryKey: ['admin-system-settings'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<AdminSystemSettings>('/rooms/admin/system-settings', {
+        signal,
+      });
+      return data;
+    },
+    enabled,
+    staleTime: 10_000,
+    retry: 1,
+  });
+}
+
+export function useUpdateAdminSystemSettings() {
+  const qc = useQueryClient();
+  return useMutation<AdminSystemSettings, Error, UpdateAdminSystemSettingsPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.patch<AdminSystemSettings>(
+        '/rooms/admin/system-settings',
+        payload,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-system-settings'] });
+      void qc.invalidateQueries({ queryKey: ['admin-audit-logs'] });
+    },
   });
 }
 

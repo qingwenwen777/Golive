@@ -7731,6 +7731,297 @@ html[lang='zh'] .gl-admin-action-select-head small {
   align-self: flex-end;
   padding: 0;
 }
+.gl-admin-system-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+.gl-admin-system-tabs {
+  border-top: 1px solid var(--gl-border);
+}
+.gl-admin-system-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+.gl-admin-system-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+.gl-admin-system-card {
+  display: flex;
+  min-width: 0;
+  min-height: 210px;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 14px;
+}
+.gl-admin-system-card.is-danger {
+  border-color: rgba(255, 61, 92, 0.28);
+  background: linear-gradient(0deg, rgba(255, 61, 92, 0.035), rgba(255, 61, 92, 0.035)),
+    var(--gl-bg);
+}
+.gl-admin-system-card-head {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.gl-admin-system-card-head > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-admin-system-card.is-danger .gl-admin-system-card-head > span {
+  background: rgba(255, 61, 92, 0.12);
+  color: var(--gl-red);
+}
+.gl-admin-system-card-head div,
+.gl-admin-system-card p,
+.gl-admin-system-card small,
+.gl-admin-system-card a {
+  min-width: 0;
+}
+.gl-admin-system-card strong,
+.gl-admin-system-card em {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-system-card strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+.gl-admin-system-card em {
+  margin-top: 2px;
+  color: var(--gl-text);
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 950;
+  line-height: 1.1;
+}
+.gl-admin-system-card p {
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+.gl-admin-system-card small {
+  margin-top: auto;
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.gl-admin-system-card a,
+.gl-admin-system-actions a,
+.gl-admin-system-save-row button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 900;
+  padding: 0 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gl-admin-system-card a {
+  width: fit-content;
+}
+.gl-admin-system-card a:hover,
+.gl-admin-system-actions a:hover,
+.gl-admin-system-save-row button:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-admin-system-card a svg {
+  transform: rotate(-90deg);
+}
+.gl-admin-system-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-top: 1px solid var(--gl-border);
+  padding-top: 14px;
+}
+.gl-admin-system-review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 14px;
+  align-items: start;
+}
+.gl-admin-system-form,
+.gl-admin-system-side,
+.gl-admin-system-runtime {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+}
+.gl-admin-system-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+.gl-admin-system-form > div:first-child span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-admin-system-form h3 {
+  margin: 4px 0 0;
+  color: var(--gl-text);
+  font-size: 18px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+.gl-admin-system-form p {
+  margin: 6px 0 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+.gl-admin-system-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.gl-admin-system-form label,
+.gl-admin-system-note {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.gl-admin-system-form label span,
+.gl-admin-system-note span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-admin-system-form select,
+.gl-admin-system-note textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 800;
+  outline: 0;
+}
+.gl-admin-system-form select {
+  height: 40px;
+  padding: 0 10px;
+}
+.gl-admin-system-note textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+.gl-admin-system-form select:focus,
+.gl-admin-system-note textarea:focus {
+  border-color: var(--gl-text);
+}
+.gl-admin-system-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gl-admin-system-save-row button {
+  border-color: var(--gl-text);
+  background: var(--gl-text);
+  color: var(--gl-bg);
+}
+.gl-admin-system-save-row button:hover {
+  background: var(--gl-text);
+}
+.gl-admin-system-save-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.gl-admin-system-save-row span {
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-admin-system-side .gl-admin-detail-row {
+  grid-template-columns: minmax(120px, 0.55fr) minmax(0, 1.45fr);
+}
+.gl-admin-system-runtime {
+  display: flex;
+  flex-direction: column;
+}
+.gl-admin-system-runtime-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+  gap: 14px;
+  align-items: center;
+  border-top: 1px solid var(--gl-border);
+  padding: 13px 14px;
+}
+.gl-admin-system-runtime-row:first-child {
+  border-top: 0;
+}
+.gl-admin-system-runtime-row div {
+  min-width: 0;
+}
+.gl-admin-system-runtime-row strong,
+.gl-admin-system-runtime-row span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-system-runtime-row strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+.gl-admin-system-runtime-row span {
+  margin-top: 3px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+.gl-admin-system-runtime-row code {
+  max-width: 420px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 8px 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 @container (max-width: 900px) {
   .gl-admin-gift-row {
     grid-template-columns: 1fr;
@@ -7777,6 +8068,9 @@ html[lang='zh'] .gl-admin-action-select-head small {
   .gl-admin-ledger-row,
   .gl-admin-bet-row,
   .gl-admin-report-ledger-row,
+  .gl-admin-system-review-grid,
+  .gl-admin-system-form-grid,
+  .gl-admin-system-runtime-row,
   .gl-admin-report-modal-grid {
     grid-template-columns: 1fr;
   }

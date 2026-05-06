@@ -347,4 +347,64 @@ func TestBlockedWordsRejectTextAndSyncRedis(t *testing.T) {
 	require.Equal(t, 2, importResp.Skipped)
 }
 
+func TestAdminSystemSettingsDriveReviewAndMutePolicy(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	defaults, err := svc.AdminSystemSettings(ctx, "admin-1")
+	require.NoError(t, err)
+	require.Equal(t, 30, defaults.ReportReviewTimeoutMinutes)
+	require.Equal(t, 1440, defaults.DefaultSiteMuteMinutes)
+	require.Equal(t, "invite_only", defaults.RegistrationPolicy)
+
+	updated, err := svc.UpdateAdminSystemSettings(ctx, "admin-1", UpdateAdminSystemSettingsReq{
+		ReportReviewTimeoutMinutes: intPtr(10),
+		DefaultSiteMuteMinutes:     intPtr(120),
+		Note:                       "faster reviews",
+	})
+	require.NoError(t, err)
+	require.Equal(t, 10, updated.ReportReviewTimeoutMinutes)
+	require.Equal(t, 120, updated.DefaultSiteMuteMinutes)
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{
+		TargetType:   "post",
+		TargetID:     "post-policy",
+		TargetUserID: "bad-user",
+		Reason:       "spam",
+		TargetText:   "bad post",
+	})
+	require.NoError(t, err)
+	claimed, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Status: "reviewing"})
+	require.NoError(t, err)
+	startedAt, err := time.Parse(time.RFC3339, claimed.ReviewStartedAt)
+	require.NoError(t, err)
+	expiresAt, err := time.Parse(time.RFC3339, claimed.ReviewExpiresAt)
+	require.NoError(t, err)
+	require.Equal(t, 10*time.Minute, expiresAt.Sub(startedAt))
+
+	muteReport, err := svc.CreateReport(ctx, "user-2", CreateReportReq{
+		TargetType:     "danmu",
+		TargetID:       "danmu-policy",
+		TargetUserID:   "bad-user",
+		TargetUserName: "Bad User",
+		Reason:         "harassment",
+		TargetText:     "bad message",
+	})
+	require.NoError(t, err)
+	resolved, err := svc.UpdateReport(ctx, "admin-1", muteReport.ID, UpdateReportReq{
+		Actions: []string{"site_mute"},
+		Note:    "default duration",
+	})
+	require.NoError(t, err)
+	require.Equal(t, 120, resolved.DurationMinutes)
+
+	logs, err := svc.AdminAuditLogs(ctx, "admin-1", "system", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, logs.Items, 1)
+	require.Equal(t, "system_settings_update", logs.Items[0].Action)
+}
+
 func boolPtr(v bool) *bool { return &v }
+func intPtr(v int) *int    { return &v }

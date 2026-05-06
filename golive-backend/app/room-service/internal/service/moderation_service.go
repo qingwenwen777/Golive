@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,13 +75,27 @@ var allowedSiteMuteDurations = map[int]struct{}{
 	10080: {},
 }
 
-const contentReportReviewTTL = 30 * time.Minute
+var allowedReviewTimeoutMinutes = map[int]struct{}{
+	10: {},
+	15: {},
+	30: {},
+	45: {},
+	60: {},
+}
+
+const (
+	defaultReportReviewTimeoutMinutes = 30
+	defaultSiteMuteMinutes            = 1440
+	systemSettingReportReviewTimeout  = "report_review_timeout_minutes"
+	systemSettingDefaultSiteMute      = "default_site_mute_minutes"
+)
 
 type ModerationService struct {
 	moderation *repo.ModerationRepo
 	rooms      *repo.RoomRepo
 	social     *repo.SocialRepo
 	live       *LiveService
+	runtime    SystemRuntimeConfig
 	now        func() time.Time
 }
 
@@ -95,6 +110,22 @@ func NewModerationService(moderation *repo.ModerationRepo, rooms *repo.RoomRepo,
 
 func (s *ModerationService) SetLiveService(live *LiveService) {
 	s.live = live
+}
+
+type SystemRuntimeConfig struct {
+	ServiceName         string
+	LogLevel            string
+	LiveFLVBase         string
+	StreamKeyTTL        time.Duration
+	ReplayRecordDir     string
+	ReplayBunnyEnabled  bool
+	ReplayUploadTimeout time.Duration
+	CoverPublicURL      string
+	PostPublicURL       string
+}
+
+func (s *ModerationService) SetSystemRuntimeConfig(cfg SystemRuntimeConfig) {
+	s.runtime = cfg
 }
 
 type ModerationUserDTO struct {
@@ -337,6 +368,31 @@ type AdminHealthDTO struct {
 	Checked bool   `json:"checked"`
 }
 
+type AdminSystemRuntimeItemDTO struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+}
+
+type AdminSystemSettingsResp struct {
+	RegistrationPolicy         string                      `json:"registrationPolicy"`
+	LiveReviewEnabled          bool                        `json:"liveReviewEnabled"`
+	ContentPolicyLevel         string                      `json:"contentPolicyLevel"`
+	ReportReviewTimeoutMinutes int                         `json:"reportReviewTimeoutMinutes"`
+	SiteMuteDurations          []int                       `json:"siteMuteDurations"`
+	DefaultSiteMuteMinutes     int                         `json:"defaultSiteMuteMinutes"`
+	Runtime                    []AdminSystemRuntimeItemDTO `json:"runtime"`
+	UpdatedBy                  string                      `json:"updatedBy,omitempty"`
+	UpdatedAt                  string                      `json:"updatedAt,omitempty"`
+}
+
+type UpdateAdminSystemSettingsReq struct {
+	ReportReviewTimeoutMinutes *int   `json:"reportReviewTimeoutMinutes"`
+	DefaultSiteMuteMinutes     *int   `json:"defaultSiteMuteMinutes"`
+	Note                       string `json:"note"`
+}
+
 type CreateUnbanAppealReq struct {
 	Reason string `json:"reason"`
 }
@@ -502,6 +558,68 @@ func (s *ModerationService) AdminOverview(ctx context.Context, adminID string) (
 	}, nil
 }
 
+func (s *ModerationService) AdminSystemSettings(ctx context.Context, adminID string) (*AdminSystemSettingsResp, error) {
+	if err := s.requireAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
+	policy, err := s.systemPolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.adminSystemSettingsResp(policy), nil
+}
+
+func (s *ModerationService) UpdateAdminSystemSettings(ctx context.Context, adminID string, req UpdateAdminSystemSettingsReq) (*AdminSystemSettingsResp, error) {
+	if err := s.requireAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
+	current, err := s.systemPolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	updates := map[string]string{}
+	changes := make([]string, 0, 2)
+	if req.ReportReviewTimeoutMinutes != nil {
+		minutes := *req.ReportReviewTimeoutMinutes
+		if _, ok := allowedReviewTimeoutMinutes[minutes]; !ok {
+			return nil, errcode.New(http.StatusBadRequest, "invalid review timeout").WithReason("invalid_review_timeout")
+		}
+		if minutes != current.ReportReviewTimeoutMinutes {
+			updates[systemSettingReportReviewTimeout] = strconv.Itoa(minutes)
+			changes = append(changes, "review timeout "+strconv.Itoa(current.ReportReviewTimeoutMinutes)+"m -> "+strconv.Itoa(minutes)+"m")
+		}
+	}
+	if req.DefaultSiteMuteMinutes != nil {
+		minutes := *req.DefaultSiteMuteMinutes
+		if _, ok := allowedSiteMuteDurations[minutes]; !ok {
+			return nil, errcode.New(http.StatusBadRequest, "invalid default mute duration").WithReason("invalid_default_mute_duration")
+		}
+		if minutes != current.DefaultSiteMuteMinutes {
+			updates[systemSettingDefaultSiteMute] = strconv.Itoa(minutes)
+			changes = append(changes, "default site mute "+strconv.Itoa(current.DefaultSiteMuteMinutes)+"m -> "+strconv.Itoa(minutes)+"m")
+		}
+	}
+	now := s.now()
+	if len(updates) > 0 {
+		if err := s.moderation.UpsertSystemSettings(ctx, updates, adminID, now); err != nil {
+			return nil, err
+		}
+		note := strings.Join(changes, "; ")
+		if trimmed := strings.TrimSpace(req.Note); trimmed != "" {
+			if note != "" {
+				note += "; "
+			}
+			note += "note: " + trimmed
+		}
+		_ = s.logAdminAudit(ctx, model.AdminAuditCategorySystem, "system_settings_update", adminID, "system_settings", "moderation_policy", "Moderation policy", "", "", note, now)
+	}
+	next, err := s.systemPolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.adminSystemSettingsResp(next), nil
+}
+
 func (s *ModerationService) CreateReport(ctx context.Context, reporterID string, req CreateReportReq) (*ContentReportDTO, error) {
 	if reporterID == "" {
 		return nil, errcode.ErrUnauthorized
@@ -639,6 +757,10 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if err != nil {
 		return nil, err
 	}
+	policy, err := s.systemPolicy(ctx)
+	if err != nil {
+		return nil, err
+	}
 	reviewerName := firstNonEmptyString(admin.Name, admin.DisplayName, admin.Username, adminID)
 	status := strings.ToLower(strings.TrimSpace(req.Status))
 	actions, err := normalizeReportActions(req)
@@ -657,12 +779,13 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 			actions = []string{model.ReportActionDismiss}
 		}
 	}
-	duration := normalizeSanctionDuration(actions, req.DurationMinutes)
+	duration := policy.normalizeSanctionDuration(actions, req.DurationMinutes)
 	note := trimRunes(strings.TrimSpace(req.Note), 1000)
 	resolutionAction := strings.Join(actions, ",")
+	reviewTTL := time.Duration(policy.ReportReviewTimeoutMinutes) * time.Minute
 
 	if status == model.ReportStatusReviewing && len(actions) == 1 && actions[0] == model.ReportActionReview {
-		report, err := s.moderation.ClaimContentReportGroup(ctx, strings.TrimSpace(id), adminID, reviewerName, now, contentReportReviewTTL)
+		report, err := s.moderation.ClaimContentReportGroup(ctx, strings.TrimSpace(id), adminID, reviewerName, now, reviewTTL)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.New(http.StatusNotFound, "report not found")
 		}
@@ -698,7 +821,7 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 		return &dto, nil
 	}
 
-	claimed, err := s.moderation.ClaimContentReportGroup(ctx, strings.TrimSpace(id), adminID, reviewerName, now, contentReportReviewTTL)
+	claimed, err := s.moderation.ClaimContentReportGroup(ctx, strings.TrimSpace(id), adminID, reviewerName, now, reviewTTL)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
 	}
@@ -1291,6 +1414,100 @@ func (s *ModerationService) requireAdmin(ctx context.Context, userID string) err
 	return nil
 }
 
+type adminSystemPolicy struct {
+	ReportReviewTimeoutMinutes int
+	DefaultSiteMuteMinutes     int
+	UpdatedBy                  string
+	UpdatedAt                  *time.Time
+}
+
+func (s *ModerationService) systemPolicy(ctx context.Context) (adminSystemPolicy, error) {
+	rows, err := s.moderation.ListSystemSettings(ctx)
+	if err != nil {
+		return adminSystemPolicy{}, err
+	}
+	settings := make(map[string]model.SystemSetting, len(rows))
+	policy := adminSystemPolicy{
+		ReportReviewTimeoutMinutes: defaultReportReviewTimeoutMinutes,
+		DefaultSiteMuteMinutes:     defaultSiteMuteMinutes,
+	}
+	for _, row := range rows {
+		settings[row.Key] = row
+		if row.UpdatedBy != "" && (policy.UpdatedAt == nil || row.UpdatedAt.After(*policy.UpdatedAt)) {
+			updatedAt := row.UpdatedAt
+			policy.UpdatedAt = &updatedAt
+			policy.UpdatedBy = row.UpdatedBy
+		}
+	}
+	policy.ReportReviewTimeoutMinutes = settingInt(settings, systemSettingReportReviewTimeout, defaultReportReviewTimeoutMinutes, allowedReviewTimeoutMinutes)
+	policy.DefaultSiteMuteMinutes = settingInt(settings, systemSettingDefaultSiteMute, defaultSiteMuteMinutes, allowedSiteMuteDurations)
+	return policy, nil
+}
+
+func settingInt(settings map[string]model.SystemSetting, key string, fallback int, allowed map[int]struct{}) int {
+	row, ok := settings[key]
+	if !ok {
+		return fallback
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(row.Value))
+	if err != nil {
+		return fallback
+	}
+	if len(allowed) > 0 {
+		if _, ok := allowed[value]; !ok {
+			return fallback
+		}
+	}
+	return value
+}
+
+func (s *ModerationService) adminSystemSettingsResp(policy adminSystemPolicy) *AdminSystemSettingsResp {
+	resp := &AdminSystemSettingsResp{
+		RegistrationPolicy:         "invite_only",
+		LiveReviewEnabled:          true,
+		ContentPolicyLevel:         "standard",
+		ReportReviewTimeoutMinutes: policy.ReportReviewTimeoutMinutes,
+		SiteMuteDurations:          []int{30, 120, 1440, 10080},
+		DefaultSiteMuteMinutes:     policy.DefaultSiteMuteMinutes,
+		Runtime:                    s.systemRuntimeItems(),
+		UpdatedBy:                  policy.UpdatedBy,
+	}
+	if policy.UpdatedAt != nil && !policy.UpdatedAt.IsZero() {
+		resp.UpdatedAt = policy.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	return resp
+}
+
+func (s *ModerationService) systemRuntimeItems() []AdminSystemRuntimeItemDTO {
+	cfg := s.runtime
+	items := []AdminSystemRuntimeItemDTO{
+		{Key: "service", Label: "room-service", Value: firstNonEmptyString(cfg.ServiceName, "room-service"), Description: "Service owning moderation and system policy."},
+		{Key: "log_level", Label: "Log level", Value: firstNonEmptyString(cfg.LogLevel, "-"), Description: "Runtime logging level from config."},
+		{Key: "flv_base", Label: "HTTP-FLV base", Value: firstNonEmptyString(cfg.LiveFLVBase, "-"), Description: "Public playback prefix for live streams."},
+		{Key: "stream_key_ttl", Label: "Stream key TTL", Value: durationValue(cfg.StreamKeyTTL), Description: "Publisher stream key validity window."},
+		{Key: "replay_record_dir", Label: "Replay record dir", Value: firstNonEmptyString(cfg.ReplayRecordDir, "-"), Description: "Server-side replay recording path."},
+		{Key: "replay_upload_timeout", Label: "Replay upload timeout", Value: durationValue(cfg.ReplayUploadTimeout), Description: "Maximum upload time for replay assets."},
+		{Key: "bunny_stream", Label: "Bunny Stream", Value: configuredValue(cfg.ReplayBunnyEnabled), Description: "External replay hosting credentials are masked."},
+		{Key: "cover_public_url", Label: "Cover uploads", Value: firstNonEmptyString(cfg.CoverPublicURL, "-"), Description: "Public URL prefix for live cover images."},
+		{Key: "post_public_url", Label: "Post images", Value: firstNonEmptyString(cfg.PostPublicURL, "-"), Description: "Public URL prefix for post images."},
+	}
+	return items
+}
+
+func durationValue(value time.Duration) string {
+	if value <= 0 {
+		return "-"
+	}
+	return value.String()
+}
+
+func configuredValue(ok bool) string {
+	if ok {
+		return "configured"
+	}
+	return "not configured"
+}
+
 func contentReportDTOs(rows []model.ContentReport) []ContentReportDTO {
 	out := make([]ContentReportDTO, 0, len(rows))
 	for _, row := range rows {
@@ -1446,7 +1663,7 @@ func statusForReportAction(action string) string {
 	}
 }
 
-func normalizeSanctionDuration(actions []string, minutes int) int {
+func (p adminSystemPolicy) normalizeSanctionDuration(actions []string, minutes int) int {
 	hasSiteMute := false
 	for _, action := range actions {
 		if action == model.ReportActionSiteMute {
@@ -1460,7 +1677,7 @@ func normalizeSanctionDuration(actions []string, minutes int) int {
 	if _, ok := allowedSiteMuteDurations[minutes]; ok {
 		return minutes
 	}
-	return 1440
+	return p.DefaultSiteMuteMinutes
 }
 
 func firstNonEmptyString(values ...string) string {
