@@ -39,6 +39,7 @@ func (r *MessageRepo) AutoMigrate() error {
 		&model.FanGroupChat{},
 		&model.FanGroupMember{},
 		&model.FanGroupMessage{},
+		&model.FanGroupReadState{},
 	)
 }
 
@@ -576,12 +577,20 @@ func syncFanGroupMember(tx *gorm.DB, groupID, userID string, now time.Time) erro
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
-		return tx.Create(&model.FanGroupMember{
+		if err := tx.Create(&model.FanGroupMember{
 			GroupID:   groupID,
 			UserID:    userID,
 			Role:      model.FanGroupRoleMember,
 			CreatedAt: now,
 			UpdatedAt: now,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.FanGroupReadState{
+			GroupID:    groupID,
+			UserID:     userID,
+			LastReadAt: now,
+			UpdatedAt:  now,
 		}).Error
 	}
 	if member.KickedAt != nil && member.KickReason != model.FanGroupKickReasonSync {
@@ -625,6 +634,35 @@ func (r *MessageRepo) ListJoinedFanGroups(ctx context.Context, userID string) ([
 		return nil, err
 	}
 	return r.fanGroupsWithMembers(ctx, groups, false, userID)
+}
+
+func (r *MessageRepo) FanGroupUnreadCounts(ctx context.Context, userID string, groupIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(groupIDs))
+	if userID == "" || len(groupIDs) == 0 {
+		return out, nil
+	}
+	for _, groupID := range groupIDs {
+		out[groupID] = 0
+	}
+	var rows []struct {
+		GroupID string
+		Unread  int64
+	}
+	err := r.db.WithContext(ctx).
+		Table("fan_group_members AS gm").
+		Select("gm.group_id, COUNT(msg.id) AS unread").
+		Joins("LEFT JOIN fan_group_read_states AS rs ON rs.group_id = gm.group_id AND rs.user_id = gm.user_id").
+		Joins("JOIN fan_group_messages AS msg ON msg.group_id = gm.group_id AND msg.sender_id <> ? AND msg.created_at > COALESCE(rs.last_read_at, gm.created_at)", userID).
+		Where("gm.user_id = ? AND gm.group_id IN ? AND gm.kicked_at IS NULL", userID, groupIDs).
+		Group("gm.group_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.GroupID] = row.Unread
+	}
+	return out, nil
 }
 
 func (r *MessageRepo) fanGroupsWithMembers(ctx context.Context, groups []model.FanGroupChat, includeRequests bool, viewerID string) ([]FanGroupWithMembers, error) {
@@ -807,6 +845,24 @@ func (r *MessageRepo) FanGroupMemberForUser(ctx context.Context, groupID, userID
 	return &member, nil
 }
 
+func (r *MessageRepo) MarkFanGroupRead(ctx context.Context, groupID, userID string, readAt time.Time) error {
+	if _, err := r.FanGroupMemberForUser(ctx, groupID, userID); err != nil {
+		return err
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "group_id"}, {Name: "user_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"last_read_at": readAt,
+			"updated_at":   readAt,
+		}),
+	}).Create(&model.FanGroupReadState{
+		GroupID:    groupID,
+		UserID:     userID,
+		LastReadAt: readAt,
+		UpdatedAt:  readAt,
+	}).Error
+}
+
 func (r *MessageRepo) FanGroupMessages(ctx context.Context, groupID, userID string, page, size int) ([]FanGroupMessageRow, int64, error) {
 	page, size = normalizeMessagePage(page, size)
 	if _, err := r.FanGroupMemberForUser(ctx, groupID, userID); err != nil {
@@ -868,6 +924,9 @@ func (r *MessageRepo) SendFanGroupMessage(ctx context.Context, groupID, senderID
 	if err := r.db.WithContext(ctx).Create(&message).Error; err != nil {
 		return nil, err
 	}
+	_ = r.db.WithContext(ctx).Model(&model.FanGroupChat{}).
+		Where("id = ?", groupID).
+		Update("updated_at", now).Error
 	return &message, nil
 }
 

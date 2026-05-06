@@ -39,6 +39,7 @@ import {
   useFanGroupMessages,
   useJoinedFanGroups,
   useMarkDirectThreadReadLocal,
+  useMarkFanGroupReadLocal,
   useMessagePreference,
   useRequestFanGroupRejoin,
   useSendDirect,
@@ -185,9 +186,11 @@ function PrivateMessages({
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [content, setContent] = useState('');
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
+  const [entryUnread, setEntryUnread] = useState(0);
   const directInputRef = useRef<HTMLInputElement | null>(null);
   const sendDirect = useSendDirect();
   const markDirectThreadReadLocal = useMarkDirectThreadReadLocal();
+  const markFanGroupReadLocal = useMarkFanGroupReadLocal();
   const joinedGroups = fanGroups.data?.items ?? [];
   const selectedGroup = selectedGroupId
     ? joinedGroups.find((item) => item.id === selectedGroupId)
@@ -214,6 +217,8 @@ function PrivateMessages({
     activeKey: selectedThread?.id ? `direct:${selectedThread.id}` : 'direct:none',
     hasNextPage: Boolean(messages.hasNextPage),
     isFetchingNextPage: messages.isFetchingNextPage,
+    entryUnread: Math.max(entryUnread, selectedThread?.unread ?? 0),
+    onEntryNoticeConsumed: () => setEntryUnread(0),
     fetchNextPage: () => messages.fetchNextPage(),
   });
   const sendThread = useSendThreadMessage(selectedThread?.id ?? '');
@@ -241,6 +246,18 @@ function PrivateMessages({
   useEffect(() => {
     if (selectedThread?.id) markDirectThreadReadLocal(selectedThread.id);
   }, [markDirectThreadReadLocal, selectedThread?.id]);
+
+  useEffect(() => {
+    if (selectedThread?.id && selectedThread.unread > 0) {
+      setEntryUnread(selectedThread.unread);
+    }
+  }, [selectedThread?.id, selectedThread?.unread]);
+
+  useEffect(() => {
+    if (selectedGroup?.id && selectedGroup.unread > 0) {
+      setEntryUnread(selectedGroup.unread);
+    }
+  }, [selectedGroup?.id, selectedGroup?.unread]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -303,6 +320,8 @@ function PrivateMessages({
                 group={group}
                 active={selectedGroup?.id === group.id}
                 onClick={() => {
+                  if (group.unread > 0) setEntryUnread(group.unread);
+                  markFanGroupReadLocal(group.id);
                   setSelectedId('');
                   setSelectedGroupId(group.id);
                 }}
@@ -321,6 +340,8 @@ function PrivateMessages({
                 thread={draft.data}
                 active={!selectedGroup && !selectedThread?.id}
                 onClick={() => {
+                  if (draft.data?.unread && draft.data.unread > 0)
+                    setEntryUnread(draft.data.unread);
                   setSelectedGroupId('');
                   setSelectedId('');
                   if (draft.data?.id) markDirectThreadReadLocal(draft.data.id);
@@ -333,6 +354,7 @@ function PrivateMessages({
                 thread={thread}
                 active={selectedThread?.id === thread.id}
                 onClick={() => {
+                  if (thread.unread > 0) setEntryUnread(thread.unread);
                   markDirectThreadReadLocal(thread.id);
                   setSelectedGroupId('');
                   setSelectedId(thread.id);
@@ -351,7 +373,12 @@ function PrivateMessages({
 
       <section className="gl-direct-chat">
         {selectedGroup ? (
-          <FanGroupChatView group={selectedGroup} userId={userId} />
+          <FanGroupChatView
+            group={selectedGroup}
+            userId={userId}
+            entryUnread={entryUnread}
+            onEntryNoticeConsumed={() => setEntryUnread(0)}
+          />
         ) : followRequiredActive ? (
           <FollowRequiredDirectState onOpenChannel={() => navigate(`/channel/${draftCreatorId}`)} />
         ) : selectedThread ? (
@@ -603,6 +630,8 @@ function useChatScroll<T extends { id: string }>(
     activeKey: string;
     hasNextPage: boolean;
     isFetchingNextPage: boolean;
+    entryUnread?: number;
+    onEntryNoticeConsumed?: () => void;
     fetchNextPage: () => Promise<unknown>;
   },
 ) {
@@ -673,6 +702,20 @@ function useChatScroll<T extends { id: string }>(
 
     const previousLastId = previousLastIdRef.current;
     if (!previousLastId) {
+      const entryUnread = Math.max(0, options.entryUnread ?? 0);
+      if (entryUnread > 0) {
+        const overflowing = node.scrollHeight > node.clientHeight + 12;
+        if (overflowing) {
+          const firstUnreadIndex = Math.max(0, items.length - entryUnread);
+          setNewNotice({
+            count: entryUnread,
+            targetId: items[firstUnreadIndex]?.id ?? lastId,
+          });
+        } else {
+          setNewNotice(null);
+        }
+        options.onEntryNoticeConsumed?.();
+      }
       window.requestAnimationFrame(() => {
         const nextNode = listRef.current;
         if (nextNode) nextNode.scrollTop = nextNode.scrollHeight;
@@ -786,11 +829,22 @@ function FanGroupThreadButton({
           {t('messages.private.fanGroups', { defaultValue: '粉丝团群聊' })}
         </small>
       </span>
+      {group.unread > 0 && <em>{group.unread > 99 ? '99+' : group.unread}</em>}
     </button>
   );
 }
 
-function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }) {
+function FanGroupChatView({
+  group,
+  userId,
+  entryUnread,
+  onEntryNoticeConsumed,
+}: {
+  group: FanGroup;
+  userId: string;
+  entryUnread: number;
+  onEntryNoticeConsumed: () => void;
+}) {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation('pages');
   const owner = group.members.find((member) => member.role === 'owner');
@@ -811,6 +865,8 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
     activeKey: group.id ? `fan:${group.id}` : 'fan:none',
     hasNextPage: Boolean(messages.hasNextPage),
     isFetchingNextPage: messages.isFetchingNextPage,
+    entryUnread: Math.max(entryUnread, group.unread ?? 0),
+    onEntryNoticeConsumed,
     fetchNextPage: () => messages.fetchNextPage(),
   });
   const sendMessage = useSendFanGroupMessage(group.id);
@@ -1384,11 +1440,23 @@ function fanGroupMessageError(err: Error, t: Translate): string {
 function NotificationPanel({ title, box, empty }: { title: string; box: string; empty: string }) {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation('pages');
-  const notifications = useNotifications(true, 1, 40, box);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const notifications = useNotifications(true, page, pageSize, box);
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead(box);
   const items = notifications.data?.items ?? [];
   const unread = notifications.data?.unread ?? 0;
+  const total = notifications.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  useEffect(() => {
+    setPage(1);
+  }, [box]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const openItem = (item: NotificationItem) => {
     if (!item.readAt) markRead.mutate(item.id);
@@ -1445,6 +1513,34 @@ function NotificationPanel({ title, box, empty }: { title: string; box: string; 
         <div className="gl-direct-empty is-full">
           <Bell size={34} />
           <strong>{empty}</strong>
+        </div>
+      )}
+      {total > pageSize && (
+        <div className="gl-message-pagination">
+          <span>
+            {t('messages.notifications.pageStatus', {
+              total,
+              page,
+              totalPages,
+              defaultValue: '共 {{total}} 条 · 第 {{page}} / {{totalPages}} 页',
+            })}
+          </span>
+          <div>
+            <button
+              type="button"
+              disabled={page <= 1 || notifications.isFetching}
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+            >
+              {t('messages.notifications.prevPage', { defaultValue: '上一页' })}
+            </button>
+            <button
+              type="button"
+              disabled={page >= totalPages || notifications.isFetching}
+              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+            >
+              {t('messages.notifications.nextPage', { defaultValue: '下一页' })}
+            </button>
+          </div>
         </div>
       )}
     </section>

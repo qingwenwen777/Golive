@@ -2055,7 +2055,10 @@
       "systemEmpty": "システム通知はまだありません。",
       "loading": "通知を読み込み中...",
       "unread": "未読 {{count}} 件",
-      "markAllRead": "すべて既読"
+      "markAllRead": "すべて既読",
+      "pageStatus": "全 {{total}} 件 · {{page}} / {{totalPages}} ページ",
+      "prevPage": "前へ",
+      "nextPage": "次へ"
     },
     "chat": {
       "newMessages": "新着 {{count}} 件",

@@ -2063,7 +2063,10 @@
       "systemEmpty": "No system notices yet.",
       "loading": "Loading notifications...",
       "unread": "{{count}} unread",
-      "markAllRead": "Mark all read"
+      "markAllRead": "Mark all read",
+      "pageStatus": "{{total}} total · Page {{page}} / {{totalPages}}",
+      "prevPage": "Previous",
+      "nextPage": "Next"
     },
     "chat": {
       "newMessages": "{{count}} new messages",

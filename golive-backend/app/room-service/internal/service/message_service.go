@@ -136,6 +136,7 @@ type FanGroupDTO struct {
 	GroupNo     int                 `json:"groupNo"`
 	Name        string              `json:"name"`
 	MemberCount int                 `json:"memberCount"`
+	Unread      int64               `json:"unread"`
 	Members     []FanGroupMemberDTO `json:"members"`
 	CreatedAt   string              `json:"createdAt"`
 	UpdatedAt   string              `json:"updatedAt"`
@@ -535,9 +536,19 @@ func (s *MessageService) ListJoinedFanGroups(ctx context.Context, userID string)
 	if err != nil {
 		return nil, err
 	}
+	groupIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		groupIDs = append(groupIDs, row.Group.ID)
+	}
+	unreadCounts, err := s.messages.FanGroupUnreadCounts(ctx, userID, groupIDs)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]FanGroupDTO, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, fanGroupDTO(row))
+		item := fanGroupDTO(row)
+		item.Unread = unreadCounts[row.Group.ID]
+		items = append(items, item)
 	}
 	return &FanGroupListResp{Items: items, Total: len(items)}, nil
 }
@@ -551,6 +562,7 @@ func (s *MessageService) FanGroupMessages(ctx context.Context, userID, groupID s
 	if err != nil {
 		return nil, fanGroupError(err)
 	}
+	_ = s.messages.MarkFanGroupRead(ctx, groupID, userID, s.now())
 	items := make([]FanGroupMessageDTO, 0, len(rows))
 	for _, row := range rows {
 		fanBadge := fanBadgeFromLevel(row.CreatorID, row.FanBadgeLevel)

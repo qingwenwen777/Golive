@@ -111,3 +111,12 @@ type FanGroupMessage struct {
 }
 
 func (FanGroupMessage) TableName() string { return "fan_group_messages" }
+
+type FanGroupReadState struct {
+	GroupID    string    `gorm:"primaryKey;type:varchar(64);index"`
+	UserID     string    `gorm:"primaryKey;type:varchar(36);index"`
+	LastReadAt time.Time `gorm:"not null;index"`
+	UpdatedAt  time.Time
+}
+
+func (FanGroupReadState) TableName() string { return "fan_group_read_states" }

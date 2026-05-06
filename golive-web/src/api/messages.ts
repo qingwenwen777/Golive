@@ -110,6 +110,7 @@ export interface FanGroup {
   groupNo: number;
   name: string;
   memberCount: number;
+  unread: number;
   members: FanGroupMember[];
   createdAt: string;
   updatedAt: string;
@@ -385,12 +386,14 @@ export function useJoinedFanGroups(enabled = true) {
       return data;
     },
     enabled,
-    staleTime: 15_000,
+    staleTime: 3_000,
+    refetchInterval: enabled ? 5_000 : false,
     retry: 1,
   });
 }
 
 export function useFanGroupMessages(groupId: string, enabled = true, size = 40) {
+  const qc = useQueryClient();
   return useInfiniteQuery<FanGroupMessageListResp, Error>({
     queryKey: ['fan-group-messages', groupId, size],
     initialPageParam: 1,
@@ -400,6 +403,8 @@ export function useFanGroupMessages(groupId: string, enabled = true, size = 40) 
         `/messages/fan-groups/${encodeURIComponent(groupId)}/messages`,
         { params: { page, size }, signal },
       );
+      markFanGroupReadInCache(qc, groupId);
+      void qc.invalidateQueries({ queryKey: ['joined-fan-groups'] });
       return data;
     },
     getNextPageParam: (lastPage) => {
@@ -413,6 +418,11 @@ export function useFanGroupMessages(groupId: string, enabled = true, size = 40) 
   });
 }
 
+export function useMarkFanGroupReadLocal() {
+  const qc = useQueryClient();
+  return useCallback((groupId: string) => markFanGroupReadInCache(qc, groupId), [qc]);
+}
+
 export function useSendFanGroupMessage(groupId: string) {
   const qc = useQueryClient();
   return useMutation<FanGroupMessage, Error, string>({
@@ -424,10 +434,22 @@ export function useSendFanGroupMessage(groupId: string) {
       return data;
     },
     onSuccess: () => {
+      markFanGroupReadInCache(qc, groupId);
       void qc.invalidateQueries({ queryKey: ['fan-group-messages', groupId] });
       void qc.invalidateQueries({ queryKey: ['joined-fan-groups'] });
     },
   });
+}
+
+function updateFanGroupCaches(qc: QueryClient, updater: (group: FanGroup) => FanGroup) {
+  qc.setQueriesData<FanGroupListResp>({ queryKey: ['joined-fan-groups'] }, (old) =>
+    old ? { ...old, items: old.items.map(updater) } : old,
+  );
+}
+
+function markFanGroupReadInCache(qc: QueryClient, groupId: string) {
+  if (!groupId) return;
+  updateFanGroupCaches(qc, (group) => (group.id === groupId ? { ...group, unread: 0 } : group));
 }
 
 export function useRequestFanGroupRejoin() {
