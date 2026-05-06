@@ -82,6 +82,7 @@ func baseCfg(user, room, gift string) *config.Config {
 		Proxy:     config.ProxyCfg{Timeout: 2 * time.Second, MaxIdleConns: 10, MaxIdleConnsPerHost: 5},
 		JWT:       config.JWTCfg{Secret: "secret"},
 		CORS:      config.CORSCfg{AllowedOrigins: []string{"http://localhost:5173"}, MaxAge: 600},
+		CSRF:      config.CSRFCfg{Secret: "csrf-secret", TokenTTL: time.Hour},
 		RateLimit: config.RateLimitCfg{Enabled: false},
 	}
 }

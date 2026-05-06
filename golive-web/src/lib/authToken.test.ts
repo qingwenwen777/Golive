@@ -2,13 +2,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AuthRefreshError, refreshAuthToken } from './authToken';
+import { clearCsrfToken } from '@/lib/csrfToken';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const axiosPostMock = vi.hoisted(() => vi.fn());
+const axiosGetMock = vi.hoisted(() => vi.fn());
 
 vi.mock('axios', () => ({
   default: {
     isAxiosError: (err: unknown) => Boolean((err as { isAxiosError?: boolean }).isAxiosError),
+    get: axiosGetMock,
     post: axiosPostMock,
   },
 }));
@@ -34,7 +37,10 @@ describe('refreshAuthToken', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_API_BASE', '/api');
     window.localStorage.clear();
+    clearCsrfToken();
     axiosPostMock.mockReset();
+    axiosGetMock.mockReset();
+    axiosGetMock.mockResolvedValue({ data: { token: 'csrf-token' } });
     useAuthStore.setState({
       token: 'old-token',
       refreshToken: 'refresh-token',
@@ -58,11 +64,14 @@ describe('refreshAuthToken', () => {
     const first = refreshAuthToken();
     const second = refreshAuthToken();
 
-    expect(axiosPostMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(axiosPostMock).toHaveBeenCalledTimes(1));
     expect(axiosPostMock).toHaveBeenCalledWith(
       '/api/auth/refresh',
       { refreshToken: 'refresh-token' },
-      { timeout: 10_000 },
+      {
+        timeout: 10_000,
+        headers: { 'X-CSRF-Token': 'csrf-token' },
+      },
     );
 
     request.resolve({ data: { token: 'new-token', refreshToken: 'new-refresh' } });

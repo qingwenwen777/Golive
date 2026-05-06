@@ -13,12 +13,21 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const refreshAuthTokenMock = vi.hoisted(() => vi.fn());
+const getCsrfTokenMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/authToken', async () => {
   const actual = await vi.importActual<typeof import('@/lib/authToken')>('@/lib/authToken');
   return {
     ...actual,
     refreshAuthToken: refreshAuthTokenMock,
+  };
+});
+
+vi.mock('@/lib/csrfToken', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/csrfToken')>('@/lib/csrfToken');
+  return {
+    ...actual,
+    getCsrfToken: getCsrfTokenMock,
   };
 });
 
@@ -59,6 +68,8 @@ describe('http axios client', () => {
     vi.stubEnv('VITE_API_BASE', '/api');
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     refreshAuthTokenMock.mockReset();
+    getCsrfTokenMock.mockReset();
+    getCsrfTokenMock.mockResolvedValue('csrf-token');
     useAuthModalStore.setState({ open: false, afterLogin: null });
     useAuthStore.setState({
       token: 'old-token',
@@ -88,6 +99,17 @@ describe('http axios client', () => {
 
     expect(adapter).toHaveBeenCalledTimes(1);
     expect(headerValue(adapter.mock.calls[0][0], 'Authorization')).toBe('Bearer old-token');
+    expect(getCsrfTokenMock).not.toHaveBeenCalled();
+  });
+
+  it('adds a CSRF token to mutating requests', async () => {
+    const adapter = vi.fn<AxiosAdapter>(async (config) => response(config, { ok: true }));
+    setAdapter(adapter);
+
+    await http.post('/rooms/room-1/follow', {});
+
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(headerValue(adapter.mock.calls[0][0], 'X-CSRF-Token')).toBe('csrf-token');
   });
 
   it('refreshes once and retries the original request with the new token after a 401', async () => {

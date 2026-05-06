@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { useAuthStore } from '@/stores/useAuthStore';
+import { CSRF_HEADER, clearCsrfToken, getCsrfToken } from '@/lib/csrfToken';
 
 export type AuthRefreshFailureKind =
   | 'missing-refresh-token'
@@ -84,11 +85,7 @@ export async function refreshAuthToken(): Promise<string> {
     }
 
     try {
-      const { data } = await axios.post<{ token: string; refreshToken: string }>(
-        `${import.meta.env.VITE_API_BASE}/auth/refresh`,
-        { refreshToken },
-        { timeout: 10_000 },
-      );
+      const { data } = await postRefresh(refreshToken);
       useAuthStore.getState().setTokens(data.token, data.refreshToken);
       return data.token;
     } catch (err) {
@@ -119,4 +116,35 @@ export async function refreshAuthToken(): Promise<string> {
   });
 
   return refreshPromise;
+}
+
+async function postRefresh(refreshToken: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const csrf = await getCsrfToken(attempt > 0);
+    try {
+      return await axios.post<{ token: string; refreshToken: string }>(
+        `${import.meta.env.VITE_API_BASE}/auth/refresh`,
+        { refreshToken },
+        {
+          timeout: 10_000,
+          headers: { [CSRF_HEADER]: csrf },
+        },
+      );
+    } catch (err) {
+      if (!isCsrfInvalid(err) || attempt > 0) throw err;
+      clearCsrfToken();
+    }
+  }
+  throw new AuthRefreshError('refresh-failed', {
+    kind: 'transient',
+    refreshToken,
+  });
+}
+
+function isCsrfInvalid(err: unknown): boolean {
+  return (
+    axios.isAxiosError(err) &&
+    err.response?.status === 403 &&
+    (err.response.data as { reason?: unknown } | undefined)?.reason === 'csrf_invalid'
+  );
 }

@@ -77,6 +77,7 @@ func main() {
 		SendBuffer:      cfg.WS.SendBuffer,
 		PongWait:        cfg.WS.PongWait,
 		MaxMessageRate:  cfg.WS.MaxMessageRate,
+		AllowedOrigins:  cfg.WS.AllowedOrigins,
 	}
 	wsH := server.NewWSHandler(h, verifier, p, moderation.NewRedisChecker(rdb), wsCfg, cfg.Room.WelcomeText)
 	mux := server.NewMux(wsH, h)

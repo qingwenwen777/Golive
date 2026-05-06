@@ -55,8 +55,14 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(obs.HTTPMiddleware("api-gateway"))
+	r.Use(middleware.SecurityHeaders())
 	obs.MountMetrics(r)
 	r.Use(middleware.CORS(cfg.CORS.AllowedOrigins, cfg.CORS.MaxAge))
+	csrf, err := middleware.NewCSRFProtector(cfg.CSRF.Secret, cfg.CSRF.TokenTTL, cfg.CORS.AllowedOrigins)
+	if err != nil {
+		return nil, err
+	}
+	r.Use(csrf.Guard())
 	r.Use(middleware.RequestID())
 	if cfg.RateLimit.Enabled {
 		r.Use(middleware.RateLimit(cfg.RateLimit.RatePerSec, cfg.RateLimit.Burst))
@@ -71,6 +77,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	api := r.Group("/api", middleware.JWTWithKeySet(jwtKeys, publicRoutes()))
 	{
 		// user-service
+		api.GET("/csrf-token", csrf.Token)
 		api.Any("/auth/*action", gin.WrapH(userProxy))
 		api.Any("/users/*action", gin.WrapH(userProxy))
 		api.Any("/creator/*action", gin.WrapH(userProxy))
@@ -105,6 +112,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 // match Gin's FullPath() format (with the parameter name preserved).
 func publicRoutes() []middleware.PublicRoute {
 	return []middleware.PublicRoute{
+		{Method: http.MethodGet, Path: "/api/csrf-token"},
 		{Method: http.MethodGet, Path: "/api/auth/*action"},
 		{Method: http.MethodPost, Path: "/api/auth/*action"},
 		// Public user profiles power creator/channel pages.

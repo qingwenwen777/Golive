@@ -9,3 +9,4 @@ vendor/
 .idea/
 .vscode/
 coverage.out
+deploy/secrets/

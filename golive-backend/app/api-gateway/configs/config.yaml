@@ -32,6 +32,10 @@ cors:
     - "https://golive.example.com"   # production placeholder
   max_age: 600
 
+csrf:
+  secret: "dev-only-csrf-secret-change-in-prod-4e6f0b"
+  token_ttl: 12h
+
 ratelimit:
   enabled: true
   rate_per_sec: 100

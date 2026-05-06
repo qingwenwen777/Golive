@@ -49,6 +49,7 @@ type WSConfig struct {
 	SendBuffer      int
 	PongWait        time.Duration
 	MaxMessageRate  float64
+	AllowedOrigins  []string
 }
 
 func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, h *hub.Hub, p producer.Producer, m moderation.Checker, cfg WSConfig) *Conn {

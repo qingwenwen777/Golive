@@ -15,10 +15,13 @@ redis:
   password: ""
 
 jwt:
-  secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
-  active_kid: "jwt-2026-05-04"
+  active_kid: "jwt-rs256-2026-05-06"
   secrets:
+    - kid: "jwt-rs256-2026-05-06"
+      alg: "RS256"
+      public_key_file: "/app/deploy/secrets/jwt_public.pem"
     - kid: "jwt-2026-05-04"
+      alg: "HS256"
       secret: "golive-1718011198-jwt-7f6a9e1d4c3b2a9081726354b0c8d9ee"
 
 kafka:

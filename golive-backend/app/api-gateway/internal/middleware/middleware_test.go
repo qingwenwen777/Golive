@@ -1,6 +1,7 @@
 package middleware_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -135,6 +136,7 @@ func TestCORS_Preflight(t *testing.T) {
 	require.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), "POST")
 	require.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "Authorization")
 	require.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "X-Request-Id")
+	require.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "X-CSRF-Token")
 	require.Contains(t, w.Header().Get("Access-Control-Expose-Headers"), "Idempotent-Replayed")
 }
 
@@ -150,4 +152,68 @@ func TestCORS_DisallowedOrigin(t *testing.T) {
 	// Request still 200 (CORS isn't enforced server-side) but no ACAO header.
 	require.Equal(t, 200, w.Code)
 	require.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
+}
+
+// csrf ------------------------------------------------------------------
+
+func TestCSRF_AllowsBrowserUnsafeRequestWithToken(t *testing.T) {
+	r := gin.New()
+	csrf, err := middleware.NewCSRFProtector("csrf-secret", time.Hour, []string{"http://localhost:5173"})
+	require.NoError(t, err)
+	r.Use(csrf.Guard())
+	r.GET("/api/csrf-token", csrf.Token)
+	r.POST("/api/x", func(c *gin.Context) { c.String(200, "ok") })
+
+	tokenReq := httptest.NewRequest("GET", "/api/csrf-token", nil)
+	tokenReq.Header.Set("Origin", "http://localhost:5173")
+	tokenResp := httptest.NewRecorder()
+	r.ServeHTTP(tokenResp, tokenReq)
+	require.Equal(t, http.StatusOK, tokenResp.Code)
+	token := tokenResp.Body.String()
+	require.Contains(t, token, "token")
+
+	req := httptest.NewRequest("POST", "/api/x", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set(middleware.HeaderCSRFToken, extractJSONToken(token))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestCSRF_RejectsBrowserUnsafeRequestWithoutToken(t *testing.T) {
+	r := gin.New()
+	csrf, err := middleware.NewCSRFProtector("csrf-secret", time.Hour, []string{"http://localhost:5173"})
+	require.NoError(t, err)
+	r.Use(csrf.Guard())
+	r.POST("/api/x", func(c *gin.Context) { c.String(200, "ok") })
+
+	req := httptest.NewRequest("POST", "/api/x", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "csrf_invalid")
+}
+
+func TestCSRF_AllowsServerToServerWithoutOrigin(t *testing.T) {
+	r := gin.New()
+	csrf, err := middleware.NewCSRFProtector("csrf-secret", time.Hour, []string{"http://localhost:5173"})
+	require.NoError(t, err)
+	r.Use(csrf.Guard())
+	r.POST("/api/srs/callback", func(c *gin.Context) { c.String(200, "ok") })
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("POST", "/api/srs/callback", nil))
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func extractJSONToken(body string) string {
+	var payload struct {
+		Token string `json:"token"`
+	}
+	_ = json.Unmarshal([]byte(body), &payload)
+	return payload.Token
 }

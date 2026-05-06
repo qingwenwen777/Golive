@@ -2,8 +2,10 @@ package jwtauth
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -13,8 +15,13 @@ import (
 var ErrInvalidToken = errors.New("invalid token")
 
 type KeyConfig struct {
-	KID    string `mapstructure:"kid"`
-	Secret string `mapstructure:"secret"`
+	KID            string `mapstructure:"kid"`
+	Alg            string `mapstructure:"alg"`
+	Secret         string `mapstructure:"secret"`
+	PrivateKey     string `mapstructure:"private_key"`
+	PrivateKeyFile string `mapstructure:"private_key_file"`
+	PublicKey      string `mapstructure:"public_key"`
+	PublicKeyFile  string `mapstructure:"public_key_file"`
 }
 
 type KeySet struct {
@@ -24,8 +31,11 @@ type KeySet struct {
 }
 
 type key struct {
-	kid    string
-	secret []byte
+	kid        string
+	alg        string
+	secret     []byte
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
 }
 
 func NewKeySet(legacySecret, activeKID string, configured []KeyConfig) (*KeySet, error) {
@@ -34,7 +44,7 @@ func NewKeySet(legacySecret, activeKID string, configured []KeyConfig) (*KeySet,
 		if legacySecret == "" {
 			return nil, errors.New("jwt secret is required")
 		}
-		k := key{secret: []byte(legacySecret)}
+		k := key{alg: jwt.SigningMethodHS256.Alg(), secret: []byte(legacySecret)}
 		return &KeySet{
 			active:     k,
 			byKID:      map[string]key{},
@@ -49,13 +59,13 @@ func NewKeySet(legacySecret, activeKID string, configured []KeyConfig) (*KeySet,
 		if kid == "" {
 			return nil, fmt.Errorf("jwt.secrets[%d].kid is required", i)
 		}
-		if cfg.Secret == "" {
-			return nil, fmt.Errorf("jwt.secrets[%d].secret is required", i)
-		}
 		if _, exists := byKID[kid]; exists {
 			return nil, fmt.Errorf("duplicate jwt kid %q", kid)
 		}
-		k := key{kid: kid, secret: []byte(cfg.Secret)}
+		k, err := newKey(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("jwt.secrets[%d]: %w", i, err)
+		}
 		byKID[kid] = k
 		ordered = append(ordered, k)
 	}
@@ -75,7 +85,7 @@ func NewKeySet(legacySecret, activeKID string, configured []KeyConfig) (*KeySet,
 		}
 	}
 	if legacySecret != "" && !containsSecret(verifyKeys, []byte(legacySecret)) {
-		verifyKeys = append(verifyKeys, key{secret: []byte(legacySecret)})
+		verifyKeys = append(verifyKeys, key{alg: jwt.SigningMethodHS256.Alg(), secret: []byte(legacySecret)})
 	}
 
 	return &KeySet{active: active, byKID: byKID, verifyKeys: verifyKeys}, nil
@@ -89,7 +99,7 @@ func (ks *KeySet) ActiveKID() string {
 }
 
 func (ks *KeySet) SignAccess(userID string, now time.Time, ttl time.Duration) (string, error) {
-	if ks == nil || len(ks.active.secret) == 0 {
+	if ks == nil {
 		return "", errors.New("jwt key set is not configured")
 	}
 	claims := jwt.MapClaims{
@@ -98,11 +108,15 @@ func (ks *KeySet) SignAccess(userID string, now time.Time, ttl time.Duration) (s
 		"exp": now.Add(ttl).Unix(),
 		"typ": "access",
 	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	method, signingKey, err := ks.active.signingMaterial()
+	if err != nil {
+		return "", err
+	}
+	tok := jwt.NewWithClaims(method, claims)
 	if ks.active.kid != "" {
 		tok.Header["kid"] = ks.active.kid
 	}
-	return tok.SignedString(ks.active.secret)
+	return tok.SignedString(signingKey)
 }
 
 func (ks *KeySet) VerifyAccess(token string) (string, error) {
@@ -119,11 +133,11 @@ func (ks *KeySet) VerifyAccess(token string) (string, error) {
 		if !ok {
 			return "", ErrInvalidToken
 		}
-		return verifyAccessWithKey(token, k.secret)
+		return verifyAccessWithJWTKey(token, k)
 	}
 
 	for _, k := range ks.verifyKeys {
-		if uid, err := verifyAccessWithKey(token, k.secret); err == nil {
+		if uid, err := verifyAccessWithJWTKey(token, k); err == nil {
 			return uid, nil
 		}
 	}
@@ -140,12 +154,16 @@ func headerKID(token string) (string, error) {
 }
 
 func verifyAccessWithKey(token string, secret []byte) (string, error) {
+	return verifyAccessWithJWTKey(token, key{alg: jwt.SigningMethodHS256.Alg(), secret: secret})
+}
+
+func verifyAccessWithJWTKey(token string, k key) (string, error) {
 	claims := jwt.MapClaims{}
 	parsed, err := jwt.ParseWithClaims(
 		token,
 		claims,
-		func(t *jwt.Token) (any, error) { return secret, nil },
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		func(t *jwt.Token) (any, error) { return k.verificationMaterial() },
+		jwt.WithValidMethods([]string{k.alg}),
 	)
 	if err != nil || !parsed.Valid {
 		return "", ErrInvalidToken
@@ -155,6 +173,100 @@ func verifyAccessWithKey(token string, secret []byte) (string, error) {
 		return "", ErrInvalidToken
 	}
 	return sub, nil
+}
+
+func (k key) signingMaterial() (jwt.SigningMethod, any, error) {
+	switch k.alg {
+	case jwt.SigningMethodHS256.Alg():
+		if len(k.secret) == 0 {
+			return nil, nil, errors.New("jwt hs256 signing secret is not configured")
+		}
+		return jwt.SigningMethodHS256, k.secret, nil
+	case jwt.SigningMethodRS256.Alg():
+		if k.privateKey == nil {
+			return nil, nil, errors.New("jwt rs256 private key is not configured")
+		}
+		return jwt.SigningMethodRS256, k.privateKey, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported jwt alg %q", k.alg)
+	}
+}
+
+func (k key) verificationMaterial() (any, error) {
+	switch k.alg {
+	case jwt.SigningMethodHS256.Alg():
+		if len(k.secret) == 0 {
+			return nil, ErrInvalidToken
+		}
+		return k.secret, nil
+	case jwt.SigningMethodRS256.Alg():
+		if k.publicKey == nil {
+			return nil, ErrInvalidToken
+		}
+		return k.publicKey, nil
+	default:
+		return nil, ErrInvalidToken
+	}
+}
+
+func newKey(cfg KeyConfig) (key, error) {
+	kid := strings.TrimSpace(cfg.KID)
+	alg := strings.ToUpper(strings.TrimSpace(cfg.Alg))
+	if alg == "" {
+		alg = jwt.SigningMethodHS256.Alg()
+	}
+	k := key{kid: kid, alg: alg}
+
+	switch alg {
+	case jwt.SigningMethodHS256.Alg():
+		if cfg.Secret == "" {
+			return key{}, errors.New("secret is required for HS256")
+		}
+		k.secret = []byte(cfg.Secret)
+		return k, nil
+	case jwt.SigningMethodRS256.Alg():
+		privatePEM, err := readKeyMaterial(cfg.PrivateKey, cfg.PrivateKeyFile)
+		if err != nil {
+			return key{}, fmt.Errorf("read private key: %w", err)
+		}
+		publicPEM, err := readKeyMaterial(cfg.PublicKey, cfg.PublicKeyFile)
+		if err != nil {
+			return key{}, fmt.Errorf("read public key: %w", err)
+		}
+		if len(privatePEM) == 0 && len(publicPEM) == 0 {
+			return key{}, errors.New("private_key/private_key_file or public_key/public_key_file is required for RS256")
+		}
+		if len(privatePEM) > 0 {
+			privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privatePEM)
+			if err != nil {
+				return key{}, fmt.Errorf("parse private key: %w", err)
+			}
+			k.privateKey = privateKey
+			k.publicKey = &privateKey.PublicKey
+		}
+		if len(publicPEM) > 0 {
+			publicKey, err := jwt.ParseRSAPublicKeyFromPEM(publicPEM)
+			if err != nil {
+				return key{}, fmt.Errorf("parse public key: %w", err)
+			}
+			k.publicKey = publicKey
+		}
+		return k, nil
+	default:
+		return key{}, fmt.Errorf("unsupported alg %q", alg)
+	}
+}
+
+func readKeyMaterial(inline, path string) ([]byte, error) {
+	inline = strings.TrimSpace(inline)
+	path = strings.TrimSpace(path)
+	if inline != "" {
+		return []byte(strings.ReplaceAll(inline, `\n`, "\n")), nil
+	}
+	if path == "" {
+		return nil, nil
+	}
+	return os.ReadFile(path)
 }
 
 func containsSecret(keys []key, secret []byte) bool {

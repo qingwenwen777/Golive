@@ -2,9 +2,11 @@ import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestCo
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { isSessionInvalidAfterRefreshFailure, refreshAuthToken } from '@/lib/authToken';
+import { CSRF_HEADER, clearCsrfToken, getCsrfToken, needsCsrfToken } from '@/lib/csrfToken';
 
 interface RetriableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+  _csrfRetry?: boolean;
 }
 
 export const http = axios.create({
@@ -12,11 +14,15 @@ export const http = axios.create({
   timeout: 10_000,
 });
 
-http.interceptors.request.use((config) => {
+http.interceptors.request.use(async (config) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (needsCsrfToken(config.method)) {
+    config.headers = config.headers ?? {};
+    config.headers[CSRF_HEADER] = await getCsrfToken();
   }
   return config;
 });
@@ -39,6 +45,11 @@ function isAuthEndpoint(url: string | undefined): boolean {
   );
 }
 
+function isCsrfInvalid(err: AxiosError): boolean {
+  const data = err.response?.data as { reason?: unknown } | undefined;
+  return err.response?.status === 403 && data?.reason === 'csrf_invalid';
+}
+
 http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -47,6 +58,15 @@ http.interceptors.response.use(
 
     if (import.meta.env.DEV) {
       console.error('[api]', config?.url, error.message);
+    }
+
+    if (config && isCsrfInvalid(error) && !config._csrfRetry) {
+      clearCsrfToken();
+      config._csrfRetry = true;
+      if (config.headers) {
+        delete (config.headers as Record<string, unknown>)[CSRF_HEADER];
+      }
+      return http.request(config as AxiosRequestConfig);
     }
 
     if (status === 401 && config && !config._retry && !isAuthEndpoint(config.url)) {

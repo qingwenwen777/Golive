@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -28,7 +29,6 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 	WriteBufferPool: writeBufPool,
-	CheckOrigin:     func(*http.Request) bool { return true },
 }
 
 type WSHandler struct {
@@ -64,7 +64,9 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ws, err := upgrader.Upgrade(w, r, nil)
+	up := upgrader
+	up.CheckOrigin = h.checkOrigin
+	ws, err := up.Upgrade(w, r, nil)
 	if err != nil {
 		metrics.HandshakeFailures.WithLabelValues("upgrade").Inc()
 		return
@@ -86,4 +88,66 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Each conn gets its own pumps. readPump exits on disconnect → leave hub.
 	go c.writePump()
 	go c.readPump(context.Background())
+}
+
+func (h *WSHandler) checkOrigin(r *http.Request) bool {
+	return originAllowed(r, h.cfg.AllowedOrigins)
+}
+
+func originAllowed(r *http.Request, allowedOrigins []string) bool {
+	origin, ok := canonicalOrigin(r.Header.Get("Origin"))
+	if !ok {
+		return false
+	}
+	if origin == "" {
+		return true
+	}
+	if sameOrigin, ok := requestOrigin(r); ok && origin == sameOrigin {
+		return true
+	}
+	for _, allowed := range allowedOrigins {
+		if normalized, ok := canonicalOrigin(allowed); ok && normalized == origin {
+			return true
+		}
+	}
+	return false
+}
+
+func requestOrigin(r *http.Request) (string, bool) {
+	proto := firstHeaderValue(r.Header.Get("X-Forwarded-Proto"))
+	if proto == "" {
+		if r.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+	host := firstHeaderValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = r.Host
+	}
+	return canonicalOrigin(proto + "://" + host)
+}
+
+func canonicalOrigin(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", true
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", false
+	}
+	return scheme + "://" + strings.ToLower(u.Host), true
+}
+
+func firstHeaderValue(raw string) string {
+	if idx := strings.IndexByte(raw, ','); idx >= 0 {
+		raw = raw[:idx]
+	}
+	return strings.TrimSpace(raw)
 }

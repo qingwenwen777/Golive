@@ -13,6 +13,12 @@ ws:
   pong_wait: 60s
   max_message_rate: 5      # client→server msgs / sec / conn (chat)
 
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "http://localhost:8080"
+    - "http://127.0.0.1:8080"
+
 redis:
   addr: "127.0.0.1:6379"
   db: 0

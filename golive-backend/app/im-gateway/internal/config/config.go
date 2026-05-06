@@ -32,6 +32,7 @@ type WSCfg struct {
 	SendBuffer      int           `mapstructure:"send_buffer"`
 	PongWait        time.Duration `mapstructure:"pong_wait"`
 	MaxMessageRate  float64       `mapstructure:"max_message_rate"`
+	AllowedOrigins  []string      `mapstructure:"allowed_origins"`
 }
 
 type RedisCfg struct {

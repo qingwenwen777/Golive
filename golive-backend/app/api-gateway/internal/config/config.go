@@ -15,6 +15,7 @@ type Config struct {
 	Proxy     ProxyCfg     `mapstructure:"proxy"`
 	JWT       JWTCfg       `mapstructure:"jwt"`
 	CORS      CORSCfg      `mapstructure:"cors"`
+	CSRF      CSRFCfg      `mapstructure:"csrf"`
 	RateLimit RateLimitCfg `mapstructure:"ratelimit"`
 }
 
@@ -53,6 +54,11 @@ func (c JWTCfg) KeySet() (*jwtauth.KeySet, error) {
 type CORSCfg struct {
 	AllowedOrigins []string `mapstructure:"allowed_origins"`
 	MaxAge         int      `mapstructure:"max_age"`
+}
+
+type CSRFCfg struct {
+	Secret   string        `mapstructure:"secret"`
+	TokenTTL time.Duration `mapstructure:"token_ttl"`
 }
 
 type RateLimitCfg struct {
