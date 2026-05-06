@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useMemo,
   useRef,
@@ -75,9 +76,12 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
 type Translate = ReturnType<typeof useTranslation>['t'];
 const CHAT_PAGE_SIZE = 40;
+const CHAT_TIME_SEPARATOR_GAP_MS = 5 * 60 * 1000;
+type ChatNewNoticeMode = 'entry' | 'live';
 type ChatNewNotice = {
   count: number;
   targetId: string;
+  mode: ChatNewNoticeMode;
 };
 
 type ChatAvatarAction = {
@@ -493,34 +497,39 @@ function PrivateMessages({
                   })}
                 </div>
               ) : directMessageItems.length ? (
-                directMessageItems.map((item) => {
+                directMessageItems.map((item, index) => {
                   const sender = directMessageSender(item, selectedThread, currentUser);
                   const senderCreatorId = creatorChannelIdForUser(sender, selectedThread.creatorId);
+                  const previous = directMessageItems[index - 1];
                   return (
-                    <ChatMessageRow
-                      key={item.id}
-                      sender={sender}
-                      body={item.body}
-                      createdAt={item.createdAt}
-                      currentUserId={userId}
-                      fanBadge={sender.fanBadge}
-                      locale={i18n.language}
-                      anchorRef={
-                        directScroll.newNotice?.targetId === item.id
-                          ? directScroll.firstNewRef
-                          : undefined
-                      }
-                      onAvatarClick={
-                        senderCreatorId ? () => navigate(`/channel/${senderCreatorId}`) : undefined
-                      }
-                      avatarTitle={
-                        senderCreatorId
-                          ? t('messages.actions.openCreatorChannel', {
-                              defaultValue: '进入主播频道',
-                            })
-                          : undefined
-                      }
-                    />
+                    <Fragment key={item.id}>
+                      {shouldShowChatTimeSeparator(item.createdAt, previous?.createdAt) && (
+                        <ChatTimeSeparator value={item.createdAt} locale={i18n.language} />
+                      )}
+                      <ChatMessageRow
+                        sender={sender}
+                        body={item.body}
+                        currentUserId={userId}
+                        fanBadge={sender.fanBadge}
+                        anchorRef={
+                          directScroll.newNotice?.targetId === item.id
+                            ? directScroll.firstNewRef
+                            : undefined
+                        }
+                        onAvatarClick={
+                          senderCreatorId
+                            ? () => navigate(`/channel/${senderCreatorId}`)
+                            : undefined
+                        }
+                        avatarTitle={
+                          senderCreatorId
+                            ? t('messages.actions.openCreatorChannel', {
+                                defaultValue: '进入主播频道',
+                              })
+                            : undefined
+                        }
+                      />
+                    </Fragment>
                   );
                 })
               ) : (
@@ -605,6 +614,10 @@ function NewMessagesJump({ notice, onClick }: { notice: ChatNewNotice; onClick: 
   );
 }
 
+function ChatTimeSeparator({ value, locale }: { value: string; locale?: string }) {
+  return <div className="gl-chat-time-separator">{formatChatSeparatorTime(value, locale)}</div>;
+}
+
 function mergeMessagePages<T extends { id: string }>(pages?: Array<{ items: T[] }>): T[] {
   if (!pages?.length) return [];
   const seen = new Set<string>();
@@ -642,7 +655,21 @@ function useChatScroll<T extends { id: string }>(
   const loadingOlderRef = useRef(false);
   const previousScrollHeightRef = useRef(0);
   const requestedOlderRef = useRef(false);
+  const newNoticeModeRef = useRef<ChatNewNoticeMode | null>(null);
   const [newNotice, setNewNotice] = useState<ChatNewNotice | null>(null);
+  const setChatNewNotice = (notice: ChatNewNotice | null) => {
+    newNoticeModeRef.current = notice?.mode ?? null;
+    setNewNotice(notice);
+  };
+  const updateChatNewNotice = (
+    updater: (current: ChatNewNotice | null) => ChatNewNotice | null,
+  ) => {
+    setNewNotice((current) => {
+      const next = updater(current);
+      newNoticeModeRef.current = next?.mode ?? null;
+      return next;
+    });
+  };
 
   useEffect(() => {
     previousLastIdRef.current = '';
@@ -650,7 +677,7 @@ function useChatScroll<T extends { id: string }>(
     loadingOlderRef.current = false;
     previousScrollHeightRef.current = 0;
     requestedOlderRef.current = false;
-    setNewNotice(null);
+    setChatNewNotice(null);
   }, [options.activeKey]);
 
   useEffect(() => {
@@ -661,7 +688,7 @@ function useChatScroll<T extends { id: string }>(
     const node = listRef.current;
     if (!node) return;
     nearBottomRef.current = distanceFromBottom(node) < 88;
-    if (nearBottomRef.current) setNewNotice(null);
+    if (nearBottomRef.current && newNoticeModeRef.current !== 'entry') setChatNewNotice(null);
     if (
       node.scrollTop <= 72 &&
       options.hasNextPage &&
@@ -682,7 +709,7 @@ function useChatScroll<T extends { id: string }>(
     const lastId = items.at(-1)?.id ?? '';
     if (!node || !lastId) {
       previousLastIdRef.current = lastId;
-      setNewNotice(null);
+      setChatNewNotice(null);
       return;
     }
 
@@ -707,12 +734,13 @@ function useChatScroll<T extends { id: string }>(
         const overflowing = node.scrollHeight > node.clientHeight + 12;
         if (overflowing) {
           const firstUnreadIndex = Math.max(0, items.length - entryUnread);
-          setNewNotice({
+          setChatNewNotice({
             count: entryUnread,
             targetId: items[firstUnreadIndex]?.id ?? lastId,
+            mode: 'entry',
           });
         } else {
-          setNewNotice(null);
+          setChatNewNotice(null);
         }
         options.onEntryNoticeConsumed?.();
       }
@@ -732,11 +760,12 @@ function useChatScroll<T extends { id: string }>(
           const nextNode = listRef.current;
           if (nextNode) nextNode.scrollTop = nextNode.scrollHeight;
         });
-        setNewNotice(null);
+        if (newNoticeModeRef.current !== 'entry') setChatNewNotice(null);
       } else if (addedItems.length) {
-        setNewNotice((current) => ({
-          count: (current?.count ?? 0) + addedItems.length,
-          targetId: current?.targetId ?? addedItems[0].id,
+        updateChatNewNotice((current) => ({
+          count: (current?.mode === 'live' ? current.count : 0) + addedItems.length,
+          targetId: current?.mode === 'live' ? current.targetId : addedItems[0].id,
+          mode: 'live',
         }));
       }
     }
@@ -744,8 +773,8 @@ function useChatScroll<T extends { id: string }>(
   }, [items, options.activeKey]);
 
   const jumpToNew = () => {
-    firstNewRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    setNewNotice(null);
+    firstNewRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setChatNewNotice(null);
   };
 
   return { listRef, firstNewRef, newNotice, onScroll, jumpToNew };
@@ -983,8 +1012,9 @@ function FanGroupChatView({
             {t('messages.fanGroupChat.loading', { defaultValue: '正在加载群聊...' })}
           </div>
         ) : groupMessageItems.length ? (
-          groupMessageItems.map((item) => {
+          groupMessageItems.map((item, index) => {
             const member = memberById.get(item.sender.id);
+            const previous = groupMessageItems[index - 1];
             const isCreatorMessage = item.sender.id === group.creatorId || item.role === 'owner';
             const canManageMember =
               canModerate && canManageFanGroupMember(currentMember, member, userId);
@@ -1010,34 +1040,38 @@ function FanGroupChatView({
               });
             }
             return (
-              <ChatMessageRow
-                key={item.id}
-                sender={item.sender}
-                body={item.body}
-                createdAt={item.createdAt}
-                currentUserId={userId}
-                role={item.role}
-                fanBadge={item.fanBadge ?? item.sender.fanBadge}
-                muted={member?.muted}
-                canManage={canManageMember}
-                locale={i18n.language}
-                anchorRef={
-                  groupScroll.newNotice?.targetId === item.id ? groupScroll.firstNewRef : undefined
-                }
-                avatarActions={avatarActions}
-                avatarTitle={
-                  avatarActions.length
-                    ? item.sender.name
-                    : isCreatorMessage
-                      ? t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })
+              <Fragment key={item.id}>
+                {shouldShowChatTimeSeparator(item.createdAt, previous?.createdAt) && (
+                  <ChatTimeSeparator value={item.createdAt} locale={i18n.language} />
+                )}
+                <ChatMessageRow
+                  sender={item.sender}
+                  body={item.body}
+                  currentUserId={userId}
+                  role={item.role}
+                  fanBadge={item.fanBadge ?? item.sender.fanBadge}
+                  muted={member?.muted}
+                  canManage={canManageMember}
+                  anchorRef={
+                    groupScroll.newNotice?.targetId === item.id
+                      ? groupScroll.firstNewRef
                       : undefined
-                }
-                onAvatarClick={
-                  !avatarActions.length && isCreatorMessage
-                    ? () => navigate(`/channel/${group.creatorId}`)
-                    : undefined
-                }
-              />
+                  }
+                  avatarActions={avatarActions}
+                  avatarTitle={
+                    avatarActions.length
+                      ? item.sender.name
+                      : isCreatorMessage
+                        ? t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })
+                        : undefined
+                  }
+                  onAvatarClick={
+                    !avatarActions.length && isCreatorMessage
+                      ? () => navigate(`/channel/${group.creatorId}`)
+                      : undefined
+                  }
+                />
+              </Fragment>
             );
           })
         ) : (
@@ -1101,13 +1135,11 @@ function FanGroupChatView({
 function ChatMessageRow({
   sender,
   body,
-  createdAt,
   currentUserId,
   role,
   fanBadge,
   muted,
   canManage,
-  locale,
   anchorRef,
   onAvatarClick,
   avatarTitle,
@@ -1115,13 +1147,11 @@ function ChatMessageRow({
 }: {
   sender: MessageUser;
   body: string;
-  createdAt: string;
   currentUserId: string;
   role?: string;
   fanBadge?: MessageFanBadge;
   muted?: boolean;
   canManage?: boolean;
-  locale?: string;
   anchorRef?: Ref<HTMLDivElement>;
   onAvatarClick?: () => void;
   avatarTitle?: string;
@@ -1182,7 +1212,6 @@ function ChatMessageRow({
           <strong>{sender.name}</strong>
           <FanBadgePill badge={fanBadge ?? sender.fanBadge} />
           <RoleBadge role={role} />
-          <time>{formatMessageTime(createdAt, locale)}</time>
         </div>
         <div className="gl-chat-message-bubble">
           <p>{body}</p>
@@ -1705,6 +1734,55 @@ function normalizeSection(value: string | undefined): MessageSection {
     return value;
   }
   return 'private';
+}
+
+function shouldShowChatTimeSeparator(value: string, previousValue?: string): boolean {
+  const currentTime = Date.parse(value);
+  if (!Number.isFinite(currentTime)) return !previousValue;
+  if (!previousValue) return true;
+  const previousTime = Date.parse(previousValue);
+  if (!Number.isFinite(previousTime)) return true;
+  return (
+    !isSameCalendarDay(new Date(currentTime), new Date(previousTime)) ||
+    currentTime - previousTime >= CHAT_TIME_SEPARATOR_GAP_MS
+  );
+}
+
+function formatChatSeparatorTime(value: string, locale = 'zh-CN'): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const normalizedLocale = locale || 'zh-CN';
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const time = new Intl.DateTimeFormat(normalizedLocale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+  if (isSameCalendarDay(date, now)) return time;
+  if (isSameCalendarDay(date, yesterday)) {
+    if (normalizedLocale.startsWith('ja')) return `昨日 ${time}`;
+    if (normalizedLocale.startsWith('en')) return `Yesterday ${time}`;
+    return `昨天 ${time}`;
+  }
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  };
+  if (date.getFullYear() !== now.getFullYear()) options.year = 'numeric';
+  return new Intl.DateTimeFormat(normalizedLocale, options).format(date);
+}
+
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
 }
 
 function formatMessageTime(value: string, locale = 'zh-CN'): string {

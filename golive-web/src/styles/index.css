@@ -15864,10 +15864,11 @@ button.gl-fan-badge-empty {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   overscroll-behavior: contain;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 18px;
+  padding: 18px 20px 20px;
   scrollbar-gutter: stable;
 }
 
@@ -15885,8 +15886,8 @@ button.gl-fan-badge-empty {
 
 .gl-chat-new-message-pill {
   position: sticky;
-  top: 8px;
-  z-index: 3;
+  top: 10px;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -15898,6 +15899,7 @@ button.gl-fan-badge-empty {
   color: #10b981;
   font-size: 13px;
   font-weight: 900;
+  margin: 0 2px -40px 0;
   padding: 0 14px;
   align-self: flex-end;
 }
@@ -15958,7 +15960,7 @@ button.gl-fan-badge-empty {
 .gl-chat-message-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 11px;
   justify-content: flex-start;
 }
 
@@ -15978,7 +15980,6 @@ button.gl-fan-badge-empty {
   border-radius: 999px;
   background: transparent;
   padding: 0;
-  margin-top: 9px;
 }
 
 .gl-chat-message-avatar-btn.is-actionable {
@@ -16019,7 +16020,7 @@ button.gl-fan-badge-empty {
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
-  gap: 5px;
+  gap: 6px;
 }
 
 .gl-chat-message-row.is-me .gl-chat-message-stack {
@@ -16029,11 +16030,11 @@ button.gl-fan-badge-empty {
 .gl-chat-message-meta {
   display: flex;
   max-width: 100%;
-  min-height: 19px;
+  min-height: 18px;
   align-items: center;
   gap: 6px;
   color: var(--gl-text-3);
-  padding-inline: 2px;
+  padding-inline: 1px;
 }
 
 .gl-chat-message-row.is-me .gl-chat-message-meta {
@@ -16056,6 +16057,22 @@ button.gl-fan-badge-empty {
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
+}
+
+.gl-chat-time-separator {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  align-self: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gl-bg-hover) 76%, transparent);
+  color: var(--gl-text-3);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 6px 0 2px;
+  padding: 0 10px;
 }
 
 .gl-chat-message-meta .gl-chat-fan-badge {
@@ -16090,16 +16107,17 @@ button.gl-fan-badge-empty {
 
 .gl-chat-message-bubble {
   max-width: 100%;
-  border: 1px solid var(--gl-border);
-  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--gl-border) 84%, transparent);
+  border-radius: 12px 12px 12px 4px;
   background: var(--gl-bg);
-  box-shadow: var(--gl-shadow);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
   color: var(--gl-text);
-  padding: 8px 12px;
+  padding: 8px 13px;
 }
 
 .gl-chat-message-row.is-me .gl-chat-message-bubble {
-  background: var(--gl-bg-hover);
+  border-radius: 12px 12px 4px 12px;
+  background: color-mix(in srgb, var(--gl-bg-hover) 92%, var(--gl-bg));
 }
 
 .gl-chat-message-bubble p {
