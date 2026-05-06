@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
 	mailaddr "net/mail"
 	"net/smtp"
@@ -172,6 +174,7 @@ type SMTPMailer struct {
 	password    string
 	senderEmail string
 	senderName  string
+	timeout     time.Duration
 }
 
 type SMTPMailerConfig struct {
@@ -181,6 +184,7 @@ type SMTPMailerConfig struct {
 	Password    string
 	SenderEmail string
 	SenderName  string
+	Timeout     time.Duration
 }
 
 func NewSMTPMailer(c SMTPMailerConfig) (*SMTPMailer, error) {
@@ -200,6 +204,9 @@ func NewSMTPMailer(c SMTPMailerConfig) (*SMTPMailer, error) {
 	if c.SenderName == "" {
 		c.SenderName = "GoLive"
 	}
+	if c.Timeout <= 0 {
+		c.Timeout = 10 * time.Second
+	}
 	return &SMTPMailer{
 		host:        c.Host,
 		port:        c.Port,
@@ -207,6 +214,7 @@ func NewSMTPMailer(c SMTPMailerConfig) (*SMTPMailer, error) {
 		password:    c.Password,
 		senderEmail: c.SenderEmail,
 		senderName:  c.SenderName,
+		timeout:     c.Timeout,
 	}, nil
 }
 
@@ -221,7 +229,69 @@ func (m *SMTPMailer) SendVerificationCode(ctx context.Context, toEmail, code str
 	msg := buildEmailCodeMessage(from.String(), to.String(), code, ttl)
 	addr := m.host + ":" + strconv.Itoa(m.port)
 	auth := smtp.PlainAuth("", m.username, m.password, m.host)
-	return smtp.SendMail(addr, auth, m.senderEmail, []string{toEmail}, []byte(msg))
+	return sendSMTPMessage(ctx, addr, m.host, m.port == 465, auth, m.senderEmail, []string{toEmail}, []byte(msg), m.timeout)
+}
+
+func sendSMTPMessage(ctx context.Context, addr, host string, implicitTLS bool, auth smtp.Auth, from string, to []string, msg []byte, timeout time.Duration) error {
+	dialer := &net.Dialer{Timeout: timeout}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		return err
+	}
+
+	var client *smtp.Client
+	if implicitTLS {
+		tlsConn := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+		if err := tlsConn.Handshake(); err != nil {
+			return err
+		}
+		client, err = smtp.NewClient(tlsConn, host)
+	} else {
+		client, err = smtp.NewClient(conn, host)
+	}
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	if !implicitTLS {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
+				return err
+			}
+		}
+	}
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); ok {
+			if err := client.Auth(auth); err != nil {
+				return err
+			}
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, recipient := range to {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(msg); err != nil {
+		_ = w.Close()
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return client.Quit()
 }
 
 func buildEmailCodeMessage(from, to, code string, ttl time.Duration) string {

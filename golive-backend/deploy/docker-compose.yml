@@ -81,6 +81,7 @@ services:
       GOPROXY: https://goproxy.cn,direct
       USERSVC_GOOGLE_CLIENT_ID: ${USERSVC_GOOGLE_CLIENT_ID:-}
       USERSVC_EMAIL_SMTP_PASSWORD: ${USERSVC_EMAIL_SMTP_PASSWORD:-}
+      USERSVC_EMAIL_SMTP_PORT: ${USERSVC_EMAIL_SMTP_PORT:-}
     depends_on:
       mysql:
         condition: service_healthy

@@ -34,7 +34,7 @@ google:
 email:
   enabled: true
   smtp_host: "smtp-relay.brevo.com"
-  smtp_port: 587
+  smtp_port: 2525
   smtp_username: "aa72ed001@smtp-brevo.com"
   smtp_password: ""
   sender_email: "noreply@golive.cc.cd"
