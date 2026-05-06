@@ -14,6 +14,7 @@ import (
 type Deps struct {
 	Auth            *service.AuthService
 	Captcha         *service.CaptchaService
+	EmailCodes      *service.EmailCodeService
 	Users           *repo.UserRepo
 	AvatarDir       string
 	AvatarPublicURL string
@@ -31,8 +32,8 @@ func NewRouter(d Deps) *gin.Engine {
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
-	authH := handler.NewAuthHandler(d.Auth, d.Captcha)
-	userH := handler.NewUserHandler(d.Users)
+	authH := handler.NewAuthHandler(d.Auth, d.Captcha, d.EmailCodes)
+	userH := handler.NewUserHandler(d.Users, d.EmailCodes)
 	creatorH := handler.NewCreatorHandler(d.Users)
 	adminH := handler.NewAdminHandler(d.Users)
 	internalH := handler.NewInternalHandler(d.Users)
@@ -42,6 +43,7 @@ func NewRouter(d Deps) *gin.Engine {
 	auth := r.Group("/auth")
 	{
 		auth.GET("/captcha", authH.Captcha)
+		auth.POST("/email-code", authH.SendEmailCode)
 		auth.POST("/login", authH.Login)
 		auth.POST("/register", authH.Register)
 		auth.POST("/google/login", authH.GoogleLogin)
@@ -61,6 +63,8 @@ func NewRouter(d Deps) *gin.Engine {
 		users.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
 		users.PATCH("/me/profile", handler.AuthRequired(d.Auth), userH.UpdateProfile)
 		users.POST("/me/password", handler.AuthRequired(d.Auth), userH.ChangePassword)
+		users.POST("/me/email/code", handler.AuthRequired(d.Auth), userH.SendEmailChangeCode)
+		users.PATCH("/me/email", handler.AuthRequired(d.Auth), userH.UpdateEmail)
 		users.GET("/me/coins/transactions", handler.AuthRequired(d.Auth), userH.CoinTransactions)
 		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), userH.TopupCoins)
 		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), userH.ClaimDailyCoinTask)

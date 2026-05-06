@@ -16,6 +16,7 @@ import {
   History,
   KeyRound,
   Languages,
+  Mail,
   Moon,
   PencilLine,
   Radio,
@@ -33,8 +34,10 @@ import {
   useBindGoogleAccount,
   useChangePassword,
   useMe,
+  useSendEmailChangeCode,
   useUnbindGoogleAccount,
   useUpdateProfile,
+  useUpdateEmail,
 } from '@/api/auth';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useFanBadges } from '@/api/gift';
@@ -808,6 +811,8 @@ export function SettingsPage() {
   const me = useMe();
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
+  const sendEmailChangeCode = useSendEmailChangeCode();
+  const updateEmail = useUpdateEmail();
   const bindGoogle = useBindGoogleAccount();
   const unbindGoogle = useUnbindGoogleAccount();
   const [tab, setTab] = useState<SettingsTab>('profile');
@@ -820,6 +825,9 @@ export function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [emailEditing, setEmailEditing] = useState(false);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [googleUnbindPassword, setGoogleUnbindPassword] = useState('');
   const currentUser = me.data ?? user;
   const displayName = userDisplayName(currentUser);
@@ -830,6 +838,10 @@ export function SettingsPage() {
     setProfileUsername(currentUser?.username ?? '');
     setProfileDisplayName(userDisplayName(currentUser));
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!emailEditing) setEmailDraft(currentUser?.email ?? '');
+  }, [currentUser?.email, emailEditing]);
 
   const tabs: Array<{ id: SettingsTab; label: string; sub: string; icon: ReactNode }> = [
     {
@@ -907,6 +919,65 @@ export function SettingsPage() {
           setNewPassword('');
           setConfirmPassword('');
           toast.success(t('library.settings.security.updated'));
+        },
+        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
+      },
+    );
+  };
+
+  const requestEmailChangeCode = () => {
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    const email = emailDraft.trim();
+    if (!email) {
+      toast.error(
+        t('library.settings.errors.invalidEmail', { defaultValue: 'Enter a valid email address.' }),
+      );
+      return;
+    }
+    sendEmailChangeCode.mutate(
+      { email },
+      {
+        onSuccess: () =>
+          toast.success(
+            t('library.settings.security.emailCodeSent', {
+              defaultValue: 'Verification code sent.',
+            }),
+          ),
+        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
+      },
+    );
+  };
+
+  const submitEmailChange = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    const email = emailDraft.trim();
+    const code = emailCode.trim();
+    if (!email || !code) {
+      toast.error(
+        t('library.settings.errors.emailCodeRequired', {
+          defaultValue: 'Enter the new email and verification code.',
+        }),
+      );
+      return;
+    }
+    updateEmail.mutate(
+      { email, emailCode: code },
+      {
+        onSuccess: () => {
+          setEmailCode('');
+          setEmailEditing(false);
+          toast.success(
+            t('library.settings.security.emailUpdated', {
+              defaultValue: 'Email binding updated.',
+            }),
+          );
         },
         onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
       },
@@ -1020,6 +1091,12 @@ export function SettingsPage() {
               newPassword={newPassword}
               confirmPassword={confirmPassword}
               pending={changePassword.isPending}
+              boundEmail={currentUser?.email ?? ''}
+              emailEditing={emailEditing}
+              emailDraft={emailDraft}
+              emailCode={emailCode}
+              emailPending={updateEmail.isPending}
+              emailCodePending={sendEmailChangeCode.isPending}
               googleLinked={Boolean(currentUser?.googleLinked)}
               googlePending={bindGoogle.isPending}
               googleUnlinkPending={unbindGoogle.isPending}
@@ -1027,6 +1104,16 @@ export function SettingsPage() {
               onCurrentPasswordChange={setCurrentPassword}
               onNewPasswordChange={setNewPassword}
               onConfirmPasswordChange={setConfirmPassword}
+              onEmailEdit={() => setEmailEditing(true)}
+              onEmailCancel={() => {
+                setEmailEditing(false);
+                setEmailCode('');
+                setEmailDraft(currentUser?.email ?? '');
+              }}
+              onEmailDraftChange={setEmailDraft}
+              onEmailCodeChange={setEmailCode}
+              onEmailCodeRequest={requestEmailChangeCode}
+              onEmailSubmit={submitEmailChange}
               onSubmit={submitPassword}
               onGoogleCredential={handleGoogleBind}
               onGoogleUnlinkClick={() => setGoogleUnbindOpen(true)}
@@ -1269,6 +1356,12 @@ function SecuritySettings({
   newPassword,
   confirmPassword,
   pending,
+  boundEmail,
+  emailEditing,
+  emailDraft,
+  emailCode,
+  emailPending,
+  emailCodePending,
   googleLinked,
   googlePending,
   googleUnlinkPending,
@@ -1276,6 +1369,12 @@ function SecuritySettings({
   onCurrentPasswordChange,
   onNewPasswordChange,
   onConfirmPasswordChange,
+  onEmailEdit,
+  onEmailCancel,
+  onEmailDraftChange,
+  onEmailCodeChange,
+  onEmailCodeRequest,
+  onEmailSubmit,
   onSubmit,
   onGoogleCredential,
   onGoogleUnlinkClick,
@@ -1285,6 +1384,12 @@ function SecuritySettings({
   newPassword: string;
   confirmPassword: string;
   pending: boolean;
+  boundEmail: string;
+  emailEditing: boolean;
+  emailDraft: string;
+  emailCode: string;
+  emailPending: boolean;
+  emailCodePending: boolean;
   googleLinked: boolean;
   googlePending: boolean;
   googleUnlinkPending: boolean;
@@ -1292,6 +1397,12 @@ function SecuritySettings({
   onCurrentPasswordChange: (value: string) => void;
   onNewPasswordChange: (value: string) => void;
   onConfirmPasswordChange: (value: string) => void;
+  onEmailEdit: () => void;
+  onEmailCancel: () => void;
+  onEmailDraftChange: (value: string) => void;
+  onEmailCodeChange: (value: string) => void;
+  onEmailCodeRequest: () => void;
+  onEmailSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onGoogleCredential: (credential: string) => void;
   onGoogleUnlinkClick: () => void;
@@ -1353,6 +1464,104 @@ function SecuritySettings({
             {t('library.settings.security.updatePassword')}
           </button>
         </div>
+      </form>
+
+      <form
+        className="gl-settings-card gl-settings-form gl-settings-email-card"
+        onSubmit={onEmailSubmit}
+      >
+        <div className="gl-settings-card-head">
+          <span className="gl-settings-card-icon">
+            <Mail size={18} />
+          </span>
+          <div>
+            <h2>{t('library.settings.security.emailTitle', { defaultValue: 'Email binding' })}</h2>
+            <p>
+              {t('library.settings.security.emailSub', {
+                defaultValue: 'Use a verified email for account recovery and security checks.',
+              })}
+            </p>
+          </div>
+        </div>
+
+        {!emailEditing ? (
+          <div className="gl-settings-provider-state gl-settings-email-state">
+            <Mail size={17} />
+            <span className="gl-settings-email-value">
+              {boundEmail ||
+                t('library.settings.security.emailEmpty', {
+                  defaultValue: 'No email is bound to this account.',
+                })}
+            </span>
+            <button className="gl-settings-button is-compact" type="button" onClick={onEmailEdit}>
+              {t('library.settings.security.emailChange', { defaultValue: 'Change' })}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="gl-settings-form-grid">
+              <label className="gl-settings-field">
+                <span>
+                  {t('library.settings.security.newEmail', { defaultValue: 'New email' })}
+                </span>
+                <input
+                  type="email"
+                  value={emailDraft}
+                  onChange={(event) => onEmailDraftChange(event.target.value)}
+                  autoComplete="email"
+                  className="gl-settings-input"
+                  required
+                />
+              </label>
+              <label className="gl-settings-field">
+                <span>
+                  {t('library.settings.security.emailCode', {
+                    defaultValue: 'Verification code',
+                  })}
+                </span>
+                <span className="gl-settings-code-row">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={emailCode}
+                    onChange={(event) => onEmailCodeChange(event.target.value)}
+                    autoComplete="one-time-code"
+                    className="gl-settings-input"
+                    required
+                  />
+                  <button
+                    className="gl-settings-button"
+                    type="button"
+                    disabled={emailCodePending}
+                    onClick={onEmailCodeRequest}
+                  >
+                    {emailCodePending
+                      ? t('library.settings.security.emailCodeSending', {
+                          defaultValue: 'Sending...',
+                        })
+                      : t('library.settings.security.emailCodeSend', {
+                          defaultValue: 'Send code',
+                        })}
+                  </button>
+                </span>
+              </label>
+            </div>
+            <div className="gl-settings-actions">
+              <button className="gl-settings-button" type="button" onClick={onEmailCancel}>
+                {t('library.settings.security.emailCancel', { defaultValue: 'Cancel' })}
+              </button>
+              <button
+                className="gl-settings-button is-primary"
+                type="submit"
+                disabled={emailPending}
+              >
+                {emailPending
+                  ? t('library.settings.security.emailSaving', { defaultValue: 'Saving...' })
+                  : t('library.settings.security.emailSave', { defaultValue: 'Save email' })}
+              </button>
+            </div>
+          </>
+        )}
       </form>
 
       <section className="gl-settings-card gl-settings-form gl-settings-google-card">
@@ -1527,15 +1736,14 @@ function BlacklistSettings({
           <h2>{t('library.settings.blacklist.title', { defaultValue: '黑名单管理' })}</h2>
           <p>
             {t('library.settings.blacklist.sub', {
-              defaultValue: '被你拉黑的主播不会出现在私信里；主播拉黑观众后，该观众无法观看和互动。',
+              defaultValue:
+                '被你拉黑的主播不会出现在私信里；主播拉黑观众后，该观众无法观看和互动。',
             })}
           </p>
         </div>
       </div>
       {pending ? (
-        <div className="gl-settings-empty-line">
-          {t('loading', { defaultValue: 'Loading...' })}
-        </div>
+        <div className="gl-settings-empty-line">{t('loading', { defaultValue: 'Loading...' })}</div>
       ) : items.length ? (
         <div className="gl-blacklist-list">
           {items.map((item) => (
@@ -1600,6 +1808,31 @@ function settingsErrorMessage(
     }
     if (data?.reason === 'invalid_current_password') {
       return t('library.settings.errors.invalidCurrentPassword');
+    }
+    if (data?.reason === 'email_taken') {
+      return t('library.settings.errors.emailTaken', {
+        defaultValue: 'This email is already bound to another account.',
+      });
+    }
+    if (data?.reason === 'invalid_email') {
+      return t('library.settings.errors.invalidEmail', {
+        defaultValue: 'Enter a valid email address.',
+      });
+    }
+    if (data?.reason === 'invalid_email_code') {
+      return t('library.settings.errors.invalidEmailCode', {
+        defaultValue: 'Email verification code is incorrect or expired.',
+      });
+    }
+    if (data?.reason === 'email_code_too_soon') {
+      return t('library.settings.errors.emailCodeTooSoon', {
+        defaultValue: 'Please wait before requesting another email code.',
+      });
+    }
+    if (data?.reason === 'email_not_configured' || data?.reason === 'email_send_failed') {
+      return t('library.settings.errors.emailCodeUnavailable', {
+        defaultValue: 'Email verification is temporarily unavailable.',
+      });
     }
     if (data?.reason === 'google_email_exists') {
       return t('library.settings.errors.googleEmailExists', {

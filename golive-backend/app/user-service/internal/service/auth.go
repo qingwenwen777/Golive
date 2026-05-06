@@ -31,6 +31,7 @@ var (
 	ErrUsernameTaken           = errcode.New(http.StatusConflict, "Username already exists")
 	ErrEmailTaken              = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
 	ErrEmailNotFound           = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
+	ErrEmailUserMismatch       = errcode.New(http.StatusNotFound, "Username and email do not match").WithReason("email_user_mismatch")
 	ErrInvalidInvite           = errcode.New(http.StatusBadRequest, "Invalid invite code").WithReason("invalid_invite")
 	ErrInviteUsed              = errcode.New(http.StatusConflict, "Invite code already used").WithReason("invite_used")
 	ErrInvalidPassword         = errcode.New(http.StatusBadRequest, "Password must be at least 8 characters and include letters and numbers").WithReason("invalid_password")
@@ -81,6 +82,10 @@ type googleUnlinker interface {
 
 type passwordResetter interface {
 	ResetPasswordByEmail(ctx context.Context, email, hash string) error
+}
+
+type usernameEmailPasswordResetter interface {
+	ResetPasswordByUsernameEmail(ctx context.Context, username, email, hash string) error
 }
 
 type TokenStore interface {
@@ -347,6 +352,51 @@ func (s *AuthService) ResetPasswordByEmail(ctx context.Context, email, newPasswo
 	return nil
 }
 
+func (s *AuthService) EnsureUsernameEmailMatch(ctx context.Context, username, email string) error {
+	username = strings.TrimSpace(username)
+	cleanEmail, ok := normalizeEmail(email)
+	if !ok || username == "" {
+		return ErrEmailUserMismatch
+	}
+	u, err := s.users.FindByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, repo.ErrUserNotFound) {
+			return ErrEmailUserMismatch
+		}
+		return fmt.Errorf("find user: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(u.Email), cleanEmail) {
+		return ErrEmailUserMismatch
+	}
+	return nil
+}
+
+func (s *AuthService) ResetPasswordByUsernameEmail(ctx context.Context, username, email, newPassword string) error {
+	username = strings.TrimSpace(username)
+	cleanEmail, ok := normalizeEmail(email)
+	if !ok || username == "" {
+		return ErrEmailUserMismatch
+	}
+	if err := ValidatePasswordPolicy(newPassword); err != nil {
+		return err
+	}
+	hash, err := HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	resetter, ok := s.users.(usernameEmailPasswordResetter)
+	if !ok {
+		return errors.New("user store cannot reset passwords by username and email")
+	}
+	if err := resetter.ResetPasswordByUsernameEmail(ctx, username, cleanEmail, hash); err != nil {
+		if errors.Is(err, repo.ErrUserNotFound) {
+			return ErrEmailUserMismatch
+		}
+		return fmt.Errorf("reset password: %w", err)
+	}
+	return nil
+}
+
 // RefreshResp is what /api/auth/refresh returns. No `user` per contract.
 type RefreshResp struct {
 	Token        string `json:"token"`
@@ -477,6 +527,10 @@ func normalizeEmail(raw string) (string, bool) {
 		return "", false
 	}
 	return email, true
+}
+
+func NormalizeEmail(raw string) (string, bool) {
+	return normalizeEmail(raw)
 }
 
 func urlSafeSeed(seed string) string {

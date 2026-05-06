@@ -10,6 +10,7 @@ export interface UserLevelInfo {
 export interface User {
   id: string;
   username: string;
+  email?: string;
   displayName?: string;
   usernameUpdatedAt?: string;
   usernameChangeAvailableAt?: string;

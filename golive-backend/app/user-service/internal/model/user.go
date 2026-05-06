@@ -98,6 +98,7 @@ func (PlatformApplication) TableName() string { return "platform_applications" }
 type PublicUser struct {
 	ID                               string             `json:"id"`
 	Username                         string             `json:"username"`
+	Email                            string             `json:"email,omitempty"`
 	DisplayName                      string             `json:"displayName,omitempty"`
 	UsernameUpdatedAt                string             `json:"usernameUpdatedAt,omitempty"`
 	UsernameChangeAvailableAt        string             `json:"usernameChangeAvailableAt,omitempty"`
@@ -133,6 +134,7 @@ func (u *User) Public() PublicUser {
 	pu := PublicUser{
 		ID:                               u.ID,
 		Username:                         u.Username,
+		Email:                            u.Email,
 		DisplayName:                      u.DisplayName,
 		Avatar:                           u.Avatar,
 		Cover:                            u.Cover,

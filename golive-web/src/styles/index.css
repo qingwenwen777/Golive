@@ -4078,7 +4078,8 @@ input:focus-visible,
   margin-top: 14px;
 }
 .gl-auth-panel.is-signup .gl-auth-input-wrap,
-.gl-auth-panel.is-signup .gl-auth-captcha-image {
+.gl-auth-panel.is-signup .gl-auth-captcha-image,
+.gl-auth-panel.is-signup .gl-auth-code-send {
   height: 42px;
 }
 .dark .gl-auth-panel {
@@ -4242,11 +4243,39 @@ input:focus-visible,
   gap: 10px;
   align-items: stretch;
 }
+.gl-auth-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
 .gl-auth-captcha-row .gl-auth-input-wrap {
   min-width: 0;
 }
-.gl-auth-captcha-row .gl-auth-input-wrap input {
+.gl-auth-captcha-row .gl-auth-input-wrap input,
+.gl-auth-code-row .gl-auth-input-wrap input {
   width: 100%;
+}
+.gl-auth-code-send {
+  display: inline-flex;
+  min-width: 96px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.gl-auth-code-send:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-auth-code-send:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 .gl-auth-captcha-image {
   display: inline-flex;
@@ -4261,6 +4290,10 @@ input:focus-visible,
   height: 44px;
 }
 .dark .gl-auth-captcha-image {
+  background: #121212;
+  border-color: #303030;
+}
+.dark .gl-auth-code-send {
   background: #121212;
   border-color: #303030;
 }
@@ -12618,6 +12651,10 @@ button.gl-fan-badge-empty {
   flex: 1 1 auto;
 }
 
+.gl-settings-email-value {
+  overflow-wrap: anywhere;
+}
+
 .gl-settings-google-card .gl-settings-card-head {
   align-items: center;
 }
@@ -12663,6 +12700,17 @@ button.gl-fan-badge-empty {
   color: var(--gl-text);
   font-size: 13px;
   font-weight: 900;
+}
+
+.gl-settings-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.gl-settings-code-row .gl-settings-button {
+  min-height: 40px;
 }
 
 .gl-settings-input {

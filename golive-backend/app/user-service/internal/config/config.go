@@ -16,6 +16,7 @@ type Config struct {
 	Redis     RedisCfg     `mapstructure:"redis"`
 	JWT       JWTCfg       `mapstructure:"jwt"`
 	Google    GoogleCfg    `mapstructure:"google"`
+	Email     EmailCfg     `mapstructure:"email"`
 	Upload    UploadCfg    `mapstructure:"upload"`
 	Bootstrap BootstrapCfg `mapstructure:"bootstrap"`
 }
@@ -56,6 +57,18 @@ func (c JWTCfg) KeySet() (*jwtauth.KeySet, error) {
 
 type GoogleCfg struct {
 	ClientID string `mapstructure:"client_id"`
+}
+
+type EmailCfg struct {
+	Enabled        bool          `mapstructure:"enabled"`
+	SMTPHost       string        `mapstructure:"smtp_host"`
+	SMTPPort       int           `mapstructure:"smtp_port"`
+	SMTPUsername   string        `mapstructure:"smtp_username"`
+	SMTPPassword   string        `mapstructure:"smtp_password"`
+	SenderEmail    string        `mapstructure:"sender_email"`
+	SenderName     string        `mapstructure:"sender_name"`
+	CodeTTL        time.Duration `mapstructure:"code_ttl"`
+	ResendInterval time.Duration `mapstructure:"resend_interval"`
 }
 
 type UploadCfg struct {
@@ -99,6 +112,15 @@ func Load(path string) (*Config, error) {
 	v.SetEnvPrefix("USERSVC")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	_ = v.BindEnv("google.client_id")
+	_ = v.BindEnv("email.enabled")
+	_ = v.BindEnv("email.smtp_host")
+	_ = v.BindEnv("email.smtp_port")
+	_ = v.BindEnv("email.smtp_username")
+	_ = v.BindEnv("email.smtp_password")
+	_ = v.BindEnv("email.sender_email")
+	_ = v.BindEnv("email.sender_name")
+	_ = v.BindEnv("email.code_ttl")
+	_ = v.BindEnv("email.resend_interval")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

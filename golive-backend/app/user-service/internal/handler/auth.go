@@ -11,12 +11,13 @@ import (
 )
 
 type AuthHandler struct {
-	svc     *service.AuthService
-	captcha *service.CaptchaService
+	svc        *service.AuthService
+	captcha    *service.CaptchaService
+	emailCodes *service.EmailCodeService
 }
 
-func NewAuthHandler(svc *service.AuthService, captcha *service.CaptchaService) *AuthHandler {
-	return &AuthHandler{svc: svc, captcha: captcha}
+func NewAuthHandler(svc *service.AuthService, captcha *service.CaptchaService, emailCodes *service.EmailCodeService) *AuthHandler {
+	return &AuthHandler{svc: svc, captcha: captcha, emailCodes: emailCodes}
 }
 
 type loginReq struct {
@@ -31,14 +32,23 @@ type registerReq struct {
 	Password    string `json:"password" binding:"required"`
 	DisplayName string `json:"displayName"`
 	Email       string `json:"email" binding:"required"`
+	EmailCode   string `json:"emailCode" binding:"required"`
 	InviteCode  string `json:"inviteCode" binding:"required"`
 	CaptchaID   string `json:"captchaId"`
 	CaptchaCode string `json:"captchaCode"`
 }
 
 type resetPasswordReq struct {
+	Username    string `json:"username" binding:"required"`
 	Email       string `json:"email" binding:"required"`
+	EmailCode   string `json:"emailCode" binding:"required"`
 	NewPassword string `json:"newPassword" binding:"required"`
+}
+
+type sendEmailCodeReq struct {
+	Purpose  string `json:"purpose" binding:"required"`
+	Username string `json:"username"`
+	Email    string `json:"email" binding:"required"`
 }
 
 type googleLoginReq struct {
@@ -67,6 +77,35 @@ func (h *AuthHandler) Captcha(c *gin.Context) {
 		return
 	}
 	resp, err := h.captcha.Generate(c.Request.Context())
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *AuthHandler) SendEmailCode(c *gin.Context) {
+	var req sendEmailCodeReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister)
+		return
+	}
+	if h.emailCodes == nil {
+		errcode.Respond(c, service.ErrEmailNotConfigured)
+		return
+	}
+	switch req.Purpose {
+	case service.EmailPurposeRegister:
+	case service.EmailPurposePasswordReset:
+		if err := h.svc.EnsureUsernameEmailMatch(c.Request.Context(), req.Username, req.Email); err != nil {
+			errcode.Respond(c, err)
+			return
+		}
+	default:
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email_code_purpose"))
+		return
+	}
+	resp, err := h.emailCodes.Send(c.Request.Context(), req.Purpose, req.Email)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
@@ -103,6 +142,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if !h.verifyCaptcha(c, req.CaptchaID, req.CaptchaCode) {
 		return
 	}
+	if h.emailCodes == nil {
+		errcode.Respond(c, service.ErrEmailNotConfigured)
+		return
+	}
+	if err := h.emailCodes.Verify(c.Request.Context(), service.EmailPurposeRegister, req.Email, req.EmailCode); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
 	resp, err := h.svc.RegisterWithInvite(c.Request.Context(), req.Username, req.Password, req.DisplayName, req.Email, req.InviteCode)
 	if err != nil {
 		errcode.Respond(c, err)
@@ -117,7 +164,19 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		errcode.Respond(c, service.ErrInvalidRegister)
 		return
 	}
-	if err := h.svc.ResetPasswordByEmail(c.Request.Context(), req.Email, req.NewPassword); err != nil {
+	if h.emailCodes == nil {
+		errcode.Respond(c, service.ErrEmailNotConfigured)
+		return
+	}
+	if err := h.svc.EnsureUsernameEmailMatch(c.Request.Context(), req.Username, req.Email); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	if err := h.emailCodes.Verify(c.Request.Context(), service.EmailPurposePasswordReset, req.Email, req.EmailCode); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	if err := h.svc.ResetPasswordByUsernameEmail(c.Request.Context(), req.Username, req.Email, req.NewPassword); err != nil {
 		errcode.Respond(c, err)
 		return
 	}

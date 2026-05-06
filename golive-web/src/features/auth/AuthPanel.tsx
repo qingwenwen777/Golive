@@ -11,6 +11,7 @@ import {
   useLoginMutation,
   useRegisterMutation,
   useResetPasswordMutation,
+  useSendEmailCodeMutation,
 } from '@/api/auth';
 import { GoLiveLogo } from '@/components/Logo';
 import { cn } from '@/lib/cn';
@@ -56,6 +57,26 @@ function authErrorMessage(
     }
     if (reason === 'invalid_email') {
       return t('auth.errors.invalidEmail', { defaultValue: 'Enter a valid email address.' });
+    }
+    if (reason === 'invalid_email_code') {
+      return t('auth.errors.invalidEmailCode', {
+        defaultValue: 'Email verification code is incorrect or expired.',
+      });
+    }
+    if (reason === 'email_code_too_soon') {
+      return t('auth.errors.emailCodeTooSoon', {
+        defaultValue: 'Please wait before requesting another email code.',
+      });
+    }
+    if (reason === 'email_not_configured' || reason === 'email_send_failed') {
+      return t('auth.errors.emailCodeUnavailable', {
+        defaultValue: 'Email verification is temporarily unavailable.',
+      });
+    }
+    if (reason === 'email_user_mismatch') {
+      return t('auth.errors.emailUserMismatch', {
+        defaultValue: 'Username and email do not match.',
+      });
     }
     if (reason === 'invalid_invite') {
       return t('auth.errors.invalidInvite', { defaultValue: 'Invite code is invalid.' });
@@ -113,10 +134,13 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetUsername, setResetUsername] = useState('');
   const [resetEmail, setResetEmail] = useState('');
+  const [resetEmailCode, setResetEmailCode] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
   const [captchaId, setCaptchaId] = useState('');
@@ -136,6 +160,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const loginMut = useLoginMutation();
   const registerMut = useRegisterMutation();
   const resetPasswordMut = useResetPasswordMutation();
+  const sendEmailCodeMut = useSendEmailCodeMutation();
   const googleLoginMut = useGoogleLoginMutation();
   const googleRegisterMut = useGoogleRegisterMutation();
   const googleLinkExistingMut = useGoogleLinkExistingMutation();
@@ -149,10 +174,13 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const displayNameId = `${id}-display-name`;
   const usernameId = `${id}-username`;
   const emailId = `${id}-email`;
+  const emailCodeId = `${id}-email-code`;
   const inviteCodeId = `${id}-invite-code`;
   const passwordId = `${id}-password`;
   const confirmPasswordId = `${id}-confirm-password`;
   const resetEmailId = `${id}-reset-email`;
+  const resetUsernameId = `${id}-reset-username`;
+  const resetEmailCodeId = `${id}-reset-email-code`;
   const resetPasswordId = `${id}-reset-password`;
   const resetConfirmPasswordId = `${id}-reset-confirm-password`;
   const captchaIdAttr = `${id}-captcha`;
@@ -181,10 +209,13 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     loginMut.reset();
     registerMut.reset();
     resetPasswordMut.reset();
+    sendEmailCodeMut.reset();
     googleLoginMut.reset();
     googleRegisterMut.reset();
     googleLinkExistingMut.reset();
     setConfirmPassword('');
+    setEmailCode('');
+    setResetEmailCode('');
     setResetConfirmPassword('');
     setGoogleLinkCredential('');
     setGoogleLinkEmail('');
@@ -201,12 +232,65 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  const sendEmailCode = (purpose: 'register' | 'password_reset') => {
+    setError(null);
+    setSuccess(null);
+    if (purpose === 'register') {
+      const cleanEmail = email.trim();
+      if (!cleanEmail) {
+        setError(t('auth.errors.invalidEmail', { defaultValue: 'Enter a valid email address.' }));
+        return;
+      }
+      sendEmailCodeMut.mutate(
+        { purpose, email: cleanEmail },
+        {
+          onSuccess: () =>
+            setSuccess(
+              t('auth.emailCodeSent', { defaultValue: 'Verification code has been sent.' }),
+            ),
+          onError: (err: Error) => setError(authErrorMessage(err, mode, t)),
+        },
+      );
+      return;
+    }
+
+    const cleanUsername = resetUsername.trim();
+    const cleanEmail = resetEmail.trim();
+    if (!cleanUsername || !cleanEmail) {
+      setError(
+        t('auth.errors.resetIdentityRequired', {
+          defaultValue: 'Enter username and email before requesting a code.',
+        }),
+      );
+      return;
+    }
+    sendEmailCodeMut.mutate(
+      { purpose, username: cleanUsername, email: cleanEmail },
+      {
+        onSuccess: () =>
+          setSuccess(t('auth.emailCodeSent', { defaultValue: 'Verification code has been sent.' })),
+        onError: (err: Error) => setError(authErrorMessage(err, mode, t)),
+      },
+    );
+  };
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
     if (isResetting) {
+      const cleanResetUsername = resetUsername.trim();
+      const cleanResetEmail = resetEmail.trim();
+      const cleanResetEmailCode = resetEmailCode.trim();
+      if (!cleanResetUsername || !cleanResetEmail || !cleanResetEmailCode) {
+        setError(
+          t('auth.errors.resetIdentityRequired', {
+            defaultValue: 'Enter username, email, and email verification code.',
+          }),
+        );
+        return;
+      }
       if (!PASSWORD_RULE_RE.test(resetPassword)) {
         setError(t('auth.errors.invalidPassword', { defaultValue: PASSWORD_RULE_TEXT }));
         return;
@@ -216,7 +300,12 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         return;
       }
       resetPasswordMut.mutate(
-        { email: resetEmail.trim(), newPassword: resetPassword },
+        {
+          username: cleanResetUsername,
+          email: cleanResetEmail,
+          emailCode: cleanResetEmailCode,
+          newPassword: resetPassword,
+        },
         {
           onSuccess: () => {
             setSuccess(
@@ -226,6 +315,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
             );
             setMode('signin');
             setPassword('');
+            setResetUsername('');
+            setResetEmail('');
+            setResetEmailCode('');
             setResetPassword('');
             setResetConfirmPassword('');
           },
@@ -240,6 +332,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     const cleanUsername = username.trim();
     const cleanDisplayName = displayName.trim();
     const cleanEmail = email.trim();
+    const cleanEmailCode = emailCode.trim();
     const cleanInviteCode = inviteCode.trim();
     const cleanCaptcha = captchaCode.trim();
 
@@ -252,6 +345,14 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
 
     if (isSigningUp && password !== confirmPassword) {
       setError(t('auth.errors.passwordMismatch'));
+      return;
+    }
+    if (isSigningUp && !cleanEmailCode) {
+      setError(
+        t('auth.errors.emailCodeRequired', {
+          defaultValue: 'Enter the email verification code to continue.',
+        }),
+      );
       return;
     }
     if (isSigningUp && !PASSWORD_RULE_RE.test(password)) {
@@ -275,6 +376,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
           username: cleanUsername,
           displayName: cleanDisplayName,
           email: cleanEmail,
+          emailCode: cleanEmailCode,
           inviteCode: cleanInviteCode,
           password,
           captchaId,
@@ -488,6 +590,22 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       <form onSubmit={onSubmit} className="gl-auth-form">
         {isResetting ? (
           <>
+            <label className="gl-auth-field" htmlFor={resetUsernameId}>
+              <span className="gl-auth-label">{t('auth.username')}</span>
+              <span className="gl-auth-input-wrap">
+                <UserRound size={18} />
+                <input
+                  id={resetUsernameId}
+                  type="text"
+                  autoComplete="username"
+                  value={resetUsername}
+                  onChange={(e) => setResetUsername(e.target.value)}
+                  placeholder={t('auth.usernamePlaceholder')}
+                  minLength={3}
+                  required
+                />
+              </span>
+            </label>
             <label className="gl-auth-field" htmlFor={resetEmailId}>
               <span className="gl-auth-label">{t('auth.email', { defaultValue: 'Email' })}</span>
               <span className="gl-auth-input-wrap">
@@ -501,6 +619,35 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   placeholder={t('auth.emailPlaceholder', { defaultValue: 'you@example.com' })}
                   required
                 />
+              </span>
+            </label>
+            <label className="gl-auth-field" htmlFor={resetEmailCodeId}>
+              <span className="gl-auth-label">
+                {t('auth.emailCode', { defaultValue: 'Email code' })}
+              </span>
+              <span className="gl-auth-code-row">
+                <span className="gl-auth-input-wrap">
+                  <input
+                    id={resetEmailCodeId}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={resetEmailCode}
+                    onChange={(e) => setResetEmailCode(e.target.value)}
+                    placeholder={t('auth.emailCodePlaceholder', { defaultValue: '6-digit code' })}
+                    required
+                  />
+                </span>
+                <button
+                  type="button"
+                  className="gl-auth-code-send"
+                  disabled={sendEmailCodeMut.isPending}
+                  onClick={() => sendEmailCode('password_reset')}
+                >
+                  {sendEmailCodeMut.isPending
+                    ? t('auth.sendingCode', { defaultValue: 'Sending...' })
+                    : t('auth.sendCode', { defaultValue: 'Send code' })}
+                </button>
               </span>
             </label>
             <label className="gl-auth-field" htmlFor={resetPasswordId}>
@@ -576,6 +723,37 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                       placeholder={t('auth.emailPlaceholder', { defaultValue: 'you@example.com' })}
                       required
                     />
+                  </span>
+                </label>
+                <label className="gl-auth-field" htmlFor={emailCodeId}>
+                  <span className="gl-auth-label">
+                    {t('auth.emailCode', { defaultValue: 'Email code' })}
+                  </span>
+                  <span className="gl-auth-code-row">
+                    <span className="gl-auth-input-wrap">
+                      <input
+                        id={emailCodeId}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={emailCode}
+                        onChange={(e) => setEmailCode(e.target.value)}
+                        placeholder={t('auth.emailCodePlaceholder', {
+                          defaultValue: '6-digit code',
+                        })}
+                        required
+                      />
+                    </span>
+                    <button
+                      type="button"
+                      className="gl-auth-code-send"
+                      disabled={sendEmailCodeMut.isPending}
+                      onClick={() => sendEmailCode('register')}
+                    >
+                      {sendEmailCodeMut.isPending
+                        ? t('auth.sendingCode', { defaultValue: 'Sending...' })
+                        : t('auth.sendCode', { defaultValue: 'Send code' })}
+                    </button>
                   </span>
                 </label>
                 <label className="gl-auth-field" htmlFor={inviteCodeId}>
@@ -777,6 +955,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
             className="gl-auth-link-btn"
             onClick={() => {
               setResetEmail(email);
+              setResetUsername(username);
               setMode('reset');
             }}
           >

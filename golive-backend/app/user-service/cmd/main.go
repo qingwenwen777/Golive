@@ -87,6 +87,21 @@ func main() {
 
 	tokenRepo := repo.NewTokenRepo(rdb)
 	captcha := service.NewCaptchaService(rdb, 5*time.Minute)
+	var emailMailer service.EmailCodeMailer
+	if cfg.Email.Enabled {
+		emailMailer, err = service.NewSMTPMailer(service.SMTPMailerConfig{
+			Host:        cfg.Email.SMTPHost,
+			Port:        cfg.Email.SMTPPort,
+			Username:    cfg.Email.SMTPUsername,
+			Password:    cfg.Email.SMTPPassword,
+			SenderEmail: cfg.Email.SenderEmail,
+			SenderName:  cfg.Email.SenderName,
+		})
+		if err != nil {
+			log.Fatal("email config", zap.Error(err))
+		}
+	}
+	emailCodes := service.NewEmailCodeService(rdb, emailMailer, cfg.Email.CodeTTL, cfg.Email.ResendInterval)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
 		JWTSecret:      cfg.JWT.Secret,
 		JWTKeys:        jwtKeys,
@@ -98,6 +113,7 @@ func main() {
 	r := server.NewRouter(server.Deps{
 		Auth:            auth,
 		Captcha:         captcha,
+		EmailCodes:      emailCodes,
 		Users:           userRepo,
 		AvatarDir:       cfg.Upload.AvatarDir,
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,

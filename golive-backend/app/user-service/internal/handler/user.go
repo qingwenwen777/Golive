@@ -19,15 +19,16 @@ import (
 )
 
 type UserHandler struct {
-	users *repo.UserRepo
+	users      *repo.UserRepo
+	emailCodes *service.EmailCodeService
 }
 
 const usernameChangeCooldown = 7 * 24 * time.Hour
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$`)
 
-func NewUserHandler(users *repo.UserRepo) *UserHandler {
-	return &UserHandler{users: users}
+func NewUserHandler(users *repo.UserRepo, emailCodes *service.EmailCodeService) *UserHandler {
+	return &UserHandler{users: users, emailCodes: emailCodes}
 }
 
 // Me returns the authenticated user's profile. AuthRequired middleware has
@@ -67,7 +68,9 @@ func (h *UserHandler) PublicProfile(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, u.Public())
+	pu := u.Public()
+	pu.Email = ""
+	c.JSON(http.StatusOK, pu)
 }
 
 type updateProfileReq struct {
@@ -164,6 +167,87 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+type sendEmailChangeCodeReq struct {
+	Email string `json:"email" binding:"required"`
+}
+
+func (h *UserHandler) SendEmailChangeCode(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req sendEmailChangeCodeReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	cleanEmail, ok := service.NormalizeEmail(req.Email)
+	if !ok {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	if h.emailCodes == nil {
+		errcode.Respond(c, service.ErrEmailNotConfigured)
+		return
+	}
+	if _, err := h.users.FindByID(c.Request.Context(), uid); err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	resp, err := h.emailCodes.Send(c.Request.Context(), service.EmailPurposeEmailChange, cleanEmail)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+type updateEmailReq struct {
+	Email     string `json:"email" binding:"required"`
+	EmailCode string `json:"emailCode" binding:"required"`
+}
+
+func (h *UserHandler) UpdateEmail(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req updateEmailReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	cleanEmail, ok := service.NormalizeEmail(req.Email)
+	if !ok {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	if h.emailCodes == nil {
+		errcode.Respond(c, service.ErrEmailNotConfigured)
+		return
+	}
+	if err := h.emailCodes.Verify(c.Request.Context(), service.EmailPurposeEmailChange, cleanEmail, req.EmailCode); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	u, err := h.users.UpdateEmail(c.Request.Context(), uid, cleanEmail)
+	if err != nil {
+		if errors.Is(err, repo.ErrEmailTaken) {
+			errcode.Respond(c, service.ErrEmailTaken)
+			return
+		}
+		if errors.Is(err, repo.ErrUserNotFound) {
+			errcode.Respond(c, service.ErrUnauthorized)
+			return
+		}
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, u.Public())
 }
 
 func cleanUsernamePatch(raw *string, c *gin.Context) (*string, bool) {

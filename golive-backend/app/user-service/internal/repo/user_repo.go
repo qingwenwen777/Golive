@@ -203,6 +203,52 @@ func (r *UserRepo) ResetPasswordByEmail(ctx context.Context, email, hash string)
 	return nil
 }
 
+func (r *UserRepo) ResetPasswordByUsernameEmail(ctx context.Context, username, email, hash string) error {
+	res := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("username = ? AND email = ?", username, email).
+		Update("password_hash", hash)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *UserRepo) UpdateEmail(ctx context.Context, id, email string) (*model.User, error) {
+	var u model.User
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).
+			Take(&u).Error; err != nil {
+			return err
+		}
+		var existing model.User
+		err := tx.Where("email = ? AND id <> ?", email, id).Take(&existing).Error
+		if err == nil {
+			return ErrEmailTaken
+		}
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.Model(&u).Update("email", email).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", id).Take(&u).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := r.hydrateUserLevel(ctx, &u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
 func (r *UserRepo) LinkGoogleAccount(ctx context.Context, id, googleSub, googleEmail string, linkedAt time.Time) (*model.User, error) {
 	var u model.User
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

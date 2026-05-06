@@ -17,6 +17,7 @@ export interface RegisterPayload {
   password: string;
   displayName: string;
   email: string;
+  emailCode: string;
   inviteCode: string;
   captchaId: string;
   captchaCode: string;
@@ -29,8 +30,20 @@ export interface CaptchaChallenge {
 }
 
 export interface ResetPasswordPayload {
+  username: string;
   email: string;
+  emailCode: string;
   newPassword: string;
+}
+
+export interface SendEmailCodePayload {
+  purpose: 'register' | 'password_reset';
+  email: string;
+  username?: string;
+}
+
+export interface SendEmailChangeCodePayload {
+  email: string;
 }
 
 export interface GoogleCredentialPayload {
@@ -59,6 +72,11 @@ export interface UpdateProfilePayload {
 export interface ChangePasswordPayload {
   currentPassword: string;
   newPassword: string;
+}
+
+export interface UpdateEmailPayload {
+  email: string;
+  emailCode: string;
 }
 
 export function useLoginMutation() {
@@ -157,6 +175,18 @@ export function useResetPasswordMutation() {
   });
 }
 
+export function useSendEmailCodeMutation() {
+  return useMutation<{ ok: boolean; expiresIn: number }, Error, SendEmailCodePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<{ ok: boolean; expiresIn: number }>(
+        '/auth/email-code',
+        payload,
+      );
+      return data;
+    },
+  });
+}
+
 export function useMe() {
   const isAuthed = useIsAuthed();
   const query = useQuery<User, Error>({
@@ -231,6 +261,32 @@ export function useChangePassword() {
     mutationFn: async (payload) => {
       const { data } = await http.post<{ ok: boolean }>('/users/me/password', payload);
       return data;
+    },
+  });
+}
+
+export function useSendEmailChangeCode() {
+  return useMutation<{ ok: boolean; expiresIn: number }, Error, SendEmailChangeCodePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.post<{ ok: boolean; expiresIn: number }>(
+        '/users/me/email/code',
+        payload,
+      );
+      return data;
+    },
+  });
+}
+
+export function useUpdateEmail() {
+  const qc = useQueryClient();
+  return useMutation<User, Error, UpdateEmailPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await http.patch<User>('/users/me/email', payload);
+      return data;
+    },
+    onSuccess: (user) => {
+      qc.setQueryData(['me'], user);
+      useAuthStore.getState().setUser(user);
     },
   });
 }
