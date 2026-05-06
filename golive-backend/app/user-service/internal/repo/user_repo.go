@@ -54,7 +54,30 @@ func (r *UserRepo) WithRedis(rdb *redis.Client) *UserRepo {
 
 // AutoMigrate creates / updates the users table.
 func (r *UserRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{}, &model.AdminAuditLog{}, &model.UserModerationState{}, &model.UnbanAppeal{})
+	if err := r.db.AutoMigrate(&model.User{}, &model.InviteCode{}, &model.CreatorApplication{}, &model.PlatformApplication{}, &model.CoinTransaction{}, &model.AdminAuditLog{}, &model.UserModerationState{}, &model.UnbanAppeal{}); err != nil {
+		return err
+	}
+	return r.ensureSearchIndexes()
+}
+
+func (r *UserRepo) ensureSearchIndexes() error {
+	if r.db == nil || r.db.Dialector.Name() != "mysql" {
+		return nil
+	}
+	var count int64
+	if err := r.db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.statistics
+WHERE table_schema = DATABASE()
+  AND table_name = 'users'
+  AND index_name = 'ft_users_search'
+`).Scan(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return r.db.Exec("CREATE FULLTEXT INDEX ft_users_search ON users (username, display_name, id)").Error
 }
 
 func (r *UserRepo) CreateAdminAuditLog(ctx context.Context, log *model.AdminAuditLog) error {

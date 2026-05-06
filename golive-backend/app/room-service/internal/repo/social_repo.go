@@ -55,6 +55,38 @@ func (s *SocialRepo) FollowerCount(ctx context.Context, channelID string) (int64
 	return s.rdb.ZCard(ctx, channelFansKey(channelID)).Result()
 }
 
+func (s *SocialRepo) FollowerCounts(ctx context.Context, channelIDs []string) (map[string]int64, error) {
+	out := make(map[string]int64, len(channelIDs))
+	if len(channelIDs) == 0 {
+		return out, nil
+	}
+	pipe := s.rdb.Pipeline()
+	cmds := make(map[string]*redis.IntCmd, len(channelIDs))
+	for _, channelID := range channelIDs {
+		if channelID == "" {
+			continue
+		}
+		if _, ok := cmds[channelID]; ok {
+			continue
+		}
+		cmds[channelID] = pipe.ZCard(ctx, channelFansKey(channelID))
+	}
+	if len(cmds) == 0 {
+		return out, nil
+	}
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		return nil, err
+	}
+	for channelID, cmd := range cmds {
+		count, err := cmd.Result()
+		if err != nil && err != redis.Nil {
+			return nil, err
+		}
+		out[channelID] = count
+	}
+	return out, nil
+}
+
 func (s *SocialRepo) FollowerCountBetween(ctx context.Context, channelID string, start, end time.Time) (int64, error) {
 	if channelID == "" {
 		return 0, nil

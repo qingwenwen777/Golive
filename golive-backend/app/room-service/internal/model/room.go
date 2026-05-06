@@ -39,12 +39,12 @@ type Room struct {
 	Verified             bool      `gorm:"not null;default:false"`
 	Avatar               string    `gorm:"type:varchar(500)"`
 	Cover                string    `gorm:"type:varchar(500)"`
-	Viewers              int64     `gorm:"not null;default:0"`
+	Viewers              int64     `gorm:"not null;default:0;index:idx_rooms_live_list,priority:3,sort:desc"`
 	PeakViewers          int64     `gorm:"not null;default:0"`
 	Category             string    `gorm:"type:varchar(64);index"`
 	CategoryJa           string    `gorm:"type:varchar(64)"`
-	StartedAt            time.Time `gorm:"index"`
-	Status               string    `gorm:"type:varchar(16);not null;default:'live';index"`
+	StartedAt            time.Time `gorm:"index;index:idx_rooms_live_list,priority:2,sort:desc"`
+	Status               string    `gorm:"type:varchar(16);not null;default:'live';index;index:idx_rooms_live_list,priority:1"`
 	OwnerID              string    `gorm:"type:varchar(36);index"`
 	StreamKey            string    `gorm:"type:varchar(128);index"`
 	ReplayUploadEnabled  bool      `gorm:"not null;default:false"`

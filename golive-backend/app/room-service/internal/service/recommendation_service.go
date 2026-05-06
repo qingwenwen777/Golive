@@ -70,15 +70,18 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 				following[channelID] = true
 			}
 		}
+		channelIDs := make([]string, 0, len(rooms))
+		seenChannels := map[string]bool{}
 		for _, room := range rooms {
-			if _, ok := subscriberByChannel[room.ChannelID]; ok {
+			if room.ChannelID == "" || seenChannels[room.ChannelID] {
 				continue
 			}
-			count, err := s.social.FollowerCount(ctx, room.ChannelID)
-			if err != nil {
-				return nil, err
-			}
-			subscriberByChannel[room.ChannelID] = count
+			seenChannels[room.ChannelID] = true
+			channelIDs = append(channelIDs, room.ChannelID)
+		}
+		subscriberByChannel, err = s.social.FollowerCounts(ctx, channelIDs)
+		if err != nil {
+			return nil, err
 		}
 	}
 

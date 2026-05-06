@@ -23,12 +23,20 @@ type PostRepo struct {
 func NewPostRepo(db *gorm.DB) *PostRepo { return &PostRepo{db: db} }
 
 func (r *PostRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(
+	if err := r.db.AutoMigrate(
 		&model.ChannelPost{},
 		&model.PostComment{},
 		&model.PostLike{},
 		&model.PostCommentLike{},
-	)
+	); err != nil {
+		return err
+	}
+	specs := append(sharedSearchFullTextIndexes(), fullTextIndexSpec{
+		Table:   "channel_posts",
+		Name:    "ft_channel_posts_search",
+		Columns: []string{"content", "channel_id"},
+	})
+	return ensureMySQLFullTextIndexes(r.db, specs...)
 }
 
 type PostUserProfile struct {

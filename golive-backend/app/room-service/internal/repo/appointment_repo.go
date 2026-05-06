@@ -25,11 +25,19 @@ type AppointmentRepo struct {
 func NewAppointmentRepo(db *gorm.DB) *AppointmentRepo { return &AppointmentRepo{db: db} }
 
 func (r *AppointmentRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(
+	if err := r.db.AutoMigrate(
 		&model.LiveAppointment{},
 		&model.AppointmentReservation{},
 		&model.Notification{},
-	)
+	); err != nil {
+		return err
+	}
+	specs := append(sharedSearchFullTextIndexes(), fullTextIndexSpec{
+		Table:   "live_appointments",
+		Name:    "ft_live_appointments_search",
+		Columns: []string{"title", "description"},
+	})
+	return ensureMySQLFullTextIndexes(r.db, specs...)
 }
 
 func (r *AppointmentRepo) ActiveCount(ctx context.Context, ownerID string, now time.Time) (int64, error) {

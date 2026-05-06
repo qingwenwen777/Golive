@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
+	"gorm.io/gorm"
 )
 
 const maxSearchRunes = 80
@@ -31,6 +32,22 @@ type CreatorSearchRow struct {
 	LiveRoomID  string
 	LastLiveAt  *time.Time
 	LastTitle   string
+}
+
+func roomsFullTextMatch(alias string) string {
+	return "MATCH(" + alias + ".title, " + alias + ".title_ja, " + alias + ".description, " + alias + ".category, " + alias + ".category_ja, " + alias + ".channel, " + alias + ".channel_id) AGAINST (? IN BOOLEAN MODE)"
+}
+
+func usersFullTextMatch(alias string) string {
+	return "MATCH(" + alias + ".username, " + alias + ".display_name, " + alias + ".id) AGAINST (? IN BOOLEAN MODE)"
+}
+
+func appointmentsFullTextMatch(alias string) string {
+	return "MATCH(" + alias + ".title, " + alias + ".description) AGAINST (? IN BOOLEAN MODE)"
+}
+
+func postsFullTextMatch(alias string) string {
+	return "MATCH(" + alias + ".content, " + alias + ".channel_id) AGAINST (? IN BOOLEAN MODE)"
 }
 
 func NewSearchPhrase(raw string) SearchPhrase {
@@ -62,6 +79,21 @@ func (r *RoomRepo) SearchCreators(ctx context.Context, phrase SearchPhrase, limi
 		return []CreatorSearchRow{}, nil
 	}
 	limit = normalizeSearchLimit(limit)
+	if query, ok := mysqlBooleanSearchQuery(phrase); ok && r.db.Dialector.Name() == "mysql" {
+		where := "(" + usersFullTextMatch("u") + " OR EXISTS (SELECT 1 FROM rooms cr WHERE cr.owner_id = u.id AND cr.owner_id <> '' AND " + roomsFullTextMatch("cr") + "))"
+		var rows []CreatorSearchRow
+		err := r.creatorSearchBaseQuery(ctx).
+			Where(where, query, query).
+			Order("u.updated_at DESC").
+			Limit(limit).
+			Scan(&rows).Error
+		if err == nil {
+			return rows, nil
+		}
+		if !shouldFallbackFromFullText(err) {
+			return nil, err
+		}
+	}
 	userWhere, userArgs := fuzzyWhere([]string{"u.username", "u.display_name", "u.id"}, phrase)
 	roomWhere, roomArgs := fuzzyWhere([]string{"cr.channel", "cr.channel_id", "cr.title", "cr.title_ja", "cr.category", "cr.category_ja"}, phrase)
 	where := "(" + userWhere + " OR EXISTS (SELECT 1 FROM rooms cr WHERE cr.owner_id = u.id AND cr.owner_id <> '' AND " + roomWhere + "))"
@@ -69,7 +101,19 @@ func (r *RoomRepo) SearchCreators(ctx context.Context, phrase SearchPhrase, limi
 	args = append(args, roomArgs...)
 
 	var rows []CreatorSearchRow
-	err := r.db.WithContext(ctx).
+	err := r.creatorSearchBaseQuery(ctx).
+		Where(where, args...).
+		Order("u.updated_at DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	if isMissingTable(err) {
+		return []CreatorSearchRow{}, nil
+	}
+	return rows, err
+}
+
+func (r *RoomRepo) creatorSearchBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
 		Table("users AS u").
 		Select(`
 			u.id,
@@ -110,15 +154,7 @@ func (r *RoomRepo) SearchCreators(ctx context.Context, phrase SearchPhrase, limi
 				LIMIT 1
 			), '') AS last_title
 		`, model.StatusLive, []string{model.StatusLive, model.StatusEnded}, []string{model.StatusLive, model.StatusEnded}).
-		Where("u.live_permission_status = ?", "approved").
-		Where(where, args...).
-		Order("u.updated_at DESC").
-		Limit(limit).
-		Scan(&rows).Error
-	if isMissingTable(err) {
-		return []CreatorSearchRow{}, nil
-	}
-	return rows, err
+		Where("u.live_permission_status = ?", "approved")
 }
 
 func (r *RoomRepo) SearchLiveRooms(ctx context.Context, phrase SearchPhrase, limit int) ([]model.Room, error) {
@@ -126,6 +162,21 @@ func (r *RoomRepo) SearchLiveRooms(ctx context.Context, phrase SearchPhrase, lim
 		return []model.Room{}, nil
 	}
 	limit = normalizeSearchLimit(limit)
+	if query, ok := mysqlBooleanSearchQuery(phrase); ok && r.db.Dialector.Name() == "mysql" {
+		where := "(" + roomsFullTextMatch("rooms") + " OR " + usersFullTextMatch("u") + ")"
+		var rooms []model.Room
+		err := r.liveRoomSearchBaseQuery(ctx).
+			Where(where, query, query).
+			Order("rooms.started_at DESC, rooms.viewers DESC").
+			Limit(limit).
+			Find(&rooms).Error
+		if err == nil {
+			return rooms, nil
+		}
+		if !shouldFallbackFromFullText(err) {
+			return nil, err
+		}
+	}
 	where, args := fuzzyWhere([]string{
 		"rooms.title",
 		"rooms.title_ja",
@@ -138,11 +189,7 @@ func (r *RoomRepo) SearchLiveRooms(ctx context.Context, phrase SearchPhrase, lim
 		"u.display_name",
 	}, phrase)
 	var rooms []model.Room
-	err := r.db.WithContext(ctx).
-		Model(&model.Room{}).
-		Select("rooms.*").
-		Joins("LEFT JOIN users u ON u.id = rooms.owner_id").
-		Where("rooms.status = ? AND rooms.owner_id <> ?", model.StatusLive, "").
+	err := r.liveRoomSearchBaseQuery(ctx).
 		Where(where, args...).
 		Order("rooms.started_at DESC, rooms.viewers DESC").
 		Limit(limit).
@@ -153,11 +200,34 @@ func (r *RoomRepo) SearchLiveRooms(ctx context.Context, phrase SearchPhrase, lim
 	return rooms, err
 }
 
+func (r *RoomRepo) liveRoomSearchBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.Room{}).
+		Select("rooms.*").
+		Joins("LEFT JOIN users u ON u.id = rooms.owner_id").
+		Where("rooms.status = ? AND rooms.owner_id <> ?", model.StatusLive, "")
+}
+
 func (r *RoomRepo) SearchReplayRooms(ctx context.Context, phrase SearchPhrase, limit int) ([]model.Room, error) {
 	if phrase.Empty() {
 		return []model.Room{}, nil
 	}
 	limit = normalizeSearchLimit(limit)
+	if query, ok := mysqlBooleanSearchQuery(phrase); ok && r.db.Dialector.Name() == "mysql" {
+		where := "(" + roomsFullTextMatch("rooms") + " OR " + usersFullTextMatch("u") + ")"
+		var rooms []model.Room
+		err := r.replayRoomSearchBaseQuery(ctx).
+			Where(where, query, query).
+			Order("COALESCE(rooms.replay_uploaded_at, rooms.ended_at, rooms.updated_at) DESC").
+			Limit(limit).
+			Find(&rooms).Error
+		if err == nil {
+			return rooms, nil
+		}
+		if !shouldFallbackFromFullText(err) {
+			return nil, err
+		}
+	}
 	where, args := fuzzyWhere([]string{
 		"rooms.title",
 		"rooms.title_ja",
@@ -170,12 +240,7 @@ func (r *RoomRepo) SearchReplayRooms(ctx context.Context, phrase SearchPhrase, l
 		"u.display_name",
 	}, phrase)
 	var rooms []model.Room
-	err := r.db.WithContext(ctx).
-		Model(&model.Room{}).
-		Select("rooms.*").
-		Joins("LEFT JOIN users u ON u.id = rooms.owner_id").
-		Where("rooms.status = ? AND rooms.replay_status = ? AND rooms.replay_bunny_video_id <> ?", model.StatusEnded, model.ReplayStatusReady, "").
-		Where("rooms.replay_visibility IN ?", []string{model.PostVisibilityPublic, model.PostVisibilityFollowers}).
+	err := r.replayRoomSearchBaseQuery(ctx).
 		Where(where, args...).
 		Order("COALESCE(rooms.replay_uploaded_at, rooms.ended_at, rooms.updated_at) DESC").
 		Limit(limit).
@@ -186,11 +251,37 @@ func (r *RoomRepo) SearchReplayRooms(ctx context.Context, phrase SearchPhrase, l
 	return rooms, err
 }
 
+func (r *RoomRepo) replayRoomSearchBaseQuery(ctx context.Context) *gorm.DB {
+	return r.db.WithContext(ctx).
+		Model(&model.Room{}).
+		Select("rooms.*").
+		Joins("LEFT JOIN users u ON u.id = rooms.owner_id").
+		Where("rooms.status = ? AND rooms.replay_status = ? AND rooms.replay_bunny_video_id <> ?", model.StatusEnded, model.ReplayStatusReady, "").
+		Where("rooms.replay_visibility IN ?", []string{model.PostVisibilityPublic, model.PostVisibilityFollowers})
+}
+
 func (r *AppointmentRepo) SearchPublicUpcoming(ctx context.Context, phrase SearchPhrase, now time.Time, limit int) ([]model.LiveAppointment, error) {
 	if phrase.Empty() {
 		return []model.LiveAppointment{}, nil
 	}
 	limit = normalizeSearchLimit(limit)
+	if query, ok := mysqlBooleanSearchQuery(phrase); ok && r.db.Dialector.Name() == "mysql" {
+		where := "(" + appointmentsFullTextMatch("live_appointments") + " OR " + roomsFullTextMatch("rooms") + " OR " + usersFullTextMatch("u") + ")"
+		var items []model.LiveAppointment
+		err := publicAppointmentQuery(r.db.WithContext(ctx), now).
+			Joins("JOIN rooms ON rooms.id = live_appointments.room_id").
+			Joins("LEFT JOIN users u ON u.id = live_appointments.owner_id").
+			Where(where, query, query, query).
+			Order("live_appointments.scheduled_at ASC, live_appointments.created_at ASC").
+			Limit(limit).
+			Find(&items).Error
+		if err == nil {
+			return items, nil
+		}
+		if !shouldFallbackFromFullText(err) {
+			return nil, err
+		}
+	}
 	where, args := fuzzyWhere([]string{
 		"live_appointments.title",
 		"live_appointments.description",
@@ -222,6 +313,25 @@ func (r *PostRepo) SearchVisible(ctx context.Context, phrase SearchPhrase, limit
 		return []model.ChannelPost{}, nil
 	}
 	limit = normalizeSearchLimit(limit)
+	if query, ok := mysqlBooleanSearchQuery(phrase); ok && r.db.Dialector.Name() == "mysql" {
+		where := "(" + postsFullTextMatch("channel_posts") + " OR " + usersFullTextMatch("u") + ")"
+		var posts []model.ChannelPost
+		err := r.db.WithContext(ctx).
+			Model(&model.ChannelPost{}).
+			Select("channel_posts.*").
+			Joins("LEFT JOIN users u ON u.id = channel_posts.owner_id").
+			Where("channel_posts.visibility IN ?", []string{model.PostVisibilityPublic, model.PostVisibilityFollowers}).
+			Where(where, query, query).
+			Order("channel_posts.created_at DESC").
+			Limit(limit).
+			Find(&posts).Error
+		if err == nil {
+			return posts, nil
+		}
+		if !shouldFallbackFromFullText(err) {
+			return nil, err
+		}
+	}
 	where, args := fuzzyWhere([]string{
 		"channel_posts.content",
 		"channel_posts.channel_id",
@@ -276,6 +386,63 @@ func fuzzyWhere(fields []string, phrase SearchPhrase) (string, []any) {
 		return "1 = 0", nil
 	}
 	return "(" + strings.Join(clauses, " OR ") + ")", args
+}
+
+func mysqlBooleanSearchQuery(phrase SearchPhrase) (string, bool) {
+	if phrase.Empty() || len(phrase.Tokens) == 0 {
+		return "", false
+	}
+	terms := make([]string, 0, len(phrase.Tokens))
+	for _, token := range phrase.Tokens {
+		parts, ok := asciiFullTextParts(token)
+		if !ok || len(parts) == 0 {
+			return "", false
+		}
+		for _, part := range parts {
+			if len(part) < 3 {
+				return "", false
+			}
+			terms = append(terms, "+"+part+"*")
+		}
+	}
+	if len(terms) == 0 {
+		return "", false
+	}
+	return strings.Join(terms, " "), true
+}
+
+func asciiFullTextParts(value string) ([]string, bool) {
+	parts := make([]string, 0, 2)
+	var b strings.Builder
+	for _, r := range strings.ToLower(value) {
+		if r > unicode.MaxASCII {
+			return nil, false
+		}
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			continue
+		}
+		if b.Len() > 0 {
+			parts = append(parts, b.String())
+			b.Reset()
+		}
+	}
+	if b.Len() > 0 {
+		parts = append(parts, b.String())
+	}
+	return parts, true
+}
+
+func shouldFallbackFromFullText(err error) bool {
+	if err == nil {
+		return false
+	}
+	if isMissingTable(err) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "fulltext") ||
+		strings.Contains(msg, "match") && strings.Contains(msg, "against")
 }
 
 func compactSQL(field string) string {

@@ -25,7 +25,18 @@ type RoomRepo struct {
 func NewRoomRepo(db *gorm.DB) *RoomRepo { return &RoomRepo{db: db} }
 
 func (r *RoomRepo) AutoMigrate() error {
-	return r.db.AutoMigrate(&model.Room{}, &model.RoomWatchEvent{})
+	if err := r.db.AutoMigrate(&model.Room{}, &model.RoomWatchEvent{}); err != nil {
+		return err
+	}
+	if err := ensureMySQLIndex(
+		r.db,
+		"rooms",
+		"idx_rooms_live_list",
+		"CREATE INDEX idx_rooms_live_list ON rooms (status, started_at DESC, viewers DESC)",
+	); err != nil {
+		return err
+	}
+	return ensureMySQLFullTextIndexes(r.db, sharedSearchFullTextIndexes()...)
 }
 
 // ListQuery is what the service layer hands to the repo. Empty Category means
