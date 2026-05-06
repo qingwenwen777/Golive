@@ -9,6 +9,12 @@ export interface MessageUser {
   avatar?: string;
   verified: boolean;
   livePermissionStatus?: string;
+  fanBadge?: MessageFanBadge;
+}
+
+export interface MessageFanBadge {
+  creatorId: string;
+  level: number;
 }
 
 export interface DirectThread {
@@ -41,6 +47,7 @@ export interface DirectMessage {
   threadId: string;
   senderId: string;
   receiverId: string;
+  sender?: MessageUser;
   body: string;
   createdAt: string;
 }
@@ -76,9 +83,16 @@ export interface BlockedUserListResp {
 
 export interface FanGroupMember {
   user: MessageUser;
+  fanBadge?: MessageFanBadge;
   role: 'owner' | 'admin' | 'member' | string;
   muted: boolean;
   mutedUntil?: string;
+  kicked?: boolean;
+  kickedAt?: string;
+  kickReason?: string;
+  rejoinRequestedAt?: string;
+  rejoinRejectedAt?: string;
+  pendingRejoin?: boolean;
   createdAt: string;
 }
 
@@ -102,6 +116,8 @@ export interface FanGroupMessage {
   id: string;
   groupId: string;
   sender: MessageUser;
+  role?: 'owner' | 'admin' | 'member' | string;
+  fanBadge?: MessageFanBadge;
   body: string;
   createdAt: string;
 }
@@ -352,6 +368,22 @@ export function useSendFanGroupMessage(groupId: string) {
   });
 }
 
+export function useRequestFanGroupRejoin() {
+  const qc = useQueryClient();
+  return useMutation<FanGroupListResp, Error, string>({
+    mutationFn: async (groupId) => {
+      const { data } = await http.post<FanGroupListResp>(
+        `/messages/fan-groups/${encodeURIComponent(groupId)}/rejoin-requests`,
+      );
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['joined-fan-groups'], data);
+      void qc.invalidateQueries({ queryKey: ['fan-groups'] });
+    },
+  });
+}
+
 export function useSyncFanGroups() {
   const qc = useQueryClient();
   return useMutation<FanGroupListResp, Error, void>({
@@ -370,7 +402,15 @@ export function useUpdateFanGroupMember() {
   return useMutation<
     FanGroupListResp,
     Error,
-    { groupId: string; userId: string; role?: string; muteMinutes?: number; kick?: boolean }
+    {
+      groupId: string;
+      userId: string;
+      role?: string;
+      muteMinutes?: number;
+      kick?: boolean;
+      approveRejoin?: boolean;
+      rejectRejoin?: boolean;
+    }
   >({
     mutationFn: async ({ groupId, userId, ...payload }) => {
       const { data } = await http.patch<FanGroupListResp>(
@@ -381,6 +421,8 @@ export function useUpdateFanGroupMember() {
     },
     onSuccess: (data) => {
       qc.setQueryData(['fan-groups'], data);
+      void qc.invalidateQueries({ queryKey: ['joined-fan-groups'] });
+      void qc.invalidateQueries({ queryKey: ['fan-group-messages'] });
     },
   });
 }

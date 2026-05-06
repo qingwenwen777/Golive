@@ -245,6 +245,19 @@ func (h *MessageHandler) SendFanGroupMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *MessageHandler) RequestFanGroupRejoin(c *gin.Context) {
+	uid, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	resp, err := h.svc.RequestFanGroupRejoin(c.Request.Context(), uid, c.Param("groupID"))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *MessageHandler) SyncFanGroups(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {

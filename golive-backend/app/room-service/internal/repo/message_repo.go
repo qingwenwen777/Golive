@@ -20,6 +20,8 @@ var (
 	ErrFanGroupNotFound       = errors.New("fan group not found")
 	ErrFanGroupMemberNotFound = errors.New("fan group member not found")
 	ErrFanGroupMuted          = errors.New("fan group member muted")
+	ErrFanGroupRejoinDenied   = errors.New("fan group rejoin denied")
+	ErrFanGroupRejoinNotFound = errors.New("fan group rejoin request not found")
 )
 
 type MessageRepo struct {
@@ -67,18 +69,22 @@ type ThreadOptionUpdate struct {
 }
 
 type FanGroupMemberRow struct {
-	GroupID     string
-	UserID      string
-	Role        string
-	MutedUntil  *time.Time
-	KickedAt    *time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Username    string
-	DisplayName string
-	Name        string
-	Avatar      string
-	Verified    bool
+	GroupID           string
+	UserID            string
+	Role              string
+	MutedUntil        *time.Time
+	KickedAt          *time.Time
+	KickReason        string
+	RejoinRequestedAt *time.Time
+	RejoinRejectedAt  *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Username          string
+	DisplayName       string
+	Name              string
+	Avatar            string
+	Verified          bool
+	FanBadgeLevel     int
 }
 
 type FanGroupWithMembers struct {
@@ -87,16 +93,24 @@ type FanGroupWithMembers struct {
 }
 
 type FanGroupMessageRow struct {
-	ID          string
-	GroupID     string
-	SenderID    string
-	Body        string
-	CreatedAt   time.Time
-	Username    string
-	DisplayName string
-	Name        string
-	Avatar      string
-	Verified    bool
+	ID            string
+	GroupID       string
+	CreatorID     string
+	SenderID      string
+	Body          string
+	CreatedAt     time.Time
+	Username      string
+	DisplayName   string
+	Name          string
+	Avatar        string
+	Verified      bool
+	Role          string
+	FanBadgeLevel int
+}
+
+type FanBadgeRow struct {
+	CreatorID string
+	Level     int
 }
 
 func (r *MessageRepo) UserProfile(ctx context.Context, userID string) (MessageUserProfile, error) {
@@ -126,6 +140,22 @@ func (r *MessageRepo) IsApprovedCreator(ctx context.Context, userID string) (boo
 		return false, err
 	}
 	return strings.EqualFold(profile.LivePermissionStatus, "approved"), nil
+}
+
+func (r *MessageRepo) FanBadge(ctx context.Context, userID, creatorID string) (*FanBadgeRow, error) {
+	var row FanBadgeRow
+	err := r.db.WithContext(ctx).
+		Table("fan_badges").
+		Select("creator_id, level").
+		Where("user_id = ? AND creator_id = ?", userID, creatorID).
+		Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) || isMissingTableName(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
 }
 
 func (r *MessageRepo) CreateNotification(ctx context.Context, n model.Notification) error {
@@ -426,9 +456,15 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 	}
 	groups := make([]model.FanGroupChat, 0, groupCount)
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&model.FanGroupMember{}).
-			Where("group_id IN (SELECT id FROM fan_group_chats WHERE creator_id = ?) AND user_id <> ?", creatorID, creatorID).
-			Update("kicked_at", now).Error; err != nil {
+		stale := tx.Model(&model.FanGroupMember{}).
+			Where("group_id IN (SELECT id FROM fan_group_chats WHERE creator_id = ?) AND user_id <> ? AND kicked_at IS NULL", creatorID, creatorID)
+		if err := stale.Updates(map[string]any{
+			"kicked_at":           now,
+			"kick_reason":         model.FanGroupKickReasonSync,
+			"rejoin_requested_at": nil,
+			"rejoin_rejected_at":  nil,
+			"updated_at":          now,
+		}).Error; err != nil {
 			return err
 		}
 		for i := 0; i < groupCount; i++ {
@@ -468,10 +504,13 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 			if err := tx.Clauses(clause.OnConflict{
 				Columns: []clause.Column{{Name: "group_id"}, {Name: "user_id"}},
 				DoUpdates: clause.Assignments(map[string]any{
-					"role":        model.FanGroupRoleOwner,
-					"kicked_at":   nil,
-					"muted_until": nil,
-					"updated_at":  now,
+					"role":                model.FanGroupRoleOwner,
+					"kicked_at":           nil,
+					"kick_reason":         "",
+					"muted_until":         nil,
+					"rejoin_requested_at": nil,
+					"rejoin_rejected_at":  nil,
+					"updated_at":          now,
 				}),
 			}).Create(&model.FanGroupMember{
 				GroupID:   group.ID,
@@ -488,19 +527,7 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 				end = len(memberIDs)
 			}
 			for _, userID := range memberIDs[start:end] {
-				if err := tx.Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "group_id"}, {Name: "user_id"}},
-					DoUpdates: clause.Assignments(map[string]any{
-						"kicked_at":  nil,
-						"updated_at": now,
-					}),
-				}).Create(&model.FanGroupMember{
-					GroupID:   group.ID,
-					UserID:    userID,
-					Role:      model.FanGroupRoleMember,
-					CreatedAt: now,
-					UpdatedAt: now,
-				}).Error; err != nil {
+				if err := syncFanGroupMember(tx, group.ID, userID, now); err != nil {
 					return err
 				}
 			}
@@ -521,12 +548,48 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 	return groups, err
 }
 
+func syncFanGroupMember(tx *gorm.DB, groupID, userID string, now time.Time) error {
+	var member model.FanGroupMember
+	res := tx.Where("group_id = ? AND user_id = ?", groupID, userID).Find(&member)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return tx.Create(&model.FanGroupMember{
+			GroupID:   groupID,
+			UserID:    userID,
+			Role:      model.FanGroupRoleMember,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}).Error
+	}
+	if member.KickedAt != nil && member.KickReason != model.FanGroupKickReasonSync {
+		return tx.Model(&model.FanGroupMember{}).
+			Where("group_id = ? AND user_id = ?", groupID, userID).
+			Update("updated_at", now).Error
+	}
+	updates := map[string]any{
+		"kicked_at":           nil,
+		"kick_reason":         "",
+		"rejoin_requested_at": nil,
+		"rejoin_rejected_at":  nil,
+		"muted_until":         nil,
+		"updated_at":          now,
+	}
+	if member.Role == "" {
+		updates["role"] = model.FanGroupRoleMember
+	}
+	return tx.Model(&model.FanGroupMember{}).
+		Where("group_id = ? AND user_id = ?", groupID, userID).
+		Updates(updates).Error
+}
+
 func (r *MessageRepo) ListFanGroups(ctx context.Context, creatorID string) ([]FanGroupWithMembers, error) {
 	var groups []model.FanGroupChat
 	if err := r.db.WithContext(ctx).Where("creator_id = ?", creatorID).Order("group_no ASC").Find(&groups).Error; err != nil {
 		return nil, err
 	}
-	return r.fanGroupsWithMembers(ctx, groups)
+	return r.fanGroupsWithMembers(ctx, groups, true, "")
 }
 
 func (r *MessageRepo) ListJoinedFanGroups(ctx context.Context, userID string) ([]FanGroupWithMembers, error) {
@@ -534,19 +597,29 @@ func (r *MessageRepo) ListJoinedFanGroups(ctx context.Context, userID string) ([
 	err := r.db.WithContext(ctx).
 		Table("fan_group_chats AS fg").
 		Select("fg.*").
-		Joins("JOIN fan_group_members AS mine ON mine.group_id = fg.id AND mine.user_id = ? AND mine.kicked_at IS NULL", userID).
+		Joins("JOIN fan_group_members AS mine ON mine.group_id = fg.id AND mine.user_id = ?", userID).
 		Order("fg.updated_at DESC, fg.group_no ASC").
 		Find(&groups).Error
 	if err != nil {
 		return nil, err
 	}
-	return r.fanGroupsWithMembers(ctx, groups)
+	return r.fanGroupsWithMembers(ctx, groups, false, userID)
 }
 
-func (r *MessageRepo) fanGroupsWithMembers(ctx context.Context, groups []model.FanGroupChat) ([]FanGroupWithMembers, error) {
+func (r *MessageRepo) fanGroupsWithMembers(ctx context.Context, groups []model.FanGroupChat, includeRequests bool, viewerID string) ([]FanGroupWithMembers, error) {
 	out := make([]FanGroupWithMembers, 0, len(groups))
 	for _, group := range groups {
 		var members []FanGroupMemberRow
+		visibility := "gm.group_id = ? AND (gm.kicked_at IS NULL"
+		args := []any{group.ID}
+		if includeRequests {
+			visibility += " OR gm.rejoin_requested_at IS NOT NULL"
+		}
+		if viewerID != "" {
+			visibility += " OR gm.user_id = ?"
+			args = append(args, viewerID)
+		}
+		visibility += ")"
 		err := r.db.WithContext(ctx).
 			Table("fan_group_members AS gm").
 			Select(`
@@ -555,17 +628,22 @@ gm.user_id,
 gm.role,
 gm.muted_until,
 gm.kicked_at,
+gm.kick_reason,
+gm.rejoin_requested_at,
+gm.rejoin_rejected_at,
 gm.created_at,
 gm.updated_at,
 COALESCE(u.username, '') AS username,
 COALESCE(u.display_name, '') AS display_name,
 COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), gm.user_id) AS name,
 COALESCE(u.avatar, '') AS avatar,
-COALESCE(u.verified, false) AS verified
+COALESCE(u.verified, false) AS verified,
+COALESCE(fb.level, 0) AS fan_badge_level
 `).
 			Joins("LEFT JOIN users AS u ON u.id = gm.user_id").
-			Where("gm.group_id = ? AND gm.kicked_at IS NULL", group.ID).
-			Order("CASE gm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, gm.created_at ASC").
+			Joins("LEFT JOIN fan_badges AS fb ON fb.user_id = gm.user_id AND fb.creator_id = ?", group.CreatorID).
+			Where(visibility, args...).
+			Order("CASE WHEN gm.kicked_at IS NOT NULL THEN 3 WHEN gm.role = 'owner' THEN 0 WHEN gm.role = 'admin' THEN 1 ELSE 2 END, gm.created_at ASC").
 			Limit(220).
 			Scan(&members).Error
 		if err != nil {
@@ -588,7 +666,19 @@ func (r *MessageRepo) FanGroupForCreator(ctx context.Context, creatorID, groupID
 	return &group, nil
 }
 
-func (r *MessageRepo) UpdateFanGroupMember(ctx context.Context, creatorID, groupID, userID, role string, mutedUntil *time.Time, clearMute bool, kick bool, now time.Time) error {
+func (r *MessageRepo) FanGroupByID(ctx context.Context, groupID string) (*model.FanGroupChat, error) {
+	var group model.FanGroupChat
+	err := r.db.WithContext(ctx).Where("id = ?", groupID).Take(&group).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFanGroupNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &group, nil
+}
+
+func (r *MessageRepo) UpdateFanGroupMember(ctx context.Context, creatorID, groupID, userID, role string, mutedUntil *time.Time, clearMute bool, kick, approveRejoin, rejectRejoin bool, now time.Time) error {
 	group, err := r.FanGroupForCreator(ctx, creatorID, groupID)
 	if err != nil {
 		return err
@@ -607,15 +697,38 @@ func (r *MessageRepo) UpdateFanGroupMember(ctx context.Context, creatorID, group
 	}
 	if kick {
 		updates["kicked_at"] = now
+		updates["kick_reason"] = model.FanGroupKickReasonManual
+		updates["rejoin_requested_at"] = nil
+		updates["rejoin_rejected_at"] = nil
+	}
+	if approveRejoin {
+		updates["role"] = model.FanGroupRoleMember
+		updates["muted_until"] = nil
+		updates["kicked_at"] = nil
+		updates["kick_reason"] = ""
+		updates["rejoin_requested_at"] = nil
+		updates["rejoin_rejected_at"] = nil
+	}
+	if rejectRejoin {
+		updates["rejoin_requested_at"] = nil
+		updates["rejoin_rejected_at"] = now
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		res := tx.Model(&model.FanGroupMember{}).
-			Where("group_id = ? AND user_id = ? AND kicked_at IS NULL", group.ID, userID).
-			Updates(updates)
+		scope := tx.Model(&model.FanGroupMember{}).
+			Where("group_id = ? AND user_id = ?", group.ID, userID)
+		if approveRejoin || rejectRejoin {
+			scope = scope.Where("kicked_at IS NOT NULL AND rejoin_requested_at IS NOT NULL")
+		} else {
+			scope = scope.Where("kicked_at IS NULL")
+		}
+		res := scope.Updates(updates)
 		if res.Error != nil {
 			return res.Error
 		}
 		if res.RowsAffected == 0 {
+			if approveRejoin || rejectRejoin {
+				return ErrFanGroupRejoinNotFound
+			}
 			return ErrFanGroupMemberNotFound
 		}
 		var count int64
@@ -628,6 +741,35 @@ func (r *MessageRepo) UpdateFanGroupMember(ctx context.Context, creatorID, group
 			Where("id = ?", group.ID).
 			Updates(map[string]any{"member_count": count, "updated_at": now}).Error
 	})
+}
+
+func (r *MessageRepo) RequestFanGroupRejoin(ctx context.Context, groupID, userID string, now time.Time) error {
+	group, err := r.FanGroupByID(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	badge, err := r.FanBadge(ctx, userID, group.CreatorID)
+	if err != nil {
+		return err
+	}
+	if badge == nil {
+		return ErrFanGroupRejoinDenied
+	}
+	res := r.db.WithContext(ctx).Model(&model.FanGroupMember{}).
+		Where("group_id = ? AND user_id = ? AND kicked_at IS NOT NULL", group.ID, userID).
+		Updates(map[string]any{
+			"kick_reason":         model.FanGroupKickReasonManual,
+			"rejoin_requested_at": now,
+			"rejoin_rejected_at":  nil,
+			"updated_at":          now,
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrFanGroupMemberNotFound
+	}
+	return nil
 }
 
 func (r *MessageRepo) FanGroupMemberForUser(ctx context.Context, groupID, userID string) (*model.FanGroupMember, error) {
@@ -660,6 +802,7 @@ func (r *MessageRepo) FanGroupMessages(ctx context.Context, groupID, userID stri
 		Select(`
 msg.id,
 msg.group_id,
+fg.creator_id,
 msg.sender_id,
 msg.body,
 msg.created_at,
@@ -667,9 +810,14 @@ COALESCE(u.username, '') AS username,
 COALESCE(u.display_name, '') AS display_name,
 COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), msg.sender_id) AS name,
 COALESCE(u.avatar, '') AS avatar,
-COALESCE(u.verified, false) AS verified
+COALESCE(u.verified, false) AS verified,
+COALESCE(gm.role, 'member') AS role,
+COALESCE(fb.level, 0) AS fan_badge_level
 `).
+		Joins("JOIN fan_group_chats AS fg ON fg.id = msg.group_id").
 		Joins("LEFT JOIN users AS u ON u.id = msg.sender_id").
+		Joins("LEFT JOIN fan_group_members AS gm ON gm.group_id = msg.group_id AND gm.user_id = msg.sender_id").
+		Joins("LEFT JOIN fan_badges AS fb ON fb.user_id = msg.sender_id AND fb.creator_id = fg.creator_id").
 		Where("msg.group_id = ?", groupID).
 		Order("msg.created_at ASC").
 		Offset((page - 1) * size).

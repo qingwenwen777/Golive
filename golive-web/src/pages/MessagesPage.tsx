@@ -4,10 +4,12 @@ import {
   Ban,
   Bell,
   BellOff,
+  Crown,
   MessageCircle,
   MoreVertical,
   Pin,
   Send,
+  ShieldCheck,
   ShieldOff,
   UserRound,
   Users,
@@ -22,14 +24,20 @@ import {
   useFanGroupMessages,
   useJoinedFanGroups,
   useMessagePreference,
+  useRequestFanGroupRejoin,
   useSendDirect,
   useSendFanGroupMessage,
   useSendThreadMessage,
   useUpdateMessagePreference,
+  useUpdateFanGroupMember,
   useUpdateThreadOptions,
+  type DirectMessage,
   type DirectThread,
   type FanGroup,
+  type FanGroupMember,
+  type MessageFanBadge,
   type MessagePreference,
+  type MessageUser,
 } from '@/api/messages';
 import { Avatar } from '@/components/Avatar';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -42,6 +50,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
+import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 
@@ -80,7 +89,17 @@ export default function MessagesPage() {
       <div className="gl-message-shell">
         <main className="gl-message-main">
           {section === 'private' ? (
-            <PrivateMessages userId={user?.id ?? ''} draftCreatorId={draftCreatorId} />
+            <PrivateMessages
+              currentUser={{
+                id: user?.id ?? '',
+                username: user?.username,
+                displayName: user?.displayName,
+                name: user?.displayName || user?.username || user?.id || '我',
+                avatar: user?.avatar,
+                verified: Boolean(user?.verified),
+              }}
+              draftCreatorId={draftCreatorId}
+            />
           ) : section === 'replies' ? (
             <NotificationPanel title="回复我的" box="reply" empty="还没有新的回复。" />
           ) : section === 'likes' ? (
@@ -96,7 +115,14 @@ export default function MessagesPage() {
   );
 }
 
-function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCreatorId: string }) {
+function PrivateMessages({
+  currentUser,
+  draftCreatorId,
+}: {
+  currentUser: MessageUser;
+  draftCreatorId: string;
+}) {
+  const userId = currentUser.id;
   const threads = useDirectThreads(true, 1, 50);
   const fanGroups = useJoinedFanGroups(true);
   const draft = useDirectDraft(draftCreatorId, Boolean(draftCreatorId));
@@ -295,15 +321,13 @@ function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCrea
                 <div className="gl-message-empty-soft">正在加载聊天记录...</div>
               ) : messages.data?.items.length ? (
                 messages.data.items.map((item) => (
-                  <div
+                  <ChatMessageRow
                     key={item.id}
-                    className={cn('gl-direct-bubble-row', item.senderId === userId && 'is-me')}
-                  >
-                    <div className="gl-direct-bubble">
-                      <p>{item.body}</p>
-                      <time>{formatMessageTime(item.createdAt)}</time>
-                    </div>
-                  </div>
+                    sender={directMessageSender(item, selectedThread, currentUser)}
+                    body={item.body}
+                    createdAt={item.createdAt}
+                    currentUserId={userId}
+                  />
                 ))
               ) : (
                 <div className="gl-direct-empty">
@@ -419,9 +443,34 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
   const owner = group.members.find((member) => member.role === 'owner');
   const currentMember = group.members.find((member) => member.user.id === userId);
   const [content, setContent] = useState('');
-  const messages = useFanGroupMessages(group.id, Boolean(group.id));
+  const messages = useFanGroupMessages(group.id, Boolean(group.id) && !currentMember?.kicked);
   const sendMessage = useSendFanGroupMessage(group.id);
-  const canSend = !currentMember?.muted;
+  const updateMember = useUpdateFanGroupMember();
+  const requestRejoinMutation = useRequestFanGroupRejoin();
+  const canSend = !currentMember?.muted && !currentMember?.kicked;
+  const canModerate = currentMember?.role === 'owner' || currentMember?.role === 'admin';
+  const memberById = useMemo(
+    () => new Map(group.members.map((member) => [member.user.id, member])),
+    [group.members],
+  );
+
+  const toggleMemberMute = (member: FanGroupMember | undefined) => {
+    if (!member || !canManageFanGroupMember(currentMember, member, userId)) return;
+    updateMember.mutate(
+      { groupId: group.id, userId: member.user.id, muteMinutes: member.muted ? 0 : 60 },
+      {
+        onSuccess: () => toast.success(member.muted ? '已解除禁言' : '已禁言 60 分钟'),
+        onError: (err) => toast.error(err.message || '更新群成员失败。'),
+      },
+    );
+  };
+
+  const submitRejoinRequest = () => {
+    requestRejoinMutation.mutate(group.id, {
+      onSuccess: () => toast.success('已提交重新加入申请，等待主播审批。'),
+      onError: (err) => toast.error(fanGroupMessageError(err)),
+    });
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -448,36 +497,31 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
         </div>
       </div>
       <div className="gl-direct-message-list">
-        {messages.isPending ? (
+        {currentMember?.kicked ? (
+          <FanGroupKickedState
+            member={currentMember}
+            pending={requestRejoinMutation.isPending}
+            onRequest={submitRejoinRequest}
+          />
+        ) : messages.isPending ? (
           <div className="gl-message-empty-soft">正在加载群聊...</div>
         ) : messages.data?.items.length ? (
-          messages.data.items.map((item) => {
-            const isMine = item.sender.id === userId;
-            return (
-              <div
-                key={item.id}
-                className={cn('gl-direct-bubble-row gl-fan-chat-message', isMine && 'is-me')}
-              >
-                {!isMine && <Avatar name={item.sender.name} src={item.sender.avatar} size={34} />}
-                <div className="gl-fan-chat-message-stack">
-                  {!isMine && (
-                    <span className="gl-fan-chat-message-meta">
-                      <strong>{item.sender.name}</strong>
-                      <time>{formatMessageTime(item.createdAt)}</time>
-                    </span>
-                  )}
-                  <div className="gl-direct-bubble gl-fan-chat-bubble">
-                    <p>{item.body}</p>
-                  </div>
-                  {isMine && (
-                    <time className="gl-fan-chat-message-time">
-                      {formatMessageTime(item.createdAt)}
-                    </time>
-                  )}
-                </div>
-              </div>
-            );
-          })
+          messages.data.items.map((item) => (
+            <ChatMessageRow
+              key={item.id}
+              sender={item.sender}
+              body={item.body}
+              createdAt={item.createdAt}
+              currentUserId={userId}
+              role={item.role}
+              fanBadge={item.fanBadge ?? item.sender.fanBadge}
+              muted={memberById.get(item.sender.id)?.muted}
+              canManage={
+                canModerate && canManageFanGroupMember(currentMember, memberById.get(item.sender.id), userId)
+              }
+              onAvatarClick={() => toggleMemberMute(memberById.get(item.sender.id))}
+            />
+          ))
         ) : (
           <div className="gl-direct-empty">
             <Users size={32} />
@@ -486,6 +530,7 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
           </div>
         )}
       </div>
+      {!currentMember?.kicked && (
       <form className="gl-direct-compose" onSubmit={submit}>
         <input
           value={content}
@@ -499,8 +544,146 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
           发送
         </button>
       </form>
+      )}
     </>
   );
+}
+
+function ChatMessageRow({
+  sender,
+  body,
+  createdAt,
+  currentUserId,
+  role,
+  fanBadge,
+  muted,
+  canManage,
+  onAvatarClick,
+}: {
+  sender: MessageUser;
+  body: string;
+  createdAt: string;
+  currentUserId: string;
+  role?: string;
+  fanBadge?: MessageFanBadge;
+  muted?: boolean;
+  canManage?: boolean;
+  onAvatarClick?: () => void;
+}) {
+  const isMine = sender.id === currentUserId;
+  const avatar = (
+    <button
+      type="button"
+      className={cn('gl-chat-message-avatar-btn', canManage && 'is-actionable', muted && 'is-muted')}
+      disabled={!canManage}
+      onClick={onAvatarClick}
+      title={canManage ? (muted ? '解除禁言' : '禁言 60 分钟') : sender.name}
+    >
+      <Avatar name={sender.name} src={sender.avatar} size={38} />
+      {muted && <span>禁</span>}
+    </button>
+  );
+
+  return (
+    <div className={cn('gl-chat-message-row', isMine && 'is-me')}>
+      {!isMine && avatar}
+      <div className="gl-chat-message-stack">
+        <div className="gl-chat-message-meta">
+          <strong>{sender.name}</strong>
+          <FanBadgePill badge={fanBadge ?? sender.fanBadge} />
+          <RoleBadge role={role} />
+          <time>{formatMessageTime(createdAt)}</time>
+        </div>
+        <div className="gl-chat-message-bubble">
+          <p>{body}</p>
+        </div>
+      </div>
+      {isMine && avatar}
+    </div>
+  );
+}
+
+function FanBadgePill({ badge }: { badge?: MessageFanBadge }) {
+  if (!badge || badge.level <= 0) return null;
+  return (
+    <span className={cn('gl-chat-fan-badge', fanBadgeToneClass(badge.level))}>
+      LV{Math.min(99, Math.max(1, Math.floor(badge.level)))}
+    </span>
+  );
+}
+
+function RoleBadge({ role }: { role?: string }) {
+  if (role === 'owner') {
+    return (
+      <span className="gl-chat-role-badge is-owner">
+        <Crown size={10} />
+        群主
+      </span>
+    );
+  }
+  if (role === 'admin') {
+    return (
+      <span className="gl-chat-role-badge is-admin">
+        <ShieldCheck size={10} />
+        管理员
+      </span>
+    );
+  }
+  return null;
+}
+
+function FanGroupKickedState({
+  member,
+  pending,
+  onRequest,
+}: {
+  member: FanGroupMember;
+  pending: boolean;
+  onRequest: () => void;
+}) {
+  const waiting = Boolean(member.rejoinRequestedAt);
+  return (
+    <div className="gl-direct-empty is-full gl-fan-chat-kicked">
+      <Users size={34} />
+      <strong>你已被踢出粉丝群</strong>
+      <span>
+        {waiting
+          ? '重新加入申请已提交，等待主播在群聊管理中审批。'
+          : member.rejoinRejectedAt
+            ? '你的重新加入申请已被驳回，可以再次提交申请。'
+            : '你暂时不能查看群消息，需要重新申请加入。'}
+      </span>
+      <button
+        type="button"
+        className="gl-creator-primary"
+        disabled={waiting || pending}
+        onClick={onRequest}
+      >
+        {waiting ? '等待审批' : pending ? '提交中...' : '申请重新加入'}
+      </button>
+    </div>
+  );
+}
+
+function directMessageSender(
+  message: DirectMessage,
+  thread: DirectThread,
+  currentUser: MessageUser,
+): MessageUser {
+  if (message.sender) return message.sender;
+  if (message.senderId === thread.peer.id) return thread.peer;
+  return currentUser;
+}
+
+function canManageFanGroupMember(
+  actor: FanGroupMember | undefined,
+  target: FanGroupMember | undefined,
+  currentUserId: string,
+) {
+  if (!actor || !target || target.user.id === currentUserId || target.kicked) return false;
+  if (target.role === 'owner') return false;
+  if (actor.role === 'owner') return true;
+  return actor.role === 'admin' && target.role === 'member';
 }
 
 function fanGroupMessageError(err: Error): string {

@@ -82,6 +82,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/messages/fan-groups/joined", auth, messageH.ListJoinedFanGroups)
 	r.GET("/messages/fan-groups/:groupID/messages", auth, messageH.FanGroupMessages)
 	r.POST("/messages/fan-groups/:groupID/messages", auth, messageH.SendFanGroupMessage)
+	r.POST("/messages/fan-groups/:groupID/rejoin-requests", auth, messageH.RequestFanGroupRejoin)
 	r.GET("/messages/fan-groups", auth, messageH.ListFanGroups)
 	r.POST("/messages/fan-groups/sync", auth, messageH.SyncFanGroups)
 	r.PATCH("/messages/fan-groups/:groupID/members/:userID", auth, messageH.UpdateFanGroupMember)

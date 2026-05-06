@@ -15554,6 +15554,158 @@ button.gl-fan-badge-empty {
   font-size: 11px;
 }
 
+.gl-chat-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+.gl-chat-message-row.is-me {
+  justify-content: flex-end;
+}
+
+.gl-chat-message-avatar-btn {
+  position: relative;
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  margin-top: 9px;
+}
+
+.gl-chat-message-avatar-btn.is-actionable {
+  cursor: pointer;
+}
+
+.gl-chat-message-avatar-btn.is-actionable:hover .gl-avatar {
+  box-shadow: 0 0 0 2px var(--gl-bg), 0 0 0 4px rgba(28, 98, 185, 0.32);
+}
+
+.gl-chat-message-avatar-btn:disabled {
+  cursor: default;
+}
+
+.gl-chat-message-avatar-btn > span {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--gl-bg);
+  border-radius: 999px;
+  background: var(--gl-red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.gl-chat-message-stack {
+  display: flex;
+  max-width: min(560px, calc(100% - 54px));
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.gl-chat-message-row.is-me .gl-chat-message-stack {
+  align-items: flex-end;
+}
+
+.gl-chat-message-meta {
+  display: flex;
+  max-width: 100%;
+  min-height: 19px;
+  align-items: center;
+  gap: 6px;
+  color: var(--gl-text-3);
+  padding-inline: 2px;
+}
+
+.gl-chat-message-row.is-me .gl-chat-message-meta {
+  justify-content: flex-end;
+}
+
+.gl-chat-message-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-chat-message-meta time {
+  color: var(--gl-text-3);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gl-chat-message-meta .gl-chat-fan-badge {
+  height: 17px;
+  padding-inline: 6px;
+  font-size: 10px;
+}
+
+.gl-chat-role-badge {
+  display: inline-flex;
+  height: 17px;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.gl-chat-role-badge.is-owner {
+  background: linear-gradient(90deg, #ffb84d, #34c98f 38%, #32b8f0 72%, #9b6dff);
+  color: #fff;
+}
+
+.gl-chat-role-badge.is-admin {
+  border: 1px solid rgba(20, 184, 166, 0.34);
+  background: rgba(20, 184, 166, 0.1);
+  color: #0f766e;
+}
+
+.gl-chat-message-bubble {
+  max-width: 100%;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg);
+  box-shadow: var(--gl-shadow);
+  color: var(--gl-text);
+  padding: 8px 12px;
+}
+
+.gl-chat-message-row.is-me .gl-chat-message-bubble {
+  background: var(--gl-bg-hover);
+}
+
+.gl-chat-message-bubble p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .gl-fan-chat-message .gl-fan-chat-bubble {
   max-width: 100%;
   border-radius: 12px;
@@ -15610,6 +15762,12 @@ button.gl-fan-badge-empty {
 
 .gl-direct-empty.is-full {
   height: 100%;
+}
+
+.gl-fan-chat-kicked .gl-creator-primary {
+  margin-top: 6px;
+  min-height: 38px;
+  padding-inline: 18px;
 }
 
 .gl-message-empty-soft {
@@ -15898,6 +16056,61 @@ button.gl-fan-badge-empty {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.gl-fan-group-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid rgba(28, 98, 185, 0.18);
+  border-radius: 8px;
+  background: rgba(28, 98, 185, 0.04);
+  padding: 12px;
+}
+
+.gl-fan-group-requests > strong {
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.gl-fan-group-request {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 9px;
+}
+
+.gl-fan-group-request > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gl-fan-group-request b {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-fan-group-request small {
+  color: var(--gl-text-2);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.gl-fan-group-request .gl-creator-primary,
+.gl-fan-group-request .gl-creator-secondary {
+  min-height: 32px;
+  padding-inline: 12px;
 }
 
 .gl-fan-group-member {

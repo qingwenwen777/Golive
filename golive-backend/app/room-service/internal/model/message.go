@@ -10,6 +10,9 @@ const (
 	FanGroupRoleOwner  = "owner"
 	FanGroupRoleAdmin  = "admin"
 	FanGroupRoleMember = "member"
+
+	FanGroupKickReasonManual = "manual"
+	FanGroupKickReasonSync   = "sync"
 )
 
 type DirectThread struct {
@@ -85,13 +88,16 @@ type FanGroupChat struct {
 func (FanGroupChat) TableName() string { return "fan_group_chats" }
 
 type FanGroupMember struct {
-	GroupID    string     `gorm:"primaryKey;type:varchar(64);index"`
-	UserID     string     `gorm:"primaryKey;type:varchar(36);index"`
-	Role       string     `gorm:"type:varchar(16);not null;default:'member';index"`
-	MutedUntil *time.Time `gorm:"index"`
-	KickedAt   *time.Time `gorm:"index"`
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	GroupID           string     `gorm:"primaryKey;type:varchar(64);index"`
+	UserID            string     `gorm:"primaryKey;type:varchar(36);index"`
+	Role              string     `gorm:"type:varchar(16);not null;default:'member';index"`
+	MutedUntil        *time.Time `gorm:"index"`
+	KickedAt          *time.Time `gorm:"index"`
+	KickReason        string     `gorm:"type:varchar(24);not null;default:'';index"`
+	RejoinRequestedAt *time.Time `gorm:"index"`
+	RejoinRejectedAt  *time.Time `gorm:"index"`
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 func (FanGroupMember) TableName() string { return "fan_group_members" }

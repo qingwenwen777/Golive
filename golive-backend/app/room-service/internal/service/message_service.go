@@ -35,13 +35,19 @@ func NewMessageService(messages *repo.MessageRepo, rooms *repo.RoomRepo, social 
 }
 
 type MessageUserDTO struct {
-	ID                   string `json:"id"`
-	Username             string `json:"username,omitempty"`
-	DisplayName          string `json:"displayName,omitempty"`
-	Name                 string `json:"name"`
-	Avatar               string `json:"avatar,omitempty"`
-	Verified             bool   `json:"verified"`
-	LivePermissionStatus string `json:"livePermissionStatus,omitempty"`
+	ID                   string       `json:"id"`
+	Username             string       `json:"username,omitempty"`
+	DisplayName          string       `json:"displayName,omitempty"`
+	Name                 string       `json:"name"`
+	Avatar               string       `json:"avatar,omitempty"`
+	Verified             bool         `json:"verified"`
+	LivePermissionStatus string       `json:"livePermissionStatus,omitempty"`
+	FanBadge             *FanBadgeDTO `json:"fanBadge,omitempty"`
+}
+
+type FanBadgeDTO struct {
+	CreatorID string `json:"creatorId"`
+	Level     int    `json:"level"`
 }
 
 type DirectThreadDTO struct {
@@ -70,12 +76,13 @@ type DirectThreadListResp struct {
 }
 
 type DirectMessageDTO struct {
-	ID         string `json:"id"`
-	ThreadID   string `json:"threadId"`
-	SenderID   string `json:"senderId"`
-	ReceiverID string `json:"receiverId"`
-	Body       string `json:"body"`
-	CreatedAt  string `json:"createdAt"`
+	ID         string         `json:"id"`
+	ThreadID   string         `json:"threadId"`
+	SenderID   string         `json:"senderId"`
+	ReceiverID string         `json:"receiverId"`
+	Sender     MessageUserDTO `json:"sender"`
+	Body       string         `json:"body"`
+	CreatedAt  string         `json:"createdAt"`
 }
 
 type DirectMessageListResp struct {
@@ -135,11 +142,18 @@ type FanGroupDTO struct {
 }
 
 type FanGroupMemberDTO struct {
-	User       MessageUserDTO `json:"user"`
-	Role       string         `json:"role"`
-	Muted      bool           `json:"muted"`
-	MutedUntil string         `json:"mutedUntil,omitempty"`
-	CreatedAt  string         `json:"createdAt"`
+	User              MessageUserDTO `json:"user"`
+	FanBadge          *FanBadgeDTO   `json:"fanBadge,omitempty"`
+	Role              string         `json:"role"`
+	Muted             bool           `json:"muted"`
+	MutedUntil        string         `json:"mutedUntil,omitempty"`
+	Kicked            bool           `json:"kicked"`
+	KickedAt          string         `json:"kickedAt,omitempty"`
+	KickReason        string         `json:"kickReason,omitempty"`
+	RejoinRequestedAt string         `json:"rejoinRequestedAt,omitempty"`
+	RejoinRejectedAt  string         `json:"rejoinRejectedAt,omitempty"`
+	PendingRejoin     bool           `json:"pendingRejoin"`
+	CreatedAt         string         `json:"createdAt"`
 }
 
 type FanGroupListResp struct {
@@ -151,6 +165,8 @@ type FanGroupMessageDTO struct {
 	ID        string         `json:"id"`
 	GroupID   string         `json:"groupId"`
 	Sender    MessageUserDTO `json:"sender"`
+	Role      string         `json:"role"`
+	FanBadge  *FanBadgeDTO   `json:"fanBadge,omitempty"`
 	Body      string         `json:"body"`
 	CreatedAt string         `json:"createdAt"`
 }
@@ -163,9 +179,11 @@ type FanGroupMessageListResp struct {
 }
 
 type UpdateFanGroupMemberReq struct {
-	Role        string `json:"role"`
-	MuteMinutes *int   `json:"muteMinutes"`
-	Kick        bool   `json:"kick"`
+	Role          string `json:"role"`
+	MuteMinutes   *int   `json:"muteMinutes"`
+	Kick          bool   `json:"kick"`
+	ApproveRejoin bool   `json:"approveRejoin"`
+	RejectRejoin  bool   `json:"rejectRejoin"`
 }
 
 func (s *MessageService) ListDirectThreads(ctx context.Context, userID string, page, size int) (*DirectThreadListResp, error) {
@@ -351,12 +369,25 @@ func (s *MessageService) DirectMessages(ctx context.Context, userID, threadID st
 	}
 	_ = s.messages.MarkDirectThreadRead(ctx, threadID, userID)
 	out := make([]DirectMessageDTO, 0, len(items))
+	senders := map[string]MessageUserDTO{}
 	for _, item := range items {
+		sender, ok := senders[item.SenderID]
+		if !ok {
+			sender, err = s.messageUser(ctx, item.SenderID)
+			if err != nil {
+				sender = fallbackMessageUser(item.SenderID)
+			}
+			if badge := s.fanBadgeDTO(ctx, item.SenderID, thread.CreatorID); badge != nil {
+				sender.FanBadge = badge
+			}
+			senders[item.SenderID] = sender
+		}
 		out = append(out, DirectMessageDTO{
 			ID:         item.ID,
 			ThreadID:   item.ThreadID,
 			SenderID:   item.SenderID,
 			ReceiverID: item.ReceiverID,
+			Sender:     sender,
 			Body:       item.Body,
 			CreatedAt:  item.CreatedAt.UTC().Format(time.RFC3339),
 		})
@@ -522,6 +553,7 @@ func (s *MessageService) FanGroupMessages(ctx context.Context, userID, groupID s
 	}
 	items := make([]FanGroupMessageDTO, 0, len(rows))
 	for _, row := range rows {
+		fanBadge := fanBadgeFromLevel(row.CreatorID, row.FanBadgeLevel)
 		items = append(items, FanGroupMessageDTO{
 			ID:      row.ID,
 			GroupID: row.GroupID,
@@ -532,7 +564,10 @@ func (s *MessageService) FanGroupMessages(ctx context.Context, userID, groupID s
 				Name:        nonEmpty(row.Name, row.Username, row.SenderID),
 				Avatar:      row.Avatar,
 				Verified:    row.Verified,
+				FanBadge:    fanBadge,
 			},
+			Role:      nonEmpty(row.Role, model.FanGroupRoleMember),
+			FanBadge:  fanBadge,
 			Body:      row.Body,
 			CreatedAt: row.CreatedAt.UTC().Format(time.RFC3339),
 		})
@@ -556,21 +591,76 @@ func (s *MessageService) SendFanGroupMessage(ctx context.Context, userID, groupI
 	if err != nil {
 		sender = fallbackMessageUser(userID)
 	}
+	member, _ := s.messages.FanGroupMemberForUser(ctx, groupID, userID)
+	if group, groupErr := s.messages.FanGroupByID(ctx, groupID); groupErr == nil {
+		if badge := s.fanBadgeDTO(ctx, userID, group.CreatorID); badge != nil {
+			sender.FanBadge = badge
+		}
+	}
+	role := model.FanGroupRoleMember
+	if member != nil && member.Role != "" {
+		role = member.Role
+	}
 	return &FanGroupMessageDTO{
 		ID:        msg.ID,
 		GroupID:   msg.GroupID,
 		Sender:    sender,
+		Role:      role,
+		FanBadge:  sender.FanBadge,
 		Body:      msg.Body,
 		CreatedAt: msg.CreatedAt.UTC().Format(time.RFC3339),
 	}, nil
 }
 
-func (s *MessageService) UpdateFanGroupMember(ctx context.Context, creatorID, groupID, userID string, req UpdateFanGroupMemberReq) (*FanGroupListResp, error) {
-	if creatorID == "" {
+func (s *MessageService) UpdateFanGroupMember(ctx context.Context, actorID, groupID, userID string, req UpdateFanGroupMemberReq) (*FanGroupListResp, error) {
+	if actorID == "" {
 		return nil, errcode.ErrUnauthorized
 	}
-	if err := s.requireCreator(ctx, creatorID); err != nil {
-		return nil, err
+	group, err := s.messages.FanGroupByID(ctx, groupID)
+	if err != nil {
+		return nil, fanGroupError(err)
+	}
+	isOwner := actorID == group.CreatorID
+	isAdmin := false
+	if !isOwner {
+		actor, err := s.messages.FanGroupMemberForUser(ctx, group.ID, actorID)
+		if err == nil && actor.Role == model.FanGroupRoleAdmin {
+			isAdmin = true
+		}
+	}
+	if !isOwner && !isAdmin {
+		return nil, errcode.New(http.StatusForbidden, "fan group moderator required").WithReason("fan_group_moderator_required")
+	}
+	if !isOwner && (req.Role != "" || req.Kick || req.ApproveRejoin || req.RejectRejoin) {
+		return nil, errcode.New(http.StatusForbidden, "only the creator can manage fan group membership").WithReason("fan_group_owner_required")
+	}
+	if userID == actorID || userID == group.CreatorID {
+		return nil, errcode.New(http.StatusBadRequest, "cannot manage this member").WithReason("invalid_group_member")
+	}
+	if isAdmin && req.MuteMinutes != nil {
+		target, err := s.messages.FanGroupMemberForUser(ctx, group.ID, userID)
+		if err != nil {
+			return nil, fanGroupError(err)
+		}
+		if target.Role != model.FanGroupRoleMember {
+			return nil, errcode.New(http.StatusForbidden, "admins can only mute regular members").WithReason("fan_group_owner_required")
+		}
+	}
+	if isOwner {
+		if err := s.requireCreator(ctx, actorID); err != nil {
+			return nil, err
+		}
+	}
+	if req.ApproveRejoin && req.RejectRejoin {
+		return nil, errcode.New(http.StatusBadRequest, "choose approve or reject").WithReason("invalid_rejoin_action")
+	}
+	if req.ApproveRejoin || req.RejectRejoin {
+		req.Kick = false
+		req.MuteMinutes = nil
+		req.Role = ""
+	}
+	if !isOwner && req.MuteMinutes == nil {
+		return nil, errcode.New(http.StatusBadRequest, "no permitted member update").WithReason("invalid_group_member_update")
 	}
 	role := ""
 	if req.Role != "" {
@@ -589,13 +679,26 @@ func (s *MessageService) UpdateFanGroupMember(ctx context.Context, creatorID, gr
 			clearMute = true
 		}
 	}
-	if err := s.messages.UpdateFanGroupMember(ctx, creatorID, groupID, userID, role, mutedUntil, clearMute, req.Kick, s.now()); err != nil {
-		if errors.Is(err, repo.ErrFanGroupNotFound) || errors.Is(err, repo.ErrFanGroupMemberNotFound) {
+	if err := s.messages.UpdateFanGroupMember(ctx, group.CreatorID, group.ID, userID, role, mutedUntil, clearMute, req.Kick, req.ApproveRejoin, req.RejectRejoin, s.now()); err != nil {
+		if errors.Is(err, repo.ErrFanGroupNotFound) || errors.Is(err, repo.ErrFanGroupMemberNotFound) || errors.Is(err, repo.ErrFanGroupRejoinNotFound) {
 			return nil, errcode.New(http.StatusNotFound, "fan group member not found").WithReason("fan_group_member_not_found")
 		}
 		return nil, err
 	}
-	return s.ListFanGroups(ctx, creatorID)
+	if actorID == group.CreatorID {
+		return s.ListFanGroups(ctx, actorID)
+	}
+	return s.ListJoinedFanGroups(ctx, actorID)
+}
+
+func (s *MessageService) RequestFanGroupRejoin(ctx context.Context, userID, groupID string) (*FanGroupListResp, error) {
+	if userID == "" {
+		return nil, errcode.ErrUnauthorized
+	}
+	if err := s.messages.RequestFanGroupRejoin(ctx, groupID, userID, s.now()); err != nil {
+		return nil, fanGroupError(err)
+	}
+	return s.ListJoinedFanGroups(ctx, userID)
 }
 
 func (s *MessageService) CreatorBlocks(ctx context.Context, creatorID, viewerID string) (bool, error) {
@@ -727,6 +830,17 @@ func (s *MessageService) messageUser(ctx context.Context, userID string) (Messag
 	}, nil
 }
 
+func (s *MessageService) fanBadgeDTO(ctx context.Context, userID, creatorID string) *FanBadgeDTO {
+	if s.messages == nil || userID == "" || creatorID == "" {
+		return nil
+	}
+	badge, err := s.messages.FanBadge(ctx, userID, creatorID)
+	if err != nil || badge == nil {
+		return nil
+	}
+	return fanBadgeFromLevel(creatorID, badge.Level)
+}
+
 func (s *MessageService) notifyDirectMessage(ctx context.Context, thread model.DirectThread, senderID, receiverID, body string) error {
 	if s.messages == nil || receiverID == "" {
 		return nil
@@ -753,6 +867,7 @@ func fanGroupDTO(row repo.FanGroupWithMembers) FanGroupDTO {
 	now := time.Now()
 	for _, member := range row.Members {
 		muted := member.MutedUntil != nil && member.MutedUntil.After(now)
+		fanBadge := fanBadgeFromLevel(row.Group.CreatorID, member.FanBadgeLevel)
 		dto := FanGroupMemberDTO{
 			User: MessageUserDTO{
 				ID:          member.UserID,
@@ -761,13 +876,27 @@ func fanGroupDTO(row repo.FanGroupWithMembers) FanGroupDTO {
 				Name:        nonEmpty(member.Name, member.Username, member.UserID),
 				Avatar:      member.Avatar,
 				Verified:    member.Verified,
+				FanBadge:    fanBadge,
 			},
-			Role:      member.Role,
-			Muted:     muted,
-			CreatedAt: member.CreatedAt.UTC().Format(time.RFC3339),
+			FanBadge:      fanBadge,
+			Role:          member.Role,
+			Muted:         muted,
+			Kicked:        member.KickedAt != nil,
+			KickReason:    member.KickReason,
+			PendingRejoin: member.KickedAt != nil && member.RejoinRequestedAt != nil,
+			CreatedAt:     member.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if muted {
 			dto.MutedUntil = member.MutedUntil.UTC().Format(time.RFC3339)
+		}
+		if member.KickedAt != nil {
+			dto.KickedAt = member.KickedAt.UTC().Format(time.RFC3339)
+		}
+		if member.RejoinRequestedAt != nil {
+			dto.RejoinRequestedAt = member.RejoinRequestedAt.UTC().Format(time.RFC3339)
+		}
+		if member.RejoinRejectedAt != nil {
+			dto.RejoinRejectedAt = member.RejoinRejectedAt.UTC().Format(time.RFC3339)
 		}
 		members = append(members, dto)
 	}
@@ -781,6 +910,16 @@ func fanGroupDTO(row repo.FanGroupWithMembers) FanGroupDTO {
 		CreatedAt:   row.Group.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   row.Group.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+}
+
+func fanBadgeFromLevel(creatorID string, level int) *FanBadgeDTO {
+	if creatorID == "" || level <= 0 {
+		return nil
+	}
+	if level > 99 {
+		level = 99
+	}
+	return &FanBadgeDTO{CreatorID: creatorID, Level: level}
 }
 
 func cleanDirectMessage(value string) (string, error) {
@@ -866,6 +1005,12 @@ func fanGroupError(err error) error {
 	}
 	if errors.Is(err, repo.ErrFanGroupMuted) {
 		return errcode.New(http.StatusForbidden, "you are muted in this fan group").WithReason("fan_group_muted")
+	}
+	if errors.Is(err, repo.ErrFanGroupRejoinDenied) {
+		return errcode.New(http.StatusForbidden, "you need an active fan badge before requesting to rejoin").WithReason("fan_group_rejoin_denied")
+	}
+	if errors.Is(err, repo.ErrFanGroupRejoinNotFound) {
+		return errcode.New(http.StatusNotFound, "fan group rejoin request not found").WithReason("fan_group_rejoin_not_found")
 	}
 	return err
 }

@@ -2008,7 +2008,13 @@ export function CreatorFanGroupsPage() {
   const update = (
     group: FanGroup,
     member: FanGroupMember,
-    patch: { role?: string; muteMinutes?: number; kick?: boolean },
+    patch: {
+      role?: string;
+      muteMinutes?: number;
+      kick?: boolean;
+      approveRejoin?: boolean;
+      rejectRejoin?: boolean;
+    },
     successKey: string,
     fallback: string,
   ) => {
@@ -2134,6 +2140,24 @@ export function CreatorFanGroupsPage() {
                   `${member.user.name} 已移出群聊。`,
                 )
               }
+              onApproveRejoin={(member) =>
+                update(
+                  group,
+                  member,
+                  { approveRejoin: true },
+                  'studio.fanGroups.rejoinApproved',
+                  `${member.user.name} 已重新加入群聊。`,
+                )
+              }
+              onRejectRejoin={(member) =>
+                update(
+                  group,
+                  member,
+                  { rejectRejoin: true },
+                  'studio.fanGroups.rejoinRejected',
+                  `${member.user.name} 的重新加入申请已驳回。`,
+                )
+              }
             />
           ))
         ) : (
@@ -2157,6 +2181,8 @@ function FanGroupPanel({
   onMute,
   onUnmute,
   onKick,
+  onApproveRejoin,
+  onRejectRejoin,
 }: {
   group: FanGroup;
   locale: string;
@@ -2166,8 +2192,12 @@ function FanGroupPanel({
   onMute: (member: FanGroupMember) => void;
   onUnmute: (member: FanGroupMember) => void;
   onKick: (member: FanGroupMember) => void;
+  onApproveRejoin: (member: FanGroupMember) => void;
+  onRejectRejoin: (member: FanGroupMember) => void;
 }) {
   const { t } = useTranslation('pages');
+  const pendingMembers = group.members.filter((member) => member.pendingRejoin);
+  const activeMembers = group.members.filter((member) => !member.kicked);
 
   return (
     <article className="gl-creator-panel gl-fan-group-panel">
@@ -2184,9 +2214,39 @@ function FanGroupPanel({
           <span>{formatFanGroupDate(group.updatedAt, locale)}</span>
         </div>
       </div>
+      {pendingMembers.length > 0 && (
+        <div className="gl-fan-group-requests">
+          <strong>重新加入申请</strong>
+          {pendingMembers.map((member) => (
+            <div key={member.user.id} className="gl-fan-group-request">
+              <Avatar name={member.user.name} src={member.user.avatar} size={34} />
+              <span>
+                <b>{member.user.name}</b>
+                <small>{member.rejoinRequestedAt ? formatFanGroupDate(member.rejoinRequestedAt, locale) : '等待审批'}</small>
+              </span>
+              <button
+                type="button"
+                className="gl-creator-secondary"
+                disabled={pending}
+                onClick={() => onRejectRejoin(member)}
+              >
+                驳回
+              </button>
+              <button
+                type="button"
+                className="gl-creator-primary"
+                disabled={pending}
+                onClick={() => onApproveRejoin(member)}
+              >
+                同意
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="gl-fan-group-members">
-        {group.members.length ? (
-          group.members.map((member) => {
+        {activeMembers.length ? (
+          activeMembers.map((member) => {
             const isAdmin = member.role === 'admin';
             const canManage = member.role !== 'owner';
             return (
@@ -2251,7 +2311,7 @@ function FanGroupPanel({
 }
 
 function countGroupAdmins(group: FanGroup) {
-  return group.members.filter((member) => member.role === 'admin').length;
+  return group.members.filter((member) => member.role === 'admin' && !member.kicked).length;
 }
 
 function fanGroupRoleLabel(role: string, t: TFunction<'pages'>) {
