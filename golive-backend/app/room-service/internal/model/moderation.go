@@ -101,27 +101,30 @@ type ModeratorActionLog struct {
 func (ModeratorActionLog) TableName() string { return "moderator_action_logs" }
 
 type ContentReport struct {
-	ID               string `gorm:"primaryKey;type:varchar(64)"`
-	GroupID          string `gorm:"type:varchar(64);not null;default:'';index"`
-	ReporterID       string `gorm:"type:varchar(36);not null;index:idx_content_reports_reporter_created"`
-	ReporterName     string `gorm:"type:varchar(128)"`
-	ReporterAvatar   string `gorm:"type:varchar(500)"`
-	TargetType       string `gorm:"type:varchar(32);not null;index:idx_content_reports_target"`
-	TargetID         string `gorm:"type:varchar(128);not null;index:idx_content_reports_target"`
-	TargetURL        string `gorm:"type:varchar(800)"`
-	RoomID           string `gorm:"type:varchar(64);index"`
-	ChannelID        string `gorm:"type:varchar(64);index"`
-	TargetOwnerID    string `gorm:"type:varchar(36);index"`
-	TargetOwnerName  string `gorm:"type:varchar(128)"`
-	TargetUserID     string `gorm:"type:varchar(36);index"`
-	TargetUserName   string `gorm:"type:varchar(128)"`
-	TargetTitle      string `gorm:"type:varchar(240)"`
-	TargetText       string `gorm:"type:text"`
-	Reason           string `gorm:"type:varchar(32);not null;index"`
-	Description      string `gorm:"type:varchar(300)"`
-	Status           string `gorm:"type:varchar(24);not null;default:pending;index"`
-	ReviewerID       string `gorm:"type:varchar(36);index"`
-	ResolutionAction string `gorm:"type:varchar(160);index"`
+	ID               string     `gorm:"primaryKey;type:varchar(64)"`
+	GroupID          string     `gorm:"type:varchar(64);not null;default:'';index"`
+	ReporterID       string     `gorm:"type:varchar(36);not null;index:idx_content_reports_reporter_created"`
+	ReporterName     string     `gorm:"type:varchar(128)"`
+	ReporterAvatar   string     `gorm:"type:varchar(500)"`
+	TargetType       string     `gorm:"type:varchar(32);not null;index:idx_content_reports_target"`
+	TargetID         string     `gorm:"type:varchar(128);not null;index:idx_content_reports_target"`
+	TargetURL        string     `gorm:"type:varchar(800)"`
+	RoomID           string     `gorm:"type:varchar(64);index"`
+	ChannelID        string     `gorm:"type:varchar(64);index"`
+	TargetOwnerID    string     `gorm:"type:varchar(36);index"`
+	TargetOwnerName  string     `gorm:"type:varchar(128)"`
+	TargetUserID     string     `gorm:"type:varchar(36);index"`
+	TargetUserName   string     `gorm:"type:varchar(128)"`
+	TargetTitle      string     `gorm:"type:varchar(240)"`
+	TargetText       string     `gorm:"type:text"`
+	Reason           string     `gorm:"type:varchar(32);not null;index"`
+	Description      string     `gorm:"type:varchar(300)"`
+	Status           string     `gorm:"type:varchar(24);not null;default:pending;index"`
+	ReviewerID       string     `gorm:"type:varchar(36);index"`
+	ReviewerName     string     `gorm:"type:varchar(128)"`
+	ReviewStartedAt  *time.Time `gorm:"index"`
+	ReviewExpiresAt  *time.Time `gorm:"index"`
+	ResolutionAction string     `gorm:"type:varchar(160);index"`
 	DurationMinutes  int
 	ResolutionNote   string     `gorm:"type:text"`
 	ResolvedAt       *time.Time `gorm:"index"`

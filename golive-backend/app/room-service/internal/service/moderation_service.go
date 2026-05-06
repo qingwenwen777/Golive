@@ -74,6 +74,8 @@ var allowedSiteMuteDurations = map[int]struct{}{
 	10080: {},
 }
 
+const contentReportReviewTTL = 30 * time.Minute
+
 type ModerationService struct {
 	moderation *repo.ModerationRepo
 	rooms      *repo.RoomRepo
@@ -215,6 +217,9 @@ type ContentReportDTO struct {
 	Description      string             `json:"description,omitempty"`
 	Status           string             `json:"status"`
 	ReviewerID       string             `json:"reviewerId,omitempty"`
+	ReviewerName     string             `json:"reviewerName,omitempty"`
+	ReviewStartedAt  string             `json:"reviewStartedAt,omitempty"`
+	ReviewExpiresAt  string             `json:"reviewExpiresAt,omitempty"`
 	ResolutionAction string             `json:"resolutionAction,omitempty"`
 	DurationMinutes  int                `json:"durationMinutes,omitempty"`
 	ResolutionNote   string             `json:"resolutionNote,omitempty"`
@@ -519,6 +524,9 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID string,
 		return nil, err
 	}
 	now := s.now()
+	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
+		return nil, err
+	}
 	report := &model.ContentReport{
 		ID:              uuid.NewString(),
 		ReporterID:      reporterID,
@@ -559,6 +567,10 @@ func (s *ModerationService) ListReports(ctx context.Context, adminID string, fil
 	if err := s.requireAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
+	now := s.now()
+	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
+		return nil, err
+	}
 	filter.Page = normalizePage(filter.Page)
 	filter.Size = normalizeSize(filter.Size)
 	rows, total, stats, err := s.moderation.ListContentReportGroups(ctx, filter)
@@ -583,6 +595,10 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 	if err := s.requireAdmin(ctx, adminID); err != nil {
 		return nil, err
 	}
+	now := s.now()
+	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
+		return nil, err
+	}
 	report, err := s.moderation.GetContentReport(ctx, strings.TrimSpace(id))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
@@ -596,13 +612,17 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 	}
 	dto := contentReportDTO(*report)
 	dto.ReportCount = int64(len(children))
-	dto.RecentCount = recentReportCount(children, s.now().Add(-time.Hour))
+	dto.RecentCount = recentReportCount(children, now.Add(-time.Hour))
 	dto.Reports = contentReportDTOs(children)
 	return &dto, nil
 }
 
 func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string, req UpdateReportReq) (*ContentReportDTO, error) {
 	if err := s.requireAdmin(ctx, adminID); err != nil {
+		return nil, err
+	}
+	now := s.now()
+	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
 		return nil, err
 	}
 	base, err := s.moderation.GetContentReport(ctx, strings.TrimSpace(id))
@@ -615,6 +635,11 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if base.Status == model.ReportStatusResolved || base.Status == model.ReportStatusDismissed {
 		return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
 	}
+	admin, err := s.moderation.UserProfile(ctx, adminID)
+	if err != nil {
+		return nil, err
+	}
+	reviewerName := firstNonEmptyString(admin.Name, admin.DisplayName, admin.Username, adminID)
 	status := strings.ToLower(strings.TrimSpace(req.Status))
 	actions, err := normalizeReportActions(req)
 	if err != nil {
@@ -634,17 +659,70 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	}
 	duration := normalizeSanctionDuration(actions, req.DurationMinutes)
 	note := trimRunes(strings.TrimSpace(req.Note), 1000)
-	if err := s.applyReportActions(ctx, adminID, base, actions, note, duration); err != nil {
-		return nil, err
-	}
-	now := s.now()
 	resolutionAction := strings.Join(actions, ",")
-	report, err := s.moderation.UpdateContentReportGroup(ctx, strings.TrimSpace(id), status, resolutionAction, adminID, note, duration, now)
+
+	if status == model.ReportStatusReviewing && len(actions) == 1 && actions[0] == model.ReportActionReview {
+		report, err := s.moderation.ClaimContentReportGroup(ctx, strings.TrimSpace(id), adminID, reviewerName, now, contentReportReviewTTL)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.New(http.StatusNotFound, "report not found")
+		}
+		if errors.Is(err, repo.ErrReportAlreadyClosed) {
+			return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
+		}
+		if errors.Is(err, repo.ErrReportClaimed) {
+			return nil, errcode.New(http.StatusConflict, "report group claimed").WithReason("report_claimed")
+		}
+		if err != nil {
+			return nil, err
+		}
+		_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, model.ReportActionReview, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
+		dto := contentReportDTO(*report)
+		return &dto, nil
+	}
+
+	if status == model.ReportStatusPending && len(actions) == 0 {
+		report, err := s.moderation.UpdateContentReportGroup(ctx, strings.TrimSpace(id), status, "", adminID, reviewerName, note, 0, now)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errcode.New(http.StatusNotFound, "report not found")
+		}
+		if errors.Is(err, repo.ErrReportAlreadyClosed) {
+			return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
+		}
+		if errors.Is(err, repo.ErrReportClaimed) {
+			return nil, errcode.New(http.StatusConflict, "report group claimed").WithReason("report_claimed")
+		}
+		if err != nil {
+			return nil, err
+		}
+		dto := contentReportDTO(*report)
+		return &dto, nil
+	}
+
+	claimed, err := s.moderation.ClaimContentReportGroup(ctx, strings.TrimSpace(id), adminID, reviewerName, now, contentReportReviewTTL)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
 	}
 	if errors.Is(err, repo.ErrReportAlreadyClosed) {
 		return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
+	}
+	if errors.Is(err, repo.ErrReportClaimed) {
+		return nil, errcode.New(http.StatusConflict, "report group claimed").WithReason("report_claimed")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := s.applyReportActions(ctx, adminID, claimed, actions, note, duration); err != nil {
+		return nil, err
+	}
+	report, err := s.moderation.UpdateContentReportGroup(ctx, strings.TrimSpace(id), status, resolutionAction, adminID, reviewerName, note, duration, now)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errcode.New(http.StatusNotFound, "report not found")
+	}
+	if errors.Is(err, repo.ErrReportAlreadyClosed) {
+		return nil, errcode.New(http.StatusConflict, "report group already handled").WithReason("report_already_handled")
+	}
+	if errors.Is(err, repo.ErrReportClaimed) {
+		return nil, errcode.New(http.StatusConflict, "report group claimed").WithReason("report_claimed")
 	}
 	if err != nil {
 		return nil, err
@@ -1241,6 +1319,7 @@ func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
 			Reason:           row.Reason,
 			Status:           row.Status,
 			ReviewerID:       row.ReviewerID,
+			ReviewerName:     row.ReviewerName,
 			ResolutionAction: row.ResolutionAction,
 			DurationMinutes:  row.DurationMinutes,
 			ResolutionNote:   row.ResolutionNote,
@@ -1251,6 +1330,12 @@ func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
 		})
 		if row.ResolvedAt != nil && !row.ResolvedAt.IsZero() {
 			out[len(out)-1].ResolvedAt = row.ResolvedAt.UTC().Format(time.RFC3339)
+		}
+		if row.ReviewStartedAt != nil && !row.ReviewStartedAt.IsZero() {
+			out[len(out)-1].ReviewStartedAt = row.ReviewStartedAt.UTC().Format(time.RFC3339)
+		}
+		if row.ReviewExpiresAt != nil && !row.ReviewExpiresAt.IsZero() {
+			out[len(out)-1].ReviewExpiresAt = row.ReviewExpiresAt.UTC().Format(time.RFC3339)
 		}
 	}
 	return out
@@ -1278,6 +1363,7 @@ func contentReportDTO(row model.ContentReport) ContentReportDTO {
 		Description:      row.Description,
 		Status:           row.Status,
 		ReviewerID:       row.ReviewerID,
+		ReviewerName:     row.ReviewerName,
 		ResolutionAction: row.ResolutionAction,
 		DurationMinutes:  row.DurationMinutes,
 		ResolutionNote:   row.ResolutionNote,
@@ -1286,6 +1372,12 @@ func contentReportDTO(row model.ContentReport) ContentReportDTO {
 	}
 	if row.ResolvedAt != nil && !row.ResolvedAt.IsZero() {
 		dto.ResolvedAt = row.ResolvedAt.UTC().Format(time.RFC3339)
+	}
+	if row.ReviewStartedAt != nil && !row.ReviewStartedAt.IsZero() {
+		dto.ReviewStartedAt = row.ReviewStartedAt.UTC().Format(time.RFC3339)
+	}
+	if row.ReviewExpiresAt != nil && !row.ReviewExpiresAt.IsZero() {
+		dto.ReviewExpiresAt = row.ReviewExpiresAt.UTC().Format(time.RFC3339)
 	}
 	return dto
 }

@@ -71,6 +71,7 @@ import {
   useUpdateBlockedWord,
   type AdminAuditCategory,
   type BlockedWord,
+  type ContentReport,
   type ReportAction,
 } from '@/api/contentModeration';
 import {
@@ -1453,6 +1454,7 @@ function CreatorsPage({
 
 function ContentPage() {
   const { t } = useTranslation('pages');
+  const currentUser = useAuthStore((s) => s.user);
   const [status, setStatus] = useState('all');
   const [targetType, setTargetType] = useState('all');
   const [reason, setReason] = useState('all');
@@ -1487,6 +1489,15 @@ function ContentPage() {
   const detail = reportDetail.data ?? selected;
   const stats = reports.data?.stats ?? { pending: 0, reviewing: 0, today: 0, total: 0 };
   const detailClosed = detail ? isReportClosed(detail.status) : false;
+  const detailReviewerName = detail ? reportReviewerName(detail, t) : '';
+  const detailClaimedByMe = Boolean(
+    detail?.status === 'reviewing' && currentUser?.id && detail.reviewerId === currentUser.id,
+  );
+  const detailLockedByOther = Boolean(
+    detail?.status === 'reviewing' && detail.reviewerId && detail.reviewerId !== currentUser?.id,
+  );
+  const detailNeedsClaim = Boolean(detail && !detailClosed && !detailClaimedByMe);
+  const detailActionDisabled = detailClosed || detailNeedsClaim;
   const detailActions = detail
     ? reportActionsForTarget(detail.targetType).filter((action) => !isExclusiveReportAction(action))
     : [];
@@ -1503,6 +1514,27 @@ function ContentPage() {
       toast.info(
         t('admin.content.reports.alreadyHandled', {
           defaultValue: 'This report has already been handled.',
+        }),
+      );
+      return;
+    }
+    if (
+      detail.status === 'reviewing' &&
+      detail.reviewerId &&
+      detail.reviewerId !== currentUser?.id
+    ) {
+      toast.error(
+        t('admin.content.reports.claimedByOtherToast', {
+          name: reportReviewerName(detail, t),
+          defaultValue: 'This report is being reviewed by {{name}}.',
+        }),
+      );
+      return;
+    }
+    if (detail.status !== 'reviewing' || detail.reviewerId !== currentUser?.id) {
+      toast.error(
+        t('admin.content.reports.claimRequired', {
+          defaultValue: 'Claim this report before applying moderation actions.',
         }),
       );
       return;
@@ -1539,6 +1571,26 @@ function ContentPage() {
           setDetailOpen(false);
           toast.success(
             t('admin.content.reports.updated', { defaultValue: 'Report status updated.' }),
+          );
+        },
+        onError: (err) => toast.error(reportMutationErrorMessage(err, t)),
+      },
+    );
+  };
+
+  const claimReport = () => {
+    if (!detail || detailClosed) return;
+    updateReport.mutate(
+      { id: detail.id, status: 'reviewing' },
+      {
+        onSuccess: (updated) => {
+          setSelectedId(updated.id);
+          setResolutionNote('');
+          setSelectedActions([]);
+          toast.success(
+            t('admin.content.reports.claimed', {
+              defaultValue: 'Report claimed for review.',
+            }),
           );
         },
         onError: (err) => toast.error(reportMutationErrorMessage(err, t)),
@@ -1792,7 +1844,15 @@ function ContentPage() {
                       </span>
                     )}
                     {item.targetUserName && <span>{item.targetUserName}</span>}
-                    {item.resolutionAction && (
+                    {item.status === 'reviewing' && (
+                      <span>
+                        {t('admin.content.reports.cardReviewer', {
+                          name: reportReviewerName(item, t),
+                          defaultValue: 'Reviewer: {{name}}',
+                        })}
+                      </span>
+                    )}
+                    {item.resolutionAction && !isReviewResolutionAction(item.resolutionAction) && (
                       <span>{reportActionLabels(item.resolutionAction, t)}</span>
                     )}
                   </div>
@@ -1887,12 +1947,77 @@ function ContentPage() {
                     label={t('admin.content.reports.status', { defaultValue: 'Status' })}
                     value={reportStatusLabel(detail.status, t)}
                   />
+                  {detail.status === 'reviewing' && (
+                    <AdminDetailRow
+                      label={t('admin.content.reports.reviewer', {
+                        defaultValue: 'Reviewer',
+                      })}
+                      value={detailReviewerName || '-'}
+                    />
+                  )}
                   <AdminDetailRow
                     label={t('admin.content.reports.result', { defaultValue: 'Result' })}
                     value={
-                      detail.resolutionAction ? reportActionLabels(detail.resolutionAction, t) : '-'
+                      detail.resolutionAction && !isReviewResolutionAction(detail.resolutionAction)
+                        ? reportActionLabels(detail.resolutionAction, t)
+                        : '-'
                     }
                   />
+                  {!detailClosed && (
+                    <div
+                      className={[
+                        'gl-admin-claim-note',
+                        detailClaimedByMe
+                          ? 'is-mine'
+                          : detailLockedByOther
+                            ? 'is-locked'
+                            : 'is-open',
+                      ].join(' ')}
+                    >
+                      <UserCheck size={17} />
+                      <div>
+                        <strong>
+                          {detailClaimedByMe
+                            ? t('admin.content.reports.claimMineTitle', {
+                                defaultValue: 'You are reviewing',
+                              })
+                            : detailLockedByOther
+                              ? t('admin.content.reports.claimLockedTitle', {
+                                  name: detailReviewerName,
+                                  defaultValue: '{{name}} is reviewing',
+                                })
+                              : t('admin.content.reports.claimOpenTitle', {
+                                  defaultValue: 'Ready to claim',
+                                })}
+                        </strong>
+                        <span>
+                          {detailClaimedByMe
+                            ? reportClaimExpiryText(detail, t, true)
+                            : detailLockedByOther
+                              ? reportClaimExpiryText(detail, t, false)
+                              : t('admin.content.reports.claimOpenBody', {
+                                  defaultValue:
+                                    'Claim this report to lock it while you review and act.',
+                                })}
+                        </span>
+                      </div>
+                      {!detailLockedByOther && (
+                        <button
+                          type="button"
+                          onClick={claimReport}
+                          disabled={updateReport.isPending}
+                        >
+                          {detailClaimedByMe
+                            ? t('admin.content.reports.renewClaim', {
+                                defaultValue: 'Renew',
+                              })
+                            : t('admin.content.reports.claim', {
+                                defaultValue: 'Claim review',
+                              })}
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {detailClosed && (
                     <div className="gl-admin-handled-note">
                       <Check size={16} />
@@ -1917,7 +2042,7 @@ function ContentPage() {
                     <textarea
                       value={resolutionNote}
                       onChange={(event) => setResolutionNote(event.target.value)}
-                      disabled={detailClosed}
+                      disabled={detailActionDisabled}
                       placeholder={t('admin.content.reports.notePlaceholder', {
                         defaultValue: 'Record action notes for audit.',
                       })}
@@ -1946,6 +2071,7 @@ function ContentPage() {
                               }
                               aria-pressed={active}
                               onClick={() => toggleReportAction(action)}
+                              disabled={detailActionDisabled}
                             >
                               <span className="gl-admin-action-card-title">
                                 <span>{reportActionLabel(action, t)}</span>
@@ -1976,7 +2102,7 @@ function ContentPage() {
                             }
                             key={value}
                             onClick={() => setMuteDuration(value)}
-                            disabled={detailClosed}
+                            disabled={detailActionDisabled}
                           >
                             {formatMuteDuration(value)}
                           </button>
@@ -1989,7 +2115,9 @@ function ContentPage() {
                       type="button"
                       onClick={() => submitReportActions()}
                       disabled={
-                        updateReport.isPending || detailClosed || selectedActions.length === 0
+                        updateReport.isPending ||
+                        detailActionDisabled ||
+                        selectedActions.length === 0
                       }
                     >
                       <Check size={15} />
@@ -2000,7 +2128,7 @@ function ContentPage() {
                     <button
                       type="button"
                       onClick={() => submitReportActions(['dismiss'])}
-                      disabled={updateReport.isPending || detailClosed}
+                      disabled={updateReport.isPending || detailActionDisabled}
                     >
                       <X size={15} />
                       {reportActionLabel('dismiss', t)}
@@ -2360,6 +2488,14 @@ function reportActionLabels(value: string, t: Translate) {
     .join(' / ');
 }
 
+function isReviewResolutionAction(value: string) {
+  return value
+    .split(',')
+    .map((action) => action.trim())
+    .filter(Boolean)
+    .every((action) => action === 'review');
+}
+
 function reportActionDescription(value: string, t: Translate) {
   const map: Record<string, string> = {
     dismiss: t('admin.content.actionDescriptions.dismiss', {
@@ -2416,6 +2552,45 @@ function isReportClosed(status: string) {
   return status === 'resolved' || status === 'dismissed';
 }
 
+function reportReviewerName(
+  report: Pick<ContentReport, 'reviewerName' | 'reviewerId'>,
+  t: Translate,
+) {
+  const name = report.reviewerName?.trim() || report.reviewerId?.trim();
+  return (
+    name ||
+    t('admin.content.reports.unknownReviewer', {
+      defaultValue: 'another admin',
+    })
+  );
+}
+
+function reportClaimExpiryText(
+  report: Pick<ContentReport, 'reviewExpiresAt'>,
+  t: Translate,
+  mine: boolean,
+) {
+  if (!report.reviewExpiresAt) {
+    return mine
+      ? t('admin.content.reports.claimMineBodyNoExpiry', {
+          defaultValue: 'The claim stays active while you continue handling this report.',
+        })
+      : t('admin.content.reports.claimLockedBodyNoExpiry', {
+          defaultValue: 'This report is locked by another reviewer.',
+        });
+  }
+  const expiry = formatDate(report.reviewExpiresAt);
+  return mine
+    ? t('admin.content.reports.claimMineBody', {
+        time: expiry,
+        defaultValue: 'Your claim auto-releases at {{time}} if there is no update.',
+      })
+    : t('admin.content.reports.claimLockedBody', {
+        time: expiry,
+        defaultValue: 'Locked until {{time}} unless the reviewer finishes first.',
+      });
+}
+
 function formatMuteDuration(minutes: number) {
   if (minutes >= 1440) return `${Math.round(minutes / 1440)}d`;
   if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
@@ -2428,6 +2603,11 @@ function reportMutationErrorMessage(err: unknown, t: Translate) {
   if (response?.data?.reason === 'report_already_handled') {
     return t('admin.content.reports.alreadyHandled', {
       defaultValue: 'This report has already been handled.',
+    });
+  }
+  if (response?.data?.reason === 'report_claimed') {
+    return t('admin.content.reports.claimedByOther', {
+      defaultValue: 'Another admin is already reviewing this report.',
     });
   }
   if (response?.data?.message) return response.data.message;

@@ -7154,6 +7154,85 @@ html[lang='zh'] .gl-admin-action-select-head small {
   background: var(--gl-text);
   color: var(--gl-bg-card);
 }
+.gl-admin-claim-note {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+  padding: 11px 12px;
+}
+.gl-admin-claim-note > svg {
+  color: var(--gl-text-2);
+}
+.gl-admin-claim-note strong,
+.gl-admin-claim-note span {
+  display: block;
+  min-width: 0;
+}
+.gl-admin-claim-note strong {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-admin-claim-note span {
+  margin-top: 2px;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+.gl-admin-claim-note button {
+  height: 32px;
+  border: 1px solid var(--gl-text);
+  border-radius: 999px;
+  background: var(--gl-text);
+  color: var(--gl-bg-card);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.gl-admin-claim-note button:hover {
+  opacity: 0.9;
+}
+.gl-admin-claim-note button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+.gl-admin-claim-note.is-open {
+  border-color: rgba(255, 61, 92, 0.22);
+  background: rgba(255, 61, 92, 0.06);
+}
+.gl-admin-claim-note.is-open > svg {
+  color: var(--gl-red);
+}
+.gl-admin-claim-note.is-mine {
+  border-color: rgba(22, 163, 74, 0.22);
+  background: rgba(22, 163, 74, 0.07);
+}
+.gl-admin-claim-note.is-mine > svg {
+  color: #15803d;
+}
+.gl-admin-claim-note.is-locked {
+  border-color: rgba(100, 116, 139, 0.2);
+  background: rgba(100, 116, 139, 0.08);
+}
+@media (max-width: 640px) {
+  .gl-admin-claim-note {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .gl-admin-claim-note button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
 .gl-admin-handled-note {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

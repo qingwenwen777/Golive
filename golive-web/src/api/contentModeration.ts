@@ -67,6 +67,9 @@ export interface ContentReport {
   description?: string;
   status: ReportStatus | string;
   reviewerId?: string;
+  reviewerName?: string;
+  reviewStartedAt?: string;
+  reviewExpiresAt?: string;
   resolutionAction?: ReportAction | string;
   durationMinutes?: number;
   resolutionNote?: string;

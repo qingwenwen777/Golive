@@ -26,6 +26,7 @@ var (
 	ErrReportDuplicate     = errors.New("report duplicate within 24h")
 	ErrReportDailyLimit    = errors.New("daily report limit reached")
 	ErrReportAlreadyClosed = errors.New("report group already handled")
+	ErrReportClaimed       = errors.New("report group claimed by another reviewer")
 	ErrBlockedWordExists   = errors.New("blocked word exists")
 	ErrBlockedWordNotFound = errors.New("blocked word not found")
 )
@@ -112,6 +113,9 @@ type ReportGroupRow struct {
 	Reason           string
 	Status           string
 	ReviewerID       string
+	ReviewerName     string
+	ReviewStartedAt  *time.Time
+	ReviewExpiresAt  *time.Time
 	ResolutionAction string
 	ResolutionNote   string
 	DurationMinutes  int
@@ -506,9 +510,24 @@ func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.
 			return ErrReportDuplicate
 		}
 		if strings.TrimSpace(report.GroupID) == "" {
-			groupID, err := r.openReportGroupID(ctx, tx, report.TargetType, report.TargetID)
+			openGroup, err := r.openReportGroup(ctx, tx, report.TargetType, report.TargetID)
 			if err != nil {
 				return err
+			}
+			groupID := ""
+			if openGroup != nil {
+				groupID = strings.TrimSpace(openGroup.GroupID)
+				if groupID == "" {
+					groupID = openGroup.ID
+				}
+				if openGroup.Status == model.ReportStatusReviewing && openGroup.ReviewExpiresAt != nil && openGroup.ReviewExpiresAt.After(now) {
+					report.Status = model.ReportStatusReviewing
+					report.ReviewerID = openGroup.ReviewerID
+					report.ReviewerName = openGroup.ReviewerName
+					report.ReviewStartedAt = openGroup.ReviewStartedAt
+					report.ReviewExpiresAt = openGroup.ReviewExpiresAt
+					report.ResolutionAction = model.ReportActionReview
+				}
 			}
 			if groupID == "" {
 				groupID = uuid.NewString()
@@ -520,18 +539,26 @@ func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.
 }
 
 func (r *ModerationRepo) openReportGroupID(ctx context.Context, tx *gorm.DB, targetType, targetID string) (string, error) {
+	existing, err := r.openReportGroup(ctx, tx, targetType, targetID)
+	if err != nil || existing == nil {
+		return "", err
+	}
+	return existing.GroupID, nil
+}
+
+func (r *ModerationRepo) openReportGroup(ctx context.Context, tx *gorm.DB, targetType, targetID string) (*model.ContentReport, error) {
 	var existing model.ContentReport
 	err := tx.WithContext(ctx).Model(&model.ContentReport{}).
 		Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
 			targetType, targetID, model.ReportStatusPending, model.ReportStatusReviewing).
-		Order("created_at DESC").
+		Order("CASE status WHEN 'reviewing' THEN 0 ELSE 1 END, created_at DESC").
 		Limit(1).
 		Take(&existing).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", nil
+		return nil, nil
 	}
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	groupID := strings.TrimSpace(existing.GroupID)
 	if groupID == "" {
@@ -540,10 +567,11 @@ func (r *ModerationRepo) openReportGroupID(ctx context.Context, tx *gorm.DB, tar
 			Where("target_type = ? AND target_id = ? AND group_id = '' AND (status = ? OR status = ?)",
 				targetType, targetID, model.ReportStatusPending, model.ReportStatusReviewing).
 			Update("group_id", groupID).Error; err != nil {
-			return "", err
+			return nil, err
 		}
 	}
-	return groupID, nil
+	existing.GroupID = groupID
+	return &existing, nil
 }
 
 func (r *ModerationRepo) ListContentReports(ctx context.Context, filter ReportListFilter) ([]model.ContentReport, int64, error) {
@@ -616,6 +644,9 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 				Reason:           row.Reason,
 				Status:           row.Status,
 				ReviewerID:       row.ReviewerID,
+				ReviewerName:     row.ReviewerName,
+				ReviewStartedAt:  row.ReviewStartedAt,
+				ReviewExpiresAt:  row.ReviewExpiresAt,
 				ResolutionAction: row.ResolutionAction,
 				ResolutionNote:   row.ResolutionNote,
 				DurationMinutes:  row.DurationMinutes,
@@ -633,6 +664,13 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 			group.RecentCount++
 		}
 		group.Status = mergeReportGroupStatus(group.Status, row.Status)
+		if row.Status == model.ReportStatusReviewing {
+			group.ReviewerID = firstNonEmpty(group.ReviewerID, row.ReviewerID)
+			group.ReviewerName = firstNonEmpty(group.ReviewerName, row.ReviewerName)
+			group.ReviewStartedAt = firstNonEmptyTime(group.ReviewStartedAt, row.ReviewStartedAt)
+			group.ReviewExpiresAt = firstNonEmptyTime(group.ReviewExpiresAt, row.ReviewExpiresAt)
+			group.ResolutionAction = firstNonEmpty(group.ResolutionAction, row.ResolutionAction)
+		}
 		if row.CreatedAt.After(group.CreatedAt) {
 			group.ID = row.ID
 			group.GroupID = firstNonEmpty(row.GroupID, group.GroupID)
@@ -647,6 +685,9 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 			group.TargetText = firstNonEmpty(row.TargetText, group.TargetText)
 			group.Reason = firstNonEmpty(row.Reason, group.Reason)
 			group.ReviewerID = firstNonEmpty(row.ReviewerID, group.ReviewerID)
+			group.ReviewerName = firstNonEmpty(row.ReviewerName, group.ReviewerName)
+			group.ReviewStartedAt = firstNonEmptyTime(row.ReviewStartedAt, group.ReviewStartedAt)
+			group.ReviewExpiresAt = firstNonEmptyTime(row.ReviewExpiresAt, group.ReviewExpiresAt)
 			group.ResolutionAction = firstNonEmpty(row.ResolutionAction, group.ResolutionAction)
 			group.ResolutionNote = firstNonEmpty(row.ResolutionNote, group.ResolutionNote)
 			group.DurationMinutes = row.DurationMinutes
@@ -733,11 +774,27 @@ func (r *ModerationRepo) GetContentReport(ctx context.Context, id string) (*mode
 	return &report, nil
 }
 
-func (r *ModerationRepo) UpdateContentReport(ctx context.Context, id, status, reviewerID, note string, now time.Time) (*model.ContentReport, error) {
-	return r.UpdateContentReportGroup(ctx, id, status, "", reviewerID, note, 0, now)
+func (r *ModerationRepo) ReleaseExpiredContentReportReviews(ctx context.Context, now time.Time) error {
+	return r.db.WithContext(ctx).Model(&model.ContentReport{}).
+		Where("status = ? AND (review_expires_at IS NULL OR review_expires_at <= ?)", model.ReportStatusReviewing, now).
+		Updates(map[string]any{
+			"status":            model.ReportStatusPending,
+			"reviewer_id":       "",
+			"reviewer_name":     "",
+			"review_started_at": nil,
+			"review_expires_at": nil,
+			"resolution_action": "",
+			"duration_minutes":  0,
+			"resolution_note":   "",
+			"resolved_at":       nil,
+			"updated_at":        now,
+		}).Error
 }
 
-func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, status, action, reviewerID, note string, durationMinutes int, now time.Time) (*model.ContentReport, error) {
+func (r *ModerationRepo) ClaimContentReportGroup(ctx context.Context, id, reviewerID, reviewerName string, now time.Time, ttl time.Duration) (*model.ContentReport, error) {
+	if ttl <= 0 {
+		ttl = 30 * time.Minute
+	}
 	report, err := r.GetContentReport(ctx, id)
 	if err != nil {
 		return nil, err
@@ -745,13 +802,88 @@ func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, statu
 	if report.Status == model.ReportStatusResolved || report.Status == model.ReportStatusDismissed {
 		return nil, ErrReportAlreadyClosed
 	}
-	if report.GroupID == "" {
-		report.GroupID = report.ID
+	hasOtherReviewer, err := r.contentReportGroupHasActiveReviewer(ctx, *report, reviewerID, now)
+	if err != nil {
+		return nil, err
 	}
+	if hasOtherReviewer {
+		return nil, ErrReportClaimed
+	}
+
+	groupID, fallbackToTarget := reportUpdateGroupID(*report)
+	startedAt := now
+	if report.Status == model.ReportStatusReviewing &&
+		report.ReviewerID == reviewerID &&
+		report.ReviewStartedAt != nil &&
+		!report.ReviewStartedAt.IsZero() &&
+		report.ReviewExpiresAt != nil &&
+		report.ReviewExpiresAt.After(now) {
+		startedAt = *report.ReviewStartedAt
+	}
+	expiresAt := now.Add(ttl)
+	updates := map[string]any{
+		"status":            model.ReportStatusReviewing,
+		"group_id":          groupID,
+		"reviewer_id":       strings.TrimSpace(reviewerID),
+		"reviewer_name":     trimForDB(reviewerName, 128),
+		"review_started_at": startedAt,
+		"review_expires_at": expiresAt,
+		"resolution_action": model.ReportActionReview,
+		"duration_minutes":  0,
+		"resolution_note":   "",
+		"resolved_at":       nil,
+		"updated_at":        now,
+	}
+	q := r.contentReportGroupUpdateScope(ctx, *report, groupID, fallbackToTarget).
+		Where(
+			"status = ? OR (status = ? AND (reviewer_id = ? OR reviewer_id = '' OR review_expires_at IS NULL OR review_expires_at <= ?))",
+			model.ReportStatusPending,
+			model.ReportStatusReviewing,
+			reviewerID,
+			now,
+		)
+	res := q.Updates(updates)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected == 0 {
+		current, getErr := r.GetContentReport(ctx, id)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if current.Status == model.ReportStatusResolved || current.Status == model.ReportStatusDismissed {
+			return nil, ErrReportAlreadyClosed
+		}
+		return nil, ErrReportClaimed
+	}
+	return r.GetContentReport(ctx, id)
+}
+
+func (r *ModerationRepo) UpdateContentReport(ctx context.Context, id, status, reviewerID, note string, now time.Time) (*model.ContentReport, error) {
+	return r.UpdateContentReportGroup(ctx, id, status, "", reviewerID, "", note, 0, now)
+}
+
+func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, status, action, reviewerID, reviewerName, note string, durationMinutes int, now time.Time) (*model.ContentReport, error) {
+	report, err := r.GetContentReport(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if report.Status == model.ReportStatusResolved || report.Status == model.ReportStatusDismissed {
+		return nil, ErrReportAlreadyClosed
+	}
+	hasOtherReviewer, err := r.contentReportGroupHasActiveReviewer(ctx, *report, reviewerID, now)
+	if err != nil {
+		return nil, err
+	}
+	if hasOtherReviewer {
+		return nil, ErrReportClaimed
+	}
+	groupID, fallbackToTarget := reportUpdateGroupID(*report)
 	updates := map[string]any{
 		"status":            status,
-		"group_id":          report.GroupID,
+		"group_id":          groupID,
 		"reviewer_id":       reviewerID,
+		"reviewer_name":     trimForDB(reviewerName, 128),
 		"resolution_action": action,
 		"duration_minutes":  durationMinutes,
 		"resolution_note":   note,
@@ -759,16 +891,22 @@ func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, statu
 	}
 	if status == model.ReportStatusResolved || status == model.ReportStatusDismissed {
 		updates["resolved_at"] = now
+		updates["review_started_at"] = nil
+		updates["review_expires_at"] = nil
 	} else {
 		updates["resolved_at"] = nil
+		if status == model.ReportStatusPending {
+			updates["reviewer_id"] = ""
+			updates["reviewer_name"] = ""
+			updates["review_started_at"] = nil
+			updates["review_expires_at"] = nil
+			updates["resolution_action"] = ""
+			updates["duration_minutes"] = 0
+			updates["resolution_note"] = ""
+		}
 	}
-	q := r.db.WithContext(ctx).Model(&model.ContentReport{})
-	if report.GroupID != "" {
-		q = q.Where("group_id = ? AND (status = ? OR status = ?)", report.GroupID, model.ReportStatusPending, model.ReportStatusReviewing)
-	} else {
-		q = q.Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
-			report.TargetType, report.TargetID, model.ReportStatusPending, model.ReportStatusReviewing)
-	}
+	q := r.contentReportGroupUpdateScope(ctx, *report, groupID, fallbackToTarget).
+		Where("status = ? OR status = ?", model.ReportStatusPending, model.ReportStatusReviewing)
 	res := q.Updates(updates)
 	if res.Error != nil {
 		return nil, res.Error
@@ -777,6 +915,40 @@ func (r *ModerationRepo) UpdateContentReportGroup(ctx context.Context, id, statu
 		return nil, ErrReportAlreadyClosed
 	}
 	return r.GetContentReport(ctx, id)
+}
+
+func (r *ModerationRepo) contentReportGroupHasActiveReviewer(ctx context.Context, report model.ContentReport, reviewerID string, now time.Time) (bool, error) {
+	groupID, fallbackToTarget := reportUpdateGroupID(report)
+	var count int64
+	err := r.contentReportGroupReadScope(ctx, report, groupID, fallbackToTarget).
+		Where("status = ? AND reviewer_id <> '' AND reviewer_id <> ? AND review_expires_at > ?",
+			model.ReportStatusReviewing, strings.TrimSpace(reviewerID), now).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (r *ModerationRepo) contentReportGroupUpdateScope(ctx context.Context, report model.ContentReport, groupID string, fallbackToTarget bool) *gorm.DB {
+	return contentReportGroupScope(r.db.WithContext(ctx).Model(&model.ContentReport{}), report, groupID, fallbackToTarget)
+}
+
+func (r *ModerationRepo) contentReportGroupReadScope(ctx context.Context, report model.ContentReport, groupID string, fallbackToTarget bool) *gorm.DB {
+	return contentReportGroupScope(r.db.WithContext(ctx).Model(&model.ContentReport{}), report, groupID, fallbackToTarget)
+}
+
+func contentReportGroupScope(q *gorm.DB, report model.ContentReport, groupID string, fallbackToTarget bool) *gorm.DB {
+	if !fallbackToTarget && strings.TrimSpace(groupID) != "" {
+		return q.Where("group_id = ?", groupID)
+	}
+	return q.Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
+		report.TargetType, report.TargetID, model.ReportStatusPending, model.ReportStatusReviewing)
+}
+
+func reportUpdateGroupID(report model.ContentReport) (string, bool) {
+	groupID := strings.TrimSpace(report.GroupID)
+	if groupID == "" {
+		return report.ID, true
+	}
+	return groupID, false
 }
 
 func applyReportFilters(q *gorm.DB, filter ReportListFilter) *gorm.DB {
@@ -1549,9 +1721,9 @@ func reportGroupKey(row model.ContentReport) string {
 func mergeReportGroupStatus(current, next string) string {
 	rank := func(status string) int {
 		switch status {
-		case model.ReportStatusPending:
-			return 0
 		case model.ReportStatusReviewing:
+			return 0
+		case model.ReportStatusPending:
 			return 1
 		case model.ReportStatusResolved:
 			return 2
@@ -1572,6 +1744,15 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func firstNonEmptyTime(values ...*time.Time) *time.Time {
+	for _, value := range values {
+		if value != nil && !value.IsZero() {
+			return value
+		}
+	}
+	return nil
 }
 
 func sameDay(a, b time.Time) bool {

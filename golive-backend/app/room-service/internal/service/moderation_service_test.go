@@ -53,6 +53,10 @@ CREATE TABLE fan_badges (
 	).Error)
 	require.NoError(t, db.Exec(
 		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"admin-2", "second-admin", "Second Admin", "", true, "admin", now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		"user-1", "reporter", "Reporter", "", false, "user", now,
 	).Error)
 	require.NoError(t, db.Exec(
@@ -227,6 +231,91 @@ func TestReportCanApplyMultipleActionsAndDismissIsExclusive(t *testing.T) {
 	require.Len(t, logs.Items, 2)
 	actions := []string{logs.Items[0].Action, logs.Items[1].Action}
 	require.ElementsMatch(t, []string{"delete_content", "site_mute"}, actions)
+}
+
+func TestReportReviewClaimLocksGroup(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{
+		TargetType:     "post",
+		TargetID:       "post-claim",
+		TargetUserID:   "bad-user",
+		TargetUserName: "Bad User",
+		Reason:         "spam",
+		TargetText:     "bad post",
+	})
+	require.NoError(t, err)
+
+	claimed, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Status: "reviewing"})
+	require.NoError(t, err)
+	require.Equal(t, "reviewing", claimed.Status)
+	require.Equal(t, "admin-1", claimed.ReviewerID)
+	require.Equal(t, "Admin", claimed.ReviewerName)
+	require.NotEmpty(t, claimed.ReviewStartedAt)
+	require.NotEmpty(t, claimed.ReviewExpiresAt)
+
+	second, err := svc.CreateReport(ctx, "user-2", CreateReportReq{
+		TargetType:     "post",
+		TargetID:       "post-claim",
+		TargetUserID:   "bad-user",
+		TargetUserName: "Bad User",
+		Reason:         "spam",
+		TargetText:     "same bad post",
+	})
+	require.NoError(t, err)
+	require.Equal(t, report.GroupID, second.GroupID)
+	require.Equal(t, "reviewing", second.Status)
+	require.Equal(t, "admin-1", second.ReviewerID)
+
+	_, err = svc.UpdateReport(ctx, "admin-2", report.ID, UpdateReportReq{Action: "dismiss"})
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr))
+	require.Equal(t, http.StatusConflict, appErr.HTTPStatus)
+	require.Equal(t, "report_claimed", appErr.Reason)
+
+	updated, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Action: "dismiss"})
+	require.NoError(t, err)
+	require.Equal(t, "dismissed", updated.Status)
+	require.Equal(t, "admin-1", updated.ReviewerID)
+	require.Empty(t, updated.ReviewExpiresAt)
+}
+
+func TestExpiredReportReviewClaimReturnsToPending(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{
+		TargetType:   "danmu",
+		TargetID:     "danmu-expired",
+		RoomID:       "room-1",
+		TargetUserID: "bad-user",
+		Reason:       "harassment",
+		TargetText:   "bad message",
+	})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Status: "reviewing"})
+	require.NoError(t, err)
+
+	now = now.Add(31 * time.Minute)
+	list, err := svc.ListReports(ctx, "admin-2", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	require.Equal(t, "pending", list.Items[0].Status)
+	require.Empty(t, list.Items[0].ReviewerID)
+	require.Empty(t, list.Items[0].ReviewExpiresAt)
+	require.Equal(t, int64(1), list.Stats.Pending)
+	require.Equal(t, int64(0), list.Stats.Reviewing)
+
+	claimed, err := svc.UpdateReport(ctx, "admin-2", report.ID, UpdateReportReq{Status: "reviewing"})
+	require.NoError(t, err)
+	require.Equal(t, "reviewing", claimed.Status)
+	require.Equal(t, "admin-2", claimed.ReviewerID)
+	require.Equal(t, "Second Admin", claimed.ReviewerName)
 }
 
 func TestBlockedWordsRejectTextAndSyncRedis(t *testing.T) {
