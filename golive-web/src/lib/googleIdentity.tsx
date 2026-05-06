@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const GOOGLE_IDENTITY_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -40,6 +40,17 @@ declare global {
 }
 
 let scriptPromise: Promise<void> | null = null;
+
+const GOOGLE_BUTTON_MIN_WIDTH = 220;
+const GOOGLE_BUTTON_MAX_WIDTH = 400;
+
+function clampGoogleButtonWidth(width: number): number {
+  if (!Number.isFinite(width) || width <= 0) return 320;
+  return Math.max(
+    GOOGLE_BUTTON_MIN_WIDTH,
+    Math.min(GOOGLE_BUTTON_MAX_WIDTH, Math.floor(width)),
+  );
+}
 
 export function googleClientId(): string {
   return (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
@@ -111,11 +122,46 @@ export function GoogleIdentityButton({
   const ref = useRef<HTMLDivElement | null>(null);
   const latestCredentialHandler = useRef(onCredential);
   const [ready, setReady] = useState(false);
+  const [buttonWidth, setButtonWidth] = useState(320);
   const clientId = googleClientId();
 
   useEffect(() => {
     latestCredentialHandler.current = onCredential;
   }, [onCredential]);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+
+    const measureTarget = node.parentElement ?? node;
+    let frame = 0;
+    const measure = () => {
+      const width = clampGoogleButtonWidth(measureTarget.getBoundingClientRect().width);
+      setButtonWidth((current) => (current === width ? current : width));
+    };
+
+    measure();
+
+    const win = window;
+    const ResizeObserverCtor: typeof ResizeObserver | undefined = win.ResizeObserver;
+
+    if (ResizeObserverCtor) {
+      const observer = new ResizeObserverCtor(() => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(measure);
+      });
+      observer.observe(measureTarget);
+      return () => {
+        cancelAnimationFrame(frame);
+        observer.disconnect();
+      };
+    }
+
+    win.addEventListener('resize', measure);
+    return () => {
+      win.removeEventListener('resize', measure);
+    };
+  }, [clientId, disabled]);
 
   useEffect(() => {
     const node = ref.current;
@@ -141,7 +187,7 @@ export function GoogleIdentityButton({
           shape: 'pill',
           text,
           logo_alignment: 'left',
-          width: Math.max(220, Math.floor(node.getBoundingClientRect().width || 320)),
+          width: buttonWidth,
         });
         setReady(true);
       })
@@ -154,7 +200,7 @@ export function GoogleIdentityButton({
       if (node) node.innerHTML = '';
       setReady(false);
     };
-  }, [clientId, disabled, onUnavailable, text]);
+  }, [buttonWidth, clientId, disabled, onUnavailable, text]);
 
   if (!clientId || disabled) {
     return (

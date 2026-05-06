@@ -4068,7 +4068,8 @@ input:focus-visible,
   inset: 0;
 }
 .gl-auth-form > .gl-google-button-shell {
-  width: 100%;
+  align-self: center;
+  width: min(100%, 400px);
 }
 .gl-auth-google-link {
   display: flex;
