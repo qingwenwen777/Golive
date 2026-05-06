@@ -110,6 +110,7 @@ export default function MessagesPage() {
                 name: user?.displayName || user?.username || user?.id || '我',
                 avatar: user?.avatar,
                 verified: Boolean(user?.verified),
+                livePermissionStatus: user?.livePermissionStatus,
               }}
               draftCreatorId={draftCreatorId}
             />
@@ -310,8 +311,10 @@ function PrivateMessages({
             <div className="gl-direct-chat-head">
               <CreatorAvatarButton
                 user={selectedThread.peer}
-                creatorId={selectedThread.creatorId}
-                enabled={selectedThread.peer.id === selectedThread.creatorId}
+                creatorId={creatorChannelIdForUser(selectedThread.peer, selectedThread.creatorId)}
+                enabled={Boolean(
+                  creatorChannelIdForUser(selectedThread.peer, selectedThread.creatorId),
+                )}
               />
               <div className="gl-direct-chat-meta">
                 <strong>
@@ -403,29 +406,31 @@ function PrivateMessages({
                   })}
                 </div>
               ) : messages.data?.items.length ? (
-                messages.data.items.map((item) => (
-                  <ChatMessageRow
-                    key={item.id}
-                    sender={directMessageSender(item, selectedThread, currentUser)}
-                    body={item.body}
-                    createdAt={item.createdAt}
-                    currentUserId={userId}
-                    fanBadge={item.sender?.fanBadge}
-                    locale={i18n.language}
-                    onAvatarClick={
-                      item.senderId === selectedThread.creatorId
-                        ? () => navigate(`/channel/${selectedThread.creatorId}`)
-                        : undefined
-                    }
-                    avatarTitle={
-                      item.senderId === selectedThread.creatorId
-                        ? t('messages.actions.openCreatorChannel', {
-                            defaultValue: '进入主播频道',
-                          })
-                        : undefined
-                    }
-                  />
-                ))
+                messages.data.items.map((item) => {
+                  const sender = directMessageSender(item, selectedThread, currentUser);
+                  const senderCreatorId = creatorChannelIdForUser(sender, selectedThread.creatorId);
+                  return (
+                    <ChatMessageRow
+                      key={item.id}
+                      sender={sender}
+                      body={item.body}
+                      createdAt={item.createdAt}
+                      currentUserId={userId}
+                      fanBadge={sender.fanBadge}
+                      locale={i18n.language}
+                      onAvatarClick={
+                        senderCreatorId ? () => navigate(`/channel/${senderCreatorId}`) : undefined
+                      }
+                      avatarTitle={
+                        senderCreatorId
+                          ? t('messages.actions.openCreatorChannel', {
+                              defaultValue: '进入主播频道',
+                            })
+                          : undefined
+                      }
+                    />
+                  );
+                })
               ) : (
                 <div className="gl-direct-empty">
                   <UserRound size={32} />
@@ -1043,6 +1048,12 @@ function directMessageSender(
   if (message.sender) return message.sender;
   if (message.senderId === thread.peer.id) return thread.peer;
   return currentUser;
+}
+
+function creatorChannelIdForUser(user: MessageUser, threadCreatorId?: string): string {
+  if (user.id && user.id === threadCreatorId) return user.id;
+  if (user.id && user.livePermissionStatus === 'approved') return user.id;
+  return '';
 }
 
 function canManageFanGroupMember(

@@ -13687,7 +13687,7 @@ button.gl-fan-badge-empty {
   max-height: min(520px, calc(100vh - 92px));
   padding: 0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: hidden !important;
 }
 
 .gl-notification-head {
@@ -13745,8 +13745,8 @@ button.gl-fan-badge-empty {
 }
 
 .gl-notification-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   max-height: min(420px, calc(100vh - 154px));
   overflow-y: auto;
@@ -13755,8 +13755,9 @@ button.gl-fan-badge-empty {
 
 .gl-notification-item {
   position: relative;
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  display: grid !important;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-areas: 'avatar copy';
   align-items: start;
   column-gap: 12px;
   border: 1px solid transparent;
@@ -13765,10 +13766,12 @@ button.gl-fan-badge-empty {
   padding: 12px 13px;
   white-space: normal;
   cursor: pointer;
-  min-height: 0;
+  min-height: 106px;
+  height: auto;
   color: var(--gl-text);
   font: inherit;
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
 }
 
@@ -13801,22 +13804,24 @@ button.gl-fan-badge-empty {
 }
 
 .gl-notification-avatar {
-  grid-column: 1;
-  grid-row: 1;
+  grid-area: avatar;
+  align-self: start;
   margin-top: 1px;
   box-shadow: 0 0 0 1px var(--gl-border);
 }
 
 .gl-notification-copy {
-  grid-column: 2;
-  display: flex;
+  grid-area: copy;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
   min-width: 0;
-  flex-direction: column;
   gap: 3px;
   padding-top: 1px;
 }
 
 .gl-notification-item strong {
+  display: block;
   color: var(--gl-text);
   font-size: 14px;
   font-weight: 900;
@@ -13826,13 +13831,16 @@ button.gl-fan-badge-empty {
 
 .gl-notification-item small,
 .gl-notification-item time {
+  display: block;
+  min-width: 0;
   color: var(--gl-text-2);
   font-size: 13px;
   line-height: 1.32;
+  overflow-wrap: anywhere;
 }
 
 .gl-notification-actor {
-  display: inline-flex;
+  display: flex;
   min-width: 0;
   align-items: center;
   gap: 4px;
