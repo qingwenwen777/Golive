@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Coins, Plus, User as UserIcon, X } from 'lucide-react';
@@ -9,6 +9,12 @@ import {
   useNotifications,
   type NotificationItem,
 } from '@/api/room';
+import {
+  useDirectThreads,
+  useJoinedFanGroups,
+  type DirectThread,
+  type FanGroup,
+} from '@/api/messages';
 import { useSearchSuggestions } from '@/api/search';
 import { Avatar } from '@/components/Avatar';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -384,6 +390,21 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
 
 const LANG_OPTIONS: AppLang[] = ['zh', 'ja', 'en'];
 
+type NotificationMenuNotice = {
+  id: string;
+  title: string;
+  body?: string;
+  link: string;
+  actorName: string;
+  actorLabel: string;
+  actorAvatar?: string;
+  actorVerified?: boolean;
+  createdAt: string;
+  count: number;
+  unread: boolean;
+  notification?: NotificationItem;
+};
+
 function suggestionTypeLabel(type: string): string {
   switch (type) {
     case 'creator':
@@ -405,14 +426,42 @@ function NotificationBell() {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const notifications = useNotifications(true, 1, 8);
+  const directThreads = useDirectThreads(true, 1, 50);
+  const fanGroups = useJoinedFanGroups(true);
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
-  const items = notifications.data?.items ?? [];
+  const items = (notifications.data?.items ?? []).filter(
+    (item) => !isChatNotificationType(item.type),
+  );
   const unread = notifications.data?.unread ?? 0;
+  const messageNotices = useMemo(
+    () => [
+      ...(directThreads.data?.items ?? [])
+        .filter((thread) => thread.unread > 0)
+        .map((thread) => directThreadNotice(thread, t)),
+      ...(fanGroups.data?.items ?? [])
+        .filter((group) => group.unread > 0)
+        .map((group) => fanGroupNotice(group, t)),
+    ],
+    [directThreads.data?.items, fanGroups.data?.items, t],
+  );
+  const menuItems = useMemo(
+    () =>
+      [...messageNotices, ...items.map((item) => notificationMenuNotice(item, t))]
+        .sort((a, b) => notificationNoticeTime(b.createdAt) - notificationNoticeTime(a.createdAt))
+        .slice(0, 8),
+    [items, messageNotices, t],
+  );
+  const messageUnread = messageNotices.reduce((sum, item) => sum + item.count, 0);
+  const totalUnread = unread + messageUnread;
+  const loading =
+    notifications.isPending ||
+    (directThreads.isPending && !directThreads.data) ||
+    (fanGroups.isPending && !fanGroups.data);
 
-  const openNotification = (item: NotificationItem) => {
-    if (!item.readAt) markRead.mutate(item.id);
-    if (item.link) navigate(item.link);
+  const openNotification = (item: NotificationMenuNotice) => {
+    if (item.notification && !item.notification.readAt) markRead.mutate(item.notification.id);
+    navigate(item.link);
   };
 
   return (
@@ -425,7 +474,7 @@ function NotificationBell() {
           title={t('notifications')}
         >
           <Bell size={22} />
-          {unread > 0 && <span className="gl-bell-dot" />}
+          {totalUnread > 0 && <span className="gl-bell-dot" />}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="gl-notification-menu w-80">
@@ -450,7 +499,9 @@ function NotificationBell() {
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                navigate('/messages/system');
+                navigate(
+                  messageUnread > 0 && unread === 0 ? '/messages/private' : '/messages/system',
+                );
               }}
             >
               {t('notificationsViewAll', { defaultValue: 'View all' })}
@@ -458,35 +509,35 @@ function NotificationBell() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {notifications.isPending ? (
+        {loading ? (
           <div className="gl-notification-state">
             {t('loading', { defaultValue: 'Loading...' })}
           </div>
-        ) : items.length === 0 ? (
+        ) : menuItems.length === 0 ? (
           <div className="gl-notification-state">
             {t('notificationsEmpty', { defaultValue: 'No notifications yet' })}
           </div>
         ) : (
           <div className="gl-notification-list">
-            {items.map((item) => (
+            {menuItems.map((item) => (
               <button
                 type="button"
                 key={item.id}
-                className={item.readAt ? 'gl-notification-item' : 'gl-notification-item is-unread'}
+                className={item.unread ? 'gl-notification-item is-unread' : 'gl-notification-item'}
                 onClick={() => openNotification(item)}
               >
                 <span className="gl-notification-dot" aria-hidden="true" />
                 <Avatar
-                  name={notificationActorName(item)}
+                  name={item.actorName}
                   src={item.actorAvatar}
                   size={42}
                   className="gl-notification-avatar"
                 />
                 <span className="gl-notification-copy">
-                  <strong>{notificationTitle(item, t)}</strong>
-                  {notificationActorLabel(item) && (
+                  <strong>{item.title}</strong>
+                  {item.actorLabel && (
                     <span className="gl-notification-actor">
-                      {notificationActorLabel(item)}
+                      {item.actorLabel}
                       {item.actorVerified && <VerifiedBadge size={12} />}
                     </span>
                   )}
@@ -507,6 +558,87 @@ function notificationTitle(
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
   return t(`notificationTypes.${item.type}.title`, { defaultValue: item.title });
+}
+
+function notificationMenuNotice(
+  item: NotificationItem,
+  t: ReturnType<typeof useTranslation>['t'],
+): NotificationMenuNotice {
+  return {
+    id: `notification:${item.id}`,
+    title: notificationTitle(item, t),
+    body: item.body,
+    link: item.link || '/messages/system',
+    actorName: notificationActorName(item),
+    actorLabel: notificationActorLabel(item),
+    actorAvatar: item.actorAvatar,
+    actorVerified: item.actorVerified,
+    createdAt: item.createdAt,
+    count: 1,
+    unread: !item.readAt,
+    notification: item,
+  };
+}
+
+function directThreadNotice(
+  thread: DirectThread,
+  t: ReturnType<typeof useTranslation>['t'],
+): NotificationMenuNotice {
+  const count = Math.max(1, thread.unread);
+  return {
+    id: `direct:${thread.id}`,
+    title: t('notificationTypes.direct_message.title', {
+      count,
+      name: thread.peer.name,
+      defaultValue: '{{name}} 发来 {{count}} 条私信',
+    }),
+    body: thread.lastMessagePreview,
+    link: `/messages/direct/${encodeURIComponent(thread.creatorId)}`,
+    actorName: thread.peer.name,
+    actorLabel: thread.peer.username ? `@${thread.peer.username}` : thread.peer.name,
+    actorAvatar: thread.peer.avatar,
+    actorVerified: thread.peer.verified,
+    createdAt: thread.lastMessageAt || new Date().toISOString(),
+    count,
+    unread: true,
+  };
+}
+
+function fanGroupNotice(
+  group: FanGroup,
+  t: ReturnType<typeof useTranslation>['t'],
+): NotificationMenuNotice {
+  const count = Math.max(1, group.unread);
+  const owner = group.members.find((member) => member.role === 'owner') ?? group.members[0];
+  return {
+    id: `fan-group:${group.id}`,
+    title: t('notificationTypes.fan_group_message.title', {
+      count,
+      name: group.name,
+      defaultValue: '{{name}} 有 {{count}} 条新消息',
+    }),
+    body: t('notificationTypes.fan_group_message.body', {
+      count: group.memberCount,
+      defaultValue: '{{count}}/200 人 · 粉丝团群聊',
+    }),
+    link: '/messages/private',
+    actorName: group.name,
+    actorLabel: owner?.user.name || group.name,
+    actorAvatar: owner?.user.avatar,
+    actorVerified: owner?.user.verified,
+    createdAt: group.updatedAt,
+    count,
+    unread: true,
+  };
+}
+
+function isChatNotificationType(type: string): boolean {
+  return type === 'direct_message' || type === 'fan_group_message';
+}
+
+function notificationNoticeTime(value: string): number {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : 0;
 }
 
 function notificationActorName(item: NotificationItem): string {

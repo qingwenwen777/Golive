@@ -164,6 +164,13 @@
     },
     "appointment_started": {
       "title": "予約ライブが開始されました"
+    },
+    "direct_message": {
+      "title": "{{name}} から新着DM {{count}} 件"
+    },
+    "fan_group_message": {
+      "title": "{{name}} に新着 {{count}} 件",
+      "body": "{{count}}/200 人 · ファンクラブグループチャット"
     }
   },
   "live": "LIVE",

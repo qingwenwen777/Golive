@@ -164,6 +164,13 @@
     },
     "appointment_started": {
       "title": "Scheduled live has started"
+    },
+    "direct_message": {
+      "title": "{{name}} sent {{count}} DMs"
+    },
+    "fan_group_message": {
+      "title": "{{name}} has {{count}} new messages",
+      "body": "{{count}}/200 members · Fan club group chat"
     }
   },
   "live": "LIVE",

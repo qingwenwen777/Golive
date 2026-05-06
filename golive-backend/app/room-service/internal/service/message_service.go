@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -290,7 +288,6 @@ func (s *MessageService) SendDirect(ctx context.Context, senderID string, req Se
 	if err != nil {
 		return nil, directSendError(err)
 	}
-	_ = s.notifyDirectMessage(ctx, *thread, senderID, creatorID, body)
 	dto, err := s.directThreadDTO(ctx, *thread, senderID)
 	if err != nil {
 		return nil, err
@@ -340,7 +337,6 @@ func (s *MessageService) SendThreadMessage(ctx context.Context, senderID, thread
 	if err != nil {
 		return nil, directSendError(err)
 	}
-	_ = s.notifyDirectMessage(ctx, *updated, senderID, receiverID, body)
 	dto, err := s.directThreadDTO(ctx, *updated, senderID)
 	if err != nil {
 		return nil, err
@@ -859,27 +855,6 @@ func (s *MessageService) fanBadgeDTO(ctx context.Context, userID, creatorID stri
 	return fanBadgeFromLevel(creatorID, badge.Level)
 }
 
-func (s *MessageService) notifyDirectMessage(ctx context.Context, thread model.DirectThread, senderID, receiverID, body string) error {
-	if s.messages == nil || receiverID == "" {
-		return nil
-	}
-	sender, _ := s.messages.UserProfile(ctx, senderID)
-	return s.messages.CreateNotification(ctx, model.Notification{
-		ID:            "dm-" + notificationHash(thread.ID, senderID, receiverID, time.Now().Format(time.RFC3339Nano)),
-		UserID:        receiverID,
-		Type:          "direct_message",
-		Title:         "你收到一条新的私信",
-		Body:          trimRunes(body, 120),
-		Link:          "/messages/private",
-		ActorID:       senderID,
-		ActorUsername: sender.Username,
-		ActorName:     nonEmpty(sender.Name, sender.Username, senderID),
-		ActorAvatar:   sender.Avatar,
-		ActorVerified: sender.Verified,
-		CreatedAt:     s.now(),
-	})
-}
-
 func fanGroupDTO(row repo.FanGroupWithMembers) FanGroupDTO {
 	members := make([]FanGroupMemberDTO, 0, len(row.Members))
 	now := time.Now()
@@ -1031,9 +1006,4 @@ func fanGroupError(err error) error {
 		return errcode.New(http.StatusNotFound, "fan group rejoin request not found").WithReason("fan_group_rejoin_not_found")
 	}
 	return err
-}
-
-func notificationHash(parts ...string) string {
-	sum := sha256.Sum256([]byte(strings.Join(parts, ":")))
-	return hex.EncodeToString(sum[:])[:32]
 }

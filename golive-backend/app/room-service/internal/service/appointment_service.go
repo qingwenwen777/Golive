@@ -514,15 +514,16 @@ func (s *AppointmentService) Notifications(ctx context.Context, userID string, p
 func notificationTypeFilter(box string) ([]string, []string) {
 	replyTypes := []string{"post_comment", "post_comment_reply"}
 	likeTypes := []string{"post_liked", "post_comment_liked", "room_liked"}
+	chatTypes := []string{"direct_message", "fan_group_message"}
 	switch strings.ToLower(strings.TrimSpace(box)) {
 	case "reply", "replies":
 		return replyTypes, nil
 	case "like", "likes":
 		return likeTypes, nil
 	case "system":
-		return nil, append(replyTypes, likeTypes...)
+		return nil, append(append(replyTypes, likeTypes...), chatTypes...)
 	default:
-		return nil, nil
+		return nil, chatTypes
 	}
 }
 

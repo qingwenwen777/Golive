@@ -164,6 +164,13 @@
     },
     "appointment_started": {
       "title": "预约直播已开播"
+    },
+    "direct_message": {
+      "title": "{{name}} 发来 {{count}} 条私信"
+    },
+    "fan_group_message": {
+      "title": "{{name}} 有 {{count}} 条新消息",
+      "body": "{{count}}/200 人 · 粉丝团群聊"
     }
   },
   "live": "直播中",

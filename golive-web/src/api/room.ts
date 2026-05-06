@@ -1007,10 +1007,13 @@ function notificationMatchesBox(item: NotificationItem, box: string): boolean {
   const normalized = box.toLowerCase();
   const replyTypes = new Set(['post_comment', 'post_comment_reply']);
   const likeTypes = new Set(['post_liked', 'post_comment_liked', 'room_liked']);
+  const chatTypes = new Set(['direct_message', 'fan_group_message']);
   if (normalized === 'reply' || normalized === 'replies') return replyTypes.has(item.type);
   if (normalized === 'like' || normalized === 'likes') return likeTypes.has(item.type);
-  if (normalized === 'system') return !replyTypes.has(item.type) && !likeTypes.has(item.type);
-  return true;
+  if (normalized === 'system') {
+    return !replyTypes.has(item.type) && !likeTypes.has(item.type) && !chatTypes.has(item.type);
+  }
+  return !chatTypes.has(item.type);
 }
 
 export function useLikeState(streamId: string, enabled: boolean) {
