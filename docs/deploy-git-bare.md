@@ -1,54 +1,56 @@
 # GoLive Git Bare 部署说明
 
-目标服务器：`154.36.185.85`
+目标服务器：`root@154.36.185.85`
+
+本项目的服务器部署方式是：本机 push 到服务器 bare 仓库，服务器
+`post-receive` hook 自动 checkout、构建前端并重启 Compose 服务。
 
 ## 1. 服务器准备
 
 推荐系统：Ubuntu 22.04 LTS。
 
-开放公网端口：
+公网只开放必要端口：
 
 ```text
-80    Web 访问
+80    Web HTTP
+443   Web HTTPS
 1935  OBS RTMP 推流
-443   后续配置 HTTPS 时再开放
 ```
 
-不要对公网开放 MySQL、Redis、Kafka、etcd、MinIO、Prometheus、Grafana、Jaeger 等端口。
+不要对公网开放 MySQL、Redis、Kafka、etcd、MinIO、Prometheus、Grafana、
+Jaeger 等内部端口。
 
 安装基础组件：
 
 ```bash
-sudo apt update
-sudo apt install -y git ca-certificates curl docker.io docker-compose-plugin
-sudo systemctl enable --now docker
-sudo usermod -aG docker "$USER"
+apt update
+apt install -y git ca-certificates curl docker.io docker-compose-plugin
+systemctl enable --now docker
 ```
 
-国内服务器建议配置 Docker 镜像加速。不同云厂商镜像地址不同，配置好后执行：
+如果在国内网络环境，建议配置 Docker 镜像源，配置后执行：
 
 ```bash
-sudo systemctl restart docker
+systemctl restart docker
 ```
 
 ## 2. 创建 bare 仓库
 
 ```bash
-sudo mkdir -p /srv/git /srv/golive/app
-sudo chown -R "$USER":"$USER" /srv/git /srv/golive
+mkdir -p /srv/git /srv/golive/app
 git init --bare /srv/git/golive.git
 ```
 
-安装 hook。第一次服务器还没有 checkout 出 `/srv/golive/app`，所以先从本机把脚本传上去：
+安装部署 hook：
 
 ```bash
-scp scripts/post-receive.golive.example 你的服务器用户名@154.36.185.85:/tmp/post-receive
-ssh 你的服务器用户名@154.36.185.85
+scp scripts/post-receive.golive.example root@154.36.185.85:/tmp/post-receive
+ssh root@154.36.185.85
 cp /tmp/post-receive /srv/git/golive.git/hooks/post-receive
 chmod +x /srv/git/golive.git/hooks/post-receive
 ```
 
-后续如果脚本有更新，也可以在服务器上从工作目录复制：
+如果 hook 脚本后续有更新，可以在服务器工作目录存在后执行：
 
 ```bash
 cp /srv/golive/app/scripts/post-receive.golive.example /srv/git/golive.git/hooks/post-receive
@@ -57,16 +59,17 @@ chmod +x /srv/git/golive.git/hooks/post-receive
 
 ## 3. 本机添加远端并部署
 
-在本机项目根目录执行：
+当前本地分支是 `master`，推荐远端名为 `prod`：
 
 ```bash
-git remote add prod ssh://你的服务器用户名@154.36.185.85/srv/git/golive.git
-git push prod main
+git remote add prod ssh://root@154.36.185.85/srv/git/golive.git
+git push prod master
 ```
 
-如果你的本地分支是 `master`：
+如果远端已经存在：
 
 ```bash
+git remote set-url prod ssh://root@154.36.185.85/srv/git/golive.git
 git push prod master
 ```
 
@@ -74,13 +77,24 @@ git push prod master
 
 ```text
 checkout 到 /srv/golive/app
-使用 node:20-alpine 构建 golive-web/dist
-启动 golive-backend/deploy/docker-compose.yml
+使用 node:20-alpine 安装依赖并构建 golive-web/dist
+启动或更新 golive-backend/deploy/docker-compose.yml
+restart Go 服务，让 go run 重新编译最新源码
+输出 docker compose ps
 ```
 
-## 4. OBS 和测试账号
+部署 hook 默认接受 `main` 和 `master`。服务器变量可覆盖：
 
-Web 地址：
+```bash
+DEPLOY_BRANCH=main
+FALLBACK_BRANCH=master
+WORK_TREE=/srv/golive/app
+GIT_DIR=/srv/git/golive.git
+```
+
+## 4. 访问地址
+
+Web：
 
 ```text
 http://154.36.185.85
@@ -92,29 +106,35 @@ OBS 推流服务器：
 rtmp://154.36.185.85/live
 ```
 
-demo 用户：
-
-```text
-用户名：demo
-密码：demo-1718011198
-```
+如果域名 `golive.us.ci` 已解析并安装证书，nginx 会自动使用 HTTPS 配置。
 
 ## 5. 常用排查命令
 
 ```bash
+ssh root@154.36.185.85
 cd /srv/golive/app/golive-backend/deploy
 docker compose ps
-docker compose logs -f nginx
-docker compose logs -f api-gateway
-docker compose logs -f room-service
-docker compose logs -f srs
+docker compose logs --tail=200 nginx
+docker compose logs --tail=200 api-gateway
+docker compose logs --tail=200 room-service
+docker compose logs --tail=200 im-gateway
+docker compose logs --tail=200 srs
 ```
 
-如果前端没有更新，手动触发一次构建：
+手动重新构建前端：
 
 ```bash
 cd /srv/golive/app/golive-web
 docker run --rm -v "$PWD:/app" -w /app node:20-alpine sh -lc 'corepack enable && pnpm config set registry https://registry.npmmirror.com && pnpm install --frozen-lockfile && pnpm build'
 cd /srv/golive/app/golive-backend/deploy
 docker compose up -d --remove-orphans
+docker compose restart api-gateway user-service room-service chat-service gift-service im-gateway
+```
+
+查看最近一次服务器 checkout：
+
+```bash
+cd /srv/golive/app
+git rev-parse --short HEAD
+git log -1 --oneline
 ```

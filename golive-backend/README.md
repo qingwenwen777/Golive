@@ -1,97 +1,107 @@
 # GoLive Backend
 
-GoLive 直播平台的 Go 后端。与 `../golive-web` 前端严格按契约对接，
-目标是前端关闭 MSW 后直连本后端，功能与 mock 行为完全一致。
+GoLive 后端是一个 Go 微服务工程，给 `../golive-web` 提供 HTTP API、
+WebSocket、直播流回调、礼物订单、弹幕处理、上传和管理后台数据。
 
 ## 技术栈
 
-- Go 1.22+、Gin（HTTP 网关）、gRPC + Protobuf（服务间）、gorilla/websocket
-- MySQL 8 + GORM、Redis 7、Kafka、etcd（服务发现）
-- Viper 配置、zap 日志、OpenTelemetry + Jaeger
-- SRS 5.0（RTMP → HLS/FLV）、Docker Compose 编排
-
-## 端口约定（硬性，来自前端 .env）
-
-| 组件          | 端口   | 说明                                |
-| ------------- | ------ | ----------------------------------- |
-| api-gateway   | 8080   | HTTP JSON，前缀 `/api`              |
-| im-gateway    | 8081   | WebSocket，路径 `/ws`               |
-| SRS HTTP-FLV  | 8082   | 拉流（`VITE_FLV_BASE`）             |
-| SRS RTMP      | 1935   | 推流                                |
-| SRS HTTP API  | 1985   | SRS 管理接口                        |
-| MySQL         | 3306   |                                     |
-| Redis         | 6379   |                                     |
-| Kafka         | 9092   |                                     |
-| etcd          | 2379   |                                     |
-| MinIO         | 9000/9001 | 对象存储（后续启用）             |
+- Go 1.22+、Gin、gorilla/websocket、gRPC + Protobuf
+- MySQL 8 + GORM、Redis 7、Kafka、etcd、MinIO
+- Viper、zap、OpenTelemetry、Jaeger、Prometheus、Grafana
+- SRS 5（RTMP → HTTP-FLV/HLS）、Docker Compose、nginx
 
 ## 服务划分
 
-```
-cmd/
-  api-gateway/      # Gin，对外 HTTP，鉴权/幂等/聚合 gRPC
-  im-gateway/       # gorilla/websocket，房间消息推送
-  user-service/     # 登录、鉴权、用户资料、金币
-  room-service/     # 房间、分类、关注、点赞
-  chat-service/     # 弹幕、敏感词、限流
-  gift-service/     # 礼物、SuperChat、订单、幂等
-```
+| 服务 | 入口 | 说明 |
+| ---- | ---- | ---- |
+| api-gateway | `app/api-gateway/cmd` | 对外 HTTP 网关，鉴权、CSRF、限流、反向代理 |
+| user-service | `app/user-service/cmd` | 登录、Google 登录、用户资料、头像/封面、金币、创作者申请 |
+| room-service | `app/room-service/cmd` | 房间、开播、预约、频道动态、关注点赞、回放、审核 |
+| chat-service | `app/chat-service/cmd` | 弹幕限流、敏感词、落盘、历史弹幕 |
+| gift-service | `app/gift-service/cmd` | 礼物、SuperChat、竞猜、幂等订单、本地消息表 |
+| im-gateway | `app/im-gateway/cmd` | WebSocket 长连接、房间 fanout、Redis Pub/Sub |
+
+## 端口约定
+
+| 组件 | 端口 | 说明 |
+| ---- | ---- | ---- |
+| nginx | 80 / 443 | 静态文件、`/api`、`/ws`、`/live` 入口 |
+| api-gateway | 8080 | HTTP JSON，外部路径前缀 `/api` |
+| im-gateway | 8081 | WebSocket，路径 `/ws` |
+| SRS RTMP | 1935 | OBS 推流 |
+| SRS HTTP | 容器内 8080 | nginx 反代为 `/live` |
+| MySQL / Redis / Kafka / etcd / MinIO | compose 内网 | 不应对公网开放 |
+| Grafana / Prometheus / Jaeger | 127.0.0.1 绑定 | 通过 SSH tunnel 访问 |
 
 ## 目录结构
 
-```
+```text
 golive-backend/
-├── cmd/<service>/main.go
-├── internal/<service>/{config,server,service,repo,model}/
-├── pkg/
-│   ├── logger/         # zap 封装 + FromCtx
-│   ├── discovery/      # Registry 接口 + etcd 实现
-│   ├── errcode/        # 统一 {message, reason?} 错误
-│   └── idempotency/    # X-Request-Id + Redis 幂等中间件
-├── api/proto/          # .proto（后续补）
-├── deploy/
-│   ├── docker-compose.yml
-│   └── srs.conf
-└── go.mod
+  api/
+    proto/              Protobuf 定义
+    gen/go/             生成后的 Go 代码
+  app/
+    <service>/
+      cmd/              服务入口
+      configs/          本地示例配置
+      internal/         handler/server/service/repo/model/config
+      README.md         单服务说明
+  deploy/
+    docker-compose.yml  本地和服务器运行栈
+    configs/            compose 使用的服务配置
+    nginx*.conf         HTTP/HTTPS 入口
+    srs.conf            SRS 配置
+    observability/      Prometheus、OTel、Grafana
+  pkg/                  公共包：JWT、幂等、错误码、日志、上传、内容策略等
 ```
 
-## 本地开发
+## 本地启动
+
+推荐从仓库根目录使用一键脚本：
 
 ```bash
-# 启动依赖（MySQL/Redis/Kafka/etcd/SRS/MinIO）
-cd deploy && docker compose up -d
-
-# 启动 api-gateway（示例）
-go run ./cmd/api-gateway
+bash scripts/dev.sh
+# 或 Windows:
+powershell -File scripts/dev.ps1
 ```
 
-## 前端联调（关掉 MSW）
+只启动后端栈：
 
-前端 `golive-web` 默认开启 MSW。联调本后端时二选一：
+```bash
+cd golive-backend/deploy
+docker compose up -d
+```
 
-1. **环境变量（推荐）**：在 `golive-web/.env.development.local` 里写
-   ```
-   VITE_ENABLE_MSW=false
-   VITE_API_BASE=http://localhost:8080/api
-   VITE_WS_BASE=ws://localhost:8081/ws
-   VITE_FLV_BASE=http://localhost:8082
-   ```
-   并在 `main.tsx` 中根据 `import.meta.env.VITE_ENABLE_MSW` 判断是否调用
-   `worker.start()`。
+Compose 中的 Go 服务使用 `go run ./app/<service>/cmd -config ./deploy/configs/<service>.yaml`，
+源码以只读卷挂载，`docker compose restart <service>` 会重新编译并加载最新代码。
 
-2. **直接删 main.tsx 里 `worker.start()` 调用**（临时做法）。
+## 测试
 
-然后 `npm run dev`，前端请求会直接打到 `http://localhost:8080/api`。
+```bash
+go test ./...
+```
 
-## 契约要点（必读）
+也可以按服务缩小范围：
 
-- JSON 字段 camelCase；时间戳 HTTP 用 ISO 8601，WS 用毫秒 Unix。
-- JWT Bearer + refreshToken 轮换；401 触发前端 `/api/auth/refresh`。
-- `/api/gifts/send` 和 `/api/super-chats` 按 `X-Request-Id` 幂等（10 分钟），
-  replay 命中响应头带 `Idempotent-Replayed: true`。
-- 余额不足：HTTP 402，body `{ message, reason: "insufficient_coin" }` +
-  一个 `status=failed, failReason="insufficient_coin"` 的 order 对象。
-- 返回给观众的 `Stream` 必须剥除 `streamKey`。
-- WS 握手 `ws://localhost:8081/ws?roomId=<id>&token=<jwt>`，无 token 会被拒绝。
+```bash
+go test ./app/api-gateway/...
+go test ./app/room-service/...
+go test ./app/user-service/...
+go test ./app/chat-service/...
+go test ./app/gift-service/...
+go test ./app/im-gateway/...
+```
 
-详细端点清单见 `docs/` 与前端 `src/mocks/handlers/*.ts`。
+## 前端契约
+
+- 前端默认同源访问：`VITE_API_BASE=/api`、`VITE_WS_BASE=/ws`、
+  `VITE_FLV_BASE=/live`。
+- JWT 使用 `Authorization: Bearer <token>`，不依赖 cookie。
+- 写操作需要 CSRF token；前端会从 `/api/csrf-token` 获取并自动重试一次。
+- `/api/gifts/send`、`/api/super-chats` 按 `X-Request-Id` 幂等，replay 响应头为
+  `Idempotent-Replayed: true`。
+- 余额不足返回 HTTP 402，`reason` 为 `insufficient_coin`。
+- 对观众返回的直播流信息不能暴露 `streamKey`。
+- WebSocket 握手：`/ws?roomId=<id>&token=<jwt>`。
+
+更多联调细节见 `../docs/integration.md`，部署流程见 `../docs/deploy-git-bare.md`。

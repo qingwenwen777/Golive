@@ -1,8 +1,13 @@
 node_modules
 dist
+coverage
+.chrome-analytics-check*
 .edge-history-check*
 history-layout-*.png
 vite-*.log
+preview-*.log
+preview-*.err.log
+preview-*.out.log
 .git
 .env
 .env.local

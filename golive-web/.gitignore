@@ -10,6 +10,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
+.chrome-analytics-check*
+.edge-history-check*
 *.local
 
 # Editor directories and files
