@@ -1,4 +1,12 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { http } from '@/lib/axios';
 
 export interface MessageUser {
@@ -140,8 +148,8 @@ export function useDirectThreads(enabled = true, page = 1, size = 30) {
       return data;
     },
     enabled,
-    staleTime: 10_000,
-    refetchInterval: enabled ? 20_000 : false,
+    staleTime: 3_000,
+    refetchInterval: enabled ? 5_000 : false,
     placeholderData: keepPreviousData,
     retry: 1,
   });
@@ -163,31 +171,50 @@ export function useDirectDraft(creatorId: string, enabled = true) {
   });
 }
 
-export function useDirectMessages(threadId: string, enabled = true, page = 1, size = 100) {
-  return useQuery<DirectMessageListResp, Error>({
-    queryKey: ['direct-messages', threadId, page, size],
-    queryFn: async ({ signal }) => {
+export function useDirectMessages(threadId: string, enabled = true, size = 40) {
+  const qc = useQueryClient();
+  return useInfiniteQuery<DirectMessageListResp, Error>({
+    queryKey: ['direct-messages', threadId, size],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam, signal }) => {
+      const page = typeof pageParam === 'number' ? pageParam : 1;
       const { data } = await http.get<DirectMessageListResp>(
         `/messages/direct/${encodeURIComponent(threadId)}`,
         { params: { page, size }, signal },
       );
+      markDirectThreadReadInCache(qc, threadId);
+      void qc.invalidateQueries({ queryKey: ['direct-threads'] });
       return data;
     },
+    getNextPageParam: (lastPage) => {
+      const nextPage = lastPage.page + 1;
+      return lastPage.page * lastPage.size < lastPage.total ? nextPage : undefined;
+    },
     enabled: enabled && !!threadId,
-    staleTime: 5_000,
-    refetchInterval: enabled && threadId ? 10_000 : false,
+    staleTime: 1_000,
+    refetchInterval: enabled && threadId ? 3_000 : false,
     retry: 1,
   });
 }
 
+export function useMarkDirectThreadReadLocal() {
+  const qc = useQueryClient();
+  return useCallback((threadId: string) => markDirectThreadReadInCache(qc, threadId), [qc]);
+}
+
 export function useSendDirect() {
   const qc = useQueryClient();
-  return useMutation<DirectThread, Error, { creatorId?: string; channelId?: string; content: string }>({
+  return useMutation<
+    DirectThread,
+    Error,
+    { creatorId?: string; channelId?: string; content: string }
+  >({
     mutationFn: async (payload) => {
       const { data } = await http.post<DirectThread>('/messages/direct', payload);
       return data;
     },
     onSuccess: (thread) => {
+      upsertDirectThreadInCache(qc, thread);
       void qc.invalidateQueries({ queryKey: ['direct-threads'] });
       void qc.invalidateQueries({ queryKey: ['direct-draft', thread.creatorId] });
       void qc.invalidateQueries({ queryKey: ['direct-messages', thread.id] });
@@ -205,16 +232,45 @@ export function useSendThreadMessage(threadId: string) {
       );
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (thread) => {
+      upsertDirectThreadInCache(qc, thread);
+      markDirectThreadReadInCache(qc, thread.id);
       void qc.invalidateQueries({ queryKey: ['direct-threads'] });
       void qc.invalidateQueries({ queryKey: ['direct-messages', threadId] });
     },
   });
 }
 
+function updateDirectThreadCaches(
+  qc: QueryClient,
+  updater: (thread: DirectThread) => DirectThread,
+) {
+  qc.setQueriesData<DirectThreadListResp>({ queryKey: ['direct-threads'] }, (old) =>
+    old ? { ...old, items: old.items.map(updater) } : old,
+  );
+  qc.setQueriesData<DirectThread>({ queryKey: ['direct-draft'] }, (old) =>
+    old ? updater(old) : old,
+  );
+}
+
+function markDirectThreadReadInCache(qc: QueryClient, threadId: string) {
+  if (!threadId) return;
+  updateDirectThreadCaches(qc, (thread) =>
+    thread.id === threadId ? { ...thread, unread: 0 } : thread,
+  );
+}
+
+function upsertDirectThreadInCache(qc: QueryClient, next: DirectThread) {
+  updateDirectThreadCaches(qc, (thread) => (thread.id === next.id ? next : thread));
+}
+
 export function useUpdateThreadOptions(threadId: string) {
   const qc = useQueryClient();
-  return useMutation<DirectThread, Error, Partial<Pick<DirectThread, 'pinned' | 'muted' | 'pushDisabled'>>>({
+  return useMutation<
+    DirectThread,
+    Error,
+    Partial<Pick<DirectThread, 'pinned' | 'muted' | 'pushDisabled'>>
+  >({
     mutationFn: async (payload) => {
       const { data } = await http.patch<DirectThread>(
         `/messages/direct/${encodeURIComponent(threadId)}`,
@@ -334,19 +390,25 @@ export function useJoinedFanGroups(enabled = true) {
   });
 }
 
-export function useFanGroupMessages(groupId: string, enabled = true, page = 1, size = 100) {
-  return useQuery<FanGroupMessageListResp, Error>({
-    queryKey: ['fan-group-messages', groupId, page, size],
-    queryFn: async ({ signal }) => {
+export function useFanGroupMessages(groupId: string, enabled = true, size = 40) {
+  return useInfiniteQuery<FanGroupMessageListResp, Error>({
+    queryKey: ['fan-group-messages', groupId, size],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam, signal }) => {
+      const page = typeof pageParam === 'number' ? pageParam : 1;
       const { data } = await http.get<FanGroupMessageListResp>(
         `/messages/fan-groups/${encodeURIComponent(groupId)}/messages`,
         { params: { page, size }, signal },
       );
       return data;
     },
+    getNextPageParam: (lastPage) => {
+      const nextPage = lastPage.page + 1;
+      return lastPage.page * lastPage.size < lastPage.total ? nextPage : undefined;
+    },
     enabled: enabled && !!groupId,
-    staleTime: 5_000,
-    refetchInterval: enabled && groupId ? 10_000 : false,
+    staleTime: 1_000,
+    refetchInterval: enabled && groupId ? 3_000 : false,
     retry: 1,
   });
 }

@@ -2057,6 +2057,10 @@
       "unread": "未読 {{count}} 件",
       "markAllRead": "すべて既読"
     },
+    "chat": {
+      "newMessages": "新着 {{count}} 件",
+      "loadingOlder": "以前のメッセージを読み込み中..."
+    },
     "private": {
       "title": "メッセージ",
       "conversationCount": "{{count}} 件の会話",
@@ -2064,7 +2068,7 @@
       "loading": "DM を読み込み中...",
       "emptyHint": "配信者をフォローすると、チャンネルから DM を開始できます。",
       "threadEmpty": "まだメッセージはありません",
-      "waitingReply": "配信者の返信を待つまで次の送信はできません",
+      "waitingReply": "配信者の最初の返信を待つまで次の送信はできません",
       "muted": "通知オフが有効です",
       "normal": "通知を受信中",
       "actions": "会話操作",
@@ -2079,9 +2083,9 @@
       "blockedToast": "ブラックリストに追加しました",
       "loadingMessages": "メッセージを読み込み中...",
       "startTitle": "配信者に DM を送る",
-      "startBody": "配信者が返信するまでは、送信できるメッセージは 1 件だけです。",
+      "startBody": "配信者が最初に返信するまでは、送信できるメッセージは 1 件だけです。",
       "input": "DM を入力",
-      "inputWaiting": "配信者の返信を待つまで次の送信はできません",
+      "inputWaiting": "配信者の最初の返信を待つまで次の送信はできません",
       "send": "送信",
       "emptyTitle": "DM はまだありません",
       "emptyBody": "配信者チャンネルを開き、DM アイコンから会話を開始できます。",
@@ -2110,7 +2114,7 @@
       "muteSuccess": "{{minutes}} 分ミュートしました",
       "unmuteSuccess": "ミュートを解除しました",
       "updateFailed": "グループメンバーを更新できませんでした。",
-      "avatarMute": "60 分ミュート",
+      "avatarMute": "このユーザーをミュート",
       "avatarUnmute": "ミュート解除",
       "mutedMark": "禁",
       "kickedTitle": "ファングループから退出させられました",
@@ -2145,7 +2149,7 @@
       "saveFailed": "メッセージ設定を保存できませんでした。"
     },
     "errors": {
-      "awaitingCreatorReply": "配信者が返信するまでは、送信できるメッセージは 1 件だけです。",
+      "awaitingCreatorReply": "配信者が最初に返信するまでは、送信できるメッセージは 1 件だけです。",
       "followRequired": "この配信者をフォローしてから DM を送信してください。",
       "userBlocked": "ブラックリスト関係があるため、DM は利用できません。",
       "sendFailed": "メッセージを送信できませんでした。"

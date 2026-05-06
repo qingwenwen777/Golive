@@ -738,7 +738,13 @@ func (s *MessageService) directThreadDTO(ctx context.Context, thread model.Direc
 		dto.Pinned = thread.ViewerPinnedAt != nil
 		dto.Muted = thread.ViewerMuted
 		dto.PushDisabled = thread.ViewerPushDisabled
-		dto.AwaitingReply = thread.LastSenderID == thread.ViewerID
+		if thread.LastSenderID == thread.ViewerID {
+			creatorHasReplied, err := s.messages.DirectThreadHasMessageFrom(ctx, thread.ID, thread.CreatorID)
+			if err != nil {
+				return DirectThreadDTO{}, err
+			}
+			dto.AwaitingReply = !creatorHasReplied
+		}
 		dto.CanSend = dto.CanSend && !dto.AwaitingReply
 	} else {
 		dto.Unread = thread.CreatorUnread

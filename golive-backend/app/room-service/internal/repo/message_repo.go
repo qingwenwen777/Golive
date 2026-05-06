@@ -236,7 +236,15 @@ func (r *MessageRepo) SendDirectMessage(ctx context.Context, input DirectSendInp
 			return err
 		}
 		if input.SenderID == input.ViewerID && thread.LastSenderID == input.ViewerID {
-			return ErrAwaitingCreatorReply
+			var creatorReplyCount int64
+			if err := tx.Model(&model.DirectMessage{}).
+				Where("thread_id = ? AND sender_id = ?", thread.ID, input.CreatorID).
+				Count(&creatorReplyCount).Error; err != nil {
+				return err
+			}
+			if creatorReplyCount == 0 {
+				return ErrAwaitingCreatorReply
+			}
 		}
 
 		message = model.DirectMessage{
@@ -288,11 +296,24 @@ func (r *MessageRepo) DirectMessages(ctx context.Context, threadID, userID strin
 		return nil, 0, err
 	}
 	var rows []model.DirectMessage
-	err := tx.Order("created_at ASC").
+	err := tx.Order("created_at DESC, id DESC").
 		Offset((page - 1) * size).
 		Limit(size).
 		Find(&rows).Error
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
+	}
 	return rows, total, err
+}
+
+func (r *MessageRepo) DirectThreadHasMessageFrom(ctx context.Context, threadID, senderID string) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&model.DirectMessage{}).
+		Where("thread_id = ? AND sender_id = ?", threadID, senderID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (r *MessageRepo) MarkDirectThreadRead(ctx context.Context, threadID, userID string) error {
@@ -819,10 +840,13 @@ COALESCE(fb.level, 0) AS fan_badge_level
 		Joins("LEFT JOIN fan_group_members AS gm ON gm.group_id = msg.group_id AND gm.user_id = msg.sender_id").
 		Joins("LEFT JOIN fan_badges AS fb ON fb.user_id = msg.sender_id AND fb.creator_id = fg.creator_id").
 		Where("msg.group_id = ?", groupID).
-		Order("msg.created_at ASC").
+		Order("msg.created_at DESC, msg.id DESC").
 		Offset((page - 1) * size).
 		Limit(size).
 		Scan(&rows).Error
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
+	}
 	return rows, total, err
 }
 

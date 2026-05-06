@@ -2058,6 +2058,10 @@
       "unread": "{{count}} 条未读",
       "markAllRead": "全部已读"
     },
+    "chat": {
+      "newMessages": "{{count}} 条新消息",
+      "loadingOlder": "正在加载更早消息..."
+    },
     "private": {
       "title": "我的消息",
       "conversationCount": "{{count}} 个会话",
@@ -2065,7 +2069,7 @@
       "loading": "正在加载私信...",
       "emptyHint": "关注主播后，可以从频道页发起私信。",
       "threadEmpty": "还没有聊天记录",
-      "waitingReply": "等待主播回复后才能继续发送",
+      "waitingReply": "等待主播首次回复后才能继续发送",
       "muted": "已开启免打扰",
       "normal": "通知正常接收",
       "actions": "会话操作",
@@ -2080,9 +2084,9 @@
       "blockedToast": "已加入黑名单",
       "loadingMessages": "正在加载聊天记录...",
       "startTitle": "开始和主播私信",
-      "startBody": "在主播回复前，你只能先发送一条消息。",
+      "startBody": "在主播首次回复前，你只能先发送一条消息。",
       "input": "输入私信内容",
-      "inputWaiting": "等待主播回复后才能继续发送",
+      "inputWaiting": "等待主播首次回复后才能继续发送",
       "send": "发送",
       "emptyTitle": "暂无私信",
       "emptyBody": "进入主播频道页，点击私信图标就能发起会话。",
@@ -2111,7 +2115,7 @@
       "muteSuccess": "已禁言 {{minutes}} 分钟",
       "unmuteSuccess": "已解除禁言",
       "updateFailed": "更新群成员失败。",
-      "avatarMute": "禁言 60 分钟",
+      "avatarMute": "禁言该用户",
       "avatarUnmute": "解除禁言",
       "mutedMark": "禁",
       "kickedTitle": "你已被踢出粉丝群",
@@ -2146,7 +2150,7 @@
       "saveFailed": "消息设置保存失败。"
     },
     "errors": {
-      "awaitingCreatorReply": "主播回复前，你最多只能发送一条消息。",
+      "awaitingCreatorReply": "主播首次回复前，你最多只能发送一条消息。",
       "followRequired": "关注该主播后才能发送私信。",
       "userBlocked": "你们之间存在黑名单关系，暂时无法私信。",
       "sendFailed": "消息发送失败。"

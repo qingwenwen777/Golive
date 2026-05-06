@@ -2065,6 +2065,10 @@
       "unread": "{{count}} unread",
       "markAllRead": "Mark all read"
     },
+    "chat": {
+      "newMessages": "{{count}} new messages",
+      "loadingOlder": "Loading earlier messages..."
+    },
     "private": {
       "title": "My messages",
       "conversationCount": "{{count}} conversations",
@@ -2072,7 +2076,7 @@
       "loading": "Loading direct messages...",
       "emptyHint": "Follow a creator, then start a direct message from their channel.",
       "threadEmpty": "No messages yet",
-      "waitingReply": "Wait for the creator to reply before sending again",
+      "waitingReply": "Wait for the creator's first reply before sending again",
       "muted": "Do Not Disturb is on",
       "normal": "Notifications are enabled",
       "actions": "Conversation actions",
@@ -2087,9 +2091,9 @@
       "blockedToast": "Added to blacklist",
       "loadingMessages": "Loading messages...",
       "startTitle": "Start a creator DM",
-      "startBody": "Before the creator replies, you can send only one message.",
+      "startBody": "Before the creator's first reply, you can send only one message.",
       "input": "Type a direct message",
-      "inputWaiting": "Wait for the creator to reply before sending again",
+      "inputWaiting": "Wait for the creator's first reply before sending again",
       "send": "Send",
       "emptyTitle": "No direct messages",
       "emptyBody": "Open a creator channel and click the DM icon to start a conversation.",
@@ -2118,7 +2122,7 @@
       "muteSuccess": "Muted for {{minutes}} minutes",
       "unmuteSuccess": "Unmuted",
       "updateFailed": "Could not update the group member.",
-      "avatarMute": "Mute for 60 minutes",
+      "avatarMute": "Mute this user",
       "avatarUnmute": "Unmute",
       "mutedMark": "M",
       "kickedTitle": "You were removed from the fan group",
@@ -2153,7 +2157,7 @@
       "saveFailed": "Could not save message settings."
     },
     "errors": {
-      "awaitingCreatorReply": "Before the creator replies, you can send only one message.",
+      "awaitingCreatorReply": "Before the creator's first reply, you can send only one message.",
       "followRequired": "Follow this creator before sending a direct message.",
       "userBlocked": "A blacklist relationship exists, so direct messages are unavailable.",
       "sendFailed": "Could not send the message."

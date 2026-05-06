@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Ban,
   Bell,
   BellOff,
+  ChevronsUp,
   Crown,
   MessageCircle,
   MoreVertical,
@@ -29,6 +38,7 @@ import {
   useDirectThreads,
   useFanGroupMessages,
   useJoinedFanGroups,
+  useMarkDirectThreadReadLocal,
   useMessagePreference,
   useRequestFanGroupRejoin,
   useSendDirect,
@@ -63,6 +73,12 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
 type Translate = ReturnType<typeof useTranslation>['t'];
+const CHAT_PAGE_SIZE = 40;
+type ChatNewNotice = {
+  count: number;
+  targetId: string;
+};
+
 type ChatAvatarAction = {
   key: string;
   label: string;
@@ -169,7 +185,9 @@ function PrivateMessages({
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [content, setContent] = useState('');
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
+  const directInputRef = useRef<HTMLInputElement | null>(null);
   const sendDirect = useSendDirect();
+  const markDirectThreadReadLocal = useMarkDirectThreadReadLocal();
   const joinedGroups = fanGroups.data?.items ?? [];
   const selectedGroup = selectedGroupId
     ? joinedGroups.find((item) => item.id === selectedGroupId)
@@ -183,7 +201,21 @@ function PrivateMessages({
         threadByDraft ??
         threads.data?.items[0] ??
         draft.data);
-  const messages = useDirectMessages(selectedThread?.id ?? '', Boolean(selectedThread?.id));
+  const messages = useDirectMessages(
+    selectedThread?.id ?? '',
+    Boolean(selectedThread?.id),
+    CHAT_PAGE_SIZE,
+  );
+  const directMessageItems = useMemo(
+    () => mergeMessagePages(messages.data?.pages),
+    [messages.data?.pages],
+  );
+  const directScroll = useChatScroll(directMessageItems, {
+    activeKey: selectedThread?.id ? `direct:${selectedThread.id}` : 'direct:none',
+    hasNextPage: Boolean(messages.hasNextPage),
+    isFetchingNextPage: messages.isFetchingNextPage,
+    fetchNextPage: () => messages.fetchNextPage(),
+  });
   const sendThread = useSendThreadMessage(selectedThread?.id ?? '');
   const blockUser = useBlockUser();
   const updateOptions = useUpdateThreadOptions(selectedThread?.id ?? '');
@@ -206,11 +238,18 @@ function PrivateMessages({
     }
   }, [draftBlockedByFollow, t]);
 
+  useEffect(() => {
+    if (selectedThread?.id) markDirectThreadReadLocal(selectedThread.id);
+  }, [markDirectThreadReadLocal, selectedThread?.id]);
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = content.trim();
     if (!text || !selectedThread) return;
-    const onSuccess = () => setContent('');
+    const onSuccess = () => {
+      setContent('');
+      focusInputSoon(directInputRef);
+    };
     const onError = (err: Error) => toast.error(messageError(err, t));
     if (selectedThread.id) {
       sendThread.mutate(text, { onSuccess, onError });
@@ -284,6 +323,7 @@ function PrivateMessages({
                 onClick={() => {
                   setSelectedGroupId('');
                   setSelectedId('');
+                  if (draft.data?.id) markDirectThreadReadLocal(draft.data.id);
                 }}
               />
             )}
@@ -293,6 +333,7 @@ function PrivateMessages({
                 thread={thread}
                 active={selectedThread?.id === thread.id}
                 onClick={() => {
+                  markDirectThreadReadLocal(thread.id);
                   setSelectedGroupId('');
                   setSelectedId(thread.id);
                 }}
@@ -331,7 +372,7 @@ function PrivateMessages({
                 <span>
                   {selectedThread.awaitingReply
                     ? t('messages.private.waitingReply', {
-                        defaultValue: '等待主播回复后才能继续发送',
+                        defaultValue: '等待主播首次回复后才能继续发送',
                       })
                     : selectedThread.muted
                       ? t('messages.private.muted', { defaultValue: '已开启免打扰' })
@@ -405,15 +446,27 @@ function PrivateMessages({
               )}
             </div>
 
-            <div className="gl-direct-message-list">
+            <div
+              className="gl-direct-message-list"
+              ref={directScroll.listRef}
+              onScroll={directScroll.onScroll}
+            >
+              {messages.isFetchingNextPage && (
+                <div className="gl-chat-loading-older">
+                  {t('messages.chat.loadingOlder', { defaultValue: '正在加载更早消息...' })}
+                </div>
+              )}
+              {directScroll.newNotice && (
+                <NewMessagesJump notice={directScroll.newNotice} onClick={directScroll.jumpToNew} />
+              )}
               {messages.isPending && selectedThread.id ? (
                 <div className="gl-message-empty-soft">
                   {t('messages.private.loadingMessages', {
                     defaultValue: '正在加载聊天记录...',
                   })}
                 </div>
-              ) : messages.data?.items.length ? (
-                messages.data.items.map((item) => {
+              ) : directMessageItems.length ? (
+                directMessageItems.map((item) => {
                   const sender = directMessageSender(item, selectedThread, currentUser);
                   const senderCreatorId = creatorChannelIdForUser(sender, selectedThread.creatorId);
                   return (
@@ -425,6 +478,11 @@ function PrivateMessages({
                       currentUserId={userId}
                       fanBadge={sender.fanBadge}
                       locale={i18n.language}
+                      anchorRef={
+                        directScroll.newNotice?.targetId === item.id
+                          ? directScroll.firstNewRef
+                          : undefined
+                      }
                       onAvatarClick={
                         senderCreatorId ? () => navigate(`/channel/${senderCreatorId}`) : undefined
                       }
@@ -446,7 +504,7 @@ function PrivateMessages({
                   </strong>
                   <span>
                     {t('messages.private.startBody', {
-                      defaultValue: '在主播回复前，你只能先发送一条消息。',
+                      defaultValue: '在主播首次回复前，你只能先发送一条消息。',
                     })}
                   </span>
                 </div>
@@ -455,6 +513,7 @@ function PrivateMessages({
 
             <form className="gl-direct-compose" onSubmit={submit}>
               <input
+                ref={directInputRef}
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 maxLength={1000}
@@ -463,14 +522,20 @@ function PrivateMessages({
                   selectedThread.canSend
                     ? t('messages.private.input', { defaultValue: '输入私信内容' })
                     : t('messages.private.inputWaiting', {
-                        defaultValue: '等待主播回复后才能继续发送',
+                        defaultValue: '等待主播首次回复后才能继续发送',
                       })
                 }
               />
               <button
                 className="gl-creator-primary"
                 type="submit"
-                disabled={!content.trim() || !selectedThread.canSend}
+                onMouseDown={(event) => event.preventDefault()}
+                disabled={
+                  !content.trim() ||
+                  !selectedThread.canSend ||
+                  sendDirect.isPending ||
+                  sendThread.isPending
+                }
               >
                 <Send size={16} />
                 {t('messages.private.send', { defaultValue: '发送' })}
@@ -498,6 +563,153 @@ function PrivateMessages({
       />
     </div>
   );
+}
+
+function NewMessagesJump({ notice, onClick }: { notice: ChatNewNotice; onClick: () => void }) {
+  const { t } = useTranslation('pages');
+  return (
+    <button className="gl-chat-new-message-pill" type="button" onClick={onClick}>
+      <ChevronsUp size={15} />
+      {t('messages.chat.newMessages', {
+        count: notice.count,
+        defaultValue: '{{count}} 条新消息',
+      })}
+    </button>
+  );
+}
+
+function mergeMessagePages<T extends { id: string }>(pages?: Array<{ items: T[] }>): T[] {
+  if (!pages?.length) return [];
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const page of [...pages].reverse()) {
+    for (const item of page.items) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+  }
+  return merged;
+}
+
+function focusInputSoon(ref: { current: HTMLInputElement | null }) {
+  window.requestAnimationFrame(() => ref.current?.focus());
+  window.setTimeout(() => ref.current?.focus(), 0);
+}
+
+function useChatScroll<T extends { id: string }>(
+  items: T[],
+  options: {
+    activeKey: string;
+    hasNextPage: boolean;
+    isFetchingNextPage: boolean;
+    fetchNextPage: () => Promise<unknown>;
+  },
+) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const firstNewRef = useRef<HTMLDivElement | null>(null);
+  const previousLastIdRef = useRef('');
+  const nearBottomRef = useRef(true);
+  const loadingOlderRef = useRef(false);
+  const previousScrollHeightRef = useRef(0);
+  const requestedOlderRef = useRef(false);
+  const [newNotice, setNewNotice] = useState<ChatNewNotice | null>(null);
+
+  useEffect(() => {
+    previousLastIdRef.current = '';
+    nearBottomRef.current = true;
+    loadingOlderRef.current = false;
+    previousScrollHeightRef.current = 0;
+    requestedOlderRef.current = false;
+    setNewNotice(null);
+  }, [options.activeKey]);
+
+  useEffect(() => {
+    if (!options.isFetchingNextPage) requestedOlderRef.current = false;
+  }, [options.isFetchingNextPage]);
+
+  const onScroll = () => {
+    const node = listRef.current;
+    if (!node) return;
+    nearBottomRef.current = distanceFromBottom(node) < 88;
+    if (nearBottomRef.current) setNewNotice(null);
+    if (
+      node.scrollTop <= 72 &&
+      options.hasNextPage &&
+      !options.isFetchingNextPage &&
+      !requestedOlderRef.current
+    ) {
+      requestedOlderRef.current = true;
+      loadingOlderRef.current = true;
+      previousScrollHeightRef.current = node.scrollHeight;
+      void options.fetchNextPage().finally(() => {
+        requestedOlderRef.current = false;
+      });
+    }
+  };
+
+  useEffect(() => {
+    const node = listRef.current;
+    const lastId = items.at(-1)?.id ?? '';
+    if (!node || !lastId) {
+      previousLastIdRef.current = lastId;
+      setNewNotice(null);
+      return;
+    }
+
+    if (loadingOlderRef.current) {
+      const previousHeight = previousScrollHeightRef.current;
+      window.requestAnimationFrame(() => {
+        const nextNode = listRef.current;
+        if (nextNode && previousHeight > 0) {
+          nextNode.scrollTop = nextNode.scrollHeight - previousHeight + nextNode.scrollTop;
+        }
+      });
+      loadingOlderRef.current = false;
+      previousScrollHeightRef.current = 0;
+      previousLastIdRef.current = lastId;
+      return;
+    }
+
+    const previousLastId = previousLastIdRef.current;
+    if (!previousLastId) {
+      window.requestAnimationFrame(() => {
+        const nextNode = listRef.current;
+        if (nextNode) nextNode.scrollTop = nextNode.scrollHeight;
+      });
+      previousLastIdRef.current = lastId;
+      return;
+    }
+
+    if (lastId !== previousLastId) {
+      const previousIndex = items.findIndex((item) => item.id === previousLastId);
+      const addedItems = previousIndex >= 0 ? items.slice(previousIndex + 1) : items.slice(-1);
+      if (nearBottomRef.current || distanceFromBottom(node) < 120) {
+        window.requestAnimationFrame(() => {
+          const nextNode = listRef.current;
+          if (nextNode) nextNode.scrollTop = nextNode.scrollHeight;
+        });
+        setNewNotice(null);
+      } else if (addedItems.length) {
+        setNewNotice((current) => ({
+          count: (current?.count ?? 0) + addedItems.length,
+          targetId: current?.targetId ?? addedItems[0].id,
+        }));
+      }
+    }
+    previousLastIdRef.current = lastId;
+  }, [items, options.activeKey]);
+
+  const jumpToNew = () => {
+    firstNewRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setNewNotice(null);
+  };
+
+  return { listRef, firstNewRef, newNotice, onScroll, jumpToNew };
+}
+
+function distanceFromBottom(node: HTMLElement) {
+  return node.scrollHeight - node.scrollTop - node.clientHeight;
 }
 
 function ThreadButton({
@@ -585,7 +797,22 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
   const currentMember = group.members.find((member) => member.user.id === userId);
   const [content, setContent] = useState('');
   const [muteTarget, setMuteTarget] = useState<FanGroupMember | null>(null);
-  const messages = useFanGroupMessages(group.id, Boolean(group.id) && !currentMember?.kicked);
+  const groupInputRef = useRef<HTMLInputElement | null>(null);
+  const messages = useFanGroupMessages(
+    group.id,
+    Boolean(group.id) && !currentMember?.kicked,
+    CHAT_PAGE_SIZE,
+  );
+  const groupMessageItems = useMemo(
+    () => mergeMessagePages(messages.data?.pages),
+    [messages.data?.pages],
+  );
+  const groupScroll = useChatScroll(groupMessageItems, {
+    activeKey: group.id ? `fan:${group.id}` : 'fan:none',
+    hasNextPage: Boolean(messages.hasNextPage),
+    isFetchingNextPage: messages.isFetchingNextPage,
+    fetchNextPage: () => messages.fetchNextPage(),
+  });
   const sendMessage = useSendFanGroupMessage(group.id);
   const updateMember = useUpdateFanGroupMember();
   const requestRejoinMutation = useRequestFanGroupRejoin();
@@ -642,7 +869,10 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
     const text = content.trim();
     if (!text || !canSend) return;
     sendMessage.mutate(text, {
-      onSuccess: () => setContent(''),
+      onSuccess: () => {
+        setContent('');
+        focusInputSoon(groupInputRef);
+      },
       onError: (err) => toast.error(fanGroupMessageError(err, t)),
     });
   };
@@ -673,7 +903,19 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
           </span>
         </div>
       </div>
-      <div className="gl-direct-message-list">
+      <div
+        className="gl-direct-message-list"
+        ref={groupScroll.listRef}
+        onScroll={groupScroll.onScroll}
+      >
+        {messages.isFetchingNextPage && !currentMember?.kicked && (
+          <div className="gl-chat-loading-older">
+            {t('messages.chat.loadingOlder', { defaultValue: '正在加载更早消息...' })}
+          </div>
+        )}
+        {groupScroll.newNotice && !currentMember?.kicked && (
+          <NewMessagesJump notice={groupScroll.newNotice} onClick={groupScroll.jumpToNew} />
+        )}
         {currentMember?.kicked ? (
           <FanGroupKickedState
             member={currentMember}
@@ -684,8 +926,8 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
           <div className="gl-message-empty-soft">
             {t('messages.fanGroupChat.loading', { defaultValue: '正在加载群聊...' })}
           </div>
-        ) : messages.data?.items.length ? (
-          messages.data.items.map((item) => {
+        ) : groupMessageItems.length ? (
+          groupMessageItems.map((item) => {
             const member = memberById.get(item.sender.id);
             const isCreatorMessage = item.sender.id === group.creatorId || item.role === 'owner';
             const canManageMember =
@@ -705,7 +947,7 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
                 key: 'mute',
                 label: member?.muted
                   ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
-                  : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言 60 分钟' }),
+                  : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言该用户' }),
                 icon: <Ban size={15} />,
                 danger: !member?.muted,
                 onSelect: () => openMemberMuteDialog(member),
@@ -723,6 +965,9 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
                 muted={member?.muted}
                 canManage={canManageMember}
                 locale={i18n.language}
+                anchorRef={
+                  groupScroll.newNotice?.targetId === item.id ? groupScroll.firstNewRef : undefined
+                }
                 avatarActions={avatarActions}
                 avatarTitle={
                   avatarActions.length
@@ -754,6 +999,7 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
       {!currentMember?.kicked && (
         <form className="gl-direct-compose" onSubmit={submit}>
           <input
+            ref={groupInputRef}
             value={content}
             onChange={(event) => setContent(event.target.value)}
             maxLength={1000}
@@ -769,7 +1015,8 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
           <button
             className="gl-creator-primary"
             type="submit"
-            disabled={!content.trim() || !canSend}
+            onMouseDown={(event) => event.preventDefault()}
+            disabled={!content.trim() || !canSend || sendMessage.isPending}
           >
             <Send size={16} />
             {t('messages.private.send', { defaultValue: '发送' })}
@@ -805,6 +1052,7 @@ function ChatMessageRow({
   muted,
   canManage,
   locale,
+  anchorRef,
   onAvatarClick,
   avatarTitle,
   avatarActions,
@@ -818,6 +1066,7 @@ function ChatMessageRow({
   muted?: boolean;
   canManage?: boolean;
   locale?: string;
+  anchorRef?: Ref<HTMLDivElement>;
   onAvatarClick?: () => void;
   avatarTitle?: string;
   avatarActions?: ChatAvatarAction[];
@@ -841,7 +1090,7 @@ function ChatMessageRow({
         (canManage
           ? muted
             ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
-            : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言 60 分钟' })
+            : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言该用户' })
           : sender.name)
       }
     >
@@ -870,7 +1119,7 @@ function ChatMessageRow({
   );
 
   return (
-    <div className={cn('gl-chat-message-row', isMine && 'is-me')}>
+    <div ref={anchorRef} className={cn('gl-chat-message-row', isMine && 'is-me')}>
       {!isMine && avatar}
       <div className="gl-chat-message-stack">
         <div className="gl-chat-message-meta">
@@ -1380,7 +1629,7 @@ function messageError(err: Error, t: Translate): string {
   const reason = apiErrorReason(err);
   if (reason === 'awaiting_creator_reply') {
     return t('messages.errors.awaitingCreatorReply', {
-      defaultValue: '主播回复前，你最多只能发送一条消息。',
+      defaultValue: '主播首次回复前，你最多只能发送一条消息。',
     });
   }
   if (reason === 'follow_required') {
