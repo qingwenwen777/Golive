@@ -18,6 +18,29 @@ const (
 	loginCooldownKeyPrefix = "login:cooldown:"
 )
 
+var rotateRefreshScript = redis.NewScript(`
+local oldKey = KEYS[1]
+local newKey = KEYS[2]
+local userID = ARGV[1]
+local ttlMillis = tonumber(ARGV[2])
+
+local current = redis.call("GET", oldKey)
+if not current then
+	return 0
+end
+if current ~= userID then
+	return 0
+end
+
+redis.call("DEL", oldKey)
+if ttlMillis and ttlMillis > 0 then
+	redis.call("SET", newKey, userID, "PX", ttlMillis)
+else
+	redis.call("SET", newKey, userID)
+end
+return 1
+`)
+
 type TokenRepo struct {
 	rdb *redis.Client
 }
@@ -46,15 +69,24 @@ func (r *TokenRepo) DeleteRefresh(ctx context.Context, token string) error {
 	return r.rdb.Del(ctx, refreshKeyPrefix+token).Err()
 }
 
-// Rotate atomically deletes the old token and stores the new one. The current
-// implementation uses a pipeline; collisions are negligible for our scale and
-// a strict CAS is unnecessary because each refreshToken is a fresh UUID.
+// Rotate atomically revokes oldToken and stores newToken when oldToken still
+// exists and belongs to userID. Redis runs the Lua script as one command, so
+// clients never observe the old token deleted before the replacement is saved.
 func (r *TokenRepo) Rotate(ctx context.Context, oldToken, newToken, userID string, ttl time.Duration) error {
-	pipe := r.rdb.TxPipeline()
-	pipe.Del(ctx, refreshKeyPrefix+oldToken)
-	pipe.Set(ctx, refreshKeyPrefix+newToken, userID, ttl)
-	_, err := pipe.Exec(ctx)
-	return err
+	result, err := rotateRefreshScript.Run(
+		ctx,
+		r.rdb,
+		[]string{refreshKeyPrefix + oldToken, refreshKeyPrefix + newToken},
+		userID,
+		ttl.Milliseconds(),
+	).Int()
+	if err != nil {
+		return err
+	}
+	if result != 1 {
+		return ErrRefreshNotFound
+	}
+	return nil
 }
 
 func (r *TokenRepo) LoginCooldown(ctx context.Context, username string) (time.Duration, bool, error) {

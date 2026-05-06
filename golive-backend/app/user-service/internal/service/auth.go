@@ -371,6 +371,9 @@ func (s *AuthService) Refresh(ctx context.Context, oldRefresh string) (*RefreshR
 	}
 	newRefresh := uuid.NewString()
 	if err := s.tokens.Rotate(ctx, oldRefresh, newRefresh, userID, s.refreshTTL); err != nil {
+		if errors.Is(err, repo.ErrRefreshNotFound) {
+			return nil, ErrInvalidRefresh
+		}
 		return nil, fmt.Errorf("rotate refresh: %w", err)
 	}
 	return &RefreshResp{Token: access, RefreshToken: newRefresh}, nil
