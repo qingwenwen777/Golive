@@ -201,14 +201,14 @@ function PrivateMessages({
     ? joinedGroups.find((item) => item.id === selectedGroupId)
     : undefined;
   const threadByDraft = threads.data?.items.find((item) => item.creatorId === draftCreatorId);
+  const selectedDirectThread = selectedId
+    ? threads.data?.items.find((item) => item.id === selectedId)
+    : undefined;
+  const routeDraftThread = draftCreatorId ? (threadByDraft ?? draft.data) : undefined;
   const followRequiredActive = draftBlockedByFollow && !selectedId && !selectedGroupId;
   const selectedThread =
-    selectedGroup || followRequiredActive
-      ? undefined
-      : ((selectedId ? threads.data?.items.find((item) => item.id === selectedId) : undefined) ??
-        threadByDraft ??
-        threads.data?.items[0] ??
-        draft.data);
+    selectedGroup || followRequiredActive ? undefined : (selectedDirectThread ?? routeDraftThread);
+  const conversationCount = (threads.data?.total ?? 0) + joinedGroups.length;
   const messages = useDirectMessages(
     selectedThread?.id ?? '',
     Boolean(selectedThread?.id),
@@ -233,6 +233,13 @@ function PrivateMessages({
     () => [...(threads.data?.items ?? [])].sort((a, b) => Number(b.pinned) - Number(a.pinned)),
     [threads.data?.items],
   );
+
+  useEffect(() => {
+    setSelectedGroupId('');
+    setSelectedId('');
+    setContent('');
+    setEntryUnread(0);
+  }, [draftCreatorId]);
 
   useEffect(() => {
     if (!selectedId && !selectedGroupId && threadByDraft?.id) setSelectedId(threadByDraft.id);
@@ -309,7 +316,7 @@ function PrivateMessages({
           <h1>{t('messages.private.title', { defaultValue: '我的消息' })}</h1>
           <span>
             {t('messages.private.conversationCount', {
-              count: (threads.data?.total ?? 0) + joinedGroups.length,
+              count: conversationCount,
               defaultValue: '{{count}} 个会话',
             })}
           </span>
@@ -582,11 +589,19 @@ function PrivateMessages({
         ) : (
           <div className="gl-direct-empty is-full">
             <MessageCircle size={38} />
-            <strong>{t('messages.private.emptyTitle', { defaultValue: '暂无私信' })}</strong>
+            <strong>
+              {conversationCount > 0
+                ? t('messages.private.selectTitle', { defaultValue: '选择一个会话' })
+                : t('messages.private.emptyTitle', { defaultValue: '暂无私信' })}
+            </strong>
             <span>
-              {t('messages.private.emptyBody', {
-                defaultValue: '进入主播频道页，点击私信图标就能发起会话。',
-              })}
+              {conversationCount > 0
+                ? t('messages.private.selectBody', {
+                    defaultValue: '从左侧选择私信或粉丝团群聊后开始查看消息。',
+                  })
+                : t('messages.private.emptyBody', {
+                    defaultValue: '进入主播频道页，点击私信图标就能发起会话。',
+                  })}
             </span>
           </div>
         )}
