@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -63,6 +63,13 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
 type Translate = ReturnType<typeof useTranslation>['t'];
+type ChatAvatarAction = {
+  key: string;
+  label: string;
+  icon?: ReactNode;
+  danger?: boolean;
+  onSelect: () => void;
+};
 
 export default function MessagesPage() {
   const navigate = useNavigate();
@@ -683,6 +690,27 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
             const isCreatorMessage = item.sender.id === group.creatorId || item.role === 'owner';
             const canManageMember =
               canModerate && canManageFanGroupMember(currentMember, member, userId);
+            const memberCreatorId = creatorChannelIdForUser(item.sender, group.creatorId);
+            const avatarActions: ChatAvatarAction[] = [];
+            if (memberCreatorId) {
+              avatarActions.push({
+                key: 'channel',
+                label: t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' }),
+                icon: <UserRound size={15} />,
+                onSelect: () => navigate(`/channel/${memberCreatorId}`),
+              });
+            }
+            if (canManageMember) {
+              avatarActions.push({
+                key: 'mute',
+                label: member?.muted
+                  ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
+                  : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言 60 分钟' }),
+                icon: <Ban size={15} />,
+                danger: !member?.muted,
+                onSelect: () => openMemberMuteDialog(member),
+              });
+            }
             return (
               <ChatMessageRow
                 key={item.id}
@@ -695,21 +723,18 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
                 muted={member?.muted}
                 canManage={canManageMember}
                 locale={i18n.language}
-                onAvatarClick={
-                  isCreatorMessage
-                    ? () => navigate(`/channel/${group.creatorId}`)
-                    : canManageMember
-                      ? () => openMemberMuteDialog(member)
+                avatarActions={avatarActions}
+                avatarTitle={
+                  avatarActions.length
+                    ? item.sender.name
+                    : isCreatorMessage
+                      ? t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })
                       : undefined
                 }
-                avatarTitle={
-                  isCreatorMessage
-                    ? t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })
-                    : canManageMember
-                      ? member?.muted
-                        ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
-                        : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言 60 分钟' })
-                      : undefined
+                onAvatarClick={
+                  !avatarActions.length && isCreatorMessage
+                    ? () => navigate(`/channel/${group.creatorId}`)
+                    : undefined
                 }
               />
             );
@@ -782,6 +807,7 @@ function ChatMessageRow({
   locale,
   onAvatarClick,
   avatarTitle,
+  avatarActions,
 }: {
   sender: MessageUser;
   body: string;
@@ -794,11 +820,13 @@ function ChatMessageRow({
   locale?: string;
   onAvatarClick?: () => void;
   avatarTitle?: string;
+  avatarActions?: ChatAvatarAction[];
 }) {
   const { t } = useTranslation('pages');
   const isMine = sender.id === currentUserId;
-  const actionable = Boolean(onAvatarClick);
-  const avatar = (
+  const hasAvatarActions = Boolean(avatarActions?.length);
+  const actionable = Boolean(onAvatarClick || hasAvatarActions);
+  const avatarButton = (
     <button
       type="button"
       className={cn(
@@ -807,7 +835,7 @@ function ChatMessageRow({
         muted && 'is-muted',
       )}
       disabled={!actionable}
-      onClick={onAvatarClick}
+      onClick={hasAvatarActions ? undefined : onAvatarClick}
       title={
         avatarTitle ||
         (canManage
@@ -820,6 +848,25 @@ function ChatMessageRow({
       <Avatar name={sender.name} src={sender.avatar} size={38} />
       {muted && <span>{t('messages.fanGroupChat.mutedMark', { defaultValue: '禁' })}</span>}
     </button>
+  );
+  const avatar = hasAvatarActions ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{avatarButton}</DropdownMenuTrigger>
+      <DropdownMenuContent align={isMine ? 'end' : 'start'} className="w-40">
+        {avatarActions?.map((action) => (
+          <DropdownMenuItem
+            key={action.key}
+            className={action.danger ? 'gl-menu-danger' : undefined}
+            onSelect={action.onSelect}
+          >
+            {action.icon}
+            {action.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : (
+    avatarButton
   );
 
   return (
