@@ -1197,6 +1197,11 @@
         "subtitle": "审计流水"
       }
     },
+    "pagination": {
+      "prev": "上一页",
+      "next": "下一页",
+      "page": "第 {{page}} / {{pages}} 页"
+    },
     "dashboard": {
       "aria": "后台总览",
       "kpis": {
@@ -1265,6 +1270,7 @@
         "all": "全部状态",
         "active": "正常",
         "banned": "已封禁",
+        "appealPending": "有待处理申诉",
         "frozen": "有冻结 Coins",
         "liveApproved": "已开通直播"
       },
@@ -1285,10 +1291,11 @@
         "invalidAmount": "请输入有效金额。",
         "coinsSaved": "Coin 余额已更新。",
         "tabs": {
-          "profile": "Profile",
+          "profile": "资料",
           "coins": "Coins",
           "lives": "开播记录",
-          "reports": "举报记录"
+          "reports": "举报记录",
+          "appeals": "申诉记录"
         },
         "status": "状态",
         "livePermission": "开播权限",
@@ -1318,7 +1325,32 @@
         "applyCoins": "应用",
         "noLives": "暂无开播记录。",
         "noReports": "暂无举报记录。",
-        "peak": "峰值"
+        "noAppeals": "暂无申诉记录。",
+        "liveMeta": "{{status}} · {{date}} · {{peak}} 峰值",
+        "reportMeta": "{{target}} · {{status}} · {{date}}",
+        "peak": "峰值",
+        "liveStatus": {
+          "created": "已创建",
+          "live": "直播中",
+          "ended": "已结束",
+          "expired": "已过期",
+          "cancelled": "已取消"
+        },
+        "appealStatus": {
+          "pending": "待处理",
+          "reviewing": "复核中",
+          "approved": "已通过",
+          "rejected": "已拒绝"
+        },
+        "appealApproved": "申诉已通过。",
+        "appealRejected": "申诉已拒绝。",
+        "appealReviewing": "申诉已标记为复核中。",
+        "appealReviewNote": "复核备注",
+        "appealReviewer": "复核人",
+        "appealNotePlaceholder": "可填写复核备注",
+        "markReviewing": "复核中",
+        "approveAppeal": "通过",
+        "rejectAppeal": "拒绝"
       },
       "coinActions": {
         "add": "充值",

@@ -1196,6 +1196,11 @@
         "subtitle": "監査履歴"
       }
     },
+    "pagination": {
+      "prev": "前へ",
+      "next": "次へ",
+      "page": "{{page}} / {{pages}} ページ"
+    },
     "dashboard": {
       "aria": "管理概要",
       "kpis": {
@@ -1264,6 +1269,7 @@
         "all": "すべての状態",
         "active": "有効",
         "banned": "停止中",
+        "appealPending": "未処理の申し立てあり",
         "frozen": "Coins 凍結あり",
         "liveApproved": "配信承認済み"
       },
@@ -1284,10 +1290,11 @@
         "invalidAmount": "有効な金額を入力してください。",
         "coinsSaved": "Coin 残高を更新しました。",
         "tabs": {
-          "profile": "Profile",
+          "profile": "プロフィール",
           "coins": "Coins",
           "lives": "配信記録",
-          "reports": "通報記録"
+          "reports": "通報記録",
+          "appeals": "申し立て"
         },
         "status": "状態",
         "livePermission": "配信権限",
@@ -1317,7 +1324,32 @@
         "applyCoins": "適用",
         "noLives": "配信記録はありません。",
         "noReports": "通報記録はありません。",
-        "peak": "最大"
+        "noAppeals": "申し立て記録はありません。",
+        "liveMeta": "{{status}} · {{date}} · 最大 {{peak}}",
+        "reportMeta": "{{target}} · {{status}} · {{date}}",
+        "peak": "最大",
+        "liveStatus": {
+          "created": "作成済み",
+          "live": "配信中",
+          "ended": "終了済み",
+          "expired": "期限切れ",
+          "cancelled": "キャンセル済み"
+        },
+        "appealStatus": {
+          "pending": "未対応",
+          "reviewing": "確認中",
+          "approved": "承認済み",
+          "rejected": "拒否済み"
+        },
+        "appealApproved": "申し立てを承認しました。",
+        "appealRejected": "申し立てを拒否しました。",
+        "appealReviewing": "申し立てを確認中にしました。",
+        "appealReviewNote": "確認メモ",
+        "appealReviewer": "確認者",
+        "appealNotePlaceholder": "任意の確認メモ",
+        "markReviewing": "確認中",
+        "approveAppeal": "承認",
+        "rejectAppeal": "拒否"
       },
       "coinActions": {
         "add": "チャージ",

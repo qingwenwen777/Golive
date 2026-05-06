@@ -158,6 +158,18 @@ const MODULE_DEFAULTS: Record<AdminModule, { label: string; subtitle: string }> 
   logs: { label: 'Operation logs', subtitle: 'Audit trail' },
 };
 
+const DETAIL_RECORD_PAGE_SIZE = 8;
+
+function pagedItems<T>(items: T[], page: number, pageSize: number) {
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const start = (currentPage - 1) * pageSize;
+  return {
+    page: currentPage,
+    items: items.slice(start, start + pageSize),
+  };
+}
+
 function isAdminModule(value: string): value is AdminModule {
   return ADMIN_MODULES.some((module) => module.key === value);
 }
@@ -962,6 +974,9 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [banReason, setBanReason] = useState('');
+  const [livePage, setLivePage] = useState(1);
+  const [reportPage, setReportPage] = useState(1);
+  const [appealPage, setAppealPage] = useState(1);
   const [coinAction, setCoinAction] = useState<CoinAdjustAction>('add');
   const [coinAmount, setCoinAmount] = useState('100');
   const [coinNote, setCoinNote] = useState('');
@@ -982,6 +997,9 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
     setEmail(user.email || '');
     setPassword('');
     setBanReason(user.banReason || '');
+    setLivePage(1);
+    setReportPage(1);
+    setAppealPage(1);
     setAppealNote('');
     setTab('profile');
   }, [user?.id]);
@@ -1007,6 +1025,12 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
   }
 
   const availableCoins = Math.max(0, user.coinBalance - (user.frozenCoins ?? 0));
+  const liveRecords = detail.data?.liveRecords ?? [];
+  const reportRecords = detail.data?.reportRecords ?? [];
+  const appealRecords = detail.data?.appealRecords ?? [];
+  const livePageData = pagedItems(liveRecords, livePage, DETAIL_RECORD_PAGE_SIZE);
+  const reportPageData = pagedItems(reportRecords, reportPage, DETAIL_RECORD_PAGE_SIZE);
+  const appealPageData = pagedItems(appealRecords, appealPage, DETAIL_RECORD_PAGE_SIZE);
   const submitProfile = () => {
     updateProfile.mutate(
       {
@@ -1284,61 +1308,99 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
       )}
 
       {tab === 'lives' && (
-        <div className="gl-admin-mini-list">
-          {(detail.data?.liveRecords ?? []).length === 0 ? (
-            <AdminEmptyState
-              label={t('admin.users.detail.noLives', { defaultValue: 'No live records.' })}
+        <div className="gl-admin-user-detail-body">
+          <div className="gl-admin-mini-list">
+            {liveRecords.length === 0 ? (
+              <AdminEmptyState
+                label={t('admin.users.detail.noLives', { defaultValue: 'No live records.' })}
+              />
+            ) : (
+              livePageData.items.map((record) => (
+                <div key={record.id}>
+                  <strong>{record.title || record.id}</strong>
+                  <span>
+                    {t('admin.users.detail.liveMeta', {
+                      status: liveRecordStatusLabel(record.status, t),
+                      date: formatDate(record.startedAt),
+                      peak: record.peakViewers,
+                      defaultValue: '{{status}} · {{date}} · {{peak}} peak',
+                    })}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          {liveRecords.length > DETAIL_RECORD_PAGE_SIZE && (
+            <AdminPager
+              page={livePageData.page}
+              pageSize={DETAIL_RECORD_PAGE_SIZE}
+              total={liveRecords.length}
+              onPage={setLivePage}
             />
-          ) : (
-            detail.data?.liveRecords.map((record) => (
-              <div key={record.id}>
-                <strong>{record.title || record.id}</strong>
-                <span>
-                  {record.status} · {formatDate(record.startedAt)} · {record.peakViewers}{' '}
-                  {t('admin.users.detail.peak', { defaultValue: 'peak' })}
-                </span>
-              </div>
-            ))
           )}
         </div>
       )}
 
       {tab === 'reports' && (
-        <div className="gl-admin-mini-list">
-          {(detail.data?.reportRecords ?? []).length === 0 ? (
-            <AdminEmptyState
-              label={t('admin.users.detail.noReports', { defaultValue: 'No report records.' })}
+        <div className="gl-admin-user-detail-body">
+          <div className="gl-admin-mini-list">
+            {reportRecords.length === 0 ? (
+              <AdminEmptyState
+                label={t('admin.users.detail.noReports', { defaultValue: 'No report records.' })}
+              />
+            ) : (
+              reportPageData.items.map((record) => (
+                <div key={record.id}>
+                  <strong>{reportReasonLabel(record.reason, t)}</strong>
+                  <span>
+                    {t('admin.users.detail.reportMeta', {
+                      target: reportTargetLabel(record.targetType, t),
+                      status: reportStatusLabel(record.status, t),
+                      date: formatDate(record.createdAt),
+                      defaultValue: '{{target}} · {{status}} · {{date}}',
+                    })}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          {reportRecords.length > DETAIL_RECORD_PAGE_SIZE && (
+            <AdminPager
+              page={reportPageData.page}
+              pageSize={DETAIL_RECORD_PAGE_SIZE}
+              total={reportRecords.length}
+              onPage={setReportPage}
             />
-          ) : (
-            detail.data?.reportRecords.map((record) => (
-              <div key={record.id}>
-                <strong>{reportReasonLabel(record.reason, t)}</strong>
-                <span>
-                  {reportTargetLabel(record.targetType, t)} · {reportStatusLabel(record.status, t)}{' '}
-                  · {formatDate(record.createdAt)}
-                </span>
-              </div>
-            ))
           )}
         </div>
       )}
 
       {tab === 'appeals' && (
-        <div className="gl-admin-mini-list gl-admin-appeal-list">
-          {(detail.data?.appealRecords ?? []).length === 0 ? (
-            <AdminEmptyState
-              label={t('admin.users.detail.noAppeals', { defaultValue: 'No appeal records.' })}
-            />
-          ) : (
-            detail.data?.appealRecords.map((record) => (
-              <AdminAppealRecord
-                key={record.id}
-                userId={userId}
-                record={record}
-                note={appealNote}
-                onNoteChange={setAppealNote}
+        <div className="gl-admin-user-detail-body">
+          <div className="gl-admin-mini-list gl-admin-appeal-list">
+            {appealRecords.length === 0 ? (
+              <AdminEmptyState
+                label={t('admin.users.detail.noAppeals', { defaultValue: 'No appeal records.' })}
               />
-            ))
+            ) : (
+              appealPageData.items.map((record) => (
+                <AdminAppealRecord
+                  key={record.id}
+                  userId={userId}
+                  record={record}
+                  note={appealNote}
+                  onNoteChange={setAppealNote}
+                />
+              ))
+            )}
+          </div>
+          {appealRecords.length > DETAIL_RECORD_PAGE_SIZE && (
+            <AdminPager
+              page={appealPageData.page}
+              pageSize={DETAIL_RECORD_PAGE_SIZE}
+              total={appealRecords.length}
+              onPage={setAppealPage}
+            />
           )}
         </div>
       )}
@@ -1553,6 +1615,8 @@ function ContentPage() {
   const [targetType, setTargetType] = useState('all');
   const [reason, setReason] = useState('all');
   const [query, setQuery] = useState('');
+  const [reportPage, setReportPage] = useState(1);
+  const [wordPage, setWordPage] = useState(1);
   const [selectedId, setSelectedId] = useState('');
   const [resolutionNote, setResolutionNote] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
@@ -1567,11 +1631,11 @@ function ContentPage() {
     targetType,
     reason,
     q: query.trim() || undefined,
-    page: 1,
+    page: reportPage,
     size: 20,
   });
   const updateReport = useUpdateAdminReport();
-  const blockedWords = useAdminBlockedWords(1, 50);
+  const blockedWords = useAdminBlockedWords(wordPage, 20);
   const createWord = useCreateBlockedWord();
   const updateWord = useUpdateBlockedWord();
   const deleteWord = useDeleteBlockedWord();
@@ -1595,6 +1659,10 @@ function ContentPage() {
   const detailActions = detail
     ? reportActionsForTarget(detail.targetType).filter((action) => !isExclusiveReportAction(action))
     : [];
+
+  useEffect(() => {
+    setReportPage(1);
+  }, [status, targetType, reason, query]);
 
   const toggleReportAction = (action: ReportAction) => {
     setSelectedActions((current) =>
@@ -1954,6 +2022,14 @@ function ContentPage() {
               ))
             )}
           </div>
+          {(reports.data?.total ?? 0) > (reports.data?.size ?? 20) && (
+            <AdminPager
+              page={reports.data?.page ?? reportPage}
+              pageSize={reports.data?.size ?? 20}
+              total={reports.data?.total ?? 0}
+              onPage={setReportPage}
+            />
+          )}
         </div>
       </section>
 
@@ -2395,6 +2471,14 @@ function ContentPage() {
             })
           )}
         </div>
+        {(blockedWords.data?.total ?? 0) > (blockedWords.data?.size ?? 20) && (
+          <AdminPager
+            page={blockedWords.data?.page ?? wordPage}
+            pageSize={blockedWords.data?.size ?? 20}
+            total={blockedWords.data?.total ?? 0}
+            onPage={setWordPage}
+          />
+        )}
       </section>
     </div>
   );
@@ -2564,6 +2648,17 @@ function appealStatusLabel(value: string, t: Translate) {
     reviewing: t('admin.users.detail.appealStatus.reviewing', { defaultValue: 'Reviewing' }),
     approved: t('admin.users.detail.appealStatus.approved', { defaultValue: 'Approved' }),
     rejected: t('admin.users.detail.appealStatus.rejected', { defaultValue: 'Rejected' }),
+  };
+  return map[value] ?? value;
+}
+
+function liveRecordStatusLabel(value: string, t: Translate) {
+  const map: Record<string, string> = {
+    created: t('admin.users.detail.liveStatus.created', { defaultValue: 'Created' }),
+    live: t('admin.users.detail.liveStatus.live', { defaultValue: 'Live' }),
+    ended: t('admin.users.detail.liveStatus.ended', { defaultValue: 'Ended' }),
+    expired: t('admin.users.detail.liveStatus.expired', { defaultValue: 'Expired' }),
+    cancelled: t('admin.users.detail.liveStatus.cancelled', { defaultValue: 'Cancelled' }),
   };
   return map[value] ?? value;
 }
@@ -4503,6 +4598,13 @@ function PermissionPanel({
   onDisable: (item: LiveCreator) => void;
 }) {
   const { t } = useTranslation('pages');
+  const [page, setPage] = useState(1);
+  const pageData = pagedItems(items, page, DETAIL_RECORD_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items.length]);
+
   return (
     <section className="gl-admin-panel">
       <div className="gl-admin-panel-head">
@@ -4520,35 +4622,45 @@ function PermissionPanel({
           {t('admin.permissions.error', { defaultValue: 'Could not load creators.' })}
         </div>
       ) : items.length ? (
-        <div className="gl-admin-list">
-          {items.map((item) => (
-            <div className="gl-admin-permission-row" key={item.id}>
-              <AdminUser
-                avatar={item.avatar}
-                name={item.displayName || item.username}
-                handle={`@${item.username || item.id.slice(0, 8)}`}
-              />
-              <span className="gl-admin-muted">{formatDate(item.updatedAt)}</span>
-              <span className="gl-admin-status is-approved">
-                {t('admin.status.approved', { defaultValue: 'Approved' })}
-              </span>
-              <button
-                type="button"
-                className="gl-admin-danger-btn"
-                aria-label={t('admin.permissions.disableFor', {
-                  name: item.displayName || item.username,
-                  defaultValue: 'Disable live permission for {{name}}',
-                })}
-                title={t('admin.permissions.disable', { defaultValue: 'Disable live' })}
-                disabled={busy}
-                onClick={() => onDisable(item)}
-              >
-                <Ban size={16} />
-                <span>{t('admin.permissions.disable', { defaultValue: 'Disable live' })}</span>
-              </button>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="gl-admin-list">
+            {pageData.items.map((item) => (
+              <div className="gl-admin-permission-row" key={item.id}>
+                <AdminUser
+                  avatar={item.avatar}
+                  name={item.displayName || item.username}
+                  handle={`@${item.username || item.id.slice(0, 8)}`}
+                />
+                <span className="gl-admin-muted">{formatDate(item.updatedAt)}</span>
+                <span className="gl-admin-status is-approved">
+                  {t('admin.status.approved', { defaultValue: 'Approved' })}
+                </span>
+                <button
+                  type="button"
+                  className="gl-admin-danger-btn"
+                  aria-label={t('admin.permissions.disableFor', {
+                    name: item.displayName || item.username,
+                    defaultValue: 'Disable live permission for {{name}}',
+                  })}
+                  title={t('admin.permissions.disable', { defaultValue: 'Disable live' })}
+                  disabled={busy}
+                  onClick={() => onDisable(item)}
+                >
+                  <Ban size={16} />
+                  <span>{t('admin.permissions.disable', { defaultValue: 'Disable live' })}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          {items.length > DETAIL_RECORD_PAGE_SIZE && (
+            <AdminPager
+              page={pageData.page}
+              pageSize={DETAIL_RECORD_PAGE_SIZE}
+              total={items.length}
+              onPage={setPage}
+            />
+          )}
+        </>
       ) : (
         <div className="gl-yt-shelf-empty">
           {t('admin.permissions.empty', {
@@ -4580,6 +4692,12 @@ function ApplicationsPanel({
   const { t } = useTranslation('pages');
   const [rejectingId, setRejectingId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [page, setPage] = useState(1);
+  const pageData = pagedItems(items, page, DETAIL_RECORD_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items.length]);
 
   return (
     <section className="gl-admin-panel">
@@ -4604,108 +4722,118 @@ function ApplicationsPanel({
           {t('admin.applications.error', { defaultValue: 'Could not load applications.' })}
         </div>
       ) : items.length ? (
-        <div className="gl-admin-review-list">
-          {items.map((app) => {
-            const pending = app.status === 'pending';
-            const busy = approveBusy || rejectBusy;
-            const rejecting = rejectingId === app.id;
-            return (
-              <article className="gl-admin-review-card" key={app.id}>
-                <div className="gl-admin-review-top">
-                  <AdminUser
-                    avatar={app.avatar}
-                    name={
-                      app.displayName ||
-                      app.username ||
-                      t('admin.fallbackCreator', { defaultValue: 'Creator' })
-                    }
-                    handle={`@${app.username || app.userId.slice(0, 8)}`}
-                  />
-                  <div className="gl-admin-review-meta">
-                    <span className={`gl-admin-status is-${app.status}`}>
-                      {statusText(app.status, t)}
-                    </span>
-                    <small>{formatDate(app.createdAt)}</small>
-                  </div>
-                </div>
-                <div className="gl-admin-reason">
-                  <span>
-                    {t('admin.applications.reason', { defaultValue: 'Live access note' })}
-                  </span>
-                  <p>
-                    {app.reason ||
-                      t('admin.applications.noReason', { defaultValue: 'No reason provided.' })}
-                  </p>
-                </div>
-                {app.rejectReason && (
-                  <div className="gl-admin-reason is-reject">
-                    <span>
-                      {t('admin.applications.rejectReason', { defaultValue: 'Reject reason' })}
-                    </span>
-                    <p>{app.rejectReason}</p>
-                  </div>
-                )}
-                {pending && (
-                  <div className="gl-admin-review-actions">
-                    <button
-                      type="button"
-                      className="gl-admin-action-text approve"
-                      disabled={busy}
-                      onClick={() => onApprove(app.id)}
-                    >
-                      <Check size={16} />
-                      {t('admin.applications.approve', { defaultValue: 'Approve' })}
-                    </button>
-                    <button
-                      type="button"
-                      className="gl-admin-action-text reject"
-                      disabled={busy}
-                      onClick={() => {
-                        setRejectingId(rejecting ? '' : app.id);
-                        setRejectReason('');
-                      }}
-                    >
-                      <X size={16} />
-                      {t('admin.applications.reject', { defaultValue: 'Reject' })}
-                    </button>
-                  </div>
-                )}
-                {rejecting && pending && (
-                  <div className="gl-admin-reject-form">
-                    <label>
-                      <span>
-                        {t('admin.applications.rejectReasonLabel', {
-                          defaultValue: 'Rejection reason',
-                        })}
+        <>
+          <div className="gl-admin-review-list">
+            {pageData.items.map((app) => {
+              const pending = app.status === 'pending';
+              const busy = approveBusy || rejectBusy;
+              const rejecting = rejectingId === app.id;
+              return (
+                <article className="gl-admin-review-card" key={app.id}>
+                  <div className="gl-admin-review-top">
+                    <AdminUser
+                      avatar={app.avatar}
+                      name={
+                        app.displayName ||
+                        app.username ||
+                        t('admin.fallbackCreator', { defaultValue: 'Creator' })
+                      }
+                      handle={`@${app.username || app.userId.slice(0, 8)}`}
+                    />
+                    <div className="gl-admin-review-meta">
+                      <span className={`gl-admin-status is-${app.status}`}>
+                        {statusText(app.status, t)}
                       </span>
-                      <textarea
-                        rows={3}
-                        value={rejectReason}
-                        maxLength={500}
-                        onChange={(event) => setRejectReason(event.target.value)}
-                        placeholder={t('admin.applications.rejectReasonPlaceholder', {
-                          defaultValue: 'Tell the creator what needs to be improved.',
-                        })}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="gl-admin-danger-btn"
-                      disabled={busy || !rejectReason.trim()}
-                      onClick={() => {
-                        onReject(app.id, rejectReason.trim());
-                        setRejectingId('');
-                        setRejectReason('');
-                      }}
-                    >
-                      {t('admin.applications.confirmReject', { defaultValue: 'Confirm reject' })}
-                    </button>
+                      <small>{formatDate(app.createdAt)}</small>
+                    </div>
                   </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
+                  <div className="gl-admin-reason">
+                    <span>
+                      {t('admin.applications.reason', { defaultValue: 'Live access note' })}
+                    </span>
+                    <p>
+                      {app.reason ||
+                        t('admin.applications.noReason', { defaultValue: 'No reason provided.' })}
+                    </p>
+                  </div>
+                  {app.rejectReason && (
+                    <div className="gl-admin-reason is-reject">
+                      <span>
+                        {t('admin.applications.rejectReason', { defaultValue: 'Reject reason' })}
+                      </span>
+                      <p>{app.rejectReason}</p>
+                    </div>
+                  )}
+                  {pending && (
+                    <div className="gl-admin-review-actions">
+                      <button
+                        type="button"
+                        className="gl-admin-action-text approve"
+                        disabled={busy}
+                        onClick={() => onApprove(app.id)}
+                      >
+                        <Check size={16} />
+                        {t('admin.applications.approve', { defaultValue: 'Approve' })}
+                      </button>
+                      <button
+                        type="button"
+                        className="gl-admin-action-text reject"
+                        disabled={busy}
+                        onClick={() => {
+                          setRejectingId(rejecting ? '' : app.id);
+                          setRejectReason('');
+                        }}
+                      >
+                        <X size={16} />
+                        {t('admin.applications.reject', { defaultValue: 'Reject' })}
+                      </button>
+                    </div>
+                  )}
+                  {rejecting && pending && (
+                    <div className="gl-admin-reject-form">
+                      <label>
+                        <span>
+                          {t('admin.applications.rejectReasonLabel', {
+                            defaultValue: 'Rejection reason',
+                          })}
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={rejectReason}
+                          maxLength={500}
+                          onChange={(event) => setRejectReason(event.target.value)}
+                          placeholder={t('admin.applications.rejectReasonPlaceholder', {
+                            defaultValue: 'Tell the creator what needs to be improved.',
+                          })}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="gl-admin-danger-btn"
+                        disabled={busy || !rejectReason.trim()}
+                        onClick={() => {
+                          onReject(app.id, rejectReason.trim());
+                          setRejectingId('');
+                          setRejectReason('');
+                        }}
+                      >
+                        {t('admin.applications.confirmReject', { defaultValue: 'Confirm reject' })}
+                      </button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          {items.length > DETAIL_RECORD_PAGE_SIZE && (
+            <AdminPager
+              page={pageData.page}
+              pageSize={DETAIL_RECORD_PAGE_SIZE}
+              total={items.length}
+              onPage={setPage}
+            />
+          )}
+        </>
       ) : (
         <div className="gl-yt-shelf-empty">
           {t('admin.applications.empty', { defaultValue: 'No creator applications yet.' })}
@@ -4735,6 +4863,12 @@ function PlatformApplicationsPanel({
   const { t } = useTranslation('pages');
   const [rejectingId, setRejectingId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [page, setPage] = useState(1);
+  const pageData = pagedItems(items, page, DETAIL_RECORD_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items.length]);
 
   return (
     <section className="gl-admin-panel">
@@ -4765,114 +4899,124 @@ function PlatformApplicationsPanel({
           {t('admin.platformApplications.error', { defaultValue: 'Could not load applications.' })}
         </div>
       ) : items.length ? (
-        <div className="gl-admin-review-list">
-          {items.map((app) => {
-            const pending = app.status === 'pending';
-            const busy = approveBusy || rejectBusy;
-            const rejecting = rejectingId === app.id;
-            return (
-              <article className="gl-admin-review-card" key={app.id}>
-                <div className="gl-admin-review-top">
-                  <AdminUser
-                    avatar={app.avatar}
-                    name={
-                      app.displayName ||
-                      app.username ||
-                      t('admin.fallbackCreator', { defaultValue: 'Creator' })
-                    }
-                    handle={`@${app.username || app.userId.slice(0, 8)}`}
-                  />
-                  <div className="gl-admin-review-meta">
-                    <span className={`gl-admin-status is-${app.status}`}>
-                      {statusText(app.status, t)}
-                    </span>
-                    <small>{formatDate(app.createdAt)}</small>
+        <>
+          <div className="gl-admin-review-list">
+            {pageData.items.map((app) => {
+              const pending = app.status === 'pending';
+              const busy = approveBusy || rejectBusy;
+              const rejecting = rejectingId === app.id;
+              return (
+                <article className="gl-admin-review-card" key={app.id}>
+                  <div className="gl-admin-review-top">
+                    <AdminUser
+                      avatar={app.avatar}
+                      name={
+                        app.displayName ||
+                        app.username ||
+                        t('admin.fallbackCreator', { defaultValue: 'Creator' })
+                      }
+                      handle={`@${app.username || app.userId.slice(0, 8)}`}
+                    />
+                    <div className="gl-admin-review-meta">
+                      <span className={`gl-admin-status is-${app.status}`}>
+                        {statusText(app.status, t)}
+                      </span>
+                      <small>{formatDate(app.createdAt)}</small>
+                    </div>
                   </div>
-                </div>
-                <div className="gl-admin-reason">
-                  <span>
-                    {t('admin.platformApplications.reason', { defaultValue: 'Signing note' })}
-                  </span>
-                  <p>
-                    {app.reason ||
-                      t('admin.platformApplications.noReason', {
-                        defaultValue: 'No reason provided.',
-                      })}
-                  </p>
-                </div>
-                {app.rejectReason && (
-                  <div className="gl-admin-reason is-reject">
+                  <div className="gl-admin-reason">
                     <span>
-                      {t('admin.platformApplications.rejectReason', {
-                        defaultValue: 'Reject reason',
-                      })}
+                      {t('admin.platformApplications.reason', { defaultValue: 'Signing note' })}
                     </span>
-                    <p>{app.rejectReason}</p>
+                    <p>
+                      {app.reason ||
+                        t('admin.platformApplications.noReason', {
+                          defaultValue: 'No reason provided.',
+                        })}
+                    </p>
                   </div>
-                )}
-                {pending && (
-                  <div className="gl-admin-review-actions">
-                    <button
-                      type="button"
-                      className="gl-admin-action-text approve"
-                      disabled={busy}
-                      onClick={() => onApprove(app.id)}
-                    >
-                      <Check size={16} />
-                      {t('admin.platformApplications.approve', { defaultValue: 'Approve' })}
-                    </button>
-                    <button
-                      type="button"
-                      className="gl-admin-action-text reject"
-                      disabled={busy}
-                      onClick={() => {
-                        setRejectingId(rejecting ? '' : app.id);
-                        setRejectReason('');
-                      }}
-                    >
-                      <X size={16} />
-                      {t('admin.platformApplications.reject', { defaultValue: 'Reject' })}
-                    </button>
-                  </div>
-                )}
-                {rejecting && pending && (
-                  <div className="gl-admin-reject-form">
-                    <label>
+                  {app.rejectReason && (
+                    <div className="gl-admin-reason is-reject">
                       <span>
-                        {t('admin.platformApplications.rejectReasonLabel', {
-                          defaultValue: 'Rejection reason',
+                        {t('admin.platformApplications.rejectReason', {
+                          defaultValue: 'Reject reason',
                         })}
                       </span>
-                      <textarea
-                        rows={3}
-                        value={rejectReason}
-                        maxLength={500}
-                        onChange={(event) => setRejectReason(event.target.value)}
-                        placeholder={t('admin.platformApplications.rejectReasonPlaceholder', {
-                          defaultValue: 'Tell the creator what needs to be improved.',
+                      <p>{app.rejectReason}</p>
+                    </div>
+                  )}
+                  {pending && (
+                    <div className="gl-admin-review-actions">
+                      <button
+                        type="button"
+                        className="gl-admin-action-text approve"
+                        disabled={busy}
+                        onClick={() => onApprove(app.id)}
+                      >
+                        <Check size={16} />
+                        {t('admin.platformApplications.approve', { defaultValue: 'Approve' })}
+                      </button>
+                      <button
+                        type="button"
+                        className="gl-admin-action-text reject"
+                        disabled={busy}
+                        onClick={() => {
+                          setRejectingId(rejecting ? '' : app.id);
+                          setRejectReason('');
+                        }}
+                      >
+                        <X size={16} />
+                        {t('admin.platformApplications.reject', { defaultValue: 'Reject' })}
+                      </button>
+                    </div>
+                  )}
+                  {rejecting && pending && (
+                    <div className="gl-admin-reject-form">
+                      <label>
+                        <span>
+                          {t('admin.platformApplications.rejectReasonLabel', {
+                            defaultValue: 'Rejection reason',
+                          })}
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={rejectReason}
+                          maxLength={500}
+                          onChange={(event) => setRejectReason(event.target.value)}
+                          placeholder={t('admin.platformApplications.rejectReasonPlaceholder', {
+                            defaultValue: 'Tell the creator what needs to be improved.',
+                          })}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="gl-admin-danger-btn"
+                        disabled={busy || !rejectReason.trim()}
+                        onClick={() => {
+                          onReject(app.id, rejectReason.trim());
+                          setRejectingId('');
+                          setRejectReason('');
+                        }}
+                      >
+                        {t('admin.platformApplications.confirmReject', {
+                          defaultValue: 'Confirm reject',
                         })}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="gl-admin-danger-btn"
-                      disabled={busy || !rejectReason.trim()}
-                      onClick={() => {
-                        onReject(app.id, rejectReason.trim());
-                        setRejectingId('');
-                        setRejectReason('');
-                      }}
-                    >
-                      {t('admin.platformApplications.confirmReject', {
-                        defaultValue: 'Confirm reject',
-                      })}
-                    </button>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
+                      </button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+          {items.length > DETAIL_RECORD_PAGE_SIZE && (
+            <AdminPager
+              page={pageData.page}
+              pageSize={DETAIL_RECORD_PAGE_SIZE}
+              total={items.length}
+              onPage={setPage}
+            />
+          )}
+        </>
       ) : (
         <div className="gl-yt-shelf-empty">
           {t('admin.platformApplications.empty', {
