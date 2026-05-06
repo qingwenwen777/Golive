@@ -227,6 +227,38 @@ describe('Chat', () => {
     expect(onOpenModeration).not.toHaveBeenCalled();
   });
 
+  it('keeps only the latest chat action menu open', () => {
+    render(
+      <Chat
+        messages={[
+          chatMessage({ id: 'msg-1', user: 'Alice', text: 'first message' }),
+          chatMessage({ id: 'msg-2', user: 'Bob', text: 'second message' }),
+        ]}
+        canModerate
+      />,
+    );
+
+    const firstRow = screen.getByText('first message').closest('.gl-chat-line');
+    const secondRow = screen.getByText('second message').closest('.gl-chat-line');
+
+    expect(firstRow).toBeTruthy();
+    expect(secondRow).toBeTruthy();
+
+    fireEvent.click(firstRow!);
+    expect(screen.getAllByText('report.chatAction')).toHaveLength(1);
+    expect(firstRow?.classList.contains('is-menu-open')).toBe(true);
+
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByText('report.chatAction')).toBeNull();
+    expect(firstRow?.classList.contains('is-menu-open')).toBe(false);
+
+    fireEvent.click(firstRow!);
+    fireEvent.click(secondRow!);
+    expect(screen.getAllByText('report.chatAction')).toHaveLength(1);
+    expect(firstRow?.classList.contains('is-menu-open')).toBe(false);
+    expect(secondRow?.classList.contains('is-menu-open')).toBe(true);
+  });
+
   it('keeps pinned SuperChats as compact capsules and reveals details in a popover', () => {
     render(
       <Chat
@@ -254,6 +286,10 @@ describe('Chat', () => {
 
     expect(within(pinned).getByText('1,000 coins')).toBeTruthy();
     expect(within(pinned).getByText('Pinned hello')).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+    expect(within(pinned).queryByText('1,000 coins')).toBeNull();
+    expect(within(pinned).queryByText('Pinned hello')).toBeNull();
   });
 
   it('orders pinned SuperChats by tier, amount, then latest send time', () => {

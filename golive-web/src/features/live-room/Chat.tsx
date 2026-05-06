@@ -237,6 +237,9 @@ function ChatRow({
   isOwner,
   isFan,
   canModerate,
+  menuOpen,
+  onToggleMenu,
+  onCloseMenu,
   onOpenModeration,
   onReportMessage,
 }: {
@@ -244,11 +247,13 @@ function ChatRow({
   isOwner?: boolean;
   isFan?: boolean;
   canModerate?: boolean;
+  menuOpen: boolean;
+  onToggleMenu: () => void;
+  onCloseMenu: () => void;
   onOpenModeration?: (target: ChatModerationTarget) => void;
   onReportMessage?: (target: ChatModerationTarget & { messageId: string; text: string }) => void;
 }) {
   const { t } = useTranslation('pages');
-  const [menuOpen, setMenuOpen] = useState(false);
   const role = isOwner ? 'owner' : m.role;
   const canOpenModeration = Boolean(canModerate && m.userId);
   const target = {
@@ -266,15 +271,15 @@ function ChatRow({
         isFan && 'is-fan',
         menuOpen && 'is-menu-open',
       )}
-      onClick={() => setMenuOpen((open) => !open)}
+      onClick={onToggleMenu}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          setMenuOpen((open) => !open);
+          onToggleMenu();
         }
-        if (event.key === 'Escape') setMenuOpen(false);
+        if (event.key === 'Escape') onCloseMenu();
       }}
     >
       <div className="gl-chat-avatar-wrap">
@@ -285,6 +290,7 @@ function ChatRow({
           onClick={(event) => {
             event.stopPropagation();
             if (!m.userId) return;
+            onCloseMenu();
             onOpenModeration?.(target);
           }}
           aria-label={t('liveRoom.chatPanel.moderateUser', {
@@ -327,7 +333,7 @@ function ChatRow({
             <button
               type="button"
               onClick={() => {
-                setMenuOpen(false);
+                onCloseMenu();
                 onReportMessage?.({ ...target, messageId: m.id, text: m.text });
               }}
             >
@@ -338,7 +344,7 @@ function ChatRow({
               <button
                 type="button"
                 onClick={() => {
-                  setMenuOpen(false);
+                  onCloseMenu();
                   onOpenModeration?.(target);
                 }}
               >
@@ -357,14 +363,19 @@ function ChatRow({
 
 function SuperChatCard({
   m,
+  menuOpen,
+  onToggleMenu,
+  onCloseMenu,
   onReport,
 }: {
   m: SuperChatMessage;
+  menuOpen: boolean;
+  onToggleMenu: () => void;
+  onCloseMenu: () => void;
   onReport?: (message: SuperChatMessage) => void;
 }) {
   const spec = tierSpec(m.tier);
   const { t } = useTranslation('pages');
-  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
       className={cn('gl-sc', m.pending && 'opacity-50 saturate-50')}
@@ -381,7 +392,7 @@ function SuperChatCard({
           <button
             type="button"
             aria-label={t('report.moreActions')}
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={onToggleMenu}
           >
             <MoreVertical size={15} />
           </button>
@@ -390,7 +401,7 @@ function SuperChatCard({
               <button
                 type="button"
                 onClick={() => {
-                  setMenuOpen(false);
+                  onCloseMenu();
                   onReport?.(m);
                 }}
               >
@@ -443,6 +454,7 @@ function PinnedSuperChatPill({
       style={style}
       onClick={onToggle}
       aria-expanded={active}
+      data-sc-pin-id={m.id}
       aria-label={t('liveRoom.chatPanel.openSuperChat', {
         user: m.user,
         defaultValue: 'Open SuperChat from {{user}}',
@@ -463,7 +475,7 @@ function PinnedSuperChatBubble({ m, locale }: { m: SuperChatMessage; locale: str
   } as CSSProperties & { '--sc-bg': string; '--sc-soft': string };
 
   return (
-    <div className="gl-sc-pin-popover" role="dialog" style={style}>
+    <div className="gl-sc-pin-popover" role="dialog" style={style} data-sc-pin-popover-id={m.id}>
       <div className="gl-sc-pin-popover-head">
         <Avatar
           name={m.user}
@@ -654,6 +666,7 @@ export function Chat({
     canScrollRight: false,
   });
   const [newMessageCount, setNewMessageCount] = useState(0);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
   // Track IME composition so Enter during candidate selection (CJK input
   // methods) does not submit a half-finished message.
   const composingRef = useRef(false);
@@ -661,6 +674,10 @@ export function Chat({
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const effectiveTab = showViewersTab ? activeTab : 'chat';
+  const toggleActionMenu = (id: string) => {
+    setExpandedPinnedId(null);
+    setOpenActionMenuId((current) => (current === id ? null : id));
+  };
 
   const trySend = () => {
     if (readOnly) return;
@@ -815,6 +832,44 @@ export function Chat({
   }, [activeTab, showViewersTab]);
 
   useEffect(() => {
+    setOpenActionMenuId(null);
+  }, [effectiveTab]);
+
+  useEffect(() => {
+    if (!openActionMenuId) return;
+    const stillExists = messages.some((message) => {
+      if (message.kind === 'system' || message.kind === 'gift') return false;
+      const menuId =
+        message.kind === 'super_chat' ? `super_chat:${message.id}` : `chat:${message.id}`;
+      return menuId === openActionMenuId;
+    });
+    if (!stillExists) setOpenActionMenuId(null);
+  }, [messages, openActionMenuId]);
+
+  useEffect(() => {
+    if (!openActionMenuId) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        setOpenActionMenuId(null);
+        return;
+      }
+      if (target.closest('.gl-chat-line.is-menu-open, .gl-sc-menu-wrap')) return;
+      setOpenActionMenuId(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenActionMenuId(null);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openActionMenuId]);
+
+  useEffect(() => {
     if (!emojiOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
@@ -875,17 +930,22 @@ export function Chat({
     if (!expandedPinnedId) return;
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && pinStackRef.current?.contains(target)) return;
+      if (target instanceof Element) {
+        const pin = target.closest('[data-sc-pin-id]') as HTMLElement | null;
+        const popover = target.closest('[data-sc-pin-popover-id]') as HTMLElement | null;
+        if (pin?.dataset.scPinId === expandedPinnedId) return;
+        if (popover?.dataset.scPinPopoverId === expandedPinnedId) return;
+      }
       setExpandedPinnedId(null);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setExpandedPinnedId(null);
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerdown', handlePointerDown, true);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [expandedPinnedId]);
@@ -960,6 +1020,7 @@ export function Chat({
                 durationMs={durationMs}
                 active={expandedPinnedId === message.id}
                 onToggle={() => {
+                  setOpenActionMenuId(null);
                   setExpandedPinnedId((current) => {
                     const next = current === message.id ? null : message.id;
                     return next;
@@ -996,10 +1057,14 @@ export function Chat({
             if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
             if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
             if (m.kind === 'super_chat') {
+              const menuId = `super_chat:${m.id}`;
               return (
                 <SuperChatCard
                   key={m.id}
                   m={m}
+                  menuOpen={openActionMenuId === menuId}
+                  onToggleMenu={() => toggleActionMenu(menuId)}
+                  onCloseMenu={() => setOpenActionMenuId(null)}
                   onReport={(target) =>
                     onReportMessage?.({
                       targetType: 'super_chat',
@@ -1022,6 +1087,7 @@ export function Chat({
             const isOwner = isOwnerMessage(chat, ownerId, ownerName);
             const isFan =
               !isOwner && Boolean(ownerId && chat.fanBadge && chat.fanBadge.creatorId === ownerId);
+            const menuId = `chat:${chat.id}`;
             return (
               <ChatRow
                 key={m.id}
@@ -1029,6 +1095,9 @@ export function Chat({
                 isOwner={isOwner}
                 isFan={isFan}
                 canModerate={canModerate}
+                menuOpen={openActionMenuId === menuId}
+                onToggleMenu={() => toggleActionMenu(menuId)}
+                onCloseMenu={() => setOpenActionMenuId(null)}
                 onOpenModeration={onOpenModeration}
                 onReportMessage={(target) =>
                   onReportMessage?.({
