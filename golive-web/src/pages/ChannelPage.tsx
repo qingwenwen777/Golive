@@ -14,6 +14,7 @@ import {
   Crown,
   FileText,
   ImagePlus,
+  MessageCircle,
   MoreHorizontal,
   PlayCircle,
   Plus,
@@ -234,6 +235,15 @@ export default function ChannelPage() {
     setReportTarget(target);
   };
 
+  const handleMessageCreator = () => {
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    if (!creatorId || isOwner) return;
+    navigate(`/messages/direct/${encodeURIComponent(creatorId)}`);
+  };
+
   const handleOwnerLiveAction = () => {
     navigate(activeLiveId ? `/studio/live/${encodeURIComponent(activeLiveId)}` : '/studio/prepare');
   };
@@ -377,15 +387,29 @@ export default function ChannelPage() {
                   </button>
                 </>
               ) : (
-                <button
-                  className="gl-retry-btn"
-                  type="button"
-                  disabled={follow.isPending || unfollow.isPending}
-                  onClick={handleSubscribe}
-                >
-                  {followState.data?.following ? <Bell size={16} /> : <UserPlus size={16} />}
-                  {followState.data?.following ? t('channel.subscribed') : t('channel.subscribe')}
-                </button>
+                <>
+                  <button
+                    className="gl-retry-btn"
+                    type="button"
+                    disabled={follow.isPending || unfollow.isPending}
+                    onClick={handleSubscribe}
+                  >
+                    {followState.data?.following ? <Bell size={16} /> : <UserPlus size={16} />}
+                    {followState.data?.following
+                      ? t('channel.subscribed')
+                      : t('channel.subscribe')}
+                  </button>
+                  <button
+                    className="gl-secondary-btn"
+                    type="button"
+                    disabled={!creatorId}
+                    onClick={handleMessageCreator}
+                    title="私信"
+                  >
+                    <MessageCircle size={16} />
+                    私信
+                  </button>
+                </>
               )}
               <button className="gl-secondary-btn" type="button" onClick={handleShare}>
                 <Share2 size={16} />

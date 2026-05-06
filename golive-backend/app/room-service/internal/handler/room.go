@@ -21,7 +21,7 @@ func NewRoomHandler(svc *service.RoomService) *RoomHandler {
 func (h *RoomHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
-	resp, err := h.svc.List(c.Request.Context(), c.Query("category"), page, size)
+	resp, err := h.svc.List(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return

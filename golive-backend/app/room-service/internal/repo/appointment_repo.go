@@ -430,9 +430,15 @@ func (r *AppointmentRepo) CreateNotifications(ctx context.Context, notifications
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&notifications).Error
 }
 
-func (r *AppointmentRepo) ListNotifications(ctx context.Context, userID string, page, size int) ([]model.Notification, int64, int64, error) {
+func (r *AppointmentRepo) ListNotifications(ctx context.Context, userID string, page, size int, includeTypes, excludeTypes []string) ([]model.Notification, int64, int64, error) {
 	page, size = normalizePageSize(page, size)
 	tx := r.db.WithContext(ctx).Model(&model.Notification{}).Where("user_id = ?", userID)
+	if len(includeTypes) > 0 {
+		tx = tx.Where("type IN ?", includeTypes)
+	}
+	if len(excludeTypes) > 0 {
+		tx = tx.Where("type NOT IN ?", excludeTypes)
+	}
 	var total int64
 	if err := tx.Count(&total).Error; err != nil {
 		return nil, 0, 0, err
@@ -442,7 +448,14 @@ func (r *AppointmentRepo) ListNotifications(ctx context.Context, userID string, 
 		return nil, 0, 0, err
 	}
 	var items []model.Notification
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
+	query := r.db.WithContext(ctx).Where("user_id = ?", userID)
+	if len(includeTypes) > 0 {
+		query = query.Where("type IN ?", includeTypes)
+	}
+	if len(excludeTypes) > 0 {
+		query = query.Where("type NOT IN ?", excludeTypes)
+	}
+	err := query.
 		Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&items).Error
 	return items, total, unread, err
 }

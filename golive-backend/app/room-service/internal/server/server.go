@@ -22,6 +22,7 @@ type Deps struct {
 	Search         *service.SearchService
 	Appointments   *service.AppointmentService
 	Moderation     *service.ModerationService
+	Messages       *service.MessageService
 	Permission     service.LivePermissionChecker
 	CoverDir       string
 	CoverPublicURL string
@@ -45,6 +46,7 @@ func NewRouter(d Deps) *gin.Engine {
 	searchH := handler.NewSearchHandler(d.Search)
 	appointmentH := handler.NewAppointmentHandler(d.Appointments)
 	moderationH := handler.NewModerationHandler(d.Moderation)
+	messageH := handler.NewMessageHandler(d.Messages)
 	srsH := handler.NewSRSHandler(d.Live)
 	coverH := handler.NewCoverUploadHandler(d.CoverDir, d.CoverPublicURL)
 
@@ -66,6 +68,20 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/notifications", auth, appointmentH.Notifications)
 	r.PATCH("/notifications/read-all", auth, appointmentH.MarkAllNotificationsRead)
 	r.PATCH("/notifications/:id/read", auth, appointmentH.MarkNotificationRead)
+	r.GET("/messages/direct", auth, messageH.ListDirectThreads)
+	r.POST("/messages/direct", auth, messageH.SendDirect)
+	r.GET("/messages/direct/creators/:creatorID", auth, messageH.DirectDraft)
+	r.GET("/messages/direct/:threadID", auth, messageH.DirectMessages)
+	r.POST("/messages/direct/:threadID", auth, messageH.SendThreadMessage)
+	r.PATCH("/messages/direct/:threadID", auth, messageH.UpdateThreadOptions)
+	r.GET("/messages/blocks", auth, messageH.ListBlocks)
+	r.POST("/messages/blocks/:userID", auth, messageH.BlockUser)
+	r.DELETE("/messages/blocks/:userID", auth, messageH.UnblockUser)
+	r.GET("/messages/settings", auth, messageH.Preference)
+	r.PATCH("/messages/settings", auth, messageH.UpdatePreference)
+	r.GET("/messages/fan-groups", auth, messageH.ListFanGroups)
+	r.POST("/messages/fan-groups/sync", auth, messageH.SyncFanGroups)
+	r.PATCH("/messages/fan-groups/:groupID/members/:userID", auth, messageH.UpdateFanGroupMember)
 
 	// Public room endpoints (no auth).
 	rooms := r.Group("/rooms")

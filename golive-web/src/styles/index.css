@@ -15111,3 +15111,744 @@ button.gl-fan-badge-empty {
     flex-basis: auto;
   }
 }
+
+.gl-message-page {
+  display: flex;
+  justify-content: center;
+}
+
+.gl-message-shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  width: min(1180px, 100%);
+  min-width: 0;
+}
+
+.gl-message-nav,
+.gl-message-auth,
+.gl-message-card,
+.gl-direct-list,
+.gl-direct-chat {
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+}
+
+.gl-message-nav {
+  position: sticky;
+  top: 82px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+}
+
+.gl-message-nav-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 10px;
+  color: var(--gl-text);
+}
+
+.gl-message-nav-head strong {
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.gl-message-nav-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  font-weight: 850;
+  text-align: left;
+  padding: 0 10px;
+}
+
+.gl-message-nav-item:hover,
+.gl-message-nav-item.is-active {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+
+.gl-message-nav-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-message-main {
+  min-width: 0;
+}
+
+.gl-message-auth {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: min(560px, 100%);
+  padding: 28px;
+}
+
+.gl-message-auth h1,
+.gl-message-card-head h1,
+.gl-direct-list-head h1 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.gl-message-auth p {
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 14px;
+}
+
+.gl-direct-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  min-height: min(720px, calc(100vh - 126px));
+}
+
+.gl-direct-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gl-direct-list-head,
+.gl-direct-chat-head,
+.gl-message-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 16px 18px;
+}
+
+.gl-direct-list-head span,
+.gl-message-card-head span,
+.gl-direct-chat-head span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.gl-direct-thread {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  min-height: 68px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gl-text);
+  text-align: left;
+  margin: 8px 8px 0;
+  padding: 10px;
+}
+
+.gl-direct-thread:hover,
+.gl-direct-thread.is-active {
+  background: var(--gl-bg-hover);
+}
+
+.gl-direct-thread > span {
+  min-width: 0;
+}
+
+.gl-direct-thread strong,
+.gl-direct-chat-head strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-direct-thread small {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-direct-thread em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--gl-red);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  padding: 0 7px;
+}
+
+.gl-direct-chat {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.gl-direct-chat-head {
+  justify-content: flex-start;
+}
+
+.gl-direct-chat-head > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gl-message-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+}
+
+.gl-message-icon-btn:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-message-icon-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.gl-direct-message-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.gl-direct-bubble-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.gl-direct-bubble-row.is-me {
+  justify-content: flex-end;
+}
+
+.gl-direct-bubble {
+  max-width: min(520px, 78%);
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+  padding: 10px 12px;
+}
+
+.gl-direct-bubble-row.is-me .gl-direct-bubble {
+  border-color: rgba(28, 98, 185, 0.28);
+  background: rgba(28, 98, 185, 0.1);
+}
+
+.gl-direct-bubble p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.gl-direct-bubble time,
+.gl-message-notice time {
+  display: block;
+  margin-top: 4px;
+  color: var(--gl-text-3);
+  font-size: 11px;
+}
+
+.gl-direct-empty,
+.gl-message-empty-soft {
+  color: var(--gl-text-2);
+}
+
+.gl-direct-empty {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 180px;
+  padding: 24px;
+  text-align: center;
+}
+
+.gl-direct-empty strong {
+  color: var(--gl-text);
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.gl-direct-empty span {
+  max-width: 340px;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.gl-direct-empty.is-full {
+  height: 100%;
+}
+
+.gl-message-empty-soft {
+  border: 1px dashed var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-2);
+  font-size: 13px;
+  font-weight: 750;
+  margin: 12px;
+  padding: 18px;
+}
+
+.gl-direct-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border-top: 1px solid var(--gl-border);
+  padding: 12px;
+}
+
+.gl-direct-compose input {
+  min-width: 0;
+  height: 42px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 14px;
+  outline: 0;
+  padding: 0 15px;
+}
+
+.gl-direct-compose input:focus {
+  border-color: #1c62b9;
+  box-shadow: inset 0 0 0 1px #1c62b9;
+}
+
+.gl-message-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.gl-message-notice-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-message-notice {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--gl-border);
+  background: transparent;
+  color: var(--gl-text);
+  text-align: left;
+  padding: 16px 18px;
+}
+
+.gl-message-notice:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-message-notice.is-unread {
+  box-shadow: inset 3px 0 0 #1c62b9;
+}
+
+.gl-message-notice > span {
+  min-width: 0;
+}
+
+.gl-message-notice strong {
+  display: block;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-message-notice small {
+  display: block;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.gl-message-notice p {
+  margin: 3px 0 0;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.gl-message-settings-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.gl-message-setting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 20px;
+}
+
+.gl-message-setting-row:last-child {
+  border-bottom: 0;
+}
+
+.gl-message-setting-row > span,
+.gl-message-radio-row {
+  min-width: 0;
+}
+
+.gl-message-setting-row strong {
+  display: block;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.gl-message-setting-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--gl-text-2);
+  font-size: 13px;
+}
+
+.gl-message-setting-row.is-radio {
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1fr);
+}
+
+.gl-message-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  justify-content: flex-start;
+}
+
+.gl-message-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 750;
+  padding: 4px 0;
+}
+
+.gl-message-radio i {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+}
+
+.gl-message-radio.is-active i {
+  border: 5px solid #4aaee8;
+}
+
+.gl-menu-danger,
+.gl-fan-group-actions .text-destructive {
+  color: #b91c1c;
+}
+
+.gl-blacklist-card {
+  gap: 14px;
+}
+
+.gl-settings-empty-line {
+  border: 1px dashed var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-2);
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 750;
+  padding: 18px;
+}
+
+.gl-blacklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-blacklist-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 12px;
+}
+
+.gl-blacklist-row > span {
+  min-width: 0;
+}
+
+.gl-blacklist-row strong,
+.gl-blacklist-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-blacklist-row strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gl-blacklist-row small {
+  color: var(--gl-text-2);
+  font-size: 12px;
+}
+
+.gl-fan-groups-page {
+  display: flex;
+  width: min(1380px, 100%);
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gl-fan-groups-head-panel {
+  gap: 10px;
+}
+
+.gl-fan-groups-head-panel p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.gl-fan-groups-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.gl-fan-group-panel {
+  min-width: 0;
+}
+
+.gl-fan-group-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gl-fan-group-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  border: 1px solid var(--gl-border);
+  border-radius: 999px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 0 10px;
+}
+
+.gl-fan-group-members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gl-fan-group-member {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 10px;
+}
+
+.gl-fan-group-member-main {
+  min-width: 0;
+}
+
+.gl-fan-group-member-main strong,
+.gl-fan-group-member-main span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-fan-group-member-main strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.gl-fan-group-member-main span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.gl-fan-group-actions {
+  min-width: 9rem;
+}
+
+.dark .gl-direct-bubble-row.is-me .gl-direct-bubble {
+  border-color: rgba(96, 165, 250, 0.32);
+  background: rgba(96, 165, 250, 0.16);
+}
+
+.dark .gl-message-radio.is-active i {
+  border-color: #60a5fa;
+}
+
+.dark .gl-menu-danger,
+.dark .gl-fan-group-actions .text-destructive {
+  color: #fecaca;
+}
+
+@media (max-width: 1120px) {
+  .gl-fan-groups-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .gl-message-shell,
+  .gl-direct-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-message-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .gl-message-nav-head {
+    flex: 0 0 auto;
+  }
+
+  .gl-message-nav-item {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 136px;
+  }
+
+  .gl-direct-layout {
+    min-height: 0;
+  }
+
+  .gl-direct-list {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .gl-message-page {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .gl-message-shell {
+    gap: 12px;
+  }
+
+  .gl-direct-list-head,
+  .gl-direct-chat-head,
+  .gl-message-card-head,
+  .gl-message-setting-row {
+    padding: 14px;
+  }
+
+  .gl-direct-compose {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-direct-compose .gl-creator-primary {
+    width: 100%;
+  }
+
+  .gl-message-setting-row,
+  .gl-message-setting-row.is-radio,
+  .gl-blacklist-row {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-blacklist-row .gl-avatar {
+    width: 42px;
+  }
+
+  .gl-fan-groups-head-panel .gl-creator-panel-head,
+  .gl-fan-group-panel .gl-creator-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .gl-fan-group-meta {
+    justify-content: flex-start;
+  }
+}

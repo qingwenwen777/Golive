@@ -123,7 +123,7 @@ func TestNotificationsBackfillActorFromLiveLinkAndProfile(t *testing.T) {
 		CreatedAt: time.Now(),
 	}).Error)
 
-	resp, err := svc.Notifications(ctx, "viewer-1", 1, 10)
+	resp, err := svc.Notifications(ctx, "viewer-1", 1, 10, "")
 	require.NoError(t, err)
 	require.Len(t, resp.Items, 1)
 	require.Equal(t, "owner-1", resp.Items[0].ActorID)
@@ -154,7 +154,7 @@ func TestNotificationsPreferCurrentProfileAvatar(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}).Error)
 
-	resp, err := svc.Notifications(ctx, "viewer-1", 1, 10)
+	resp, err := svc.Notifications(ctx, "viewer-1", 1, 10, "")
 	require.NoError(t, err)
 	require.Len(t, resp.Items, 1)
 	require.Equal(t, "Creator Display", resp.Items[0].ActorName)

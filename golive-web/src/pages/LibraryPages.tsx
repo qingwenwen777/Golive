@@ -6,6 +6,7 @@ import { AxiosError } from 'axios';
 import { useQueries } from '@tanstack/react-query';
 import {
   AtSign,
+  Ban,
   Bell,
   Camera,
   ChevronLeft,
@@ -37,6 +38,7 @@ import {
 } from '@/api/auth';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useFanBadges } from '@/api/gift';
+import { useBlockedUsers, useUnblockUser, type BlockedUser } from '@/api/messages';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
 import {
   useChannelAppointments,
@@ -793,7 +795,7 @@ export function LikedPage() {
   );
 }
 
-type SettingsTab = 'profile' | 'security' | 'preferences';
+type SettingsTab = 'profile' | 'security' | 'preferences' | 'blacklist';
 
 export function SettingsPage() {
   const { t, i18n } = useTranslation('pages');
@@ -809,6 +811,8 @@ export function SettingsPage() {
   const bindGoogle = useBindGoogleAccount();
   const unbindGoogle = useUnbindGoogleAccount();
   const [tab, setTab] = useState<SettingsTab>('profile');
+  const blockedUsers = useBlockedUsers(isAuthed && tab === 'blacklist', 1, 100);
+  const unblockUser = useUnblockUser();
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [googleUnbindOpen, setGoogleUnbindOpen] = useState(false);
   const [profileUsername, setProfileUsername] = useState('');
@@ -845,6 +849,14 @@ export function SettingsPage() {
       label: t('library.settings.nav.preferences.label'),
       sub: t('library.settings.nav.preferences.sub'),
       icon: <Sparkles size={18} />,
+    },
+    {
+      id: 'blacklist',
+      label: t('library.settings.nav.blacklist.label', { defaultValue: '黑名单' }),
+      sub: t('library.settings.nav.blacklist.sub', {
+        defaultValue: '管理不再互动的用户和主播',
+      }),
+      icon: <Ban size={18} />,
     },
   ];
 
@@ -1026,7 +1038,7 @@ export function SettingsPage() {
                 )
               }
             />
-          ) : (
+          ) : tab === 'preferences' ? (
             <PreferencesSettings
               lang={lang}
               theme={theme}
@@ -1034,6 +1046,22 @@ export function SettingsPage() {
               onLangChange={setLang}
               onCoins={() => navigate('/coins')}
               onStudio={() => navigate('/studio')}
+            />
+          ) : (
+            <BlacklistSettings
+              pending={blockedUsers.isPending}
+              items={blockedUsers.data?.items ?? []}
+              unblocking={unblockUser.isPending}
+              onUnblock={(userId) =>
+                unblockUser.mutate(userId, {
+                  onSuccess: () =>
+                    toast.success(
+                      t('library.settings.blacklist.unblocked', {
+                        defaultValue: '已移出黑名单。',
+                      }),
+                    ),
+                })
+              }
             />
           )}
         </div>
@@ -1474,6 +1502,66 @@ function PreferencesSettings({
         </div>
       </section>
     </>
+  );
+}
+
+function BlacklistSettings({
+  pending,
+  items,
+  unblocking,
+  onUnblock,
+}: {
+  pending: boolean;
+  items: BlockedUser[];
+  unblocking: boolean;
+  onUnblock: (userId: string) => void;
+}) {
+  const { t } = useTranslation('pages');
+  return (
+    <section className="gl-settings-card gl-settings-form gl-blacklist-card">
+      <div className="gl-settings-card-head">
+        <span className="gl-settings-card-icon">
+          <Ban size={18} />
+        </span>
+        <div>
+          <h2>{t('library.settings.blacklist.title', { defaultValue: '黑名单管理' })}</h2>
+          <p>
+            {t('library.settings.blacklist.sub', {
+              defaultValue: '被你拉黑的主播不会出现在私信里；主播拉黑观众后，该观众无法观看和互动。',
+            })}
+          </p>
+        </div>
+      </div>
+      {pending ? (
+        <div className="gl-settings-empty-line">
+          {t('loading', { defaultValue: 'Loading...' })}
+        </div>
+      ) : items.length ? (
+        <div className="gl-blacklist-list">
+          {items.map((item) => (
+            <div className="gl-blacklist-row" key={item.user.id}>
+              <Avatar name={item.user.name} src={item.user.avatar} size={42} />
+              <span>
+                <strong>{item.user.name}</strong>
+                <small>{item.role === 'creator' ? '主播' : '用户'}</small>
+              </span>
+              <button
+                className="gl-settings-button"
+                type="button"
+                disabled={unblocking}
+                onClick={() => onUnblock(item.user.id)}
+              >
+                {t('library.settings.blacklist.unblock', { defaultValue: '移出黑名单' })}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="gl-settings-empty-line">
+          {t('library.settings.blacklist.empty', { defaultValue: '暂无黑名单用户。' })}
+        </div>
+      )}
+    </section>
   );
 }
 

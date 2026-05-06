@@ -109,7 +109,7 @@ func TestRoomServiceListUsesRealtimeViewerMetrics(t *testing.T) {
 	roomSvc.SetLiveRepo(live)
 	roomSvc.now = func() time.Time { return startedAt.Add(3 * time.Minute) }
 
-	resp, err := roomSvc.List(ctx, "", 1, 10)
+	resp, err := roomSvc.List(ctx, "", "", 1, 10)
 	require.NoError(t, err)
 	require.Len(t, resp.Items, 1)
 	require.Equal(t, int64(7), resp.Items[0].Viewers)

@@ -28,6 +28,8 @@ type PostService struct {
 	social     *repo.SocialRepo
 	permission LivePermissionChecker
 	textPolicy TextPolicy
+	blocks     ChannelBlockChecker
+	notify     NotificationWriter
 }
 
 func NewPostService(posts *repo.PostRepo, rooms *repo.RoomRepo, social *repo.SocialRepo, permission LivePermissionChecker) *PostService {
@@ -39,8 +41,20 @@ type TextPolicy interface {
 	EnsureUserCanInteract(ctx context.Context, userID string) error
 }
 
+type NotificationWriter interface {
+	CreateNotifications(ctx context.Context, notifications []model.Notification) error
+}
+
 func (s *PostService) SetTextPolicy(policy TextPolicy) {
 	s.textPolicy = policy
+}
+
+func (s *PostService) SetBlockChecker(blocks ChannelBlockChecker) {
+	s.blocks = blocks
+}
+
+func (s *PostService) SetNotificationWriter(writer NotificationWriter) {
+	s.notify = writer
 }
 
 type CreatePostReq struct {
@@ -202,6 +216,15 @@ func (s *PostService) ListChannel(ctx context.Context, viewerID, channelKey stri
 		return nil, err
 	}
 	isOwner := viewerID != "" && viewerID == ownerID
+	if !isOwner && s.blocks != nil && viewerID != "" {
+		blocked, err := s.blocks.BlocksInteraction(ctx, viewerID, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return &PostListResp{Items: []ChannelPostDTO{}, Total: 0, Page: page, Size: size}, nil
+		}
+	}
 	var posts []model.ChannelPost
 	var total int64
 	if isOwner {
@@ -400,8 +423,9 @@ func (s *PostService) CreateComment(ctx context.Context, userID, postID string, 
 	parentID := strings.TrimSpace(req.ParentID)
 	rootID := commentID
 	depth := 0
+	var parent *model.PostComment
 	if parentID != "" {
-		parent, err := s.posts.GetComment(ctx, postID, parentID)
+		parent, err = s.posts.GetComment(ctx, postID, parentID)
 		if err != nil {
 			return nil, postError(err)
 		}
@@ -427,6 +451,7 @@ func (s *PostService) CreateComment(ctx context.Context, userID, postID string, 
 	if err := s.posts.CreateComment(ctx, comment); err != nil {
 		return nil, err
 	}
+	_ = s.notifyPostComment(ctx, *post, *comment, parent)
 	author := s.authorForUser(ctx, userID)
 	dto := commentDTO(*comment, author, false, true)
 	return &dto, nil
@@ -462,12 +487,20 @@ func (s *PostService) LikePost(ctx context.Context, userID, postID string) (*Pos
 			return nil, err
 		}
 	}
-	if _, err := s.visiblePost(ctx, userID, postID); err != nil {
+	post, err := s.visiblePost(ctx, userID, postID)
+	if err != nil {
+		return nil, err
+	}
+	alreadyLiked, err := s.posts.PostLikedIDs(ctx, userID, []string{postID})
+	if err != nil {
 		return nil, err
 	}
 	count, err := s.posts.LikePost(ctx, postID, userID)
 	if err != nil {
 		return nil, postError(err)
+	}
+	if !alreadyLiked[postID] {
+		_ = s.notifyPostLiked(ctx, *post, userID)
 	}
 	return &PostLikeState{PostID: postID, Liked: true, Likes: count}, nil
 }
@@ -500,15 +533,24 @@ func (s *PostService) LikeComment(ctx context.Context, userID, postID, commentID
 			return nil, err
 		}
 	}
-	if _, err := s.visiblePost(ctx, userID, postID); err != nil {
+	post, err := s.visiblePost(ctx, userID, postID)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := s.posts.GetComment(ctx, postID, commentID); err != nil {
+	comment, err := s.posts.GetComment(ctx, postID, commentID)
+	if err != nil {
 		return nil, postError(err)
+	}
+	alreadyLiked, err := s.posts.CommentLikedIDs(ctx, userID, []string{commentID})
+	if err != nil {
+		return nil, err
 	}
 	count, err := s.posts.LikeComment(ctx, commentID, userID)
 	if err != nil {
 		return nil, postError(err)
+	}
+	if !alreadyLiked[commentID] {
+		_ = s.notifyCommentLiked(ctx, *post, *comment, userID)
 	}
 	return &CommentLikeState{CommentID: commentID, Liked: true, Likes: count}, nil
 }
@@ -581,6 +623,15 @@ func (s *PostService) visiblePost(ctx context.Context, viewerID, postID string) 
 func (s *PostService) canViewPost(ctx context.Context, viewerID string, post model.ChannelPost) (bool, error) {
 	if viewerID != "" && viewerID == post.OwnerID {
 		return true, nil
+	}
+	if s.blocks != nil && viewerID != "" {
+		blocked, err := s.blocks.BlocksInteraction(ctx, viewerID, post.OwnerID)
+		if err != nil {
+			return false, err
+		}
+		if blocked {
+			return false, nil
+		}
 	}
 	switch normalizePostVisibility(post.Visibility) {
 	case model.PostVisibilityPublic:
@@ -723,6 +774,80 @@ func commentDTO(comment model.PostComment, author PostAuthor, liked, canDelete b
 		CreatedAt:  comment.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:  comment.UpdatedAt.UTC().Format(time.RFC3339),
 	}
+}
+
+func (s *PostService) notifyPostComment(ctx context.Context, post model.ChannelPost, comment model.PostComment, parent *model.PostComment) error {
+	if s.notify == nil {
+		return nil
+	}
+	targetID := post.OwnerID
+	kind := "post_comment"
+	title := "有人评论了你的帖子"
+	if parent != nil {
+		targetID = parent.UserID
+		kind = "post_comment_reply"
+		title = "有人回复了你的评论"
+	}
+	if targetID == "" || targetID == comment.UserID {
+		return nil
+	}
+	actor := s.authorForUser(ctx, comment.UserID)
+	return s.notify.CreateNotifications(ctx, []model.Notification{{
+		ID:            kind + "-" + notificationHash(post.ID, comment.ID, targetID),
+		UserID:        targetID,
+		Type:          kind,
+		Title:         title,
+		Body:          trimRunes(comment.Content, 120),
+		Link:          "/channel/" + post.OwnerID,
+		ActorID:       actor.ID,
+		ActorUsername: actor.Username,
+		ActorName:     actor.Name,
+		ActorAvatar:   actor.Avatar,
+		ActorVerified: actor.Verified,
+		CreatedAt:     time.Now(),
+	}})
+}
+
+func (s *PostService) notifyPostLiked(ctx context.Context, post model.ChannelPost, actorID string) error {
+	if s.notify == nil || post.OwnerID == "" || post.OwnerID == actorID {
+		return nil
+	}
+	actor := s.authorForUser(ctx, actorID)
+	return s.notify.CreateNotifications(ctx, []model.Notification{{
+		ID:            "post-liked-" + notificationHash(post.ID, actorID),
+		UserID:        post.OwnerID,
+		Type:          "post_liked",
+		Title:         "你的帖子收到新的赞",
+		Body:          trimRunes(post.Content, 120),
+		Link:          "/channel/" + post.OwnerID,
+		ActorID:       actor.ID,
+		ActorUsername: actor.Username,
+		ActorName:     actor.Name,
+		ActorAvatar:   actor.Avatar,
+		ActorVerified: actor.Verified,
+		CreatedAt:     time.Now(),
+	}})
+}
+
+func (s *PostService) notifyCommentLiked(ctx context.Context, post model.ChannelPost, comment model.PostComment, actorID string) error {
+	if s.notify == nil || comment.UserID == "" || comment.UserID == actorID {
+		return nil
+	}
+	actor := s.authorForUser(ctx, actorID)
+	return s.notify.CreateNotifications(ctx, []model.Notification{{
+		ID:            "comment-liked-" + notificationHash(comment.ID, actorID),
+		UserID:        comment.UserID,
+		Type:          "post_comment_liked",
+		Title:         "你的评论收到新的赞",
+		Body:          trimRunes(comment.Content, 120),
+		Link:          "/channel/" + post.OwnerID,
+		ActorID:       actor.ID,
+		ActorUsername: actor.Username,
+		ActorName:     actor.Name,
+		ActorAvatar:   actor.Avatar,
+		ActorVerified: actor.Verified,
+		CreatedAt:     time.Now(),
+	}})
 }
 
 func postError(err error) error {

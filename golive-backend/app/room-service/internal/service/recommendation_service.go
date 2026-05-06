@@ -106,6 +106,13 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 	}
 	scored := make([]scoredRoom, 0, len(rooms))
 	for _, room := range rooms {
+		blocked, err := s.blocksRoomInteraction(ctx, viewerID, room.OwnerID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			continue
+		}
 		s.applyOwnerProfile(ctx, &room)
 		categoryKey := preferenceCategoryKey(room.Category)
 		viewers := maxInt64(room.Viewers, room.PeakViewers)
@@ -167,6 +174,13 @@ func (s *RoomService) RecordWatch(ctx context.Context, viewerID, roomID string) 
 	}
 	if room.Status != model.StatusLive && room.Status != model.StatusEnded {
 		return nil
+	}
+	blocked, err := s.blocksRoomInteraction(ctx, viewerID, room.OwnerID)
+	if err != nil {
+		return err
+	}
+	if blocked {
+		return errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
 	}
 	now := s.now()
 	return s.rooms.RecordWatchEvent(ctx, &model.RoomWatchEvent{

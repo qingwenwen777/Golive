@@ -31,6 +31,7 @@ type AppointmentService struct {
 	rooms        *repo.RoomRepo
 	social       *repo.SocialRepo
 	live         *LiveService
+	blocks       ChannelBlockChecker
 	now          func() time.Time
 }
 
@@ -107,6 +108,10 @@ func NewAppointmentService(appointments *repo.AppointmentRepo, rooms *repo.RoomR
 		live:         live,
 		now:          time.Now,
 	}
+}
+
+func (s *AppointmentService) SetBlockChecker(blocks ChannelBlockChecker) {
+	s.blocks = blocks
 }
 
 func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload AppointmentPayload) (*AppointmentDTO, error) {
@@ -277,6 +282,15 @@ func (s *AppointmentService) ListChannel(ctx context.Context, channelKey, viewer
 			return &AppointmentListResp{Items: []AppointmentDTO{}, Total: 0, Page: page, Size: size}, nil
 		}
 		return nil, err
+	}
+	if viewerID != "" && viewerID != ownerID && s.blocks != nil {
+		blocked, err := s.blocks.BlocksInteraction(ctx, viewerID, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return &AppointmentListResp{Items: []AppointmentDTO{}, Total: 0, Page: page, Size: size}, nil
+		}
 	}
 	items, total, err := s.appointments.ListPublicByOwner(ctx, ownerID, s.now(), page, size)
 	if err != nil {
@@ -467,8 +481,9 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 	return &st, nil
 }
 
-func (s *AppointmentService) Notifications(ctx context.Context, userID string, page, size int) (*NotificationListResp, error) {
-	items, total, unread, err := s.appointments.ListNotifications(ctx, userID, page, size)
+func (s *AppointmentService) Notifications(ctx context.Context, userID string, page, size int, box string) (*NotificationListResp, error) {
+	includeTypes, excludeTypes := notificationTypeFilter(box)
+	items, total, unread, err := s.appointments.ListNotifications(ctx, userID, page, size, includeTypes, excludeTypes)
 	if err != nil {
 		return nil, err
 	}
@@ -494,6 +509,21 @@ func (s *AppointmentService) Notifications(ctx context.Context, userID string, p
 		out = append(out, dto)
 	}
 	return &NotificationListResp{Items: out, Total: total, Unread: unread, Page: page, Size: size}, nil
+}
+
+func notificationTypeFilter(box string) ([]string, []string) {
+	replyTypes := []string{"post_comment", "post_comment_reply"}
+	likeTypes := []string{"post_liked", "post_comment_liked", "room_liked"}
+	switch strings.ToLower(strings.TrimSpace(box)) {
+	case "reply", "replies":
+		return replyTypes, nil
+	case "like", "likes":
+		return likeTypes, nil
+	case "system":
+		return nil, append(replyTypes, likeTypes...)
+	default:
+		return nil, nil
+	}
 }
 
 func (s *AppointmentService) notificationActorFromNotification(ctx context.Context, item model.Notification) notificationActor {
@@ -616,6 +646,15 @@ func (s *AppointmentService) listResp(ctx context.Context, items []model.LiveApp
 	out := make([]AppointmentDTO, 0, len(items))
 	now := s.now()
 	for _, item := range items {
+		if viewerID != "" && viewerID != item.OwnerID && s.blocks != nil {
+			blocked, err := s.blocks.BlocksInteraction(ctx, viewerID, item.OwnerID)
+			if err != nil {
+				return nil, err
+			}
+			if blocked {
+				continue
+			}
+		}
 		room := rooms[item.RoomID]
 		s.applyOwnerVerification(ctx, item.OwnerID, &room)
 		out = append(out, s.dtoFrom(item, &room, counts[item.ID], reserved[item.ID], s.waitingCount(ctx, item.RoomID), now))

@@ -18,6 +18,7 @@ import {
   ListChecks,
   LockKeyhole,
   MessageSquare,
+  MoreVertical,
   PlayCircle,
   Radio,
   Save,
@@ -61,6 +62,13 @@ import {
   type ModerationLog,
   type ModerationUser,
 } from '@/api/moderation';
+import {
+  useFanGroups,
+  useSyncFanGroups,
+  useUpdateFanGroupMember,
+  type FanGroup,
+  type FanGroupMember,
+} from '@/api/messages';
 import {
   useCancelAppointment,
   useCreateAppointment,
@@ -1969,6 +1977,306 @@ export function CreatorRoomModeratorsPage() {
   );
 }
 
+export function CreatorFanGroupsPage() {
+  const { t, i18n } = useTranslation('pages');
+  const { user } = useStudioUser();
+  const groups = useFanGroups(Boolean(user));
+  const syncGroups = useSyncFanGroups();
+  const updateMember = useUpdateFanGroupMember();
+  const items = groups.data?.items ?? [];
+  const memberCount = items.reduce((sum, group) => sum + group.memberCount, 0);
+  const adminCount = items.reduce((sum, group) => sum + countGroupAdmins(group), 0);
+  const mutedCount = items.reduce(
+    (sum, group) => sum + group.members.filter((member) => member.muted).length,
+    0,
+  );
+
+  const sync = () => {
+    syncGroups.mutate(undefined, {
+      onSuccess: (data) =>
+        toast.success(
+          t('studio.fanGroups.synced', {
+            count: data.total,
+            defaultValue: `已同步 ${data.total} 个粉丝团群聊。`,
+          }),
+        ),
+      onError: (err) =>
+        toast.error(err.message || t('studio.fanGroups.syncFailed', { defaultValue: '同步群聊失败。' })),
+    });
+  };
+
+  const update = (
+    group: FanGroup,
+    member: FanGroupMember,
+    patch: { role?: string; muteMinutes?: number; kick?: boolean },
+    successKey: string,
+    fallback: string,
+  ) => {
+    updateMember.mutate(
+      { groupId: group.id, userId: member.user.id, ...patch },
+      {
+        onSuccess: () => toast.success(t(successKey, { name: member.user.name, defaultValue: fallback })),
+        onError: (err) =>
+          toast.error(err.message || t('studio.fanGroups.updateFailed', { defaultValue: '更新群成员失败。' })),
+      },
+    );
+  };
+
+  return (
+    <div className="gl-fan-groups-page">
+      <section className="gl-creator-kpis">
+        <StudioKpi
+          icon={<MessageSquare size={18} />}
+          label={t('studio.fanGroups.groupCount', { defaultValue: '群聊数量' })}
+          value={(groups.data?.total ?? 0).toLocaleString()}
+          sub={t('studio.fanGroups.groupCountSub', { defaultValue: '每群最多 200 人' })}
+        />
+        <StudioKpi
+          icon={<Users size={18} />}
+          label={t('studio.fanGroups.memberCount', { defaultValue: '粉丝团成员' })}
+          value={memberCount.toLocaleString()}
+          sub={t('studio.fanGroups.memberCountSub', { defaultValue: '已分配入群' })}
+        />
+        <StudioKpi
+          icon={<Crown size={18} />}
+          label={t('studio.fanGroups.adminCount', { defaultValue: '群管理员' })}
+          value={adminCount.toLocaleString()}
+          sub={t('studio.fanGroups.adminCountSub', { defaultValue: '可协助管理群聊' })}
+        />
+        <StudioKpi
+          icon={<LockKeyhole size={18} />}
+          label={t('studio.fanGroups.mutedCount', { defaultValue: '禁言成员' })}
+          value={mutedCount.toLocaleString()}
+          sub={t('studio.fanGroups.mutedCountSub', { defaultValue: '含临时禁言' })}
+        />
+      </section>
+
+      <section className="gl-creator-panel gl-fan-groups-head-panel">
+        <div className="gl-creator-panel-head">
+          <div>
+            <span>{t('studio.fanGroups.label', { defaultValue: '粉丝团群聊' })}</span>
+            <h2>{t('studio.fanGroups.title', { defaultValue: '群聊管理' })}</h2>
+          </div>
+          <button
+            type="button"
+            className="gl-creator-secondary"
+            disabled={syncGroups.isPending}
+            onClick={sync}
+          >
+            <Users size={16} />
+            {syncGroups.isPending
+              ? t('studio.fanGroups.syncing', { defaultValue: '同步中' })
+              : t('studio.fanGroups.sync', { defaultValue: '同步粉丝团' })}
+          </button>
+        </div>
+        <p>
+          {t('studio.fanGroups.description', {
+            defaultValue:
+              '系统会把已加入粉丝团的成员按每 200 人一个群分配，超过人数时自动创建新的粉丝团群聊。',
+          })}
+        </p>
+      </section>
+
+      <section className="gl-fan-groups-list">
+        {groups.isPending ? (
+          <div className="gl-creator-empty-soft">
+            {t('studio.loading', { defaultValue: 'Loading studio...' })}
+          </div>
+        ) : items.length ? (
+          items.map((group) => (
+            <FanGroupPanel
+              key={group.id}
+              group={group}
+              locale={i18n.language}
+              pending={updateMember.isPending}
+              onPromote={(member) =>
+                update(
+                  group,
+                  member,
+                  { role: 'admin' },
+                  'studio.fanGroups.adminSet',
+                  `${member.user.name} 已设为群管理员。`,
+                )
+              }
+              onDemote={(member) =>
+                update(
+                  group,
+                  member,
+                  { role: 'member' },
+                  'studio.fanGroups.adminRemoved',
+                  `${member.user.name} 已取消管理员。`,
+                )
+              }
+              onMute={(member) =>
+                update(
+                  group,
+                  member,
+                  { muteMinutes: 60 },
+                  'studio.fanGroups.muted',
+                  `${member.user.name} 已禁言 60 分钟。`,
+                )
+              }
+              onUnmute={(member) =>
+                update(
+                  group,
+                  member,
+                  { muteMinutes: 0 },
+                  'studio.fanGroups.unmuted',
+                  `${member.user.name} 已解除禁言。`,
+                )
+              }
+              onKick={(member) =>
+                update(
+                  group,
+                  member,
+                  { kick: true },
+                  'studio.fanGroups.kicked',
+                  `${member.user.name} 已移出群聊。`,
+                )
+              }
+            />
+          ))
+        ) : (
+          <div className="gl-creator-panel gl-fan-group-panel">
+            <div className="gl-creator-empty-soft">
+              {t('studio.fanGroups.empty', { defaultValue: '还没有粉丝团群聊，先同步粉丝团成员。' })}
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function FanGroupPanel({
+  group,
+  locale,
+  pending,
+  onPromote,
+  onDemote,
+  onMute,
+  onUnmute,
+  onKick,
+}: {
+  group: FanGroup;
+  locale: string;
+  pending: boolean;
+  onPromote: (member: FanGroupMember) => void;
+  onDemote: (member: FanGroupMember) => void;
+  onMute: (member: FanGroupMember) => void;
+  onUnmute: (member: FanGroupMember) => void;
+  onKick: (member: FanGroupMember) => void;
+}) {
+  const { t } = useTranslation('pages');
+
+  return (
+    <article className="gl-creator-panel gl-fan-group-panel">
+      <div className="gl-creator-panel-head">
+        <div>
+          <span>{t('studio.fanGroups.groupNo', { no: group.groupNo, defaultValue: `第 ${group.groupNo} 群` })}</span>
+          <h2>{group.name}</h2>
+        </div>
+        <div className="gl-fan-group-meta">
+          <span>
+            <Users size={15} />
+            {group.memberCount}/200
+          </span>
+          <span>{formatFanGroupDate(group.updatedAt, locale)}</span>
+        </div>
+      </div>
+      <div className="gl-fan-group-members">
+        {group.members.length ? (
+          group.members.map((member) => {
+            const isAdmin = member.role === 'admin';
+            const canManage = member.role !== 'owner';
+            return (
+              <div key={member.user.id} className="gl-fan-group-member">
+                <Avatar name={member.user.name} src={member.user.avatar} size={38} />
+                <div className="gl-fan-group-member-main">
+                  <strong>{member.user.name}</strong>
+                  <span>
+                    {member.user.username ? `@${member.user.username}` : member.user.id} ·{' '}
+                    {fanGroupRoleLabel(member.role, t)}
+                    {member.muted
+                      ? ` · ${t('studio.fanGroups.mutedState', { defaultValue: '已禁言' })}`
+                      : ''}
+                  </span>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="gl-message-icon-btn"
+                      disabled={pending || !canManage}
+                      aria-label={t('studio.fanGroups.memberActions', { defaultValue: '成员操作' })}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="gl-fan-group-actions">
+                    {isAdmin ? (
+                      <DropdownMenuItem onSelect={() => onDemote(member)}>
+                        {t('studio.fanGroups.demote', { defaultValue: '取消管理员' })}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onSelect={() => onPromote(member)}>
+                        {t('studio.fanGroups.promote', { defaultValue: '设为管理员' })}
+                      </DropdownMenuItem>
+                    )}
+                    {member.muted ? (
+                      <DropdownMenuItem onSelect={() => onUnmute(member)}>
+                        {t('studio.fanGroups.unmute', { defaultValue: '解除禁言' })}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onSelect={() => onMute(member)}>
+                        {t('studio.fanGroups.mute', { defaultValue: '禁言 60 分钟' })}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem className="text-destructive" onSelect={() => onKick(member)}>
+                      {t('studio.fanGroups.kick', { defaultValue: '移出群聊' })}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            );
+          })
+        ) : (
+          <div className="gl-creator-empty-soft">
+            {t('studio.fanGroups.noMembers', { defaultValue: '这个群暂时没有成员。' })}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function countGroupAdmins(group: FanGroup) {
+  return group.members.filter((member) => member.role === 'admin').length;
+}
+
+function fanGroupRoleLabel(role: string, t: TFunction<'pages'>) {
+  if (role === 'owner') {
+    return t('studio.fanGroups.roleOwner', { defaultValue: '群主' });
+  }
+  if (role === 'admin') {
+    return t('studio.fanGroups.roleAdmin', { defaultValue: '管理员' });
+  }
+  return t('studio.fanGroups.roleMember', { defaultValue: '成员' });
+}
+
+function formatFanGroupDate(value: string, locale: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
 function ModerationUserRow({
   user,
   active,
@@ -2857,6 +3165,9 @@ function StudioTabs() {
       </NavLink>
       <NavLink to="/studio/moderators">
         {t('studio.tabs.moderators', { defaultValue: '房间房管' })}
+      </NavLink>
+      <NavLink to="/studio/fan-groups">
+        {t('studio.tabs.fanGroups', { defaultValue: '群聊管理' })}
       </NavLink>
       <NavLink to="/studio/replay">
         {t('studio.tabs.replay', { defaultValue: 'Data replay' })}

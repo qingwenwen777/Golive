@@ -107,6 +107,13 @@ func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID
 		}
 		return nil, err
 	}
+	blocked, err := s.blocksRoomInteraction(ctx, viewerID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return &LiveHistoryResp{Items: []LiveHistoryItem{}, Total: 0, Page: page, Size: size}, nil
+	}
 	if replaysOnly && viewerID != ownerID {
 		items, total, err := s.replayItemsForViewer(ctx, ownerID, viewerID, page, size)
 		if err != nil {
@@ -146,6 +153,13 @@ func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory stri
 	visibleRooms := make([]model.Room, 0, len(rooms))
 	replaysByRoom := make(map[string]*model.Replay, len(rooms))
 	for _, room := range rooms {
+		blocked, err := s.blocksRoomInteraction(ctx, viewerID, room.OwnerID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			continue
+		}
 		replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
 		if err != nil {
 			return nil, err

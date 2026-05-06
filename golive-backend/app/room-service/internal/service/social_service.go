@@ -16,6 +16,8 @@ import (
 type SocialService struct {
 	social *repo.SocialRepo
 	rooms  *repo.RoomRepo
+	blocks ChannelBlockChecker
+	notify NotificationWriter
 }
 
 func NewSocialService(social *repo.SocialRepo, rooms ...*repo.RoomRepo) *SocialService {
@@ -24,6 +26,14 @@ func NewSocialService(social *repo.SocialRepo, rooms ...*repo.RoomRepo) *SocialS
 		roomRepo = rooms[0]
 	}
 	return &SocialService{social: social, rooms: roomRepo}
+}
+
+func (s *SocialService) SetBlockChecker(blocks ChannelBlockChecker) {
+	s.blocks = blocks
+}
+
+func (s *SocialService) SetNotificationWriter(writer NotificationWriter) {
+	s.notify = writer
 }
 
 // Follow state ---------------------------------------------------------
@@ -69,6 +79,15 @@ func (s *SocialService) Follow(ctx context.Context, uid, channelID string) (*Fol
 	}
 	if selfChannel {
 		return nil, errcode.New(409, "cannot follow your own channel").WithReason("self_follow")
+	}
+	if ownerID := ownerIDFromChannelID(channelID); ownerID != "" && s.blocks != nil {
+		blocked, err := s.blocks.BlocksInteraction(ctx, uid, ownerID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
+		}
 	}
 	if err := s.social.Follow(ctx, uid, channelID); err != nil {
 		return nil, err
@@ -530,9 +549,16 @@ func (s *SocialService) GetLike(ctx context.Context, uid, streamID string) (*Lik
 }
 
 func (s *SocialService) Like(ctx context.Context, uid, streamID string) (*LikeState, error) {
+	if err := s.ensureRoomInteractionAllowed(ctx, uid, streamID); err != nil {
+		return nil, err
+	}
+	prev, _ := s.social.GetLike(ctx, streamID, uid)
 	st, err := s.social.Like(ctx, streamID, uid)
 	if err != nil {
 		return nil, err
+	}
+	if prev == nil || !prev.Liked {
+		_ = s.notifyRoomLiked(ctx, uid, streamID)
 	}
 	return toLikeState(streamID, st), nil
 }
@@ -546,6 +572,9 @@ func (s *SocialService) Unlike(ctx context.Context, uid, streamID string) (*Like
 }
 
 func (s *SocialService) Dislike(ctx context.Context, uid, streamID string) (*LikeState, error) {
+	if err := s.ensureRoomInteractionAllowed(ctx, uid, streamID); err != nil {
+		return nil, err
+	}
 	st, err := s.social.Dislike(ctx, streamID, uid)
 	if err != nil {
 		return nil, err
@@ -568,4 +597,50 @@ func toLikeState(sid string, st *repo.LikeState) *LikeState {
 		Disliked: st.Disliked,
 		Likes:    st.Likes,
 	}
+}
+
+func (s *SocialService) ensureRoomInteractionAllowed(ctx context.Context, uid, streamID string) error {
+	if s.blocks == nil || s.rooms == nil || uid == "" {
+		return nil
+	}
+	room, err := s.rooms.GetByID(ctx, streamID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	blocked, err := s.blocks.BlocksInteraction(ctx, uid, room.OwnerID)
+	if err != nil {
+		return err
+	}
+	if blocked {
+		return errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
+	}
+	return nil
+}
+
+func (s *SocialService) notifyRoomLiked(ctx context.Context, actorID, streamID string) error {
+	if s.notify == nil || s.rooms == nil || actorID == "" {
+		return nil
+	}
+	room, err := s.rooms.GetByID(ctx, streamID)
+	if err != nil || room == nil || room.OwnerID == "" || room.OwnerID == actorID {
+		return nil
+	}
+	profile, _ := s.rooms.OwnerProfile(ctx, actorID)
+	return s.notify.CreateNotifications(ctx, []model.Notification{{
+		ID:            "room-liked-" + notificationHash(streamID, actorID),
+		UserID:        room.OwnerID,
+		Type:          "room_liked",
+		Title:         "你的直播间收到新的赞",
+		Body:          strings.TrimSpace(room.Title),
+		Link:          "/live/" + room.ID,
+		ActorID:       actorID,
+		ActorUsername: profile.Username,
+		ActorName:     ownerProfileName(profile),
+		ActorAvatar:   profile.Avatar,
+		ActorVerified: profile.Verified,
+		CreatedAt:     time.Now(),
+	}})
 }

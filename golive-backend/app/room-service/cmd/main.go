@@ -68,6 +68,10 @@ func main() {
 	if err := postRepo.AutoMigrate(); err != nil {
 		log.Fatal("post automigrate", zap.Error(err))
 	}
+	messageRepo := repo.NewMessageRepo(db)
+	if err := messageRepo.AutoMigrate(); err != nil {
+		log.Fatal("message automigrate", zap.Error(err))
+	}
 	if n, err := roomRepo.FixUUIDChannels(context.Background()); err != nil {
 		log.Warn("fix uuid channels", zap.Error(err))
 	} else if n > 0 {
@@ -94,6 +98,7 @@ func main() {
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
+	messageSvc := service.NewMessageService(messageRepo, roomRepo, socialRepo)
 	moderationSvc.SetLiveService(liveSvc)
 	moderationSvc.SetSystemRuntimeConfig(service.SystemRuntimeConfig{
 		ServiceName:         cfg.Service.Name,
@@ -107,6 +112,10 @@ func main() {
 		PostPublicURL:       cfg.Upload.PostPublicURL,
 	})
 	liveSvc.SetTextPolicy(moderationSvc)
+	roomSvc.SetBlockChecker(messageSvc)
+	appointmentSvc.SetBlockChecker(messageSvc)
+	socialSvc.SetBlockChecker(messageSvc)
+	socialSvc.SetNotificationWriter(messageRepo)
 	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL)
 	if err != nil {
 		log.Fatal("new user permission client", zap.Error(err))
@@ -114,6 +123,8 @@ func main() {
 	defer permission.Close()
 	postSvc := service.NewPostService(postRepo, roomRepo, socialRepo, permission)
 	postSvc.SetTextPolicy(moderationSvc)
+	postSvc.SetBlockChecker(messageSvc)
+	postSvc.SetNotificationWriter(messageRepo)
 	searchSvc := service.NewSearchService(roomSvc, socialSvc, postSvc, appointmentSvc)
 	if activeRooms, err := roomRepo.ActiveRooms(context.Background()); err != nil {
 		log.Warn("load active rooms for moderation cache", zap.Error(err))
@@ -145,6 +156,7 @@ func main() {
 		Search:         searchSvc,
 		Appointments:   appointmentSvc,
 		Moderation:     moderationSvc,
+		Messages:       messageSvc,
 		Permission:     permission,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,

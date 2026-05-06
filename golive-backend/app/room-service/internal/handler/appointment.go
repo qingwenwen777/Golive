@@ -196,7 +196,7 @@ func (h *AppointmentHandler) Notifications(c *gin.Context) {
 		return
 	}
 	page, size := pageSize(c, 1, 20)
-	resp, err := h.svc.Notifications(c.Request.Context(), uid, page, size)
+	resp, err := h.svc.Notifications(c.Request.Context(), uid, page, size, c.Query("box"))
 	if err != nil {
 		errcode.Respond(c, err)
 		return

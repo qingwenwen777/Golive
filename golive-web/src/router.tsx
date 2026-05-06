@@ -66,6 +66,11 @@ const CreatorRoomModeratorsPage = lazy(() =>
     default: module.CreatorRoomModeratorsPage,
   })),
 );
+const CreatorFanGroupsPage = lazy(() =>
+  import('@/pages/CreatorStudioPage').then((module) => ({
+    default: module.CreatorFanGroupsPage,
+  })),
+);
 const CreatorReplayPage = lazy(() =>
   import('@/pages/CreatorStudioPage').then((module) => ({
     default: module.CreatorReplayPage,
@@ -106,6 +111,7 @@ const LikedPage = lazy(() =>
     default: module.LikedPage,
   })),
 );
+const MessagesPage = lazy(() => import('@/pages/MessagesPage'));
 const SettingsPage = lazy(() =>
   import('@/pages/LibraryPages').then((module) => ({
     default: module.SettingsPage,
@@ -132,6 +138,7 @@ export const router = createBrowserRouter([
           { path: 'posts', element: <CreatorPostsPage /> },
           { path: 'appointments', element: <CreatorAppointmentsPage /> },
           { path: 'moderators', element: <CreatorRoomModeratorsPage /> },
+          { path: 'fan-groups', element: <CreatorFanGroupsPage /> },
           { path: 'replay', element: <CreatorReplayPage /> },
           { path: 'live-replays', element: <CreatorLiveReplaysPage /> },
         ],
@@ -145,6 +152,9 @@ export const router = createBrowserRouter([
       { path: 'history', element: <HistoryPage /> },
       { path: 'watch-later', element: <WatchLaterPage /> },
       { path: 'liked', element: <LikedPage /> },
+      { path: 'messages', element: <MessagesPage /> },
+      { path: 'messages/:section', element: <MessagesPage /> },
+      { path: 'messages/:section/:targetId', element: <MessagesPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'account-banned', element: <BannedAccountPage /> },
       { path: 'privacy', element: <PrivacyPage /> },

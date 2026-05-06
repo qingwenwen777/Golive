@@ -19,8 +19,14 @@ type RoomService struct {
 	social  *repo.SocialRepo
 	live    *repo.LiveRepo
 	replay  *ReplayService
+	blocks  ChannelBlockChecker
 	flvBase string
 	now     func() time.Time
+}
+
+type ChannelBlockChecker interface {
+	BlocksInteraction(ctx context.Context, viewerID, creatorID string) (bool, error)
+	CreatorBlocks(ctx context.Context, creatorID, viewerID string) (bool, error)
 }
 
 func NewRoomService(rooms *repo.RoomRepo, flvBase string, social ...*repo.SocialRepo) *RoomService {
@@ -40,6 +46,10 @@ func (s *RoomService) SetReplayService(replay *ReplayService) {
 
 func (s *RoomService) SetLiveRepo(live *repo.LiveRepo) {
 	s.live = live
+}
+
+func (s *RoomService) SetBlockChecker(blocks ChannelBlockChecker) {
+	s.blocks = blocks
 }
 
 // playbackURL builds the public HTTP-FLV URL for a live room. Viewers receive
@@ -67,7 +77,7 @@ type ListResp struct {
 	Size  int            `json:"size"`
 }
 
-func (s *RoomService) List(ctx context.Context, rawCategory string, page, size int) (*ListResp, error) {
+func (s *RoomService) List(ctx context.Context, viewerID, rawCategory string, page, size int) (*ListResp, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -83,6 +93,13 @@ func (s *RoomService) List(ctx context.Context, rawCategory string, page, size i
 	now := s.now()
 	items := make([]model.Stream, 0, len(rooms))
 	for i := range rooms {
+		blocked, err := s.blocksRoomInteraction(ctx, viewerID, rooms[i].OwnerID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			continue
+		}
 		st := s.streamFromRoom(ctx, &rooms[i], now, "")
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
@@ -160,6 +177,13 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 			return nil, ErrRoomNotFound
 		}
 		return nil, err
+	}
+	blocked, err := s.blocksRoomInteraction(ctx, viewerID, r.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrRoomNotFound
 	}
 	isOwner := viewerID != "" && viewerID == r.OwnerID
 	isPublicScheduled := r.Status == model.StatusScheduled && !s.now().After(r.StartedAt.Add(30*time.Minute))
@@ -284,4 +308,11 @@ func (s *RoomService) addSubscriberCount(ctx context.Context, st *model.Stream) 
 	}
 	st.SubscriberCount = count
 	return nil
+}
+
+func (s *RoomService) blocksRoomInteraction(ctx context.Context, viewerID, ownerID string) (bool, error) {
+	if s.blocks == nil || viewerID == "" || ownerID == "" || viewerID == ownerID {
+		return false, nil
+	}
+	return s.blocks.BlocksInteraction(ctx, viewerID, ownerID)
 }

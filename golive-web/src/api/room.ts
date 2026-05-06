@@ -865,12 +865,12 @@ export function useUnreserveAppointment(id: string) {
   });
 }
 
-export function useNotifications(enabled = true, page = 1, size = 20) {
+export function useNotifications(enabled = true, page = 1, size = 20, box?: string) {
   return useQuery<NotificationListResp, Error>({
-    queryKey: ['notifications', page, size],
+    queryKey: ['notifications', page, size, box ?? 'all'],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<NotificationListResp>('/notifications', {
-        params: { page, size },
+        params: { page, size, box },
         signal,
       });
       return data;
