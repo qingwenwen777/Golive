@@ -19,6 +19,7 @@ var (
 	ErrAwaitingCreatorReply   = errors.New("awaiting creator reply")
 	ErrFanGroupNotFound       = errors.New("fan group not found")
 	ErrFanGroupMemberNotFound = errors.New("fan group member not found")
+	ErrFanGroupMuted          = errors.New("fan group member muted")
 )
 
 type MessageRepo struct {
@@ -35,6 +36,7 @@ func (r *MessageRepo) AutoMigrate() error {
 		&model.MessagePreference{},
 		&model.FanGroupChat{},
 		&model.FanGroupMember{},
+		&model.FanGroupMessage{},
 	)
 }
 
@@ -82,6 +84,19 @@ type FanGroupMemberRow struct {
 type FanGroupWithMembers struct {
 	Group   model.FanGroupChat
 	Members []FanGroupMemberRow
+}
+
+type FanGroupMessageRow struct {
+	ID          string
+	GroupID     string
+	SenderID    string
+	Body        string
+	CreatedAt   time.Time
+	Username    string
+	DisplayName string
+	Name        string
+	Avatar      string
+	Verified    bool
 }
 
 func (r *MessageRepo) UserProfile(ctx context.Context, userID string) (MessageUserProfile, error) {
@@ -509,6 +524,24 @@ func (r *MessageRepo) ListFanGroups(ctx context.Context, creatorID string) ([]Fa
 	if err := r.db.WithContext(ctx).Where("creator_id = ?", creatorID).Order("group_no ASC").Find(&groups).Error; err != nil {
 		return nil, err
 	}
+	return r.fanGroupsWithMembers(ctx, groups)
+}
+
+func (r *MessageRepo) ListJoinedFanGroups(ctx context.Context, userID string) ([]FanGroupWithMembers, error) {
+	var groups []model.FanGroupChat
+	err := r.db.WithContext(ctx).
+		Table("fan_group_chats AS fg").
+		Select("fg.*").
+		Joins("JOIN fan_group_members AS mine ON mine.group_id = fg.id AND mine.user_id = ? AND mine.kicked_at IS NULL", userID).
+		Order("fg.updated_at DESC, fg.group_no ASC").
+		Find(&groups).Error
+	if err != nil {
+		return nil, err
+	}
+	return r.fanGroupsWithMembers(ctx, groups)
+}
+
+func (r *MessageRepo) fanGroupsWithMembers(ctx context.Context, groups []model.FanGroupChat) ([]FanGroupWithMembers, error) {
 	out := make([]FanGroupWithMembers, 0, len(groups))
 	for _, group := range groups {
 		var members []FanGroupMemberRow
@@ -593,6 +626,75 @@ func (r *MessageRepo) UpdateFanGroupMember(ctx context.Context, creatorID, group
 			Where("id = ?", group.ID).
 			Updates(map[string]any{"member_count": count, "updated_at": now}).Error
 	})
+}
+
+func (r *MessageRepo) FanGroupMemberForUser(ctx context.Context, groupID, userID string) (*model.FanGroupMember, error) {
+	var member model.FanGroupMember
+	err := r.db.WithContext(ctx).
+		Where("group_id = ? AND user_id = ? AND kicked_at IS NULL", groupID, userID).
+		Take(&member).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFanGroupMemberNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &member, nil
+}
+
+func (r *MessageRepo) FanGroupMessages(ctx context.Context, groupID, userID string, page, size int) ([]FanGroupMessageRow, int64, error) {
+	page, size = normalizeMessagePage(page, size)
+	if _, err := r.FanGroupMemberForUser(ctx, groupID, userID); err != nil {
+		return nil, 0, err
+	}
+	tx := r.db.WithContext(ctx).Model(&model.FanGroupMessage{}).Where("group_id = ?", groupID)
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []FanGroupMessageRow
+	err := r.db.WithContext(ctx).
+		Table("fan_group_messages AS msg").
+		Select(`
+msg.id,
+msg.group_id,
+msg.sender_id,
+msg.body,
+msg.created_at,
+COALESCE(u.username, '') AS username,
+COALESCE(u.display_name, '') AS display_name,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), msg.sender_id) AS name,
+COALESCE(u.avatar, '') AS avatar,
+COALESCE(u.verified, false) AS verified
+`).
+		Joins("LEFT JOIN users AS u ON u.id = msg.sender_id").
+		Where("msg.group_id = ?", groupID).
+		Order("msg.created_at ASC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&rows).Error
+	return rows, total, err
+}
+
+func (r *MessageRepo) SendFanGroupMessage(ctx context.Context, groupID, senderID, body string, now time.Time) (*model.FanGroupMessage, error) {
+	member, err := r.FanGroupMemberForUser(ctx, groupID, senderID)
+	if err != nil {
+		return nil, err
+	}
+	if member.MutedUntil != nil && member.MutedUntil.After(now) {
+		return nil, ErrFanGroupMuted
+	}
+	message := model.FanGroupMessage{
+		ID:        uuid.NewString(),
+		GroupID:   groupID,
+		SenderID:  senderID,
+		Body:      body,
+		CreatedAt: now,
+	}
+	if err := r.db.WithContext(ctx).Create(&message).Error; err != nil {
+		return nil, err
+	}
+	return &message, nil
 }
 
 func defaultPreference(userID string) *model.MessagePreference {

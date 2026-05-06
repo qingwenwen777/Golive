@@ -95,3 +95,13 @@ type FanGroupMember struct {
 }
 
 func (FanGroupMember) TableName() string { return "fan_group_members" }
+
+type FanGroupMessage struct {
+	ID        string    `gorm:"primaryKey;type:varchar(64)"`
+	GroupID   string    `gorm:"type:varchar(64);not null;index"`
+	SenderID  string    `gorm:"type:varchar(36);not null;index"`
+	Body      string    `gorm:"type:varchar(1200);not null"`
+	CreatedAt time.Time `gorm:"not null;index"`
+}
+
+func (FanGroupMessage) TableName() string { return "fan_group_messages" }

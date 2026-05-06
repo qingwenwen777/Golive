@@ -4,10 +4,14 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Coins, Plus, User as UserIcon, X } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
 import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
   useNotifications,
+  type NotificationItem,
 } from '@/api/room';
 import { useSearchSuggestions } from '@/api/search';
 import { Avatar } from '@/components/Avatar';
+import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { AvatarUploadDialog } from '@/features/account/AvatarUploadDialog';
 import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveId';
 import { Icons } from '@/components/Icons';
@@ -400,21 +404,126 @@ function suggestionTypeLabel(type: string): string {
 }
 
 function NotificationBell() {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const notifications = useNotifications(true, 1, 8);
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+  const items = notifications.data?.items ?? [];
   const unread = notifications.data?.unread ?? 0;
 
+  const openNotification = (item: NotificationItem) => {
+    if (!item.readAt) markRead.mutate(item.id);
+    if (item.link) navigate(item.link);
+  };
+
   return (
-    <button
-      type="button"
-      className="gl-icon-btn gl-notification-btn"
-      aria-label={t('notifications')}
-      onClick={() => navigate('/messages/system')}
-      title={t('notifications')}
-    >
-      <Bell size={22} />
-      {unread > 0 && <span className="gl-bell-dot" />}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="gl-icon-btn gl-notification-btn"
+          aria-label={t('notifications')}
+          title={t('notifications')}
+        >
+          <Bell size={22} />
+          {unread > 0 && <span className="gl-bell-dot" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="gl-notification-menu w-80">
+        <DropdownMenuLabel className="gl-notification-head">
+          <span>{t('notifications')}</span>
+          <div>
+            {unread > 0 && (
+              <button
+                type="button"
+                disabled={markAllRead.isPending}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  markAllRead.mutate();
+                }}
+              >
+                {t('notificationsReadAll', { defaultValue: 'Read all' })}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                navigate('/messages/system');
+              }}
+            >
+              {t('notificationsViewAll', { defaultValue: 'View all' })}
+            </button>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {notifications.isPending ? (
+          <div className="gl-notification-state">
+            {t('loading', { defaultValue: 'Loading...' })}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="gl-notification-state">
+            {t('notificationsEmpty', { defaultValue: 'No notifications yet' })}
+          </div>
+        ) : (
+          <div className="gl-notification-list">
+            {items.map((item) => (
+              <DropdownMenuItem
+                key={item.id}
+                className={item.readAt ? 'gl-notification-item' : 'gl-notification-item is-unread'}
+                onClick={() => openNotification(item)}
+              >
+                <span className="gl-notification-dot" aria-hidden="true" />
+                <Avatar
+                  name={notificationActorName(item)}
+                  src={item.actorAvatar}
+                  size={42}
+                  className="gl-notification-avatar"
+                />
+                <span className="gl-notification-copy">
+                  <strong>{notificationTitle(item, t)}</strong>
+                  {notificationActorLabel(item) && (
+                    <span className="gl-notification-actor">
+                      {notificationActorLabel(item)}
+                      {item.actorVerified && <VerifiedBadge size={12} />}
+                    </span>
+                  )}
+                  {item.body && <small>{item.body}</small>}
+                  <time>{formatNotificationTime(item.createdAt, i18n.language)}</time>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
+}
+
+function notificationTitle(
+  item: NotificationItem,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  return t(`notificationTypes.${item.type}.title`, { defaultValue: item.title });
+}
+
+function notificationActorName(item: NotificationItem): string {
+  return item.actorName || item.actorUsername || item.body || 'GoLive';
+}
+
+function notificationActorLabel(item: NotificationItem): string {
+  if (item.actorUsername) return `@${item.actorUsername}`;
+  return item.actorName || '';
+}
+
+function formatNotificationTime(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 }

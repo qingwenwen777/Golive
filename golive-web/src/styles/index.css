@@ -13698,6 +13698,12 @@ button.gl-fan-badge-empty {
   padding: 12px 14px;
 }
 
+.gl-notification-head > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .gl-notification-head button {
   border: 0;
   background: transparent;
@@ -15118,15 +15124,11 @@ button.gl-fan-badge-empty {
 }
 
 .gl-message-shell {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  align-items: start;
-  gap: 16px;
-  width: min(1180px, 100%);
+  display: block;
+  width: min(1120px, 100%);
   min-width: 0;
 }
 
-.gl-message-nav,
 .gl-message-auth,
 .gl-message-card,
 .gl-direct-list,
@@ -15313,6 +15315,100 @@ button.gl-fan-badge-empty {
   padding: 0 7px;
 }
 
+.gl-fan-chat-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 8px 0 10px;
+}
+
+.gl-fan-chat-section-title {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 900;
+  padding: 0 18px;
+}
+
+.gl-fan-chat-thread {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.gl-fan-chat-avatars {
+  display: grid;
+  width: 44px;
+  height: 34px;
+  place-items: center;
+  color: var(--gl-text-2);
+}
+
+.gl-fan-chat-avatars .gl-avatar {
+  grid-area: 1 / 1;
+  box-shadow: 0 0 0 2px var(--gl-bg-card);
+}
+
+.gl-fan-chat-avatars .gl-avatar:nth-child(1) {
+  transform: translate(-8px, -3px);
+}
+
+.gl-fan-chat-avatars .gl-avatar:nth-child(2) {
+  transform: translate(8px, -3px);
+}
+
+.gl-fan-chat-avatars .gl-avatar:nth-child(3) {
+  transform: translate(0, 9px);
+}
+
+.gl-fan-chat-head-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+
+.gl-fan-chat-member-list {
+  gap: 8px;
+}
+
+.gl-fan-chat-member {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  padding: 10px;
+}
+
+.gl-fan-chat-member > span {
+  min-width: 0;
+}
+
+.gl-fan-chat-member strong,
+.gl-fan-chat-member small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-fan-chat-member strong {
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gl-fan-chat-member small {
+  color: var(--gl-text-2);
+  font-size: 12px;
+}
+
 .gl-direct-chat {
   display: grid;
   min-width: 0;
@@ -15324,7 +15420,11 @@ button.gl-fan-badge-empty {
   justify-content: flex-start;
 }
 
-.gl-direct-chat-head > div {
+.gl-direct-chat-head .gl-avatar {
+  flex: 0 0 auto;
+}
+
+.gl-direct-chat-head > .gl-direct-chat-meta {
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -15361,6 +15461,8 @@ button.gl-fan-badge-empty {
 
 .gl-direct-bubble-row {
   display: flex;
+  align-items: flex-end;
+  gap: 8px;
   justify-content: flex-start;
 }
 
@@ -15387,6 +15489,14 @@ button.gl-fan-badge-empty {
   overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 1.55;
+}
+
+.gl-direct-bubble > strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .gl-direct-bubble time,
@@ -15570,6 +15680,10 @@ button.gl-fan-badge-empty {
   flex-wrap: wrap;
   gap: 10px 18px;
   justify-content: flex-start;
+}
+
+.gl-message-radio-row.is-binary {
+  justify-content: flex-end;
 }
 
 .gl-message-radio {

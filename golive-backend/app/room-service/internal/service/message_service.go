@@ -147,6 +147,21 @@ type FanGroupListResp struct {
 	Total int           `json:"total"`
 }
 
+type FanGroupMessageDTO struct {
+	ID        string         `json:"id"`
+	GroupID   string         `json:"groupId"`
+	Sender    MessageUserDTO `json:"sender"`
+	Body      string         `json:"body"`
+	CreatedAt string         `json:"createdAt"`
+}
+
+type FanGroupMessageListResp struct {
+	Items []FanGroupMessageDTO `json:"items"`
+	Total int64                `json:"total"`
+	Page  int                  `json:"page"`
+	Size  int                  `json:"size"`
+}
+
 type UpdateFanGroupMemberReq struct {
 	Role        string `json:"role"`
 	MuteMinutes *int   `json:"muteMinutes"`
@@ -481,6 +496,75 @@ func (s *MessageService) ListFanGroups(ctx context.Context, creatorID string) (*
 	return &FanGroupListResp{Items: items, Total: len(items)}, nil
 }
 
+func (s *MessageService) ListJoinedFanGroups(ctx context.Context, userID string) (*FanGroupListResp, error) {
+	if userID == "" {
+		return nil, errcode.ErrUnauthorized
+	}
+	rows, err := s.messages.ListJoinedFanGroups(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]FanGroupDTO, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, fanGroupDTO(row))
+	}
+	return &FanGroupListResp{Items: items, Total: len(items)}, nil
+}
+
+func (s *MessageService) FanGroupMessages(ctx context.Context, userID, groupID string, page, size int) (*FanGroupMessageListResp, error) {
+	if userID == "" {
+		return nil, errcode.ErrUnauthorized
+	}
+	page, size = normalizeListPage(page, size)
+	rows, total, err := s.messages.FanGroupMessages(ctx, groupID, userID, page, size)
+	if err != nil {
+		return nil, fanGroupError(err)
+	}
+	items := make([]FanGroupMessageDTO, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, FanGroupMessageDTO{
+			ID:      row.ID,
+			GroupID: row.GroupID,
+			Sender: MessageUserDTO{
+				ID:          row.SenderID,
+				Username:    row.Username,
+				DisplayName: row.DisplayName,
+				Name:        nonEmpty(row.Name, row.Username, row.SenderID),
+				Avatar:      row.Avatar,
+				Verified:    row.Verified,
+			},
+			Body:      row.Body,
+			CreatedAt: row.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	return &FanGroupMessageListResp{Items: items, Total: total, Page: page, Size: size}, nil
+}
+
+func (s *MessageService) SendFanGroupMessage(ctx context.Context, userID, groupID, content string) (*FanGroupMessageDTO, error) {
+	if userID == "" {
+		return nil, errcode.ErrUnauthorized
+	}
+	body, err := cleanDirectMessage(content)
+	if err != nil {
+		return nil, err
+	}
+	msg, err := s.messages.SendFanGroupMessage(ctx, groupID, userID, body, s.now())
+	if err != nil {
+		return nil, fanGroupError(err)
+	}
+	sender, err := s.messageUser(ctx, userID)
+	if err != nil {
+		sender = fallbackMessageUser(userID)
+	}
+	return &FanGroupMessageDTO{
+		ID:        msg.ID,
+		GroupID:   msg.GroupID,
+		Sender:    sender,
+		Body:      msg.Body,
+		CreatedAt: msg.CreatedAt.UTC().Format(time.RFC3339),
+	}, nil
+}
+
 func (s *MessageService) UpdateFanGroupMember(ctx context.Context, creatorID, groupID, userID string, req UpdateFanGroupMemberReq) (*FanGroupListResp, error) {
 	if creatorID == "" {
 		return nil, errcode.ErrUnauthorized
@@ -771,6 +855,19 @@ func directSendError(err error) error {
 		return errcode.New(http.StatusConflict, "wait for the creator to reply before sending another message").WithReason("awaiting_creator_reply")
 	}
 	return directThreadError(err)
+}
+
+func fanGroupError(err error) error {
+	if errors.Is(err, repo.ErrFanGroupNotFound) {
+		return errcode.New(http.StatusNotFound, "fan group not found").WithReason("fan_group_not_found")
+	}
+	if errors.Is(err, repo.ErrFanGroupMemberNotFound) {
+		return errcode.New(http.StatusForbidden, "join the fan group before chatting").WithReason("fan_group_member_required")
+	}
+	if errors.Is(err, repo.ErrFanGroupMuted) {
+		return errcode.New(http.StatusForbidden, "you are muted in this fan group").WithReason("fan_group_muted")
+	}
+	return err
 }
 
 func notificationHash(parts ...string) string {

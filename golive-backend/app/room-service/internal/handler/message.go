@@ -198,6 +198,53 @@ func (h *MessageHandler) ListFanGroups(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *MessageHandler) ListJoinedFanGroups(c *gin.Context) {
+	uid, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	resp, err := h.svc.ListJoinedFanGroups(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *MessageHandler) FanGroupMessages(c *gin.Context) {
+	uid, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	page, size := pageSize(c, 1, 100)
+	resp, err := h.svc.FanGroupMessages(c.Request.Context(), uid, c.Param("groupID"), page, size)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *MessageHandler) SendFanGroupMessage(c *gin.Context) {
+	uid, ok := requireUser(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	resp, err := h.svc.SendFanGroupMessage(c.Request.Context(), uid, c.Param("groupID"), req.Content)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *MessageHandler) SyncFanGroups(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {

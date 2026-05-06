@@ -98,6 +98,21 @@ export interface FanGroupListResp {
   total: number;
 }
 
+export interface FanGroupMessage {
+  id: string;
+  groupId: string;
+  sender: MessageUser;
+  body: string;
+  createdAt: string;
+}
+
+export interface FanGroupMessageListResp {
+  items: FanGroupMessage[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export function useDirectThreads(enabled = true, page = 1, size = 30) {
   return useQuery<DirectThreadListResp, Error>({
     queryKey: ['direct-threads', page, size],
@@ -287,6 +302,53 @@ export function useFanGroups(enabled = true) {
     enabled,
     staleTime: 15_000,
     retry: 1,
+  });
+}
+
+export function useJoinedFanGroups(enabled = true) {
+  return useQuery<FanGroupListResp, Error>({
+    queryKey: ['joined-fan-groups'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<FanGroupListResp>('/messages/fan-groups/joined', { signal });
+      return data;
+    },
+    enabled,
+    staleTime: 15_000,
+    retry: 1,
+  });
+}
+
+export function useFanGroupMessages(groupId: string, enabled = true, page = 1, size = 100) {
+  return useQuery<FanGroupMessageListResp, Error>({
+    queryKey: ['fan-group-messages', groupId, page, size],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<FanGroupMessageListResp>(
+        `/messages/fan-groups/${encodeURIComponent(groupId)}/messages`,
+        { params: { page, size }, signal },
+      );
+      return data;
+    },
+    enabled: enabled && !!groupId,
+    staleTime: 5_000,
+    refetchInterval: enabled && groupId ? 10_000 : false,
+    retry: 1,
+  });
+}
+
+export function useSendFanGroupMessage(groupId: string) {
+  const qc = useQueryClient();
+  return useMutation<FanGroupMessage, Error, string>({
+    mutationFn: async (content) => {
+      const { data } = await http.post<FanGroupMessage>(
+        `/messages/fan-groups/${encodeURIComponent(groupId)}/messages`,
+        { content },
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['fan-group-messages', groupId] });
+      void qc.invalidateQueries({ queryKey: ['joined-fan-groups'] });
+    },
   });
 }
 

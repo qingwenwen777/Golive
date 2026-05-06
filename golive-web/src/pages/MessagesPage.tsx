@@ -4,15 +4,13 @@ import {
   Ban,
   Bell,
   BellOff,
-  ChevronRight,
-  Heart,
   MessageCircle,
   MoreVertical,
   Pin,
   Send,
-  Settings,
   ShieldOff,
   UserRound,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNotifications, useMarkNotificationRead, type NotificationItem } from '@/api/room';
@@ -21,12 +19,16 @@ import {
   useDirectDraft,
   useDirectMessages,
   useDirectThreads,
+  useFanGroupMessages,
+  useJoinedFanGroups,
   useMessagePreference,
   useSendDirect,
+  useSendFanGroupMessage,
   useSendThreadMessage,
   useUpdateMessagePreference,
   useUpdateThreadOptions,
   type DirectThread,
+  type FanGroup,
   type MessagePreference,
 } from '@/api/messages';
 import { Avatar } from '@/components/Avatar';
@@ -44,19 +46,6 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
-
-const SECTION_ITEMS: Array<{
-  id: MessageSection;
-  path: string;
-  label: string;
-  icon: typeof MessageCircle;
-}> = [
-  { id: 'private', path: '/messages/private', label: '我的消息', icon: MessageCircle },
-  { id: 'replies', path: '/messages/replies', label: '回复我的', icon: Bell },
-  { id: 'likes', path: '/messages/likes', label: '收到的赞', icon: Heart },
-  { id: 'system', path: '/messages/system', label: '系统通知', icon: ShieldOff },
-  { id: 'settings', path: '/messages/settings', label: '消息设置', icon: Settings },
-];
 
 export default function MessagesPage() {
   const navigate = useNavigate();
@@ -89,28 +78,6 @@ export default function MessagesPage() {
   return (
     <div className="gl-page gl-message-page">
       <div className="gl-message-shell">
-        <aside className="gl-message-nav">
-          <div className="gl-message-nav-head">
-            <MessageCircle size={22} />
-            <strong>消息</strong>
-          </div>
-          {SECTION_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={cn('gl-message-nav-item', section === item.id && 'is-active')}
-                onClick={() => navigate(item.path)}
-              >
-                <Icon size={17} />
-                <span>{item.label}</span>
-                <ChevronRight size={15} />
-              </button>
-            );
-          })}
-        </aside>
-
         <main className="gl-message-main">
           {section === 'private' ? (
             <PrivateMessages userId={user?.id ?? ''} draftCreatorId={draftCreatorId} />
@@ -131,17 +98,24 @@ export default function MessagesPage() {
 
 function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCreatorId: string }) {
   const threads = useDirectThreads(true, 1, 50);
+  const fanGroups = useJoinedFanGroups(true);
   const draft = useDirectDraft(draftCreatorId, Boolean(draftCreatorId));
   const [selectedId, setSelectedId] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [content, setContent] = useState('');
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const sendDirect = useSendDirect();
+  const joinedGroups = fanGroups.data?.items ?? [];
+  const selectedGroup = selectedGroupId
+    ? joinedGroups.find((item) => item.id === selectedGroupId)
+    : undefined;
   const threadByDraft = threads.data?.items.find((item) => item.creatorId === draftCreatorId);
-  const selectedThread =
-    (selectedId ? threads.data?.items.find((item) => item.id === selectedId) : undefined) ??
-    threadByDraft ??
-    threads.data?.items[0] ??
-    draft.data;
+  const selectedThread = selectedGroup
+    ? undefined
+    : ((selectedId ? threads.data?.items.find((item) => item.id === selectedId) : undefined) ??
+      threadByDraft ??
+      threads.data?.items[0] ??
+      draft.data);
   const messages = useDirectMessages(selectedThread?.id ?? '', Boolean(selectedThread?.id));
   const sendThread = useSendThreadMessage(selectedThread?.id ?? '');
   const blockUser = useBlockUser();
@@ -152,8 +126,8 @@ function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCrea
   );
 
   useEffect(() => {
-    if (!selectedId && threadByDraft?.id) setSelectedId(threadByDraft.id);
-  }, [selectedId, threadByDraft?.id]);
+    if (!selectedId && !selectedGroupId && threadByDraft?.id) setSelectedId(threadByDraft.id);
+  }, [selectedGroupId, selectedId, threadByDraft?.id]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -195,8 +169,24 @@ function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCrea
       <aside className="gl-direct-list">
         <div className="gl-direct-list-head">
           <h1>我的消息</h1>
-          <span>{threads.data?.total ?? 0} 个会话</span>
+          <span>{(threads.data?.total ?? 0) + joinedGroups.length} 个会话</span>
         </div>
+        {fanGroups.isPending ? null : joinedGroups.length ? (
+          <div className="gl-fan-chat-section">
+            <span className="gl-fan-chat-section-title">粉丝团群聊</span>
+            {joinedGroups.map((group) => (
+              <FanGroupThreadButton
+                key={group.id}
+                group={group}
+                active={selectedGroup?.id === group.id}
+                onClick={() => {
+                  setSelectedId('');
+                  setSelectedGroupId(group.id);
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
         {threads.isPending ? (
           <div className="gl-message-empty-soft">正在加载私信...</div>
         ) : sortedThreads.length || draft.data ? (
@@ -204,8 +194,11 @@ function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCrea
             {draft.data && !threadByDraft && (
               <ThreadButton
                 thread={draft.data}
-                active={!selectedThread?.id}
-                onClick={() => setSelectedId('')}
+                active={!selectedGroup && !selectedThread?.id}
+                onClick={() => {
+                  setSelectedGroupId('');
+                  setSelectedId('');
+                }}
               />
             )}
             {sortedThreads.map((thread) => (
@@ -213,21 +206,26 @@ function PrivateMessages({ userId, draftCreatorId }: { userId: string; draftCrea
                 key={thread.id}
                 thread={thread}
                 active={selectedThread?.id === thread.id}
-                onClick={() => setSelectedId(thread.id)}
+                onClick={() => {
+                  setSelectedGroupId('');
+                  setSelectedId(thread.id);
+                }}
               />
             ))}
           </>
-        ) : (
+        ) : joinedGroups.length ? null : (
           <div className="gl-message-empty-soft">关注主播后，可以从频道页发起私信。</div>
         )}
       </aside>
 
       <section className="gl-direct-chat">
-        {selectedThread ? (
+        {selectedGroup ? (
+          <FanGroupChatView group={selectedGroup} userId={userId} />
+        ) : selectedThread ? (
           <>
             <div className="gl-direct-chat-head">
               <Avatar name={selectedThread.peer.name} src={selectedThread.peer.avatar} size={42} />
-              <div>
+              <div className="gl-direct-chat-meta">
                 <strong>
                   {selectedThread.peer.name}
                   {selectedThread.peer.verified && <VerifiedBadge size={14} />}
@@ -379,6 +377,128 @@ function ThreadButton({
   );
 }
 
+function FanGroupThreadButton({
+  group,
+  active,
+  onClick,
+}: {
+  group: FanGroup;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const previewMembers = group.members.slice(0, 3);
+  return (
+    <button
+      type="button"
+      className={cn('gl-direct-thread gl-fan-chat-thread', active && 'is-active')}
+      onClick={onClick}
+    >
+      <span className="gl-fan-chat-avatars">
+        {previewMembers.length ? (
+          previewMembers.map((member) => (
+            <Avatar
+              key={member.user.id}
+              name={member.user.name}
+              src={member.user.avatar}
+              size={26}
+            />
+          ))
+        ) : (
+          <Users size={22} />
+        )}
+      </span>
+      <span>
+        <strong>{group.name}</strong>
+        <small>{group.memberCount}/200 人 · 粉丝团群聊</small>
+      </span>
+    </button>
+  );
+}
+
+function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }) {
+  const owner = group.members.find((member) => member.role === 'owner');
+  const currentMember = group.members.find((member) => member.user.id === userId);
+  const [content, setContent] = useState('');
+  const messages = useFanGroupMessages(group.id, Boolean(group.id));
+  const sendMessage = useSendFanGroupMessage(group.id);
+  const canSend = !currentMember?.muted;
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = content.trim();
+    if (!text || !canSend) return;
+    sendMessage.mutate(text, {
+      onSuccess: () => setContent(''),
+      onError: (err) => toast.error(fanGroupMessageError(err)),
+    });
+  };
+
+  return (
+    <>
+      <div className="gl-direct-chat-head">
+        <span className="gl-fan-chat-head-icon">
+          <Users size={22} />
+        </span>
+        <div className="gl-direct-chat-meta">
+          <strong>{group.name}</strong>
+          <span>
+            {group.memberCount}/200 人
+            {owner ? ` · 群主 ${owner.user.name}` : ''}
+          </span>
+        </div>
+      </div>
+      <div className="gl-direct-message-list">
+        {messages.isPending ? (
+          <div className="gl-message-empty-soft">正在加载群聊...</div>
+        ) : messages.data?.items.length ? (
+          messages.data.items.map((item) => (
+            <div
+              key={item.id}
+              className={cn('gl-direct-bubble-row', item.sender.id === userId && 'is-me')}
+            >
+              {item.sender.id !== userId && (
+                <Avatar name={item.sender.name} src={item.sender.avatar} size={30} />
+              )}
+              <div className="gl-direct-bubble">
+                {item.sender.id !== userId && <strong>{item.sender.name}</strong>}
+                <p>{item.body}</p>
+                <time>{formatMessageTime(item.createdAt)}</time>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="gl-direct-empty">
+            <Users size={32} />
+            <strong>粉丝团群聊</strong>
+            <span>所有加入粉丝团的成员会显示在这个群里。</span>
+          </div>
+        )}
+      </div>
+      <form className="gl-direct-compose" onSubmit={submit}>
+        <input
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+          maxLength={1000}
+          disabled={!canSend || sendMessage.isPending}
+          placeholder={canSend ? '输入群聊内容' : '你已被禁言，暂时不能发言'}
+        />
+        <button className="gl-creator-primary" type="submit" disabled={!content.trim() || !canSend}>
+          <Send size={16} />
+          发送
+        </button>
+      </form>
+    </>
+  );
+}
+
+function fanGroupMessageError(err: Error): string {
+  const reason = (err as Error & { response?: { data?: { reason?: string } } }).response?.data
+    ?.reason;
+  if (reason === 'fan_group_muted') return '你已被禁言，暂时不能在群聊发言。';
+  if (reason === 'fan_group_member_required') return '你不在这个粉丝团群聊里。';
+  return err.message || '群聊消息发送失败。';
+}
+
 function NotificationPanel({ title, box, empty }: { title: string; box: string; empty: string }) {
   const navigate = useNavigate();
   const notifications = useNotifications(true, 1, 40, box);
@@ -430,13 +550,22 @@ function NotificationPanel({ title, box, empty }: { title: string; box: string; 
 function MessageSettingsPanel() {
   const pref = useMessagePreference(true);
   const update = useUpdateMessagePreference();
-  const current = pref.data ?? defaultPreference;
+  const [draft, setDraft] = useState<MessagePreference>(defaultPreference);
+
+  useEffect(() => {
+    if (pref.data) setDraft(pref.data);
+  }, [pref.data]);
 
   const patch = (value: Partial<MessagePreference>) => {
-    update.mutate(
-      { ...current, ...value },
-      { onSuccess: () => toast.success('消息设置已保存') },
-    );
+    const next = { ...draft, ...value };
+    setDraft(next);
+    update.mutate(next, {
+      onSuccess: () => toast.success('消息设置已保存'),
+      onError: (err) => {
+        if (pref.data) setDraft(pref.data);
+        toast.error(err.message || '消息设置保存失败。');
+      },
+    });
   };
 
   return (
@@ -448,31 +577,31 @@ function MessageSettingsPanel() {
       <SettingSwitch
         title="消息提醒"
         sub="关闭后，消息将不再进行提醒"
-        checked={current.messageReminderEnabled}
-        onChange={() => patch({ messageReminderEnabled: !current.messageReminderEnabled })}
+        checked={draft.messageReminderEnabled}
+        onChange={(messageReminderEnabled) => patch({ messageReminderEnabled })}
       />
       <SettingRadioGroup
         title="回复我的消息提醒"
         sub="接收谁的评论消息提醒"
-        value={current.replyReminderScope}
+        value={draft.replyReminderScope}
         onChange={(replyReminderScope) => patch({ replyReminderScope })}
       />
       <SettingRadioGroup
         title="@我的消息提醒"
         sub="接收谁的 @ 消息提醒"
-        value={current.mentionReminderScope}
+        value={draft.mentionReminderScope}
         onChange={(mentionReminderScope) => patch({ mentionReminderScope })}
       />
       <SettingSwitch
         title="收到的赞消息提醒"
-        checked={current.likeReminderEnabled}
-        onChange={() => patch({ likeReminderEnabled: !current.likeReminderEnabled })}
+        checked={draft.likeReminderEnabled}
+        onChange={(likeReminderEnabled) => patch({ likeReminderEnabled })}
       />
       <SettingSwitch
         title="收起未关注人消息"
         sub="开启后，未关注人消息将被折叠起来"
-        checked={current.foldUnfollowedMessages}
-        onChange={() => patch({ foldUnfollowedMessages: !current.foldUnfollowedMessages })}
+        checked={draft.foldUnfollowedMessages}
+        onChange={(foldUnfollowedMessages) => patch({ foldUnfollowedMessages })}
       />
     </section>
   );
@@ -487,7 +616,7 @@ function SettingSwitch({
   title: string;
   sub?: string;
   checked: boolean;
-  onChange: () => void;
+  onChange: (checked: boolean) => void;
 }) {
   return (
     <div className="gl-message-setting-row">
@@ -495,15 +624,22 @@ function SettingSwitch({
         <strong>{title}</strong>
         {sub && <small>{sub}</small>}
       </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        className={cn('gl-yt-switch', checked && 'is-on')}
-        onClick={onChange}
-      >
-        <span className="gl-yt-switch-thumb" />
-      </button>
+      <div className="gl-message-radio-row is-binary">
+        {[
+          [true, '开启'],
+          [false, '关闭'],
+        ].map(([value, label]) => (
+          <button
+            key={String(value)}
+            type="button"
+            className={cn('gl-message-radio', checked === value && 'is-active')}
+            onClick={() => onChange(Boolean(value))}
+          >
+            <i />
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
