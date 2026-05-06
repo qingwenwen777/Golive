@@ -730,22 +730,12 @@ export default function CoinPage() {
                     })}
                   />
                 </div>
-                <button
-                  type="button"
-                  className="gl-secondary-btn gl-coin-wide"
-                  onClick={handleBindTestAccount}
-                  disabled={bindStripeTestAccount.isPending}
-                >
-                  {bindStripeTestAccount.isPending
-                    ? t('coin.withdraw.bindingTestAccount', { defaultValue: 'Binding...' })
-                    : t('coin.withdraw.bindTestAccount', { defaultValue: 'Bind test account' })}
-                </button>
               </label>
             )}
             <button
               type="button"
               className="gl-secondary-btn gl-coin-wide"
-              onClick={handleWithdraw}
+              onClick={showTestAccountBind ? handleBindTestAccount : handleWithdraw}
               disabled={
                 withdraw.isPending ||
                 stripeAccountLink.isPending ||
