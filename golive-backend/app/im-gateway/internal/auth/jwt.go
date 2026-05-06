@@ -2,12 +2,15 @@ package auth
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/qingwenwen777/golive/pkg/jwtauth"
 )
 
-// ErrInvalidToken is returned when a token is present but does not validate.
-var ErrInvalidToken = errors.New("invalid token")
+var (
+	ErrMissingToken = errors.New("missing token")
+	ErrInvalidToken = errors.New("invalid token")
+)
 
 // Identity is what the WS handler attaches to each connection.
 type Identity struct {
@@ -38,11 +41,12 @@ func NewHMACVerifierWithKeySet(keys *jwtauth.KeySet) *HMACVerifier {
 	return &HMACVerifier{keys: keys}
 }
 
-// Verify implements the contract above. An empty token returns an anonymous
-// identity (NOT an error). Any other failure returns ErrInvalidToken.
+// Verify requires a valid access token. Empty tokens are rejected so live room
+// WebSocket connections are limited to authenticated users.
 func (v *HMACVerifier) Verify(token string) (Identity, error) {
+	token = strings.TrimSpace(token)
 	if token == "" {
-		return Identity{Anonymous: true}, nil
+		return Identity{}, ErrMissingToken
 	}
 	uid, err := v.keys.VerifyAccess(token)
 	if err != nil {

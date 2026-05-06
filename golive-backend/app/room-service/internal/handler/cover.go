@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,50 +44,20 @@ func (h *CoverUploadHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	contentType := file.Header.Get("Content-Type")
-	ext, ok := allowedCoverExt(contentType)
-	if !ok {
-		ext = strings.ToLower(filepath.Ext(file.Filename))
-		if !allowedExt(ext) {
-			errcode.Respond(c, errcode.New(400, "cover must be jpg, png, webp, or gif"))
-			return
-		}
-	}
-
 	base := time.Now().UTC().Format("20060102") + "-" + uuid.NewString()
-	name, err := uploadimage.SaveOptimized(file, h.dir, base, ext, uploadimage.Options{
+	name, err := uploadimage.SaveOptimized(file, h.dir, base, "", uploadimage.Options{
 		MaxWidth:  1280,
 		MaxHeight: 720,
 		Quality:   93,
 	})
 	if err != nil {
+		if uploadimage.IsInvalidUpload(err) {
+			errcode.Respond(c, errcode.New(400, "cover must be a valid jpg, png, webp, or gif"))
+			return
+		}
 		errcode.Respond(c, fmt.Errorf("save cover: %w", err))
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"url": h.publicURL + "/" + name})
-}
-
-func allowedCoverExt(contentType string) (string, bool) {
-	switch strings.ToLower(strings.TrimSpace(contentType)) {
-	case "image/jpeg", "image/jpg":
-		return ".jpg", true
-	case "image/png":
-		return ".png", true
-	case "image/webp":
-		return ".webp", true
-	case "image/gif":
-		return ".gif", true
-	default:
-		return "", false
-	}
-}
-
-func allowedExt(ext string) bool {
-	switch ext {
-	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
-		return true
-	default:
-		return false
-	}
 }

@@ -1,11 +1,25 @@
 package server
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 )
+
+func TestServeHTTP_RejectsMissingToken(t *testing.T) {
+	h := NewWSHandler(nil, auth.NewHMACVerifier("secret"), nil, nil, WSConfig{}, "")
+	req := httptest.NewRequest(http.MethodGet, "http://localhost:8081/ws?roomId=room-1", nil)
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusUnauthorized, w.Code)
+	require.Contains(t, w.Body.String(), "missing token")
+}
 
 func TestOriginAllowed_AllowsConfiguredOrigin(t *testing.T) {
 	req := httptest.NewRequest("GET", "http://localhost:8081/ws", nil)

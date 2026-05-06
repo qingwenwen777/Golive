@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -157,23 +156,17 @@ func (h *PostHandler) UploadImage(c *gin.Context) {
 		return
 	}
 
-	contentType := file.Header.Get("Content-Type")
-	ext, ok := allowedCoverExt(contentType)
-	if !ok {
-		ext = strings.ToLower(filepath.Ext(file.Filename))
-		if !allowedExt(ext) {
-			errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image must be jpg, png, webp, or gif"))
-			return
-		}
-	}
-
 	base := time.Now().UTC().Format("20060102") + "-" + uuid.NewString()
-	name, err := uploadimage.SaveOptimized(file, h.imageDir, base, ext, uploadimage.Options{
+	name, err := uploadimage.SaveOptimized(file, h.imageDir, base, "", uploadimage.Options{
 		MaxWidth:  1600,
 		MaxHeight: 1600,
 		Quality:   92,
 	})
 	if err != nil {
+		if uploadimage.IsInvalidUpload(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image must be a valid jpg, png, webp, or gif"))
+			return
+		}
 		errcode.Respond(c, fmt.Errorf("save post image: %w", err))
 		return
 	}

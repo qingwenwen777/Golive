@@ -15,7 +15,7 @@
 | **懒订阅**     | 房间第一个连接进入 → SUBSCRIBE；最后一个离开 → UNSUBSCRIBE。这是关键 ——避免空闲进程持有上亿条 idle 订阅。最后离开后再加锁双检防 race。              |
 | 慢消费者       | 每个 `Conn.send` 是 cap=256 的 chan，**满即踢**（非阻塞）。一个慢客户端不能拖慢同房间的其他 5 万人。                                          |
 | 客户端→服务端  | 不直接广播。`chat` 写 Kafka `danmu` topic（partition=roomId 保序），由 chat-service 审核+落盘+回 publish。本服务只做 token / 限流校验。       |
-| 鉴权           | 握手 query 带 `token`：缺失 → 匿名只读，非法 → 401，合法 → 写入 `Identity`。匿名连接发 `chat` 直接拒绝。                                     |
+| 鉴权           | 握手 query 必须带有效 `token`：缺失/非法 → 401，合法 → 写入 `Identity`。                                                               |
 | 心跳/超时      | `ReadIdleTimeout=60s`，任意帧（含 heartbeat、pong）都会续期；`WriteDeadline=10s`；`ReadLimit=4KB` 防滥用。                                  |
 | 指标           | Prometheus：连接数、房间数、按 type 收发计数、丢弃原因、broadcast latency 直方图。Top-N 单独 `/debug/rooms`，避免 roomId label 高基数。     |
 
@@ -32,7 +32,7 @@
 | S→C        | `gift`          | `user, giftName, ts`                                                  |
 | C→S        | `heartbeat`     | —                                                                     |
 | C→S        | `resume`        | `lastMessageId?` （MVP 仅回 `system: "resumed"`，无重放缓冲）         |
-| C→S        | `chat`          | `text` （≤200 字节；匿名拒绝；rate limit 5 msg/s/conn）               |
+| C→S        | `chat`          | `text` （≤200 字节；rate limit 5 msg/s/conn）                         |
 
 握手即送：一条 `system: "Welcome to the live room!"` + 一条 `viewer_count: 1`，对齐前端 mock 行为。
 
@@ -57,9 +57,9 @@ go test ./app/im-gateway/...
 
 - **hub**：lazy subscribe 仅首次 / 最后离开拆订阅 / 同房 fanout / 房间隔离 /
   慢消费者被 evict / viewer_count 周期推送 / Snapshot Top-N 排序
-- **dispatch**：heartbeat 静默 / resume ack / 匿名 chat 拒绝 / 已认证 chat 进 producer /
+- **dispatch**：heartbeat 静默 / resume ack / 未认证 chat 拒绝 / 已认证 chat 进 producer /
   rate-limit 上限 / 超长 chat 丢弃 / 未知 type 丢弃
-- **auth**：空 token 匿名 / 合法 token 鉴权 / 错签名拒绝 / 错 secret 拒绝
+- **auth**：空 token 拒绝 / 合法 token 鉴权 / 错签名拒绝 / 错 secret 拒绝
 
 ## 压测
 

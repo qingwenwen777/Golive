@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,9 +47,9 @@ func NewWSHandler(h *hub.Hub, v auth.Verifier, p producer.Producer, m moderation
 
 // ServeHTTP performs the handshake. Failure modes (per spec):
 //
-//	roomId missing → 400
-//	token invalid → 401   (token absent is OK → anonymous)
-//	upgrade fails → upgrader writes the response itself
+//	roomId missing -> 400
+//	token missing/invalid -> 401
+//	upgrade fails -> upgrader writes the response itself
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	roomID := strings.TrimSpace(r.URL.Query().Get("roomId"))
 	if roomID == "" {
@@ -59,8 +60,14 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ownerID := strings.TrimSpace(r.URL.Query().Get("ownerId"))
 	identity, err := h.verifier.Verify(r.URL.Query().Get("token"))
 	if err != nil {
-		metrics.HandshakeFailures.WithLabelValues("invalid_token").Inc()
-		http.Error(w, "invalid token", http.StatusUnauthorized)
+		reason := "invalid_token"
+		message := "invalid token"
+		if errors.Is(err, auth.ErrMissingToken) {
+			reason = "missing_token"
+			message = "missing token"
+		}
+		metrics.HandshakeFailures.WithLabelValues(reason).Inc()
+		http.Error(w, message, http.StatusUnauthorized)
 		return
 	}
 

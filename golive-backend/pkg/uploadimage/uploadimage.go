@@ -2,6 +2,7 @@ package uploadimage
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	stddraw "image/draw"
@@ -13,7 +14,13 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
-	"strings"
+
+	_ "golang.org/x/image/webp"
+)
+
+var (
+	ErrUnsupportedType = errors.New("unsupported image type")
+	ErrInvalidImage    = errors.New("invalid image")
 )
 
 type Options struct {
@@ -22,7 +29,7 @@ type Options struct {
 	Quality   int
 }
 
-func SaveOptimized(file *multipart.FileHeader, dir, basename, fallbackExt string, opts Options) (string, error) {
+func SaveOptimized(file *multipart.FileHeader, dir, basename, _ string, opts Options) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -32,10 +39,14 @@ func SaveOptimized(file *multipart.FileHeader, dir, basename, fallbackExt string
 		return "", err
 	}
 
+	ext, ok := detectAllowedExt(data)
+	if !ok {
+		return "", ErrUnsupportedType
+	}
+
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		name := basename + cleanExt(fallbackExt)
-		return name, os.WriteFile(filepath.Join(dir, name), data, 0o644)
+		return "", ErrInvalidImage
 	}
 
 	maxWidth, maxHeight := opts.MaxWidth, opts.MaxHeight
@@ -47,8 +58,7 @@ func SaveOptimized(file *multipart.FileHeader, dir, basename, fallbackExt string
 	}
 	width, height := fitDimensions(img.Bounds().Dx(), img.Bounds().Dy(), maxWidth, maxHeight)
 	if width <= 0 || height <= 0 {
-		name := basename + cleanExt(fallbackExt)
-		return name, os.WriteFile(filepath.Join(dir, name), data, 0o644)
+		return "", ErrInvalidImage
 	}
 
 	resized := resizeOverWhite(img, width, height)
@@ -67,7 +77,7 @@ func SaveOptimized(file *multipart.FileHeader, dir, basename, fallbackExt string
 
 	originalFits := img.Bounds().Dx() <= maxWidth && img.Bounds().Dy() <= maxHeight
 	if originalFits && encoded.Len() >= int(float64(len(data))*0.8) {
-		name := basename + cleanExt(fallbackExt)
+		name := basename + ext
 		return name, os.WriteFile(filepath.Join(dir, name), data, 0o644)
 	}
 
@@ -84,15 +94,23 @@ func readUpload(file *multipart.FileHeader) ([]byte, error) {
 	return io.ReadAll(src)
 }
 
-func cleanExt(ext string) string {
-	ext = strings.ToLower(strings.TrimSpace(ext))
-	if ext == "" {
-		return ".jpg"
+func IsInvalidUpload(err error) bool {
+	return errors.Is(err, ErrUnsupportedType) || errors.Is(err, ErrInvalidImage)
+}
+
+func detectAllowedExt(data []byte) (string, bool) {
+	switch {
+	case len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff:
+		return ".jpg", true
+	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}):
+		return ".png", true
+	case len(data) >= 6 && (bytes.Equal(data[:6], []byte("GIF87a")) || bytes.Equal(data[:6], []byte("GIF89a"))):
+		return ".gif", true
+	case len(data) >= 12 && bytes.Equal(data[:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")):
+		return ".webp", true
+	default:
+		return "", false
 	}
-	if !strings.HasPrefix(ext, ".") {
-		return "." + ext
-	}
-	return ext
 }
 
 func fitDimensions(width, height, maxWidth, maxHeight int) (int, int) {

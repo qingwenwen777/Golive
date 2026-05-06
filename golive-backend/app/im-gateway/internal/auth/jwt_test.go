@@ -20,12 +20,10 @@ func sign(t *testing.T, secret, sub string) string {
 	return s
 }
 
-func TestVerifier_EmptyToken_Anonymous(t *testing.T) {
+func TestVerifier_EmptyToken_Error(t *testing.T) {
 	v := auth.NewHMACVerifier("k")
-	id, err := v.Verify("")
-	require.NoError(t, err)
-	require.True(t, id.Anonymous)
-	require.False(t, id.CanChat())
+	_, err := v.Verify("")
+	require.ErrorIs(t, err, auth.ErrMissingToken)
 }
 
 func TestVerifier_GoodToken_Authenticated(t *testing.T) {

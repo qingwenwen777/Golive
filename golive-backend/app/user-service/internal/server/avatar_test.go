@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +30,7 @@ func TestUploadAvatarReturnsRelativeURLAndPersistsUser(t *testing.T) {
 	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
 	require.NoError(t, err)
 
-	body, contentType := multipartBody(t, "face.png", "image/png", []byte("png"))
+	body, contentType := multipartBody(t, "face.png", "image/png", pngUpload(t))
 	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", body)
 	req.Header.Set("Authorization", "Bearer "+login.Token)
 	req.Header.Set("Content-Type", contentType)
@@ -56,7 +59,7 @@ func TestUploadAvatarRejectsInvalidType(t *testing.T) {
 	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
 	require.NoError(t, err)
 
-	body, contentType := multipartBody(t, "notes.txt", "text/plain", []byte("nope"))
+	body, contentType := multipartBody(t, "notes.png", "image/png", []byte("nope"))
 	req := httptest.NewRequest(http.MethodPost, "/users/me/avatar", body)
 	req.Header.Set("Authorization", "Bearer "+login.Token)
 	req.Header.Set("Content-Type", contentType)
@@ -79,7 +82,7 @@ func TestUploadCoverReturnsRelativeURLAndPersistsUser(t *testing.T) {
 	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
 	require.NoError(t, err)
 
-	body, contentType := multipartBody(t, "banner.webp", "image/webp", []byte("webp"))
+	body, contentType := multipartBody(t, "banner.png", "image/png", pngUpload(t))
 	req := httptest.NewRequest(http.MethodPost, "/users/me/cover", body)
 	req.Header.Set("Authorization", "Bearer "+login.Token)
 	req.Header.Set("Content-Type", contentType)
@@ -116,4 +119,24 @@ func multipartBody(t *testing.T, filename, contentType string, data []byte) (*by
 	require.NoError(t, err)
 	require.NoError(t, w.Close())
 	return body, w.FormDataContentType()
+}
+
+func pngUpload(t *testing.T) []byte {
+	t.Helper()
+
+	img := image.NewNRGBA(image.Rect(0, 0, 12, 8))
+	for y := 0; y < 8; y++ {
+		for x := 0; x < 12; x++ {
+			img.Set(x, y, color.NRGBA{
+				R: uint8(30 + x*10),
+				G: uint8(60 + y*12),
+				B: 180,
+				A: 255,
+			})
+		}
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, png.Encode(&buf, img))
+	return buf.Bytes()
 }

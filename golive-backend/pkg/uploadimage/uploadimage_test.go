@@ -2,8 +2,10 @@ package uploadimage
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"mime/multipart"
 	"net/http"
@@ -74,29 +76,57 @@ func TestSaveOptimizedKeepsSmallOriginalWhenReencodingWouldNotHelp(t *testing.T)
 	}
 }
 
-func TestSaveOptimizedFallsBackToCleanExtensionForUndecodableUploads(t *testing.T) {
+func TestSaveOptimizedRejectsUnsupportedUploads(t *testing.T) {
 	original := []byte("not an image payload")
-	file := multipartFileHeader(t, "upload.bin", "application/octet-stream", original)
+	file := multipartFileHeader(t, "upload.png", "image/png", original)
 	dir := t.TempDir()
 
-	name, err := SaveOptimized(file, dir, "upload", "WEBP", Options{
+	name, err := SaveOptimized(file, dir, "upload", ".png", Options{
 		MaxWidth:  512,
 		MaxHeight: 512,
 		Quality:   92,
 	})
+	if !errors.Is(err, ErrUnsupportedType) {
+		t.Fatalf("SaveOptimized error = %v, want ErrUnsupportedType", err)
+	}
+	if name != "" {
+		t.Fatalf("name = %q, want empty", name)
+	}
+}
+
+func TestSaveOptimizedRejectsMalformedImagesWithValidMagic(t *testing.T) {
+	original := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 'b', 'a', 'd'}
+	file := multipartFileHeader(t, "upload.png", "image/png", original)
+	dir := t.TempDir()
+
+	name, err := SaveOptimized(file, dir, "upload", ".png", Options{
+		MaxWidth:  512,
+		MaxHeight: 512,
+		Quality:   92,
+	})
+	if !errors.Is(err, ErrInvalidImage) {
+		t.Fatalf("SaveOptimized error = %v, want ErrInvalidImage", err)
+	}
+	if name != "" {
+		t.Fatalf("name = %q, want empty", name)
+	}
+}
+
+func TestSaveOptimizedUsesDetectedFormatInsteadOfHeader(t *testing.T) {
+	original := jpegBytes(t, 16, 16)
+	file := multipartFileHeader(t, "avatar.png", "image/png", original)
+	dir := t.TempDir()
+
+	name, err := SaveOptimized(file, dir, "avatar", ".png", Options{
+		MaxWidth:  512,
+		MaxHeight: 512,
+		Quality:   94,
+	})
 	if err != nil {
 		t.Fatalf("SaveOptimized returned error: %v", err)
 	}
-	if name != "upload.webp" {
-		t.Fatalf("fallback name = %q, want upload.webp", name)
-	}
-
-	saved, err := os.ReadFile(filepath.Join(dir, name))
-	if err != nil {
-		t.Fatalf("read fallback file: %v", err)
-	}
-	if !bytes.Equal(saved, original) {
-		t.Fatalf("fallback upload contents changed")
+	if name != "avatar.jpg" {
+		t.Fatalf("SaveOptimized name = %q, want avatar.jpg", name)
 	}
 }
 
@@ -175,6 +205,28 @@ func pngBytes(t *testing.T, width, height int) []byte {
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil {
 		t.Fatalf("encode png: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func jpegBytes(t *testing.T, width, height int) []byte {
+	t.Helper()
+
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.NRGBA{
+				R: uint8((x * 11) % 255),
+				G: uint8((y * 19) % 255),
+				B: uint8((x + y*2) % 255),
+				A: 255,
+			})
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("encode jpeg: %v", err)
 	}
 	return buf.Bytes()
 }

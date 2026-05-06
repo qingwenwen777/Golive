@@ -92,6 +92,6 @@ go run ./cmd/api-gateway
 - 余额不足：HTTP 402，body `{ message, reason: "insufficient_coin" }` +
   一个 `status=failed, failReason="insufficient_coin"` 的 order 对象。
 - 返回给观众的 `Stream` 必须剥除 `streamKey`。
-- WS 握手 `ws://localhost:8081/ws?roomId=<id>&token=<jwt>`，无 token 允许匿名只读。
+- WS 握手 `ws://localhost:8081/ws?roomId=<id>&token=<jwt>`，无 token 会被拒绝。
 
 详细端点清单见 `docs/` 与前端 `src/mocks/handlers/*.ts`。
