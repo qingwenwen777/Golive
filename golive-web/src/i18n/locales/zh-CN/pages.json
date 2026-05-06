@@ -2014,7 +2014,11 @@
       "connecting": "正在打开 Stripe...",
       "pending": "提现中...",
       "submit": "用 Stripe 提现",
-      "connectStripe": "连接 Stripe"
+      "connectStripe": "连接 Stripe",
+      "testAccount": "Stripe 测试账户",
+      "testAccountAria": "Stripe 测试 Connected account ID",
+      "bindingTestAccount": "绑定中...",
+      "bindTestAccount": "绑定测试账户"
     },
     "task": {
       "claim": "领取",
@@ -2046,6 +2050,10 @@
       "withdrawInsufficient": "可提现余额不足。",
       "withdrawSuccess": "提现已提交给 Stripe，净额 {{amount}} coins，当前余额 {{balance}}。",
       "withdrawFailed": "Stripe 提现失败。",
+      "bindTestAccountFirst": "请先绑定 Stripe 测试 Connected account。",
+      "invalidStripeAccount": "请输入有效的 Stripe Connected account ID。",
+      "stripeAccountBound": "已绑定 Stripe 测试账户 {{accountId}}。",
+      "stripeAccountBindFailed": "无法绑定这个 Stripe 测试账户。",
       "stripeConnectFailed": "无法打开 Stripe 入驻流程。",
       "stripeConnectRefresh": "请继续完成 Stripe 入驻后再提现。",
       "stripeConnectReturned": "Stripe 账户状态已刷新。",

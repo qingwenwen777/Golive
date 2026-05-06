@@ -57,10 +57,13 @@ export interface ConfirmTopupResp {
 
 export interface StripeAccountStatus {
   stripeConfigured: boolean;
+  testMode: boolean;
   connected: boolean;
   accountId?: string;
   chargesEnabled?: boolean;
+  canWithdraw: boolean;
   payoutsEnabled: boolean;
+  transfersStatus?: string;
   detailsSubmitted: boolean;
   currentlyDue?: string[];
   disabledReason?: string;
@@ -69,6 +72,11 @@ export interface StripeAccountStatus {
 export interface StripeAccountLinkResp {
   url: string;
   accountId: string;
+}
+
+export interface BindStripeTestAccountResp {
+  user: User;
+  account: StripeAccountStatus;
 }
 
 export interface WithdrawCoinsResp {
@@ -171,6 +179,24 @@ export function useStripeAccountLink() {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['coins', 'stripe-account'] });
+    },
+  });
+}
+
+export function useBindStripeTestAccount() {
+  const qc = useQueryClient();
+  return useMutation<BindStripeTestAccountResp, Error, { accountId: string }>({
+    mutationFn: async ({ accountId }) => {
+      const { data } = await http.post<BindStripeTestAccountResp>(
+        '/users/me/coins/stripe/test-account',
+        { accountId },
+      );
+      return data;
+    },
+    onSuccess: (resp) => {
+      qc.setQueryData(['me'], resp.user);
+      qc.setQueryData(['coins', 'stripe-account'], resp.account);
+      useAuthStore.getState().setUser(resp.user);
     },
   });
 }

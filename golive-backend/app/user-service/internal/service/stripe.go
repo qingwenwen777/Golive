@@ -73,6 +73,7 @@ type StripeAccount struct {
 	ChargesEnabled   bool     `json:"chargesEnabled"`
 	PayoutsEnabled   bool     `json:"payoutsEnabled"`
 	DetailsSubmitted bool     `json:"detailsSubmitted"`
+	TransfersStatus  string   `json:"transfersStatus,omitempty"`
 	CurrentlyDue     []string `json:"currentlyDue,omitempty"`
 	DisabledReason   string   `json:"disabledReason,omitempty"`
 }
@@ -132,6 +133,13 @@ func (s *StripeService) PublishableKey() string {
 		return ""
 	}
 	return s.publishableKey
+}
+
+func (s *StripeService) TestMode() bool {
+	if s == nil {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(s.secretKey), "sk_test_")
 }
 
 func (s *StripeService) Currency() string {
@@ -393,6 +401,9 @@ func accountFromStripe(acct *stripe.Account) *StripeAccount {
 		ChargesEnabled:   acct.ChargesEnabled,
 		PayoutsEnabled:   acct.PayoutsEnabled,
 		DetailsSubmitted: acct.DetailsSubmitted,
+	}
+	if acct.Capabilities != nil {
+		out.TransfersStatus = string(acct.Capabilities.Transfers)
 	}
 	if acct.Requirements != nil {
 		out.CurrentlyDue = acct.Requirements.CurrentlyDue

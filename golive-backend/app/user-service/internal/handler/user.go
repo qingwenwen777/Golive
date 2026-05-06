@@ -476,7 +476,9 @@ func (h *UserHandler) StripeAccountStatus(c *gin.Context) {
 	if h.stripe == nil || !h.stripe.Configured() {
 		c.JSON(http.StatusOK, gin.H{
 			"stripeConfigured": false,
+			"testMode":         false,
 			"connected":        false,
+			"canWithdraw":      false,
 			"payoutsEnabled":   false,
 			"detailsSubmitted": false,
 		})
@@ -490,7 +492,9 @@ func (h *UserHandler) StripeAccountStatus(c *gin.Context) {
 	if strings.TrimSpace(u.StripeAccountID) == "" {
 		c.JSON(http.StatusOK, gin.H{
 			"stripeConfigured": true,
+			"testMode":         h.stripe.TestMode(),
 			"connected":        false,
+			"canWithdraw":      false,
 			"payoutsEnabled":   false,
 			"detailsSubmitted": false,
 		})
@@ -503,13 +507,72 @@ func (h *UserHandler) StripeAccountStatus(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"stripeConfigured": true,
+		"testMode":         h.stripe.TestMode(),
 		"connected":        true,
+		"canWithdraw":      stripeAccountCanWithdraw(h.stripe, acct),
 		"accountId":        acct.ID,
 		"chargesEnabled":   acct.ChargesEnabled,
 		"payoutsEnabled":   acct.PayoutsEnabled,
+		"transfersStatus":  acct.TransfersStatus,
 		"detailsSubmitted": acct.DetailsSubmitted,
 		"currentlyDue":     acct.CurrentlyDue,
 		"disabledReason":   acct.DisabledReason,
+	})
+}
+
+type bindStripeTestAccountReq struct {
+	AccountID string `json:"accountId"`
+}
+
+func (h *UserHandler) BindStripeTestAccount(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if h.stripe == nil || !h.stripe.Configured() {
+		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
+		return
+	}
+	if !h.stripe.TestMode() {
+		errcode.Respond(c, errcode.New(http.StatusForbidden, "test stripe account binding is only available in test mode").WithReason("stripe_test_only"))
+		return
+	}
+	var req bindStripeTestAccountReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid stripe account").WithReason("invalid_stripe_account"))
+		return
+	}
+	accountID := strings.TrimSpace(req.AccountID)
+	if !strings.HasPrefix(accountID, "acct_") {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid stripe account").WithReason("invalid_stripe_account"))
+		return
+	}
+	acct, err := h.stripe.RetrieveAccount(c.Request.Context(), accountID)
+	if err != nil || acct == nil || acct.ID == "" {
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not retrieve stripe account").WithReason("stripe_account_failed"))
+		return
+	}
+	u, err := h.users.SetStripeAccountID(c.Request.Context(), uid, acct.ID)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"user": u.Public(),
+		"account": gin.H{
+			"stripeConfigured": true,
+			"testMode":         true,
+			"connected":        true,
+			"canWithdraw":      stripeAccountCanWithdraw(h.stripe, acct),
+			"accountId":        acct.ID,
+			"chargesEnabled":   acct.ChargesEnabled,
+			"payoutsEnabled":   acct.PayoutsEnabled,
+			"transfersStatus":  acct.TransfersStatus,
+			"detailsSubmitted": acct.DetailsSubmitted,
+			"currentlyDue":     acct.CurrentlyDue,
+			"disabledReason":   acct.DisabledReason,
+		},
 	})
 }
 
@@ -588,13 +651,14 @@ func (h *UserHandler) WithdrawCoins(c *gin.Context) {
 		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not retrieve stripe account").WithReason("stripe_account_failed"))
 		return
 	}
-	if !acct.PayoutsEnabled {
+	if !stripeAccountCanWithdraw(h.stripe, acct) {
 		c.JSON(http.StatusConflict, gin.H{
 			"message":          "stripe onboarding is required",
 			"reason":           "stripe_onboarding_required",
 			"detailsSubmitted": acct.DetailsSubmitted,
 			"currentlyDue":     acct.CurrentlyDue,
 			"disabledReason":   acct.DisabledReason,
+			"transfersStatus":  acct.TransfersStatus,
 		})
 		return
 	}
@@ -674,6 +738,16 @@ func withdrawFeeBasisPoints(u *model.User) int64 {
 		return certifiedWithdrawFeeRateBasisPoints
 	}
 	return withdrawFeeRateBasisPoints
+}
+
+func stripeAccountCanWithdraw(stripeSvc *service.StripeService, acct *service.StripeAccount) bool {
+	if acct == nil || strings.TrimSpace(acct.ID) == "" {
+		return false
+	}
+	if stripeSvc != nil && stripeSvc.TestMode() {
+		return true
+	}
+	return acct.PayoutsEnabled
 }
 
 func requestOrigin(c *gin.Context) string {

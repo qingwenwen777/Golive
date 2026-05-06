@@ -2013,7 +2013,11 @@
       "connecting": "Stripe を開いています...",
       "pending": "出金中...",
       "submit": "Stripe で出金",
-      "connectStripe": "Stripe に接続"
+      "connectStripe": "Stripe に接続",
+      "testAccount": "Stripe テストアカウント",
+      "testAccountAria": "Stripe テスト Connected account ID",
+      "bindingTestAccount": "連携中...",
+      "bindTestAccount": "テストアカウントを連携"
     },
     "task": {
       "claim": "受け取る",
@@ -2045,6 +2049,10 @@
       "withdrawInsufficient": "出金可能残高が不足しています。",
       "withdrawSuccess": "出金を Stripe に送信しました。純額 {{amount}} coins、現在の残高 {{balance}}。",
       "withdrawFailed": "Stripe 出金に失敗しました。",
+      "bindTestAccountFirst": "出金前に Stripe テスト Connected account を連携してください。",
+      "invalidStripeAccount": "有効な Stripe Connected account ID を入力してください。",
+      "stripeAccountBound": "Stripe テストアカウント {{accountId}} を連携しました。",
+      "stripeAccountBindFailed": "この Stripe テストアカウントを連携できませんでした。",
       "stripeConnectFailed": "Stripe オンボーディングを開始できませんでした。",
       "stripeConnectRefresh": "出金を有効にするには Stripe オンボーディングを続けてください。",
       "stripeConnectReturned": "Stripe アカウント状態を更新しました。",

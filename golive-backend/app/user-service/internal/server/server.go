@@ -71,6 +71,7 @@ func NewRouter(d Deps) *gin.Engine {
 		users.POST("/me/coins/topup/confirm", handler.AuthRequired(d.Auth), userH.ConfirmTopupCoins)
 		users.GET("/me/coins/stripe/account", handler.AuthRequired(d.Auth), userH.StripeAccountStatus)
 		users.POST("/me/coins/stripe/account-link", handler.AuthRequired(d.Auth), userH.StripeAccountLink)
+		users.POST("/me/coins/stripe/test-account", handler.AuthRequired(d.Auth), userH.BindStripeTestAccount)
 		users.POST("/me/coins/withdrawals", handler.AuthRequired(d.Auth), userH.WithdrawCoins)
 		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), userH.ClaimDailyCoinTask)
 		users.POST("/me/avatar", handler.AuthRequired(d.Auth), avatarH.Upload)
