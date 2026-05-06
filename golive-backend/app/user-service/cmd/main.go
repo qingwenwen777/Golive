@@ -109,12 +109,20 @@ func main() {
 		RefreshTTL:     cfg.JWT.RefreshTTL,
 		GoogleClientID: cfg.Google.ClientID,
 	})
+	stripeSvc := service.NewStripeService(service.StripeOptions{
+		PublishableKey:       cfg.Stripe.PublishableKey,
+		SecretKey:            cfg.Stripe.SecretKey,
+		Currency:             cfg.Stripe.Currency,
+		CoinsPerCurrencyUnit: cfg.Stripe.CoinsPerCurrencyUnit,
+		ConnectCountry:       cfg.Stripe.ConnectCountry,
+	})
 
 	r := server.NewRouter(server.Deps{
 		Auth:            auth,
 		Captcha:         captcha,
 		EmailCodes:      emailCodes,
 		Users:           userRepo,
+		Stripe:          stripeSvc,
 		AvatarDir:       cfg.Upload.AvatarDir,
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,
 		CoverDir:        cfg.Upload.CoverDir,

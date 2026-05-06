@@ -45,6 +45,13 @@ upload:
   cover_dir: "./uploads/covers"
   cover_public_url: "/api/uploads/covers"
 
+stripe:
+  publishable_key: ""
+  secret_key: ""
+  currency: "usd"
+  coins_per_currency_unit: 10
+  connect_country: "US"
+
 bootstrap:
   admin:
     enabled: true

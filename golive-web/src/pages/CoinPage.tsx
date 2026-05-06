@@ -20,6 +20,10 @@ import { useMe, useTopupCoins } from '@/api/auth';
 import {
   useClaimDailyCoinTask,
   useCoinTransactions,
+  useConfirmTopupCoins,
+  useStripeAccountLink,
+  useStripeAccountStatus,
+  useWithdrawCoins,
   type CoinTransaction,
   type CoinTransactionType,
 } from '@/api/coins';
@@ -40,8 +44,10 @@ type RecordFilter =
   | 'task'
   | 'creator';
 
-const COINS_PER_RMB = 10;
+const COINS_PER_CURRENCY_UNIT = 10;
+const STRIPE_DISPLAY_CURRENCY = 'USD';
 const MIN_TOPUP_COINS = 10;
+const MIN_WITHDRAW_COINS = 10;
 const QUICK_TOPUPS = [10, 50, 100, 500] as const;
 const WITHDRAW_FEE_RATE = 0.35;
 const CERTIFIED_WITHDRAW_FEE_RATE = 0.25;
@@ -108,8 +114,14 @@ export default function CoinPage() {
   const me = useMe();
   const currentUser = me.data ?? user;
   const balance = currentUser?.coinBalance ?? 0;
+  const frozenBalance = currentUser?.frozenCoins ?? 0;
+  const availableBalance = Math.max(0, balance - frozenBalance);
   const transactions = useCoinTransactions();
   const topup = useTopupCoins();
+  const confirmTopup = useConfirmTopupCoins();
+  const stripeAccount = useStripeAccountStatus();
+  const stripeAccountLink = useStripeAccountLink();
+  const withdraw = useWithdrawCoins();
   const claimTask = useClaimDailyCoinTask();
 
   const [topupText, setTopupText] = useState(String(MIN_TOPUP_COINS));
@@ -118,6 +130,7 @@ export default function CoinPage() {
   const [recordPage, setRecordPage] = useState(1);
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
   const [activity, setActivity] = useState(() => readDailyCoinActivity(user?.id));
+  const handledStripeReturn = useRef<string | null>(null);
 
   useEffect(() => {
     setActivity(readDailyCoinActivity(currentUser?.id));
@@ -133,6 +146,78 @@ export default function CoinPage() {
       rechargeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 80);
   }, [searchParams]);
+
+  useEffect(() => {
+    const topupStatus = searchParams.get('stripe_topup');
+    const sessionId = searchParams.get('session_id');
+    const connectStatus = searchParams.get('stripe_connect');
+    if (!topupStatus && !connectStatus) return;
+
+    const key = `${topupStatus ?? ''}:${sessionId ?? ''}:${connectStatus ?? ''}`;
+    if (handledStripeReturn.current === key) return;
+    handledStripeReturn.current = key;
+
+    const clearStripeParams = () => {
+      const next = new URL(window.location.href);
+      next.searchParams.delete('stripe_topup');
+      next.searchParams.delete('session_id');
+      next.searchParams.delete('stripe_connect');
+      window.history.replaceState({}, '', `${next.pathname}${next.search}${next.hash}`);
+    };
+
+    if (topupStatus === 'cancelled') {
+      toast.info(
+        t('coin.toast.topupCancelled', { defaultValue: 'Stripe checkout was cancelled.' }),
+      );
+      clearStripeParams();
+      return;
+    }
+
+    if (topupStatus === 'success' && sessionId) {
+      confirmTopup.mutate(
+        { sessionId },
+        {
+          onSuccess: (resp) => {
+            toast.success(
+              resp.credited
+                ? t('coin.toast.topupSuccess', {
+                    balance: resp.user.coinBalance.toLocaleString(),
+                    defaultValue: 'Top-up complete. Current balance: {{balance}} coins.',
+                  })
+                : t('coin.toast.topupAlreadyCredited', {
+                    defaultValue: 'This Stripe payment was already credited.',
+                  }),
+            );
+            clearStripeParams();
+          },
+          onError: (err) => {
+            toast.error(
+              err.message ||
+                t('coin.toast.topupVerifyFailed', {
+                  defaultValue: 'Could not verify the Stripe payment.',
+                }),
+            );
+            clearStripeParams();
+          },
+        },
+      );
+      return;
+    }
+
+    if (connectStatus) {
+      toast.info(
+        connectStatus === 'refresh'
+          ? t('coin.toast.stripeConnectRefresh', {
+              defaultValue: 'Continue Stripe onboarding to enable withdrawals.',
+            })
+          : t('coin.toast.stripeConnectReturned', {
+              defaultValue: 'Stripe account status refreshed.',
+            }),
+      );
+      void stripeAccount.refetch();
+      clearStripeParams();
+    }
+  }, [confirmTopup, searchParams, stripeAccount, t]);
 
   const rows = transactions.data?.items ?? [];
   const monthKey = new Date().toISOString().slice(0, 7);
@@ -192,13 +277,12 @@ export default function CoinPage() {
     topup.mutate(
       { amount: topupAmount },
       {
-        onSuccess: (next) => {
-          toast.success(
-            t('coin.toast.topupSuccess', {
-              balance: next.coinBalance.toLocaleString(),
-              defaultValue: 'Top-up complete. Current balance: {{balance}} coins.',
-            }),
-          );
+        onSuccess: (resp) => {
+          if (resp.checkoutUrl) {
+            window.location.assign(resp.checkoutUrl);
+            return;
+          }
+          toast.error(t('coin.toast.topupFailed', { defaultValue: 'Top-up failed.' }));
         },
         onError: (err) =>
           toast.error(
@@ -249,16 +333,67 @@ export default function CoinPage() {
     );
   };
 
-  const handleWithdrawPreview = () => {
+  const startStripeOnboarding = () => {
     if (!isAuthed) {
       openLogin();
       return;
     }
-    toast.info(
-      t('coin.toast.withdrawPreview', {
-        defaultValue:
-          'Withdrawals are reserved for payment integration and no coins will be deducted.',
-      }),
+    stripeAccountLink.mutate(undefined, {
+      onSuccess: (resp) => {
+        window.location.assign(resp.url);
+      },
+      onError: (err) =>
+        toast.error(
+          err.message ||
+            t('coin.toast.stripeConnectFailed', {
+              defaultValue: 'Could not start Stripe onboarding.',
+            }),
+        ),
+    });
+  };
+
+  const handleWithdraw = () => {
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    if (withdrawAmount < MIN_WITHDRAW_COINS) {
+      toast.error(
+        t('coin.toast.minWithdraw', { defaultValue: 'Withdrawal must be at least 10 coins.' }),
+      );
+      return;
+    }
+    if (withdrawAmount > availableBalance) {
+      toast.error(
+        t('coin.toast.withdrawInsufficient', {
+          defaultValue: 'Insufficient available coin balance.',
+        }),
+      );
+      return;
+    }
+    if (!stripeAccount.data?.payoutsEnabled) {
+      startStripeOnboarding();
+      return;
+    }
+    withdraw.mutate(
+      { amount: withdrawAmount },
+      {
+        onSuccess: (resp) => {
+          toast.success(
+            t('coin.toast.withdrawSuccess', {
+              amount: resp.netCoins.toLocaleString(),
+              balance: resp.user.coinBalance.toLocaleString(),
+              defaultValue:
+                'Withdrawal sent to Stripe. Net {{amount}} coins, current balance {{balance}}.',
+            }),
+          );
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('coin.toast.withdrawFailed', { defaultValue: 'Stripe withdrawal failed.' }),
+          ),
+      },
     );
   };
 
@@ -454,7 +589,7 @@ export default function CoinPage() {
             </div>
             <div className="gl-coin-exchange">
               <span>{t('coin.topup.pay', { defaultValue: 'Pay' })}</span>
-              <strong>{formatRmb(topupAmount, i18n.language)}</strong>
+              <strong>{formatFiat(topupAmount, i18n.language)}</strong>
             </div>
             <button
               type="button"
@@ -464,23 +599,23 @@ export default function CoinPage() {
             >
               <CreditCard size={16} />
               {topup.isPending
-                ? t('coin.topup.pending', { defaultValue: 'Topping up...' })
-                : t('coin.topup.submit', { defaultValue: 'Top up now' })}
+                ? t('coin.topup.pending', { defaultValue: 'Opening Stripe...' })
+                : t('coin.topup.submit', { defaultValue: 'Pay with Stripe' })}
             </button>
           </section>
 
           <section className="gl-coin-panel">
             <div className="gl-coin-panel-head">
               <div>
-                <h2>{t('coin.withdraw.title', { defaultValue: 'Withdrawal preview' })}</h2>
+                <h2>{t('coin.withdraw.title', { defaultValue: 'Withdraw' })}</h2>
                 <p>
                   {platformCertified
                     ? t('coin.withdraw.subCertified', {
                         defaultValue:
-                          'Platform certified rate: 25% fee. Enabled after payment integration.',
+                          'Platform certified rate: 25% fee. Paid through Stripe Connect.',
                       })
                     : t('coin.withdraw.sub', {
-                        defaultValue: '35% fee. Enabled after payment integration.',
+                        defaultValue: '35% fee. Paid through Stripe Connect.',
                       })}
                 </p>
               </div>
@@ -502,6 +637,10 @@ export default function CoinPage() {
             </label>
             <div className="gl-coin-withdraw-lines">
               <span>
+                {t('coin.withdraw.available', { defaultValue: 'Available' })}{' '}
+                <strong>{formatCoins(availableBalance)}</strong>
+              </span>
+              <span>
                 {t('coin.withdraw.rate', { defaultValue: 'Fee rate' })}{' '}
                 <strong>{Math.round(withdrawFeeRate * 100)}%</strong>
               </span>
@@ -514,8 +653,8 @@ export default function CoinPage() {
                 <strong>{formatCoins(withdrawNet)}</strong>
               </span>
               <span>
-                {t('coin.withdraw.rmb', { defaultValue: 'Approx. RMB' })}{' '}
-                <strong>{formatRmb(withdrawNet, i18n.language)}</strong>
+                {t('coin.withdraw.rmb', { defaultValue: 'Stripe amount' })}{' '}
+                <strong>{formatFiat(withdrawNet, i18n.language)}</strong>
               </span>
             </div>
             {platformCertified && (
@@ -529,9 +668,18 @@ export default function CoinPage() {
             <button
               type="button"
               className="gl-secondary-btn gl-coin-wide"
-              onClick={handleWithdrawPreview}
+              onClick={handleWithdraw}
+              disabled={
+                withdraw.isPending || stripeAccountLink.isPending || stripeAccount.isPending
+              }
             >
-              {t('coin.withdraw.preview', { defaultValue: 'Preview withdrawal' })}
+              {stripeAccountLink.isPending
+                ? t('coin.withdraw.connecting', { defaultValue: 'Opening Stripe...' })
+                : withdraw.isPending
+                  ? t('coin.withdraw.pending', { defaultValue: 'Withdrawing...' })
+                  : stripeAccount.data?.payoutsEnabled
+                    ? t('coin.withdraw.submit', { defaultValue: 'Withdraw with Stripe' })
+                    : t('coin.withdraw.connectStripe', { defaultValue: 'Connect Stripe' })}
             </button>
           </section>
         </aside>
@@ -688,6 +836,8 @@ function recordMeta(type: CoinTransactionType) {
   switch (type) {
     case 'topup':
       return { labelKey: 'coin.record.topup', labelDefault: 'Top-up', icon: CreditCard };
+    case 'withdrawal':
+      return { labelKey: 'coin.record.withdrawal', labelDefault: 'Withdrawal', icon: Wallet };
     case 'daily_task':
       return { labelKey: 'coin.record.dailyTask', labelDefault: 'Daily task', icon: CalendarCheck };
     case 'gift_spend':
@@ -762,9 +912,13 @@ function formatCoins(value: number): string {
   return `${Math.round(value).toLocaleString()} coins`;
 }
 
-function formatRmb(coins: number, locale: string): string {
-  const rmb = Math.max(0, coins) / COINS_PER_RMB;
-  return `¥${rmb.toLocaleString(locale, { maximumFractionDigits: 2 })}`;
+function formatFiat(coins: number, locale: string): string {
+  const amount = Math.max(0, coins) / COINS_PER_CURRENCY_UNIT;
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: STRIPE_DISPLAY_CURRENCY,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function formatTime(value: string, locale: string): string {

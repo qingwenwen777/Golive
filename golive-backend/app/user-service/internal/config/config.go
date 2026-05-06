@@ -18,6 +18,7 @@ type Config struct {
 	Google    GoogleCfg    `mapstructure:"google"`
 	Email     EmailCfg     `mapstructure:"email"`
 	Upload    UploadCfg    `mapstructure:"upload"`
+	Stripe    StripeCfg    `mapstructure:"stripe"`
 	Bootstrap BootstrapCfg `mapstructure:"bootstrap"`
 }
 
@@ -78,6 +79,14 @@ type UploadCfg struct {
 	CoverPublicURL  string `mapstructure:"cover_public_url"`
 }
 
+type StripeCfg struct {
+	PublishableKey       string `mapstructure:"publishable_key"`
+	SecretKey            string `mapstructure:"secret_key"`
+	Currency             string `mapstructure:"currency"`
+	CoinsPerCurrencyUnit int64  `mapstructure:"coins_per_currency_unit"`
+	ConnectCountry       string `mapstructure:"connect_country"`
+}
+
 type BootstrapCfg struct {
 	DemoUser DemoUserCfg `mapstructure:"demo_user"`
 	Admin    AdminCfg    `mapstructure:"admin"`
@@ -121,6 +130,11 @@ func Load(path string) (*Config, error) {
 	_ = v.BindEnv("email.sender_name")
 	_ = v.BindEnv("email.code_ttl")
 	_ = v.BindEnv("email.resend_interval")
+	_ = v.BindEnv("stripe.publishable_key")
+	_ = v.BindEnv("stripe.secret_key")
+	_ = v.BindEnv("stripe.currency")
+	_ = v.BindEnv("stripe.coins_per_currency_unit")
+	_ = v.BindEnv("stripe.connect_country")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

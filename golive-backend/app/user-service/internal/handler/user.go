@@ -21,14 +21,19 @@ import (
 type UserHandler struct {
 	users      *repo.UserRepo
 	emailCodes *service.EmailCodeService
+	stripe     *service.StripeService
 }
 
 const usernameChangeCooldown = 7 * 24 * time.Hour
+const minTopupCoins int64 = 10
+const minWithdrawCoins int64 = 10
+const withdrawFeeRateBasisPoints int64 = 3500
+const certifiedWithdrawFeeRateBasisPoints int64 = 2500
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{2,31}$`)
 
-func NewUserHandler(users *repo.UserRepo, emailCodes *service.EmailCodeService) *UserHandler {
-	return &UserHandler{users: users, emailCodes: emailCodes}
+func NewUserHandler(users *repo.UserRepo, emailCodes *service.EmailCodeService, stripeSvc *service.StripeService) *UserHandler {
+	return &UserHandler{users: users, emailCodes: emailCodes, stripe: stripeSvc}
 }
 
 // Me returns the authenticated user's profile. AuthRequired middleware has
@@ -288,10 +293,132 @@ type topupReq struct {
 	Amount int64 `json:"amount"`
 }
 
+type topupCheckoutResp struct {
+	CheckoutURL          string `json:"checkoutUrl"`
+	SessionID            string `json:"sessionId"`
+	Amount               int64  `json:"amount"`
+	Currency             string `json:"currency"`
+	CoinsPerCurrencyUnit int64  `json:"coinsPerCurrencyUnit"`
+	PublishableKey       string `json:"publishableKey,omitempty"`
+}
+
+// TopupCoins starts a Stripe Checkout flow. Coins are credited only after the
+// return handler verifies the Checkout Session with Stripe.
+func (h *UserHandler) TopupCoins(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	var req topupReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid amount"})
+		return
+	}
+	if req.Amount < minTopupCoins {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 10 coins"})
+		return
+	}
+	if h.stripe == nil || !h.stripe.Configured() {
+		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
+		return
+	}
+	u, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	origin := requestOrigin(c)
+	checkout, err := h.stripe.CreateTopupCheckout(
+		c.Request.Context(),
+		uid,
+		u.Email,
+		req.Amount,
+		origin+"/coins?stripe_topup=success&session_id={CHECKOUT_SESSION_ID}",
+		origin+"/coins?stripe_topup=cancelled",
+	)
+	if err != nil {
+		if errors.Is(err, service.ErrStripeNotConfigured) {
+			errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
+			return
+		}
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not create stripe checkout session").WithReason("stripe_checkout_failed"))
+		return
+	}
+	c.JSON(http.StatusOK, topupCheckoutResp{
+		CheckoutURL:          checkout.URL,
+		SessionID:            checkout.ID,
+		Amount:               req.Amount,
+		Currency:             h.stripe.Currency(),
+		CoinsPerCurrencyUnit: h.stripe.CoinsPerCurrencyUnit(),
+		PublishableKey:       h.stripe.PublishableKey(),
+	})
+}
+
+type confirmTopupReq struct {
+	SessionID string `json:"sessionId"`
+}
+
+func (h *UserHandler) ConfirmTopupCoins(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if h.stripe == nil || !h.stripe.Configured() {
+		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
+		return
+	}
+	var req confirmTopupReq
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.SessionID) == "" {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "missing stripe checkout session"))
+		return
+	}
+	sess, err := h.stripe.RetrieveCheckoutSession(c.Request.Context(), req.SessionID)
+	if err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not verify stripe checkout session").WithReason("stripe_checkout_verify_failed"))
+		return
+	}
+	if sess == nil || sess.ClientReferenceID != uid || sess.Metadata["user_id"] != uid {
+		errcode.Respond(c, errcode.New(http.StatusForbidden, "stripe checkout session does not belong to this user").WithReason("stripe_session_user_mismatch"))
+		return
+	}
+	if sess.PaymentStatus != "paid" {
+		c.JSON(http.StatusConflict, gin.H{
+			"message":       "stripe checkout session is not paid",
+			"reason":        "stripe_payment_not_paid",
+			"paymentStatus": sess.PaymentStatus,
+		})
+		return
+	}
+	amount, err := strconv.ParseInt(sess.Metadata["coins"], 10, 64)
+	if err != nil || amount < minTopupCoins {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid stripe checkout metadata").WithReason("stripe_invalid_metadata"))
+		return
+	}
+	u, tx, credited, err := h.users.CreditStripeTopupIfNeeded(
+		c.Request.Context(),
+		uid,
+		amount,
+		sess.ID,
+		sess.Metadata["currency"],
+	)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"user":          u.Public(),
+		"transaction":   tx,
+		"credited":      credited,
+		"paymentStatus": sess.PaymentStatus,
+	})
+}
+
 // TopupCoins increments the authenticated user's coin balance by the given
 // amount and returns the updated public user. This is a stub for development;
 // real billing integration is out of scope.
-func (h *UserHandler) TopupCoins(c *gin.Context) {
+func (h *UserHandler) legacyTopupCoins(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {
 		errcode.Respond(c, service.ErrUnauthorized)
@@ -338,6 +465,240 @@ func (h *UserHandler) CoinTransactions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": rows})
+}
+
+func (h *UserHandler) StripeAccountStatus(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if h.stripe == nil || !h.stripe.Configured() {
+		c.JSON(http.StatusOK, gin.H{
+			"stripeConfigured": false,
+			"connected":        false,
+			"payoutsEnabled":   false,
+			"detailsSubmitted": false,
+		})
+		return
+	}
+	u, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if strings.TrimSpace(u.StripeAccountID) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"stripeConfigured": true,
+			"connected":        false,
+			"payoutsEnabled":   false,
+			"detailsSubmitted": false,
+		})
+		return
+	}
+	acct, err := h.stripe.RetrieveAccount(c.Request.Context(), u.StripeAccountID)
+	if err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not retrieve stripe account").WithReason("stripe_account_failed"))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"stripeConfigured": true,
+		"connected":        true,
+		"accountId":        acct.ID,
+		"chargesEnabled":   acct.ChargesEnabled,
+		"payoutsEnabled":   acct.PayoutsEnabled,
+		"detailsSubmitted": acct.DetailsSubmitted,
+		"currentlyDue":     acct.CurrentlyDue,
+		"disabledReason":   acct.DisabledReason,
+	})
+}
+
+func (h *UserHandler) StripeAccountLink(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if h.stripe == nil || !h.stripe.Configured() {
+		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
+		return
+	}
+	u, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	accountID := strings.TrimSpace(u.StripeAccountID)
+	if accountID == "" {
+		acct, err := h.stripe.CreateExpressAccount(c.Request.Context(), uid, u.Email)
+		if err != nil {
+			errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not create stripe connected account").WithReason("stripe_account_failed"))
+			return
+		}
+		accountID = acct.ID
+		if _, err := h.users.SetStripeAccountID(c.Request.Context(), uid, accountID); err != nil {
+			errcode.Respond(c, err)
+			return
+		}
+	}
+	origin := requestOrigin(c)
+	link, err := h.stripe.CreateAccountLink(
+		c.Request.Context(),
+		accountID,
+		origin+"/coins?stripe_connect=return",
+		origin+"/coins?stripe_connect=refresh",
+	)
+	if err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not create stripe onboarding link").WithReason("stripe_account_link_failed"))
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"url": link, "accountId": accountID})
+}
+
+type withdrawReq struct {
+	Amount int64 `json:"amount"`
+}
+
+func (h *UserHandler) WithdrawCoins(c *gin.Context) {
+	uid := UserIDFromCtx(c)
+	if uid == "" {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if h.stripe == nil || !h.stripe.Configured() {
+		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
+		return
+	}
+	var req withdrawReq
+	if err := c.ShouldBindJSON(&req); err != nil || req.Amount < minWithdrawCoins {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid withdrawal amount").WithReason("invalid_withdrawal_amount"))
+		return
+	}
+	u, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	if strings.TrimSpace(u.StripeAccountID) == "" {
+		errcode.Respond(c, errcode.New(http.StatusConflict, "stripe onboarding is required").WithReason("stripe_onboarding_required"))
+		return
+	}
+	acct, err := h.stripe.RetrieveAccount(c.Request.Context(), u.StripeAccountID)
+	if err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "could not retrieve stripe account").WithReason("stripe_account_failed"))
+		return
+	}
+	if !acct.PayoutsEnabled {
+		c.JSON(http.StatusConflict, gin.H{
+			"message":          "stripe onboarding is required",
+			"reason":           "stripe_onboarding_required",
+			"detailsSubmitted": acct.DetailsSubmitted,
+			"currentlyDue":     acct.CurrentlyDue,
+			"disabledReason":   acct.DisabledReason,
+		})
+		return
+	}
+	feeRate := withdrawFeeBasisPoints(u)
+	fee := req.Amount * feeRate / 10000
+	netCoins := req.Amount - fee
+	if netCoins <= 0 {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "withdrawal amount is too small").WithReason("invalid_withdrawal_amount"))
+		return
+	}
+	amountMinor, err := h.stripe.MoneyMinorForCoins(netCoins)
+	if err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "withdrawal amount is too small").WithReason("invalid_withdrawal_amount"))
+		return
+	}
+	_, pending, err := h.users.BeginStripeWithdrawal(
+		c.Request.Context(),
+		uid,
+		req.Amount,
+		fee,
+		netCoins,
+		h.stripe.Currency(),
+		u.StripeAccountID,
+	)
+	if err != nil {
+		if errors.Is(err, repo.ErrInsufficientCoins) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "insufficient available coins").WithReason("insufficient_coin"))
+			return
+		}
+		errcode.Respond(c, err)
+		return
+	}
+	tr, err := h.stripe.CreateTransfer(c.Request.Context(), service.StripeTransferCreateRequest{
+		AmountMinor:    amountMinor,
+		Currency:       h.stripe.Currency(),
+		Destination:    u.StripeAccountID,
+		Description:    "GoLive coin withdrawal",
+		IdempotencyKey: "golive_withdrawal_" + pending.ID,
+		Metadata: map[string]string{
+			"kind":          "coin_withdrawal",
+			"user_id":       uid,
+			"withdrawal_id": pending.ID,
+			"coins":         fmt.Sprintf("%d", req.Amount),
+			"fee":           fmt.Sprintf("%d", fee),
+			"net_coins":     fmt.Sprintf("%d", netCoins),
+		},
+	})
+	if err != nil {
+		_ = h.users.FailStripeWithdrawal(c.Request.Context(), pending.ID, err.Error())
+		errcode.Respond(c, errcode.New(http.StatusBadGateway, "stripe transfer failed").WithReason("stripe_transfer_failed"))
+		return
+	}
+	nextUser, withdrawal, coinTx, err := h.users.CompleteStripeWithdrawal(c.Request.Context(), pending.ID, tr.ID)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"user":           nextUser.Public(),
+		"transaction":    coinTx,
+		"withdrawal":     withdrawal,
+		"transferId":     tr.ID,
+		"amount":         req.Amount,
+		"fee":            fee,
+		"netCoins":       netCoins,
+		"currency":       h.stripe.Currency(),
+		"amountMinor":    amountMinor,
+		"payoutsEnabled": acct.PayoutsEnabled,
+	})
+}
+
+func withdrawFeeBasisPoints(u *model.User) int64 {
+	if u != nil &&
+		u.Verified &&
+		u.LivePermissionStatus == model.LivePermissionApproved &&
+		u.PlatformVerificationStatus == model.PlatformVerificationApproved {
+		return certifiedWithdrawFeeRateBasisPoints
+	}
+	return withdrawFeeRateBasisPoints
+}
+
+func requestOrigin(c *gin.Context) string {
+	proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto"))
+	if proto == "" {
+		if c.Request != nil && c.Request.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+	if i := strings.Index(proto, ","); i >= 0 {
+		proto = strings.TrimSpace(proto[:i])
+	}
+	host := strings.TrimSpace(c.GetHeader("X-Forwarded-Host"))
+	if host == "" && c.Request != nil {
+		host = strings.TrimSpace(c.Request.Host)
+	}
+	if i := strings.Index(host, ","); i >= 0 {
+		host = strings.TrimSpace(host[:i])
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	return proto + "://" + host
 }
 
 type dailyCoinTask struct {

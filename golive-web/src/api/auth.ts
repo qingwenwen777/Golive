@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { http } from '@/lib/axios';
-import { coinTransactionsKey } from '@/api/coins';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import type { LoginResp, User } from '@/types/user';
 
@@ -217,17 +216,20 @@ export function usePublicUser(id: string) {
   });
 }
 
+export interface TopupCheckoutResp {
+  checkoutUrl: string;
+  sessionId: string;
+  amount: number;
+  currency: string;
+  coinsPerCurrencyUnit: number;
+  publishableKey?: string;
+}
+
 export function useTopupCoins() {
-  const qc = useQueryClient();
-  return useMutation<User, Error, { amount: number }>({
+  return useMutation<TopupCheckoutResp, Error, { amount: number }>({
     mutationFn: async ({ amount }) => {
-      const { data } = await http.post<User>('/users/me/coins/topup', { amount });
+      const { data } = await http.post<TopupCheckoutResp>('/users/me/coins/topup', { amount });
       return data;
-    },
-    onSuccess: (user) => {
-      qc.setQueryData(['me'], user);
-      useAuthStore.getState().setUser(user);
-      void qc.invalidateQueries({ queryKey: coinTransactionsKey });
     },
   });
 }

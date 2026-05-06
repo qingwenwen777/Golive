@@ -16,6 +16,7 @@ type Deps struct {
 	Captcha         *service.CaptchaService
 	EmailCodes      *service.EmailCodeService
 	Users           *repo.UserRepo
+	Stripe          *service.StripeService
 	AvatarDir       string
 	AvatarPublicURL string
 	CoverDir        string
@@ -33,7 +34,7 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
 	authH := handler.NewAuthHandler(d.Auth, d.Captcha, d.EmailCodes)
-	userH := handler.NewUserHandler(d.Users, d.EmailCodes)
+	userH := handler.NewUserHandler(d.Users, d.EmailCodes, d.Stripe)
 	creatorH := handler.NewCreatorHandler(d.Users)
 	adminH := handler.NewAdminHandler(d.Users)
 	internalH := handler.NewInternalHandler(d.Users)
@@ -67,6 +68,10 @@ func NewRouter(d Deps) *gin.Engine {
 		users.PATCH("/me/email", handler.AuthRequired(d.Auth), userH.UpdateEmail)
 		users.GET("/me/coins/transactions", handler.AuthRequired(d.Auth), userH.CoinTransactions)
 		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), userH.TopupCoins)
+		users.POST("/me/coins/topup/confirm", handler.AuthRequired(d.Auth), userH.ConfirmTopupCoins)
+		users.GET("/me/coins/stripe/account", handler.AuthRequired(d.Auth), userH.StripeAccountStatus)
+		users.POST("/me/coins/stripe/account-link", handler.AuthRequired(d.Auth), userH.StripeAccountLink)
+		users.POST("/me/coins/withdrawals", handler.AuthRequired(d.Auth), userH.WithdrawCoins)
 		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), userH.ClaimDailyCoinTask)
 		users.POST("/me/avatar", handler.AuthRequired(d.Auth), avatarH.Upload)
 		users.POST("/me/cover", handler.AuthRequired(d.Auth), coverH.Upload)

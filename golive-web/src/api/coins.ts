@@ -12,7 +12,8 @@ export type CoinTransactionType =
   | 'bet_payout'
   | 'bet_refund'
   | 'creator_gift_income'
-  | 'creator_super_chat_income';
+  | 'creator_super_chat_income'
+  | 'withdrawal';
 
 export interface CoinTransaction {
   id: string;
@@ -47,6 +48,51 @@ export interface DailyCoinTaskClaimResp {
   alreadyClaimed: boolean;
 }
 
+export interface ConfirmTopupResp {
+  user: User;
+  transaction: CoinTransaction;
+  credited: boolean;
+  paymentStatus: string;
+}
+
+export interface StripeAccountStatus {
+  stripeConfigured: boolean;
+  connected: boolean;
+  accountId?: string;
+  chargesEnabled?: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  currentlyDue?: string[];
+  disabledReason?: string;
+}
+
+export interface StripeAccountLinkResp {
+  url: string;
+  accountId: string;
+}
+
+export interface WithdrawCoinsResp {
+  user: User;
+  transaction: CoinTransaction;
+  withdrawal: {
+    id: string;
+    amount: number;
+    fee: number;
+    netCoins: number;
+    currency: string;
+    status: string;
+    stripeTransferId?: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  transferId: string;
+  amount: number;
+  fee: number;
+  netCoins: number;
+  currency: string;
+  amountMinor: number;
+}
+
 export const coinTransactionsKey = ['coins', 'transactions'] as const;
 
 export function useCoinTransactions() {
@@ -78,6 +124,71 @@ export function useClaimDailyCoinTask() {
       qc.setQueryData(['me'], resp.user);
       useAuthStore.getState().setUser(resp.user);
       void qc.invalidateQueries({ queryKey: coinTransactionsKey });
+    },
+  });
+}
+
+export function useConfirmTopupCoins() {
+  const qc = useQueryClient();
+  return useMutation<ConfirmTopupResp, Error, { sessionId: string }>({
+    mutationFn: async ({ sessionId }) => {
+      const { data } = await http.post<ConfirmTopupResp>('/users/me/coins/topup/confirm', {
+        sessionId,
+      });
+      return data;
+    },
+    onSuccess: (resp) => {
+      qc.setQueryData(['me'], resp.user);
+      useAuthStore.getState().setUser(resp.user);
+      void qc.invalidateQueries({ queryKey: coinTransactionsKey });
+    },
+  });
+}
+
+export function useStripeAccountStatus() {
+  const isAuthed = useIsAuthed();
+  return useQuery<StripeAccountStatus, Error>({
+    queryKey: ['coins', 'stripe-account'],
+    queryFn: async ({ signal }) => {
+      const { data } = await http.get<StripeAccountStatus>('/users/me/coins/stripe/account', {
+        signal,
+      });
+      return data;
+    },
+    enabled: isAuthed,
+    staleTime: 20_000,
+  });
+}
+
+export function useStripeAccountLink() {
+  const qc = useQueryClient();
+  return useMutation<StripeAccountLinkResp, Error, void>({
+    mutationFn: async () => {
+      const { data } = await http.post<StripeAccountLinkResp>(
+        '/users/me/coins/stripe/account-link',
+      );
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['coins', 'stripe-account'] });
+    },
+  });
+}
+
+export function useWithdrawCoins() {
+  const qc = useQueryClient();
+  return useMutation<WithdrawCoinsResp, Error, { amount: number }>({
+    mutationFn: async ({ amount }) => {
+      const { data } = await http.post<WithdrawCoinsResp>('/users/me/coins/withdrawals', {
+        amount,
+      });
+      return data;
+    },
+    onSuccess: (resp) => {
+      qc.setQueryData(['me'], resp.user);
+      useAuthStore.getState().setUser(resp.user);
+      void qc.invalidateQueries({ queryKey: coinTransactionsKey });
+      void qc.invalidateQueries({ queryKey: ['coins', 'stripe-account'] });
     },
   });
 }
