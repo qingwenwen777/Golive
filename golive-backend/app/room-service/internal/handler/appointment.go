@@ -221,7 +221,7 @@ func (h *AppointmentHandler) MarkAllNotificationsRead(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.svc.MarkAllNotificationsRead(c.Request.Context(), uid); err != nil {
+	if err := h.svc.MarkAllNotificationsRead(c.Request.Context(), uid, c.Query("box")); err != nil {
 		errcode.Respond(c, err)
 		return
 	}

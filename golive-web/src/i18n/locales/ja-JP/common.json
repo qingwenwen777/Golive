@@ -119,6 +119,7 @@
   },
   "loading": "読み込み中...",
   "notificationsReadAll": "すべて既読",
+  "notificationsViewAll": "すべて表示",
   "notificationsEmpty": "通知はまだありません",
   "notificationTypes": {
     "appointment_reminder": {

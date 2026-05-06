@@ -119,6 +119,7 @@
   },
   "loading": "加载中...",
   "notificationsReadAll": "全部已读",
+  "notificationsViewAll": "查看全部",
   "notificationsEmpty": "暂无通知",
   "notificationTypes": {
     "appointment_reminder": {

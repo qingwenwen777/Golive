@@ -273,9 +273,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                   >
                     {activeLiveId ? <Icons.Live size={22} /> : <Icons.Plus size={22} />}
                     <span className="gl-create-label">
-                      {activeLiveId
-                        ? t('nav.liveNow')
-                        : t('goLive', { defaultValue: t('create') })}
+                      {activeLiveId ? t('nav.liveNow') : t('goLive', { defaultValue: t('create') })}
                     </span>
                   </button>
                 </>
@@ -471,7 +469,8 @@ function NotificationBell() {
         ) : (
           <div className="gl-notification-list">
             {items.map((item) => (
-              <DropdownMenuItem
+              <button
+                type="button"
                 key={item.id}
                 className={item.readAt ? 'gl-notification-item' : 'gl-notification-item is-unread'}
                 onClick={() => openNotification(item)}
@@ -494,7 +493,7 @@ function NotificationBell() {
                   {item.body && <small>{item.body}</small>}
                   <time>{formatNotificationTime(item.createdAt, i18n.language)}</time>
                 </span>
-              </DropdownMenuItem>
+              </button>
             ))}
           </div>
         )}

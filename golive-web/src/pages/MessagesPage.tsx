@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Ban,
@@ -15,7 +16,12 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNotifications, useMarkNotificationRead, type NotificationItem } from '@/api/room';
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+  type NotificationItem,
+} from '@/api/room';
 import {
   useBlockUser,
   useDirectDraft,
@@ -41,6 +47,7 @@ import {
 } from '@/api/messages';
 import { Avatar } from '@/components/Avatar';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,15 +62,17 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
+type Translate = ReturnType<typeof useTranslation>['t'];
 
 export default function MessagesPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation('pages');
   const { section: rawSection, targetId } = useParams<{ section?: string; targetId?: string }>();
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const user = useAuthStore((s) => s.user);
   const section = normalizeSection(rawSection);
-  const draftCreatorId = rawSection === 'direct' ? targetId ?? '' : '';
+  const draftCreatorId = rawSection === 'direct' ? (targetId ?? '') : '';
 
   useEffect(() => {
     if (!rawSection) navigate('/messages/private', { replace: true });
@@ -74,10 +83,14 @@ export default function MessagesPage() {
       <div className="gl-page gl-message-page">
         <div className="gl-message-auth">
           <MessageCircle size={34} />
-          <h1>登录后查看消息</h1>
-          <p>私信、动态通知和系统通知都会集中在这里。</p>
+          <h1>{t('messages.auth.title', { defaultValue: '登录后查看消息' })}</h1>
+          <p>
+            {t('messages.auth.body', {
+              defaultValue: '私信、动态通知和系统通知都会集中在这里。',
+            })}
+          </p>
           <button className="gl-creator-primary" type="button" onClick={() => openLogin()}>
-            登录
+            {t('messages.auth.login', { defaultValue: '登录' })}
           </button>
         </div>
       </div>
@@ -101,11 +114,25 @@ export default function MessagesPage() {
               draftCreatorId={draftCreatorId}
             />
           ) : section === 'replies' ? (
-            <NotificationPanel title="回复我的" box="reply" empty="还没有新的回复。" />
+            <NotificationPanel
+              title={t('messages.sections.replies', { defaultValue: '回复我的' })}
+              box="reply"
+              empty={t('messages.notifications.repliesEmpty', { defaultValue: '还没有新的回复。' })}
+            />
           ) : section === 'likes' ? (
-            <NotificationPanel title="收到的赞" box="like" empty="你的帖子、评论或直播间收到赞后会显示在这里。" />
+            <NotificationPanel
+              title={t('messages.sections.likes', { defaultValue: '收到的赞' })}
+              box="like"
+              empty={t('messages.notifications.likesEmpty', {
+                defaultValue: '你的帖子、评论或直播间收到赞后会显示在这里。',
+              })}
+            />
           ) : section === 'system' ? (
-            <NotificationPanel title="系统通知" box="system" empty="暂无系统通知。" />
+            <NotificationPanel
+              title={t('messages.sections.system', { defaultValue: '系统通知' })}
+              box="system"
+              empty={t('messages.notifications.systemEmpty', { defaultValue: '暂无系统通知。' })}
+            />
           ) : (
             <MessageSettingsPanel />
           )}
@@ -122,10 +149,14 @@ function PrivateMessages({
   currentUser: MessageUser;
   draftCreatorId: string;
 }) {
+  const navigate = useNavigate();
+  const { t, i18n } = useTranslation('pages');
   const userId = currentUser.id;
   const threads = useDirectThreads(true, 1, 50);
   const fanGroups = useJoinedFanGroups(true);
   const draft = useDirectDraft(draftCreatorId, Boolean(draftCreatorId));
+  const draftErrorReason = apiErrorReason(draft.error);
+  const draftBlockedByFollow = Boolean(draftCreatorId && draftErrorReason === 'follow_required');
   const [selectedId, setSelectedId] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [content, setContent] = useState('');
@@ -136,12 +167,14 @@ function PrivateMessages({
     ? joinedGroups.find((item) => item.id === selectedGroupId)
     : undefined;
   const threadByDraft = threads.data?.items.find((item) => item.creatorId === draftCreatorId);
-  const selectedThread = selectedGroup
-    ? undefined
-    : ((selectedId ? threads.data?.items.find((item) => item.id === selectedId) : undefined) ??
-      threadByDraft ??
-      threads.data?.items[0] ??
-      draft.data);
+  const followRequiredActive = draftBlockedByFollow && !selectedId && !selectedGroupId;
+  const selectedThread =
+    selectedGroup || followRequiredActive
+      ? undefined
+      : ((selectedId ? threads.data?.items.find((item) => item.id === selectedId) : undefined) ??
+        threadByDraft ??
+        threads.data?.items[0] ??
+        draft.data);
   const messages = useDirectMessages(selectedThread?.id ?? '', Boolean(selectedThread?.id));
   const sendThread = useSendThreadMessage(selectedThread?.id ?? '');
   const blockUser = useBlockUser();
@@ -155,12 +188,22 @@ function PrivateMessages({
     if (!selectedId && !selectedGroupId && threadByDraft?.id) setSelectedId(threadByDraft.id);
   }, [selectedGroupId, selectedId, threadByDraft?.id]);
 
+  useEffect(() => {
+    if (draftBlockedByFollow) {
+      toast.error(
+        t('messages.private.followRequiredToast', {
+          defaultValue: '关注该主播后才能发送私信。',
+        }),
+      );
+    }
+  }, [draftBlockedByFollow, t]);
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = content.trim();
     if (!text || !selectedThread) return;
     const onSuccess = () => setContent('');
-    const onError = (err: Error) => toast.error(messageError(err));
+    const onError = (err: Error) => toast.error(messageError(err, t));
     if (selectedThread.id) {
       sendThread.mutate(text, { onSuccess, onError });
       return;
@@ -194,12 +237,19 @@ function PrivateMessages({
     <div className="gl-direct-layout">
       <aside className="gl-direct-list">
         <div className="gl-direct-list-head">
-          <h1>我的消息</h1>
-          <span>{(threads.data?.total ?? 0) + joinedGroups.length} 个会话</span>
+          <h1>{t('messages.private.title', { defaultValue: '我的消息' })}</h1>
+          <span>
+            {t('messages.private.conversationCount', {
+              count: (threads.data?.total ?? 0) + joinedGroups.length,
+              defaultValue: '{{count}} 个会话',
+            })}
+          </span>
         </div>
         {fanGroups.isPending ? null : joinedGroups.length ? (
           <div className="gl-fan-chat-section">
-            <span className="gl-fan-chat-section-title">粉丝团群聊</span>
+            <span className="gl-fan-chat-section-title">
+              {t('messages.private.fanGroups', { defaultValue: '粉丝团群聊' })}
+            </span>
             {joinedGroups.map((group) => (
               <FanGroupThreadButton
                 key={group.id}
@@ -214,7 +264,9 @@ function PrivateMessages({
           </div>
         ) : null}
         {threads.isPending ? (
-          <div className="gl-message-empty-soft">正在加载私信...</div>
+          <div className="gl-message-empty-soft">
+            {t('messages.private.loading', { defaultValue: '正在加载私信...' })}
+          </div>
         ) : sortedThreads.length || draft.data ? (
           <>
             {draft.data && !threadByDraft && (
@@ -240,17 +292,27 @@ function PrivateMessages({
             ))}
           </>
         ) : joinedGroups.length ? null : (
-          <div className="gl-message-empty-soft">关注主播后，可以从频道页发起私信。</div>
+          <div className="gl-message-empty-soft">
+            {t('messages.private.emptyHint', {
+              defaultValue: '关注主播后，可以从频道页发起私信。',
+            })}
+          </div>
         )}
       </aside>
 
       <section className="gl-direct-chat">
         {selectedGroup ? (
           <FanGroupChatView group={selectedGroup} userId={userId} />
+        ) : followRequiredActive ? (
+          <FollowRequiredDirectState onOpenChannel={() => navigate(`/channel/${draftCreatorId}`)} />
         ) : selectedThread ? (
           <>
             <div className="gl-direct-chat-head">
-              <Avatar name={selectedThread.peer.name} src={selectedThread.peer.avatar} size={42} />
+              <CreatorAvatarButton
+                user={selectedThread.peer}
+                creatorId={selectedThread.creatorId}
+                enabled={selectedThread.peer.id === selectedThread.creatorId}
+              />
               <div className="gl-direct-chat-meta">
                 <strong>
                   {selectedThread.peer.name}
@@ -258,33 +320,41 @@ function PrivateMessages({
                 </strong>
                 <span>
                   {selectedThread.awaitingReply
-                    ? '等待主播回复后才能继续发送'
+                    ? t('messages.private.waitingReply', {
+                        defaultValue: '等待主播回复后才能继续发送',
+                      })
                     : selectedThread.muted
-                      ? '已开启免打扰'
-                      : '通知正常接收'}
+                      ? t('messages.private.muted', { defaultValue: '已开启免打扰' })
+                      : t('messages.private.normal', { defaultValue: '通知正常接收' })}
                 </span>
               </div>
               {selectedThread.id && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="gl-message-icon-btn" type="button" aria-label="会话操作">
+                    <button
+                      className="gl-message-icon-btn"
+                      type="button"
+                      aria-label={t('messages.private.actions', { defaultValue: '会话操作' })}
+                    >
                       <MoreVertical size={19} />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-44">
                     <DropdownMenuItem
-                      onSelect={() =>
-                        updateOptions.mutate({ pinned: !selectedThread.pinned })
-                      }
+                      onSelect={() => updateOptions.mutate({ pinned: !selectedThread.pinned })}
                     >
                       <Pin size={15} />
-                      {selectedThread.pinned ? '取消置顶' : '置顶聊天'}
+                      {selectedThread.pinned
+                        ? t('messages.private.unpin', { defaultValue: '取消置顶' })
+                        : t('messages.private.pin', { defaultValue: '置顶聊天' })}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() => updateOptions.mutate({ muted: !selectedThread.muted })}
                     >
                       {selectedThread.muted ? <Bell size={15} /> : <BellOff size={15} />}
-                      {selectedThread.muted ? '关闭免打扰' : '开启免打扰'}
+                      {selectedThread.muted
+                        ? t('messages.private.unmute', { defaultValue: '关闭免打扰' })
+                        : t('messages.private.mute', { defaultValue: '开启免打扰' })}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() =>
@@ -292,24 +362,33 @@ function PrivateMessages({
                       }
                     >
                       <BellOff size={15} />
-                      {selectedThread.pushDisabled ? '接收推送' : '不接收推送'}
+                      {selectedThread.pushDisabled
+                        ? t('messages.private.enablePush', { defaultValue: '接收推送' })
+                        : t('messages.private.disablePush', { defaultValue: '不接收推送' })}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => openReport(selectedThread)}>
                       <ShieldOff size={15} />
-                      举报该用户
+                      {t('messages.private.report', { defaultValue: '举报该用户' })}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="gl-menu-danger"
                       onSelect={() =>
                         blockUser.mutate(
                           { userId: selectedThread.peer.id, reason: 'direct_message' },
-                          { onSuccess: () => toast.success('已加入黑名单') },
+                          {
+                            onSuccess: () =>
+                              toast.success(
+                                t('messages.private.blockedToast', {
+                                  defaultValue: '已加入黑名单',
+                                }),
+                              ),
+                          },
                         )
                       }
                     >
                       <Ban size={15} />
-                      加入黑名单
+                      {t('messages.private.block', { defaultValue: '加入黑名单' })}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -318,7 +397,11 @@ function PrivateMessages({
 
             <div className="gl-direct-message-list">
               {messages.isPending && selectedThread.id ? (
-                <div className="gl-message-empty-soft">正在加载聊天记录...</div>
+                <div className="gl-message-empty-soft">
+                  {t('messages.private.loadingMessages', {
+                    defaultValue: '正在加载聊天记录...',
+                  })}
+                </div>
               ) : messages.data?.items.length ? (
                 messages.data.items.map((item) => (
                   <ChatMessageRow
@@ -327,13 +410,33 @@ function PrivateMessages({
                     body={item.body}
                     createdAt={item.createdAt}
                     currentUserId={userId}
+                    fanBadge={item.sender?.fanBadge}
+                    locale={i18n.language}
+                    onAvatarClick={
+                      item.senderId === selectedThread.creatorId
+                        ? () => navigate(`/channel/${selectedThread.creatorId}`)
+                        : undefined
+                    }
+                    avatarTitle={
+                      item.senderId === selectedThread.creatorId
+                        ? t('messages.actions.openCreatorChannel', {
+                            defaultValue: '进入主播频道',
+                          })
+                        : undefined
+                    }
                   />
                 ))
               ) : (
                 <div className="gl-direct-empty">
                   <UserRound size={32} />
-                  <strong>开始和主播私信</strong>
-                  <span>在主播回复前，你只能先发送一条消息。</span>
+                  <strong>
+                    {t('messages.private.startTitle', { defaultValue: '开始和主播私信' })}
+                  </strong>
+                  <span>
+                    {t('messages.private.startBody', {
+                      defaultValue: '在主播回复前，你只能先发送一条消息。',
+                    })}
+                  </span>
                 </div>
               )}
             </div>
@@ -345,7 +448,11 @@ function PrivateMessages({
                 maxLength={1000}
                 disabled={!selectedThread.canSend || sendDirect.isPending || sendThread.isPending}
                 placeholder={
-                  selectedThread.canSend ? '输入私信内容' : '等待主播回复后才能继续发送'
+                  selectedThread.canSend
+                    ? t('messages.private.input', { defaultValue: '输入私信内容' })
+                    : t('messages.private.inputWaiting', {
+                        defaultValue: '等待主播回复后才能继续发送',
+                      })
                 }
               />
               <button
@@ -354,15 +461,19 @@ function PrivateMessages({
                 disabled={!content.trim() || !selectedThread.canSend}
               >
                 <Send size={16} />
-                发送
+                {t('messages.private.send', { defaultValue: '发送' })}
               </button>
             </form>
           </>
         ) : (
           <div className="gl-direct-empty is-full">
             <MessageCircle size={38} />
-            <strong>暂无私信</strong>
-            <span>进入主播频道页，点击私信图标就能发起会话。</span>
+            <strong>{t('messages.private.emptyTitle', { defaultValue: '暂无私信' })}</strong>
+            <span>
+              {t('messages.private.emptyBody', {
+                defaultValue: '进入主播频道页，点击私信图标就能发起会话。',
+              })}
+            </span>
           </div>
         )}
       </section>
@@ -386,15 +497,23 @@ function ThreadButton({
   active: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation('pages');
   return (
-    <button type="button" className={cn('gl-direct-thread', active && 'is-active')} onClick={onClick}>
+    <button
+      type="button"
+      className={cn('gl-direct-thread', active && 'is-active')}
+      onClick={onClick}
+    >
       <Avatar name={thread.peer.name} src={thread.peer.avatar} size={44} />
       <span>
         <strong>
           {thread.peer.name}
           {thread.peer.verified && <VerifiedBadge size={12} />}
         </strong>
-        <small>{thread.lastMessagePreview || '还没有聊天记录'}</small>
+        <small>
+          {thread.lastMessagePreview ||
+            t('messages.private.threadEmpty', { defaultValue: '还没有聊天记录' })}
+        </small>
       </span>
       {thread.unread > 0 && <em>{thread.unread > 99 ? '99+' : thread.unread}</em>}
     </button>
@@ -410,6 +529,7 @@ function FanGroupThreadButton({
   active: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const previewMembers = group.members.slice(0, 3);
   return (
     <button
@@ -433,16 +553,26 @@ function FanGroupThreadButton({
       </span>
       <span>
         <strong>{group.name}</strong>
-        <small>{group.memberCount}/200 人 · 粉丝团群聊</small>
+        <small>
+          {t('messages.fanGroupChat.memberCount', {
+            count: group.memberCount,
+            defaultValue: '{{count}}/200 人',
+          })}
+          {' · '}
+          {t('messages.private.fanGroups', { defaultValue: '粉丝团群聊' })}
+        </small>
       </span>
     </button>
   );
 }
 
 function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }) {
+  const navigate = useNavigate();
+  const { t, i18n } = useTranslation('pages');
   const owner = group.members.find((member) => member.role === 'owner');
   const currentMember = group.members.find((member) => member.user.id === userId);
   const [content, setContent] = useState('');
+  const [muteTarget, setMuteTarget] = useState<FanGroupMember | null>(null);
   const messages = useFanGroupMessages(group.id, Boolean(group.id) && !currentMember?.kicked);
   const sendMessage = useSendFanGroupMessage(group.id);
   const updateMember = useUpdateFanGroupMember();
@@ -454,21 +584,44 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
     [group.members],
   );
 
-  const toggleMemberMute = (member: FanGroupMember | undefined) => {
+  const openMemberMuteDialog = (member: FanGroupMember | undefined) => {
     if (!member || !canManageFanGroupMember(currentMember, member, userId)) return;
+    setMuteTarget(member);
+  };
+
+  const updateMemberMute = (member: FanGroupMember, muteMinutes: number) => {
     updateMember.mutate(
-      { groupId: group.id, userId: member.user.id, muteMinutes: member.muted ? 0 : 60 },
+      { groupId: group.id, userId: member.user.id, muteMinutes },
       {
-        onSuccess: () => toast.success(member.muted ? '已解除禁言' : '已禁言 60 分钟'),
-        onError: (err) => toast.error(err.message || '更新群成员失败。'),
+        onSuccess: () => {
+          setMuteTarget(null);
+          toast.success(
+            muteMinutes > 0
+              ? t('messages.fanGroupChat.muteSuccess', {
+                  minutes: muteMinutes,
+                  defaultValue: '已禁言 {{minutes}} 分钟',
+                })
+              : t('messages.fanGroupChat.unmuteSuccess', { defaultValue: '已解除禁言' }),
+          );
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('messages.fanGroupChat.updateFailed', { defaultValue: '更新群成员失败。' }),
+          ),
       },
     );
   };
 
   const submitRejoinRequest = () => {
     requestRejoinMutation.mutate(group.id, {
-      onSuccess: () => toast.success('已提交重新加入申请，等待主播审批。'),
-      onError: (err) => toast.error(fanGroupMessageError(err)),
+      onSuccess: () =>
+        toast.success(
+          t('messages.fanGroupChat.requestSuccess', {
+            defaultValue: '已提交重新加入申请，等待主播审批。',
+          }),
+        ),
+      onError: (err) => toast.error(fanGroupMessageError(err, t)),
     });
   };
 
@@ -478,21 +631,33 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
     if (!text || !canSend) return;
     sendMessage.mutate(text, {
       onSuccess: () => setContent(''),
-      onError: (err) => toast.error(fanGroupMessageError(err)),
+      onError: (err) => toast.error(fanGroupMessageError(err, t)),
     });
   };
 
   return (
     <>
       <div className="gl-direct-chat-head">
-        <span className="gl-fan-chat-head-icon">
-          <Users size={22} />
-        </span>
+        {owner ? (
+          <CreatorAvatarButton user={owner.user} creatorId={group.creatorId} enabled />
+        ) : (
+          <span className="gl-fan-chat-head-icon">
+            <Users size={22} />
+          </span>
+        )}
         <div className="gl-direct-chat-meta">
           <strong>{group.name}</strong>
           <span>
-            {group.memberCount}/200 人
-            {owner ? ` · 群主 ${owner.user.name}` : ''}
+            {t('messages.fanGroupChat.memberCount', {
+              count: group.memberCount,
+              defaultValue: '{{count}}/200 人',
+            })}
+            {owner
+              ? t('messages.fanGroupChat.ownerSuffix', {
+                  name: owner.user.name,
+                  defaultValue: ' · 群主 {{name}}',
+                })
+              : ''}
           </span>
         </div>
       </div>
@@ -504,47 +669,98 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
             onRequest={submitRejoinRequest}
           />
         ) : messages.isPending ? (
-          <div className="gl-message-empty-soft">正在加载群聊...</div>
+          <div className="gl-message-empty-soft">
+            {t('messages.fanGroupChat.loading', { defaultValue: '正在加载群聊...' })}
+          </div>
         ) : messages.data?.items.length ? (
-          messages.data.items.map((item) => (
-            <ChatMessageRow
-              key={item.id}
-              sender={item.sender}
-              body={item.body}
-              createdAt={item.createdAt}
-              currentUserId={userId}
-              role={item.role}
-              fanBadge={item.fanBadge ?? item.sender.fanBadge}
-              muted={memberById.get(item.sender.id)?.muted}
-              canManage={
-                canModerate && canManageFanGroupMember(currentMember, memberById.get(item.sender.id), userId)
-              }
-              onAvatarClick={() => toggleMemberMute(memberById.get(item.sender.id))}
-            />
-          ))
+          messages.data.items.map((item) => {
+            const member = memberById.get(item.sender.id);
+            const isCreatorMessage = item.sender.id === group.creatorId || item.role === 'owner';
+            const canManageMember =
+              canModerate && canManageFanGroupMember(currentMember, member, userId);
+            return (
+              <ChatMessageRow
+                key={item.id}
+                sender={item.sender}
+                body={item.body}
+                createdAt={item.createdAt}
+                currentUserId={userId}
+                role={item.role}
+                fanBadge={item.fanBadge ?? item.sender.fanBadge}
+                muted={member?.muted}
+                canManage={canManageMember}
+                locale={i18n.language}
+                onAvatarClick={
+                  isCreatorMessage
+                    ? () => navigate(`/channel/${group.creatorId}`)
+                    : canManageMember
+                      ? () => openMemberMuteDialog(member)
+                      : undefined
+                }
+                avatarTitle={
+                  isCreatorMessage
+                    ? t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })
+                    : canManageMember
+                      ? member?.muted
+                        ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
+                        : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言 60 分钟' })
+                      : undefined
+                }
+              />
+            );
+          })
         ) : (
           <div className="gl-direct-empty">
             <Users size={32} />
-            <strong>粉丝团群聊</strong>
-            <span>所有加入粉丝团的成员会显示在这个群里。</span>
+            <strong>{t('messages.fanGroupChat.emptyTitle', { defaultValue: '粉丝团群聊' })}</strong>
+            <span>
+              {t('messages.fanGroupChat.emptyBody', {
+                defaultValue: '所有加入粉丝团的成员会显示在这个群里。',
+              })}
+            </span>
           </div>
         )}
       </div>
       {!currentMember?.kicked && (
-      <form className="gl-direct-compose" onSubmit={submit}>
-        <input
-          value={content}
-          onChange={(event) => setContent(event.target.value)}
-          maxLength={1000}
-          disabled={!canSend || sendMessage.isPending}
-          placeholder={canSend ? '输入群聊内容' : '你已被禁言，暂时不能发言'}
-        />
-        <button className="gl-creator-primary" type="submit" disabled={!content.trim() || !canSend}>
-          <Send size={16} />
-          发送
-        </button>
-      </form>
+        <form className="gl-direct-compose" onSubmit={submit}>
+          <input
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+            maxLength={1000}
+            disabled={!canSend || sendMessage.isPending}
+            placeholder={
+              canSend
+                ? t('messages.fanGroupChat.input', { defaultValue: '输入群聊内容' })
+                : t('messages.fanGroupChat.mutedInput', {
+                    defaultValue: '你已被禁言，暂时不能发言',
+                  })
+            }
+          />
+          <button
+            className="gl-creator-primary"
+            type="submit"
+            disabled={!content.trim() || !canSend}
+          >
+            <Send size={16} />
+            {t('messages.private.send', { defaultValue: '发送' })}
+          </button>
+        </form>
       )}
+      <FanGroupMuteDialog
+        target={muteTarget}
+        actor={currentMember}
+        currentUserId={userId}
+        pending={updateMember.isPending}
+        onOpenChange={(open) => {
+          if (!open) setMuteTarget(null);
+        }}
+        onMute={(duration) => {
+          if (muteTarget) updateMemberMute(muteTarget, duration);
+        }}
+        onUnmute={() => {
+          if (muteTarget) updateMemberMute(muteTarget, 0);
+        }}
+      />
     </>
   );
 }
@@ -558,7 +774,9 @@ function ChatMessageRow({
   fanBadge,
   muted,
   canManage,
+  locale,
   onAvatarClick,
+  avatarTitle,
 }: {
   sender: MessageUser;
   body: string;
@@ -568,19 +786,34 @@ function ChatMessageRow({
   fanBadge?: MessageFanBadge;
   muted?: boolean;
   canManage?: boolean;
+  locale?: string;
   onAvatarClick?: () => void;
+  avatarTitle?: string;
 }) {
+  const { t } = useTranslation('pages');
   const isMine = sender.id === currentUserId;
+  const actionable = Boolean(onAvatarClick);
   const avatar = (
     <button
       type="button"
-      className={cn('gl-chat-message-avatar-btn', canManage && 'is-actionable', muted && 'is-muted')}
-      disabled={!canManage}
+      className={cn(
+        'gl-chat-message-avatar-btn',
+        actionable && 'is-actionable',
+        muted && 'is-muted',
+      )}
+      disabled={!actionable}
       onClick={onAvatarClick}
-      title={canManage ? (muted ? '解除禁言' : '禁言 60 分钟') : sender.name}
+      title={
+        avatarTitle ||
+        (canManage
+          ? muted
+            ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
+            : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言 60 分钟' })
+          : sender.name)
+      }
     >
       <Avatar name={sender.name} src={sender.avatar} size={38} />
-      {muted && <span>禁</span>}
+      {muted && <span>{t('messages.fanGroupChat.mutedMark', { defaultValue: '禁' })}</span>}
     </button>
   );
 
@@ -592,7 +825,7 @@ function ChatMessageRow({
           <strong>{sender.name}</strong>
           <FanBadgePill badge={fanBadge ?? sender.fanBadge} />
           <RoleBadge role={role} />
-          <time>{formatMessageTime(createdAt)}</time>
+          <time>{formatMessageTime(createdAt, locale)}</time>
         </div>
         <div className="gl-chat-message-bubble">
           <p>{body}</p>
@@ -613,11 +846,12 @@ function FanBadgePill({ badge }: { badge?: MessageFanBadge }) {
 }
 
 function RoleBadge({ role }: { role?: string }) {
+  const { t } = useTranslation('pages');
   if (role === 'owner') {
     return (
       <span className="gl-chat-role-badge is-owner">
         <Crown size={10} />
-        群主
+        {t('messages.fanGroupChat.owner', { defaultValue: '群主' })}
       </span>
     );
   }
@@ -625,11 +859,134 @@ function RoleBadge({ role }: { role?: string }) {
     return (
       <span className="gl-chat-role-badge is-admin">
         <ShieldCheck size={10} />
-        管理员
+        {t('messages.fanGroupChat.admin', { defaultValue: '管理员' })}
       </span>
     );
   }
   return null;
+}
+
+function CreatorAvatarButton({
+  user,
+  creatorId,
+  enabled,
+}: {
+  user: MessageUser;
+  creatorId: string;
+  enabled?: boolean;
+}) {
+  const navigate = useNavigate();
+  const { t } = useTranslation('pages');
+  if (!enabled || !creatorId) {
+    return <Avatar name={user.name} src={user.avatar} size={42} />;
+  }
+  return (
+    <button
+      type="button"
+      className="gl-creator-avatar-link"
+      onClick={() => navigate(`/channel/${creatorId}`)}
+      title={t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })}
+    >
+      <Avatar name={user.name} src={user.avatar} size={42} />
+    </button>
+  );
+}
+
+function FollowRequiredDirectState({ onOpenChannel }: { onOpenChannel: () => void }) {
+  const { t } = useTranslation('pages');
+  return (
+    <div className="gl-direct-empty is-full">
+      <MessageCircle size={38} />
+      <strong>
+        {t('messages.private.followRequiredTitle', { defaultValue: '关注主播后才能私信' })}
+      </strong>
+      <span>
+        {t('messages.private.followRequiredBody', {
+          defaultValue: '先进入主播频道关注 TA，然后就可以从这里发起私信。',
+        })}
+      </span>
+      <button type="button" className="gl-creator-primary" onClick={onOpenChannel}>
+        {t('messages.private.openChannel', { defaultValue: '去主播频道' })}
+      </button>
+    </div>
+  );
+}
+
+function FanGroupMuteDialog({
+  target,
+  actor,
+  currentUserId,
+  pending,
+  onOpenChange,
+  onMute,
+  onUnmute,
+}: {
+  target: FanGroupMember | null;
+  actor: FanGroupMember | undefined;
+  currentUserId: string;
+  pending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMute: (duration: number) => void;
+  onUnmute: () => void;
+}) {
+  const { t } = useTranslation('pages');
+  const blocked = !canManageFanGroupMember(actor, target ?? undefined, currentUserId);
+  const durations = [5, 10, 30, 60];
+  const muted = Boolean(target?.muted);
+  const statusText = blocked
+    ? t('messages.fanGroupChat.muteBlocked', {
+        defaultValue: '群主、管理员或你自己不能被禁言。',
+      })
+    : muted
+      ? t('messages.fanGroupChat.alreadyMuted', {
+          defaultValue: '该成员当前已被禁言，可解除禁言。',
+        })
+      : t('messages.fanGroupChat.mutePrompt', { defaultValue: '选择禁言时长' });
+
+  return (
+    <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
+      <DialogContent className="gl-mute-dialog">
+        <DialogTitle>
+          {muted
+            ? t('messages.fanGroupChat.unmuteTitle', { defaultValue: '解除禁言' })
+            : t('messages.fanGroupChat.muteTitle', { defaultValue: '禁言用户' })}
+        </DialogTitle>
+        <div className="gl-mute-target">
+          <ShieldCheck size={22} />
+          <div>
+            <strong>{target?.user.name ?? ''}</strong>
+            <span>{statusText}</span>
+          </div>
+        </div>
+        {muted && !blocked ? (
+          <button
+            type="button"
+            className="gl-mute-unmute-btn"
+            disabled={pending}
+            onClick={onUnmute}
+          >
+            {t('messages.fanGroupChat.unmuteAction', { defaultValue: '解除禁言' })}
+          </button>
+        ) : (
+          <div className="gl-mute-duration-grid">
+            {durations.map((duration) => (
+              <button
+                key={duration}
+                type="button"
+                disabled={blocked || pending}
+                onClick={() => onMute(duration)}
+              >
+                {t('messages.fanGroupChat.muteMinutes', {
+                  count: duration,
+                  defaultValue: '{{count}} 分钟',
+                })}
+              </button>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function FanGroupKickedState({
@@ -641,17 +998,26 @@ function FanGroupKickedState({
   pending: boolean;
   onRequest: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const waiting = Boolean(member.rejoinRequestedAt);
   return (
     <div className="gl-direct-empty is-full gl-fan-chat-kicked">
       <Users size={34} />
-      <strong>你已被踢出粉丝群</strong>
+      <strong>
+        {t('messages.fanGroupChat.kickedTitle', { defaultValue: '你已被踢出粉丝群' })}
+      </strong>
       <span>
         {waiting
-          ? '重新加入申请已提交，等待主播在群聊管理中审批。'
+          ? t('messages.fanGroupChat.kickedWaiting', {
+              defaultValue: '重新加入申请已提交，等待主播在群聊管理中审批。',
+            })
           : member.rejoinRejectedAt
-            ? '你的重新加入申请已被驳回，可以再次提交申请。'
-            : '你暂时不能查看群消息，需要重新申请加入。'}
+            ? t('messages.fanGroupChat.kickedRejected', {
+                defaultValue: '你的重新加入申请已被驳回，可以再次提交申请。',
+              })
+            : t('messages.fanGroupChat.kickedBody', {
+                defaultValue: '你暂时不能查看群消息，需要重新申请加入。',
+              })}
       </span>
       <button
         type="button"
@@ -659,7 +1025,11 @@ function FanGroupKickedState({
         disabled={waiting || pending}
         onClick={onRequest}
       >
-        {waiting ? '等待审批' : pending ? '提交中...' : '申请重新加入'}
+        {waiting
+          ? t('messages.fanGroupChat.waitingApproval', { defaultValue: '等待审批' })
+          : pending
+            ? t('messages.fanGroupChat.submitting', { defaultValue: '提交中...' })
+            : t('messages.fanGroupChat.requestRejoin', { defaultValue: '申请重新加入' })}
       </button>
     </div>
   );
@@ -686,19 +1056,32 @@ function canManageFanGroupMember(
   return actor.role === 'admin' && target.role === 'member';
 }
 
-function fanGroupMessageError(err: Error): string {
-  const reason = (err as Error & { response?: { data?: { reason?: string } } }).response?.data
-    ?.reason;
-  if (reason === 'fan_group_muted') return '你已被禁言，暂时不能在群聊发言。';
-  if (reason === 'fan_group_member_required') return '你不在这个粉丝团群聊里。';
-  return err.message || '群聊消息发送失败。';
+function fanGroupMessageError(err: Error, t: Translate): string {
+  const reason = apiErrorReason(err);
+  if (reason === 'fan_group_muted') {
+    return t('messages.fanGroupChat.errorMuted', {
+      defaultValue: '你已被禁言，暂时不能在群聊发言。',
+    });
+  }
+  if (reason === 'fan_group_member_required') {
+    return t('messages.fanGroupChat.errorMemberRequired', {
+      defaultValue: '你不在这个粉丝团群聊里。',
+    });
+  }
+  return (
+    err.message ||
+    t('messages.fanGroupChat.errorSendFailed', { defaultValue: '群聊消息发送失败。' })
+  );
 }
 
 function NotificationPanel({ title, box, empty }: { title: string; box: string; empty: string }) {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation('pages');
   const notifications = useNotifications(true, 1, 40, box);
   const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead(box);
   const items = notifications.data?.items ?? [];
+  const unread = notifications.data?.unread ?? 0;
 
   const openItem = (item: NotificationItem) => {
     if (!item.readAt) markRead.mutate(item.id);
@@ -709,10 +1092,29 @@ function NotificationPanel({ title, box, empty }: { title: string; box: string; 
     <section className="gl-message-card">
       <div className="gl-message-card-head">
         <h1>{title}</h1>
-        <span>{notifications.data?.unread ?? 0} 条未读</span>
+        <div className="gl-message-card-actions">
+          <span>
+            {t('messages.notifications.unread', {
+              count: unread,
+              defaultValue: '{{count}} 条未读',
+            })}
+          </span>
+          {unread > 0 && (
+            <button
+              type="button"
+              className="gl-message-read-all"
+              disabled={markAllRead.isPending}
+              onClick={() => markAllRead.mutate()}
+            >
+              {t('messages.notifications.markAllRead', { defaultValue: '全部已读' })}
+            </button>
+          )}
+        </div>
       </div>
       {notifications.isPending ? (
-        <div className="gl-message-empty-soft">正在加载通知...</div>
+        <div className="gl-message-empty-soft">
+          {t('messages.notifications.loading', { defaultValue: '正在加载通知...' })}
+        </div>
       ) : items.length ? (
         <div className="gl-message-notice-list">
           {items.map((item) => (
@@ -727,7 +1129,7 @@ function NotificationPanel({ title, box, empty }: { title: string; box: string; 
                 <strong>{item.title}</strong>
                 {item.actorName && <small>@{item.actorUsername || item.actorName}</small>}
                 {item.body && <p>{item.body}</p>}
-                <time>{formatMessageTime(item.createdAt)}</time>
+                <time>{formatMessageTime(item.createdAt, i18n.language)}</time>
               </span>
             </button>
           ))}
@@ -743,6 +1145,7 @@ function NotificationPanel({ title, box, empty }: { title: string; box: string; 
 }
 
 function MessageSettingsPanel() {
+  const { t } = useTranslation('pages');
   const pref = useMessagePreference(true);
   const update = useUpdateMessagePreference();
   const [draft, setDraft] = useState<MessagePreference>(defaultPreference);
@@ -755,10 +1158,13 @@ function MessageSettingsPanel() {
     const next = { ...draft, ...value };
     setDraft(next);
     update.mutate(next, {
-      onSuccess: () => toast.success('消息设置已保存'),
+      onSuccess: () =>
+        toast.success(t('messages.settings.saved', { defaultValue: '消息设置已保存' })),
       onError: (err) => {
         if (pref.data) setDraft(pref.data);
-        toast.error(err.message || '消息设置保存失败。');
+        toast.error(
+          err.message || t('messages.settings.saveFailed', { defaultValue: '消息设置保存失败。' }),
+        );
       },
     });
   };
@@ -766,35 +1172,39 @@ function MessageSettingsPanel() {
   return (
     <section className="gl-message-card gl-message-settings-panel">
       <div className="gl-message-card-head">
-        <h1>消息设置</h1>
-        <span>提醒、回复、点赞和收纳规则</span>
+        <h1>{t('messages.sections.settings', { defaultValue: '消息设置' })}</h1>
+        <span>
+          {t('messages.settings.subtitle', { defaultValue: '提醒、回复、点赞和收纳规则' })}
+        </span>
       </div>
       <SettingSwitch
-        title="消息提醒"
-        sub="关闭后，消息将不再进行提醒"
+        title={t('messages.settings.reminder', { defaultValue: '消息提醒' })}
+        sub={t('messages.settings.reminderSub', { defaultValue: '关闭后，消息将不再进行提醒' })}
         checked={draft.messageReminderEnabled}
         onChange={(messageReminderEnabled) => patch({ messageReminderEnabled })}
       />
       <SettingRadioGroup
-        title="回复我的消息提醒"
-        sub="接收谁的评论消息提醒"
+        title={t('messages.settings.replies', { defaultValue: '回复我的消息提醒' })}
+        sub={t('messages.settings.repliesSub', { defaultValue: '接收谁的评论消息提醒' })}
         value={draft.replyReminderScope}
         onChange={(replyReminderScope) => patch({ replyReminderScope })}
       />
       <SettingRadioGroup
-        title="@我的消息提醒"
-        sub="接收谁的 @ 消息提醒"
+        title={t('messages.settings.mentions', { defaultValue: '@我的消息提醒' })}
+        sub={t('messages.settings.mentionsSub', { defaultValue: '接收谁的 @ 消息提醒' })}
         value={draft.mentionReminderScope}
         onChange={(mentionReminderScope) => patch({ mentionReminderScope })}
       />
       <SettingSwitch
-        title="收到的赞消息提醒"
+        title={t('messages.settings.likes', { defaultValue: '收到的赞消息提醒' })}
         checked={draft.likeReminderEnabled}
         onChange={(likeReminderEnabled) => patch({ likeReminderEnabled })}
       />
       <SettingSwitch
-        title="收起未关注人消息"
-        sub="开启后，未关注人消息将被折叠起来"
+        title={t('messages.settings.fold', { defaultValue: '收起未关注人消息' })}
+        sub={t('messages.settings.foldSub', {
+          defaultValue: '开启后，未关注人消息将被折叠起来',
+        })}
         checked={draft.foldUnfollowedMessages}
         onChange={(foldUnfollowedMessages) => patch({ foldUnfollowedMessages })}
       />
@@ -813,6 +1223,7 @@ function SettingSwitch({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const { t } = useTranslation('pages');
   return (
     <div className="gl-message-setting-row">
       <span>
@@ -821,8 +1232,8 @@ function SettingSwitch({
       </span>
       <div className="gl-message-radio-row is-binary">
         {[
-          [true, '开启'],
-          [false, '关闭'],
+          [true, t('messages.settings.on', { defaultValue: '开启' })],
+          [false, t('messages.settings.off', { defaultValue: '关闭' })],
         ].map(([value, label]) => (
           <button
             key={String(value)}
@@ -850,6 +1261,7 @@ function SettingRadioGroup({
   value: string;
   onChange: (value: 'all' | 'following' | 'none') => void;
 }) {
+  const { t } = useTranslation('pages');
   return (
     <div className="gl-message-setting-row is-radio">
       <span>
@@ -858,9 +1270,9 @@ function SettingRadioGroup({
       </span>
       <div className="gl-message-radio-row">
         {[
-          ['all', '所有人'],
-          ['following', '关注的人'],
-          ['none', '不接收任何消息提醒'],
+          ['all', t('messages.settings.all', { defaultValue: '所有人' })],
+          ['following', t('messages.settings.following', { defaultValue: '关注的人' })],
+          ['none', t('messages.settings.none', { defaultValue: '不接收任何消息提醒' })],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -892,8 +1304,8 @@ function normalizeSection(value: string | undefined): MessageSection {
   return 'private';
 }
 
-function formatMessageTime(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+function formatMessageTime(value: string, locale = 'zh-CN'): string {
+  return new Intl.DateTimeFormat(locale || 'zh-CN', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -901,11 +1313,25 @@ function formatMessageTime(value: string): string {
   }).format(new Date(value));
 }
 
-function messageError(err: Error): string {
-  const reason = (err as Error & { response?: { data?: { reason?: string; message?: string } } })
-    .response?.data?.reason;
-  if (reason === 'awaiting_creator_reply') return '主播回复前，你最多只能发送一条消息。';
-  if (reason === 'follow_required') return '关注该主播后才能发送私信。';
-  if (reason === 'user_blocked') return '你们之间存在黑名单关系，暂时无法私信。';
-  return err.message || '消息发送失败。';
+function apiErrorReason(err: unknown): string | undefined {
+  return (err as { response?: { data?: { reason?: string } } } | null | undefined)?.response?.data
+    ?.reason;
+}
+
+function messageError(err: Error, t: Translate): string {
+  const reason = apiErrorReason(err);
+  if (reason === 'awaiting_creator_reply') {
+    return t('messages.errors.awaitingCreatorReply', {
+      defaultValue: '主播回复前，你最多只能发送一条消息。',
+    });
+  }
+  if (reason === 'follow_required') {
+    return t('messages.errors.followRequired', { defaultValue: '关注该主播后才能发送私信。' });
+  }
+  if (reason === 'user_blocked') {
+    return t('messages.errors.userBlocked', {
+      defaultValue: '你们之间存在黑名单关系，暂时无法私信。',
+    });
+  }
+  return err.message || t('messages.errors.sendFailed', { defaultValue: '消息发送失败。' });
 }

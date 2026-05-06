@@ -917,7 +917,7 @@ export function useMarkNotificationRead() {
   });
 }
 
-export function useMarkAllNotificationsRead() {
+export function useMarkAllNotificationsRead(box?: string) {
   const qc = useQueryClient();
   return useMutation<
     { ok: boolean },
@@ -926,16 +926,22 @@ export function useMarkAllNotificationsRead() {
     { prev: Array<[QueryKey, NotificationListResp | undefined]> }
   >({
     mutationFn: async () => {
-      const { data } = await http.patch<{ ok: boolean }>('/notifications/read-all');
+      const { data } = await http.patch<{ ok: boolean }>('/notifications/read-all', undefined, {
+        params: box ? { box } : undefined,
+      });
       return data;
     },
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ['notifications'] });
       const prev = qc.getQueriesData<NotificationListResp>({ queryKey: ['notifications'] });
       const readAt = new Date().toISOString();
-      qc.setQueriesData<NotificationListResp>({ queryKey: ['notifications'] }, (old) =>
-        old ? markNotificationListRead(old, readAt) : old,
-      );
+      prev.forEach(([queryKey, data]) => {
+        if (!data) return;
+        qc.setQueryData(
+          queryKey,
+          markNotificationListRead(data, readAt, box, notificationQueryBox(queryKey)),
+        );
+      });
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
@@ -970,12 +976,41 @@ function markNotificationListItemRead(
 function markNotificationListRead(
   list: NotificationListResp,
   readAt: string,
+  box?: string,
+  queryBox = 'all',
 ): NotificationListResp {
+  if (!box) {
+    return {
+      ...list,
+      unread: 0,
+      items: list.items.map((item) => (item.readAt ? item : { ...item, readAt })),
+    };
+  }
+  let newlyRead = 0;
+  const items = list.items.map((item) => {
+    if (item.readAt || !notificationMatchesBox(item, box)) return item;
+    newlyRead += 1;
+    return { ...item, readAt };
+  });
   return {
     ...list,
-    unread: 0,
-    items: list.items.map((item) => (item.readAt ? item : { ...item, readAt })),
+    unread: queryBox === box ? 0 : Math.max(0, list.unread - newlyRead),
+    items,
   };
+}
+
+function notificationQueryBox(queryKey: QueryKey): string {
+  return Array.isArray(queryKey) ? String(queryKey[3] ?? 'all') : 'all';
+}
+
+function notificationMatchesBox(item: NotificationItem, box: string): boolean {
+  const normalized = box.toLowerCase();
+  const replyTypes = new Set(['post_comment', 'post_comment_reply']);
+  const likeTypes = new Set(['post_liked', 'post_comment_liked', 'room_liked']);
+  if (normalized === 'reply' || normalized === 'replies') return replyTypes.has(item.type);
+  if (normalized === 'like' || normalized === 'likes') return likeTypes.has(item.type);
+  if (normalized === 'system') return !replyTypes.has(item.type) && !likeTypes.has(item.type);
+  return true;
 }
 
 export function useLikeState(streamId: string, enabled: boolean) {

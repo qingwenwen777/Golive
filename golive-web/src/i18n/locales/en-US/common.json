@@ -119,6 +119,7 @@
   },
   "loading": "Loading...",
   "notificationsReadAll": "Read all",
+  "notificationsViewAll": "View all",
   "notificationsEmpty": "No notifications yet",
   "notificationTypes": {
     "appointment_reminder": {

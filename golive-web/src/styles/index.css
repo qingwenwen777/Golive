@@ -7763,8 +7763,8 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-system-card.is-danger {
   border-color: rgba(255, 61, 92, 0.28);
-  background: linear-gradient(0deg, rgba(255, 61, 92, 0.035), rgba(255, 61, 92, 0.035)),
-    var(--gl-bg);
+  background:
+    linear-gradient(0deg, rgba(255, 61, 92, 0.035), rgba(255, 61, 92, 0.035)), var(--gl-bg);
 }
 .gl-admin-system-card-head {
   display: grid;
@@ -13761,11 +13761,15 @@ button.gl-fan-badge-empty {
   column-gap: 12px;
   border: 1px solid transparent;
   border-radius: 10px;
+  background: transparent;
   padding: 12px 13px;
   white-space: normal;
   cursor: pointer;
   min-height: 0;
   color: var(--gl-text);
+  font: inherit;
+  width: 100%;
+  text-align: left;
 }
 
 .gl-notification-menu .gl-notification-item:focus,
@@ -15252,6 +15256,30 @@ button.gl-fan-badge-empty {
   font-weight: 750;
 }
 
+.gl-message-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gl-message-read-all {
+  border: 0;
+  background: transparent;
+  color: var(--gl-text);
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0;
+}
+
+.gl-message-read-all:hover {
+  color: var(--gl-btn-primary);
+}
+
+.gl-message-read-all:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .gl-direct-thread {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
@@ -15471,6 +15499,25 @@ button.gl-fan-badge-empty {
   flex: 0 0 auto;
 }
 
+.gl-creator-avatar-link {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+}
+
+.gl-creator-avatar-link:hover .gl-avatar {
+  box-shadow:
+    0 0 0 2px var(--gl-bg),
+    0 0 0 4px rgba(28, 98, 185, 0.28);
+}
+
 .gl-direct-chat-head > .gl-direct-chat-meta {
   min-width: 0;
   flex: 1 1 auto;
@@ -15585,7 +15632,9 @@ button.gl-fan-badge-empty {
 }
 
 .gl-chat-message-avatar-btn.is-actionable:hover .gl-avatar {
-  box-shadow: 0 0 0 2px var(--gl-bg), 0 0 0 4px rgba(28, 98, 185, 0.32);
+  box-shadow:
+    0 0 0 2px var(--gl-bg),
+    0 0 0 4px rgba(28, 98, 185, 0.32);
 }
 
 .gl-chat-message-avatar-btn:disabled {

@@ -466,10 +466,16 @@ func (r *AppointmentRepo) MarkNotificationRead(ctx context.Context, userID, id s
 		Update("read_at", readAt).Error
 }
 
-func (r *AppointmentRepo) MarkAllNotificationsRead(ctx context.Context, userID string, readAt time.Time) error {
-	return r.db.WithContext(ctx).Model(&model.Notification{}).
-		Where("user_id = ? AND read_at IS NULL", userID).
-		Update("read_at", readAt).Error
+func (r *AppointmentRepo) MarkAllNotificationsRead(ctx context.Context, userID string, readAt time.Time, includeTypes, excludeTypes []string) error {
+	tx := r.db.WithContext(ctx).Model(&model.Notification{}).
+		Where("user_id = ? AND read_at IS NULL", userID)
+	if len(includeTypes) > 0 {
+		tx = tx.Where("type IN ?", includeTypes)
+	}
+	if len(excludeTypes) > 0 {
+		tx = tx.Where("type NOT IN ?", excludeTypes)
+	}
+	return tx.Update("read_at", readAt).Error
 }
 
 func publicAppointmentQuery(db *gorm.DB, now time.Time) *gorm.DB {

@@ -595,8 +595,9 @@ func (s *AppointmentService) MarkNotificationRead(ctx context.Context, userID, i
 	return s.appointments.MarkNotificationRead(ctx, userID, id, s.now())
 }
 
-func (s *AppointmentService) MarkAllNotificationsRead(ctx context.Context, userID string) error {
-	return s.appointments.MarkAllNotificationsRead(ctx, userID, s.now())
+func (s *AppointmentService) MarkAllNotificationsRead(ctx context.Context, userID string, box string) error {
+	includeTypes, excludeTypes := notificationTypeFilter(box)
+	return s.appointments.MarkAllNotificationsRead(ctx, userID, s.now(), includeTypes, excludeTypes)
 }
 
 func (s *AppointmentService) RunScheduler(ctx context.Context) {
