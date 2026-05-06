@@ -459,9 +459,11 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 			}).Create(&group).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("creator_id = ? AND group_no = ?", creatorID, groupNo).Take(&group).Error; err != nil {
+			var persisted model.FanGroupChat
+			if err := tx.Where("creator_id = ? AND group_no = ?", creatorID, groupNo).Take(&persisted).Error; err != nil {
 				return err
 			}
+			group = persisted
 			groups = append(groups, group)
 			if err := tx.Clauses(clause.OnConflict{
 				Columns: []clause.Column{{Name: "group_id"}, {Name: "user_id"}},

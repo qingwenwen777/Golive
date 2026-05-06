@@ -451,21 +451,33 @@ function FanGroupChatView({ group, userId }: { group: FanGroup; userId: string }
         {messages.isPending ? (
           <div className="gl-message-empty-soft">正在加载群聊...</div>
         ) : messages.data?.items.length ? (
-          messages.data.items.map((item) => (
-            <div
-              key={item.id}
-              className={cn('gl-direct-bubble-row', item.sender.id === userId && 'is-me')}
-            >
-              {item.sender.id !== userId && (
-                <Avatar name={item.sender.name} src={item.sender.avatar} size={30} />
-              )}
-              <div className="gl-direct-bubble">
-                {item.sender.id !== userId && <strong>{item.sender.name}</strong>}
-                <p>{item.body}</p>
-                <time>{formatMessageTime(item.createdAt)}</time>
+          messages.data.items.map((item) => {
+            const isMine = item.sender.id === userId;
+            return (
+              <div
+                key={item.id}
+                className={cn('gl-direct-bubble-row gl-fan-chat-message', isMine && 'is-me')}
+              >
+                {!isMine && <Avatar name={item.sender.name} src={item.sender.avatar} size={34} />}
+                <div className="gl-fan-chat-message-stack">
+                  {!isMine && (
+                    <span className="gl-fan-chat-message-meta">
+                      <strong>{item.sender.name}</strong>
+                      <time>{formatMessageTime(item.createdAt)}</time>
+                    </span>
+                  )}
+                  <div className="gl-direct-bubble gl-fan-chat-bubble">
+                    <p>{item.body}</p>
+                  </div>
+                  {isMine && (
+                    <time className="gl-fan-chat-message-time">
+                      {formatMessageTime(item.createdAt)}
+                    </time>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="gl-direct-empty">
             <Users size={32} />

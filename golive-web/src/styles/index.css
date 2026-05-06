@@ -15409,6 +15409,53 @@ button.gl-fan-badge-empty {
   font-size: 12px;
 }
 
+.gl-fan-chat-message {
+  align-items: flex-start;
+}
+
+.gl-fan-chat-message .gl-avatar {
+  margin-top: 18px;
+}
+
+.gl-fan-chat-message-stack {
+  display: flex;
+  max-width: min(560px, 76%);
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gl-fan-chat-message.is-me .gl-fan-chat-message-stack {
+  align-items: flex-end;
+}
+
+.gl-fan-chat-message-meta {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--gl-text-2);
+  padding-left: 2px;
+}
+
+.gl-fan-chat-message-meta strong {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gl-fan-chat-message-meta time,
+.gl-fan-chat-message-time {
+  color: var(--gl-text-3);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .gl-direct-chat {
   display: grid;
   min-width: 0;
@@ -15505,6 +15552,30 @@ button.gl-fan-badge-empty {
   margin-top: 4px;
   color: var(--gl-text-3);
   font-size: 11px;
+}
+
+.gl-fan-chat-message .gl-fan-chat-bubble {
+  max-width: 100%;
+  border-radius: 12px;
+  background: var(--gl-bg);
+  box-shadow: var(--gl-shadow);
+  padding: 8px 11px;
+}
+
+.gl-fan-chat-message.is-me .gl-fan-chat-bubble {
+  border-color: var(--gl-btn-primary);
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+}
+
+.gl-fan-chat-message.is-me .gl-fan-chat-bubble p {
+  color: inherit;
+}
+
+.dark .gl-fan-chat-message.is-me .gl-fan-chat-bubble {
+  border-color: #f4f4f5;
+  background: #f4f4f5;
+  color: #111827;
 }
 
 .gl-direct-empty,
