@@ -25,13 +25,11 @@ import (
 type fakeStripeAPI struct {
 	nextSession int
 	sessions    map[string]*service.StripeCheckoutSession
-	accounts    map[string]*service.StripeAccount
 }
 
 func newFakeStripeAPI() *fakeStripeAPI {
 	return &fakeStripeAPI{
 		sessions: make(map[string]*service.StripeCheckoutSession),
-		accounts: make(map[string]*service.StripeAccount),
 	}
 }
 
@@ -53,34 +51,7 @@ func (f *fakeStripeAPI) RetrieveCheckoutSession(_ context.Context, id string) (*
 	return f.sessions[id], nil
 }
 
-func (f *fakeStripeAPI) CreateExpressAccount(_ context.Context, _ service.StripeAccountCreateRequest) (*service.StripeAccount, error) {
-	acct := &service.StripeAccount{ID: "acct_test", PayoutsEnabled: true, DetailsSubmitted: true, TransfersStatus: "active"}
-	f.accounts[acct.ID] = acct
-	return acct, nil
-}
-
-func (f *fakeStripeAPI) RetrieveAccount(_ context.Context, id string) (*service.StripeAccount, error) {
-	if acct := f.accounts[id]; acct != nil {
-		cp := *acct
-		return &cp, nil
-	}
-	return &service.StripeAccount{ID: id, PayoutsEnabled: true, DetailsSubmitted: true, TransfersStatus: "active"}, nil
-}
-
-func (f *fakeStripeAPI) CreateAccountLink(_ context.Context, req service.StripeAccountLinkCreateRequest) (string, error) {
-	return "https://connect.stripe.test/" + req.AccountID, nil
-}
-
-func (f *fakeStripeAPI) CreateTransfer(_ context.Context, _ service.StripeTransferCreateRequest) (*service.StripeTransfer, error) {
-	return &service.StripeTransfer{ID: "tr_test"}, nil
-}
-
 func newCoinsTestRouter(t *testing.T) (*gin.Engine, *repo.UserRepo, *service.AuthService) {
-	router, users, auth, _ := newCoinsTestRouterWithStripe(t)
-	return router, users, auth
-}
-
-func newCoinsTestRouterWithStripe(t *testing.T) (*gin.Engine, *repo.UserRepo, *service.AuthService, *fakeStripeAPI) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -109,10 +80,9 @@ func newCoinsTestRouterWithStripe(t *testing.T) (*gin.Engine, *repo.UserRepo, *s
 		SecretKey:            "sk_test_fake",
 		Currency:             "usd",
 		CoinsPerCurrencyUnit: 10,
-		ConnectCountry:       "US",
 	}, stripeAPI)
 
-	return NewRouter(Deps{Auth: auth, Users: users, Stripe: stripeSvc}), users, auth, stripeAPI
+	return NewRouter(Deps{Auth: auth, Users: users, Stripe: stripeSvc}), users, auth
 }
 
 func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
@@ -209,13 +179,11 @@ func TestTopupCoinsRejectsInvalidAmount(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestWithdrawCoinsCreatesStripeTransferAndLedger(t *testing.T) {
+func TestWithdrawCoinsIsNotImplemented(t *testing.T) {
 	router, users, auth := newCoinsTestRouter(t)
 	ctx := context.Background()
 
 	login, err := auth.Register(ctx, "demo", "demo", "Demo")
-	require.NoError(t, err)
-	_, err = users.SetStripeAccountID(ctx, login.User.ID, "acct_test")
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/withdrawals", bytes.NewBufferString(`{"amount":100}`))
@@ -224,86 +192,19 @@ func TestWithdrawCoinsCreatesStripeTransferAndLedger(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, http.StatusNotImplemented, rec.Code)
 	var got struct {
-		User        model.PublicUser      `json:"user"`
-		Transaction model.CoinTransaction `json:"transaction"`
-		Amount      int64                 `json:"amount"`
-		Fee         int64                 `json:"fee"`
-		NetCoins    int64                 `json:"netCoins"`
-		TransferID  string                `json:"transferId"`
+		Message string `json:"message"`
+		Reason  string `json:"reason"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
-	require.Equal(t, int64(1100), got.User.CoinBalance)
-	require.Equal(t, int64(0), got.User.FrozenCoins)
-	require.Equal(t, int64(100), got.Amount)
-	require.Equal(t, int64(35), got.Fee)
-	require.Equal(t, int64(65), got.NetCoins)
-	require.Equal(t, "tr_test", got.TransferID)
-	require.Equal(t, model.CoinTxWithdrawal, got.Transaction.Type)
-	require.Equal(t, int64(-100), got.Transaction.Amount)
-	require.Equal(t, int64(1100), got.Transaction.BalanceAfter)
+	require.Equal(t, "withdrawal_not_implemented", got.Reason)
+	require.NotEmpty(t, got.Message)
 
 	persisted, err := users.FindByID(ctx, login.User.ID)
 	require.NoError(t, err)
-	require.Equal(t, int64(1100), persisted.CoinBalance)
+	require.Equal(t, int64(1200), persisted.CoinBalance)
 	require.Equal(t, int64(0), persisted.FrozenCoins)
-}
-
-func TestBindStripeTestAccountAllowsRestrictedAccount(t *testing.T) {
-	router, users, auth, stripeAPI := newCoinsTestRouterWithStripe(t)
-	ctx := context.Background()
-	stripeAPI.accounts["acct_restricted"] = &service.StripeAccount{
-		ID:               "acct_restricted",
-		PayoutsEnabled:   false,
-		DetailsSubmitted: false,
-		TransfersStatus:  "pending",
-		CurrentlyDue:     []string{"external_account"},
-		DisabledReason:   "requirements.past_due",
-	}
-
-	login, err := auth.Register(ctx, "demo", "demo", "Demo")
-	require.NoError(t, err)
-
-	bindReq := httptest.NewRequest(http.MethodPost, "/users/me/coins/stripe/test-account", bytes.NewBufferString(`{"accountId":"acct_restricted"}`))
-	bindReq.Header.Set("Authorization", "Bearer "+login.Token)
-	bindReq.Header.Set("Content-Type", "application/json")
-	bindRec := httptest.NewRecorder()
-	router.ServeHTTP(bindRec, bindReq)
-
-	require.Equal(t, http.StatusOK, bindRec.Code)
-	var bound struct {
-		Account struct {
-			AccountID       string `json:"accountId"`
-			CanWithdraw     bool   `json:"canWithdraw"`
-			PayoutsEnabled  bool   `json:"payoutsEnabled"`
-			TransfersStatus string `json:"transfersStatus"`
-		} `json:"account"`
-	}
-	require.NoError(t, json.Unmarshal(bindRec.Body.Bytes(), &bound))
-	require.Equal(t, "acct_restricted", bound.Account.AccountID)
-	require.True(t, bound.Account.CanWithdraw)
-	require.False(t, bound.Account.PayoutsEnabled)
-	require.Equal(t, "pending", bound.Account.TransfersStatus)
-
-	persisted, err := users.FindByID(ctx, login.User.ID)
-	require.NoError(t, err)
-	require.Equal(t, "acct_restricted", persisted.StripeAccountID)
-
-	withdrawReq := httptest.NewRequest(http.MethodPost, "/users/me/coins/withdrawals", bytes.NewBufferString(`{"amount":100}`))
-	withdrawReq.Header.Set("Authorization", "Bearer "+login.Token)
-	withdrawReq.Header.Set("Content-Type", "application/json")
-	withdrawRec := httptest.NewRecorder()
-	router.ServeHTTP(withdrawRec, withdrawReq)
-
-	require.Equal(t, http.StatusOK, withdrawRec.Code)
-	var withdrawal struct {
-		User       model.PublicUser `json:"user"`
-		TransferID string           `json:"transferId"`
-	}
-	require.NoError(t, json.Unmarshal(withdrawRec.Body.Bytes(), &withdrawal))
-	require.Equal(t, "tr_test", withdrawal.TransferID)
-	require.Equal(t, int64(1100), withdrawal.User.CoinBalance)
 }
 
 func TestClaimDailyTaskIsOncePerDay(t *testing.T) {

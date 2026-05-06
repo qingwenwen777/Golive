@@ -114,7 +114,6 @@ func main() {
 		SecretKey:            cfg.Stripe.SecretKey,
 		Currency:             cfg.Stripe.Currency,
 		CoinsPerCurrencyUnit: cfg.Stripe.CoinsPerCurrencyUnit,
-		ConnectCountry:       cfg.Stripe.ConnectCountry,
 	})
 
 	r := server.NewRouter(server.Deps{

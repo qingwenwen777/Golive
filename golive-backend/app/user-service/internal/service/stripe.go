@@ -7,10 +7,7 @@ import (
 	"strings"
 
 	stripe "github.com/stripe/stripe-go/v84"
-	"github.com/stripe/stripe-go/v84/account"
-	"github.com/stripe/stripe-go/v84/accountlink"
 	"github.com/stripe/stripe-go/v84/checkout/session"
-	"github.com/stripe/stripe-go/v84/transfer"
 )
 
 var ErrStripeNotConfigured = errors.New("stripe is not configured")
@@ -20,7 +17,6 @@ type StripeOptions struct {
 	SecretKey            string
 	Currency             string
 	CoinsPerCurrencyUnit int64
-	ConnectCountry       string
 }
 
 type StripeService struct {
@@ -28,17 +24,12 @@ type StripeService struct {
 	secretKey            string
 	currency             string
 	coinsPerCurrencyUnit int64
-	connectCountry       string
 	api                  StripeAPI
 }
 
 type StripeAPI interface {
 	CreateCheckoutSession(ctx context.Context, req StripeCheckoutCreateRequest) (*StripeCheckoutSession, error)
 	RetrieveCheckoutSession(ctx context.Context, id string) (*StripeCheckoutSession, error)
-	CreateExpressAccount(ctx context.Context, req StripeAccountCreateRequest) (*StripeAccount, error)
-	RetrieveAccount(ctx context.Context, id string) (*StripeAccount, error)
-	CreateAccountLink(ctx context.Context, req StripeAccountLinkCreateRequest) (string, error)
-	CreateTransfer(ctx context.Context, req StripeTransferCreateRequest) (*StripeTransfer, error)
 }
 
 type StripeCheckoutCreateRequest struct {
@@ -61,42 +52,6 @@ type StripeCheckoutSession struct {
 	Metadata          map[string]string
 }
 
-type StripeAccountCreateRequest struct {
-	UserID   string
-	Email    string
-	Country  string
-	Currency string
-}
-
-type StripeAccount struct {
-	ID               string   `json:"accountId,omitempty"`
-	ChargesEnabled   bool     `json:"chargesEnabled"`
-	PayoutsEnabled   bool     `json:"payoutsEnabled"`
-	DetailsSubmitted bool     `json:"detailsSubmitted"`
-	TransfersStatus  string   `json:"transfersStatus,omitempty"`
-	CurrentlyDue     []string `json:"currentlyDue,omitempty"`
-	DisabledReason   string   `json:"disabledReason,omitempty"`
-}
-
-type StripeAccountLinkCreateRequest struct {
-	AccountID  string
-	ReturnURL  string
-	RefreshURL string
-}
-
-type StripeTransferCreateRequest struct {
-	AmountMinor    int64
-	Currency       string
-	Destination    string
-	Description    string
-	IdempotencyKey string
-	Metadata       map[string]string
-}
-
-type StripeTransfer struct {
-	ID string
-}
-
 func NewStripeService(opts StripeOptions) *StripeService {
 	return NewStripeServiceWithAPI(opts, liveStripeAPI{secretKey: strings.TrimSpace(opts.SecretKey)})
 }
@@ -110,16 +65,11 @@ func NewStripeServiceWithAPI(opts StripeOptions, api StripeAPI) *StripeService {
 	if coinsPerUnit <= 0 {
 		coinsPerUnit = 10
 	}
-	country := strings.ToUpper(strings.TrimSpace(opts.ConnectCountry))
-	if country == "" {
-		country = "US"
-	}
 	return &StripeService{
 		publishableKey:       strings.TrimSpace(opts.PublishableKey),
 		secretKey:            strings.TrimSpace(opts.SecretKey),
 		currency:             currency,
 		coinsPerCurrencyUnit: coinsPerUnit,
-		connectCountry:       country,
 		api:                  api,
 	}
 }
@@ -133,13 +83,6 @@ func (s *StripeService) PublishableKey() string {
 		return ""
 	}
 	return s.publishableKey
-}
-
-func (s *StripeService) TestMode() bool {
-	if s == nil {
-		return false
-	}
-	return strings.HasPrefix(strings.TrimSpace(s.secretKey), "sk_test_")
 }
 
 func (s *StripeService) Currency() string {
@@ -200,46 +143,6 @@ func (s *StripeService) RetrieveCheckoutSession(ctx context.Context, id string) 
 		return nil, ErrStripeNotConfigured
 	}
 	return s.api.RetrieveCheckoutSession(ctx, strings.TrimSpace(id))
-}
-
-func (s *StripeService) CreateExpressAccount(ctx context.Context, userID, email string) (*StripeAccount, error) {
-	if !s.Configured() {
-		return nil, ErrStripeNotConfigured
-	}
-	return s.api.CreateExpressAccount(ctx, StripeAccountCreateRequest{
-		UserID:   strings.TrimSpace(userID),
-		Email:    strings.TrimSpace(email),
-		Country:  s.connectCountry,
-		Currency: s.Currency(),
-	})
-}
-
-func (s *StripeService) RetrieveAccount(ctx context.Context, id string) (*StripeAccount, error) {
-	if !s.Configured() {
-		return nil, ErrStripeNotConfigured
-	}
-	return s.api.RetrieveAccount(ctx, strings.TrimSpace(id))
-}
-
-func (s *StripeService) CreateAccountLink(ctx context.Context, accountID, returnURL, refreshURL string) (string, error) {
-	if !s.Configured() {
-		return "", ErrStripeNotConfigured
-	}
-	return s.api.CreateAccountLink(ctx, StripeAccountLinkCreateRequest{
-		AccountID:  strings.TrimSpace(accountID),
-		ReturnURL:  returnURL,
-		RefreshURL: refreshURL,
-	})
-}
-
-func (s *StripeService) CreateTransfer(ctx context.Context, req StripeTransferCreateRequest) (*StripeTransfer, error) {
-	if !s.Configured() {
-		return nil, ErrStripeNotConfigured
-	}
-	if req.Currency == "" {
-		req.Currency = s.Currency()
-	}
-	return s.api.CreateTransfer(ctx, req)
 }
 
 type liveStripeAPI struct {
@@ -303,82 +206,6 @@ func (a liveStripeAPI) RetrieveCheckoutSession(ctx context.Context, id string) (
 	return checkoutSessionFromStripe(sess), nil
 }
 
-func (a liveStripeAPI) CreateExpressAccount(ctx context.Context, req StripeAccountCreateRequest) (*StripeAccount, error) {
-	if err := a.ensureKey(); err != nil {
-		return nil, err
-	}
-	params := &stripe.AccountParams{
-		BusinessType:    stripe.String(string(stripe.AccountBusinessTypeIndividual)),
-		Capabilities:    &stripe.AccountCapabilitiesParams{Transfers: &stripe.AccountCapabilitiesTransfersParams{Requested: stripe.Bool(true)}},
-		Country:         stripe.String(req.Country),
-		DefaultCurrency: stripe.String(req.Currency),
-		Email:           optionalString(req.Email),
-		Metadata: map[string]string{
-			"golive_user_id": req.UserID,
-		},
-		Type: stripe.String(string(stripe.AccountTypeExpress)),
-	}
-	params.Context = ctx
-	acct, err := account.New(params)
-	if err != nil {
-		return nil, err
-	}
-	return accountFromStripe(acct), nil
-}
-
-func (a liveStripeAPI) RetrieveAccount(ctx context.Context, id string) (*StripeAccount, error) {
-	if err := a.ensureKey(); err != nil {
-		return nil, err
-	}
-	params := &stripe.AccountParams{}
-	params.Context = ctx
-	acct, err := account.GetByID(id, params)
-	if err != nil {
-		return nil, err
-	}
-	return accountFromStripe(acct), nil
-}
-
-func (a liveStripeAPI) CreateAccountLink(ctx context.Context, req StripeAccountLinkCreateRequest) (string, error) {
-	if err := a.ensureKey(); err != nil {
-		return "", err
-	}
-	params := &stripe.AccountLinkParams{
-		Account:    stripe.String(req.AccountID),
-		RefreshURL: stripe.String(req.RefreshURL),
-		ReturnURL:  stripe.String(req.ReturnURL),
-		Type:       stripe.String("account_onboarding"),
-	}
-	params.Context = ctx
-	link, err := accountlink.New(params)
-	if err != nil {
-		return "", err
-	}
-	return link.URL, nil
-}
-
-func (a liveStripeAPI) CreateTransfer(ctx context.Context, req StripeTransferCreateRequest) (*StripeTransfer, error) {
-	if err := a.ensureKey(); err != nil {
-		return nil, err
-	}
-	params := &stripe.TransferParams{
-		Amount:      stripe.Int64(req.AmountMinor),
-		Currency:    stripe.String(req.Currency),
-		Description: stripe.String(req.Description),
-		Destination: stripe.String(req.Destination),
-		Metadata:    req.Metadata,
-	}
-	params.Context = ctx
-	if req.IdempotencyKey != "" {
-		params.SetIdempotencyKey(req.IdempotencyKey)
-	}
-	tr, err := transfer.New(params)
-	if err != nil {
-		return nil, err
-	}
-	return &StripeTransfer{ID: tr.ID}, nil
-}
-
 func checkoutSessionFromStripe(sess *stripe.CheckoutSession) *StripeCheckoutSession {
 	if sess == nil {
 		return nil
@@ -390,26 +217,6 @@ func checkoutSessionFromStripe(sess *stripe.CheckoutSession) *StripeCheckoutSess
 		ClientReferenceID: sess.ClientReferenceID,
 		Metadata:          sess.Metadata,
 	}
-}
-
-func accountFromStripe(acct *stripe.Account) *StripeAccount {
-	if acct == nil {
-		return nil
-	}
-	out := &StripeAccount{
-		ID:               acct.ID,
-		ChargesEnabled:   acct.ChargesEnabled,
-		PayoutsEnabled:   acct.PayoutsEnabled,
-		DetailsSubmitted: acct.DetailsSubmitted,
-	}
-	if acct.Capabilities != nil {
-		out.TransfersStatus = string(acct.Capabilities.Transfers)
-	}
-	if acct.Requirements != nil {
-		out.CurrentlyDue = acct.Requirements.CurrentlyDue
-		out.DisabledReason = string(acct.Requirements.DisabledReason)
-	}
-	return out
 }
 
 func optionalString(value string) *string {

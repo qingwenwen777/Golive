@@ -84,7 +84,6 @@ type StripeCfg struct {
 	SecretKey            string `mapstructure:"secret_key"`
 	Currency             string `mapstructure:"currency"`
 	CoinsPerCurrencyUnit int64  `mapstructure:"coins_per_currency_unit"`
-	ConnectCountry       string `mapstructure:"connect_country"`
 }
 
 type BootstrapCfg struct {

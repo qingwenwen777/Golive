@@ -38,7 +38,6 @@ type User struct {
 	CoinBalance                      int64      `gorm:"not null;default:0" json:"coinBalance"`
 	FrozenCoins                      int64      `gorm:"not null;default:0" json:"frozenCoins"`
 	TotalTopupCoins                  int64      `gorm:"-" json:"-"`
-	StripeAccountID                  string     `gorm:"type:varchar(64);index" json:"-"`
 	Banned                           bool       `gorm:"not null;default:false" json:"banned,omitempty"`
 	BanReason                        string     `gorm:"type:text" json:"banReason,omitempty"`
 	Verified                         bool       `gorm:"not null;default:false" json:"verified,omitempty"`

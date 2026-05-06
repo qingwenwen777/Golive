@@ -1196,11 +1196,6 @@
         "subtitle": "Audit trail"
       }
     },
-    "pagination": {
-      "prev": "Previous",
-      "next": "Next",
-      "page": "Page {{page}} / {{pages}}"
-    },
     "dashboard": {
       "aria": "Admin overview",
       "kpis": {
@@ -2007,25 +2002,17 @@
     },
     "withdraw": {
       "title": "Withdraw",
-      "sub": "35% fee. Paid through Stripe Connect.",
-      "subCertified": "Platform certified rate: 25% fee. Paid through Stripe Connect.",
+      "sub": "35% fee preview. Withdrawals are not implemented yet.",
+      "subCertified": "Platform certified rate preview: 25% fee. Withdrawals are not implemented yet.",
       "amount": "Withdrawal amount",
       "amountAria": "Withdrawal coin amount",
       "available": "Available",
       "rate": "Fee rate",
       "fee": "Fee",
       "net": "Estimated arrival",
-      "rmb": "Stripe amount",
+      "rmb": "Estimated value",
       "certifiedNote": "Platform certification reduced this fee by 10 percentage points.",
-      "preview": "Preview withdrawal",
-      "connecting": "Opening Stripe...",
-      "pending": "Withdrawing...",
-      "submit": "Withdraw with Stripe",
-      "connectStripe": "Connect Stripe",
-      "testAccount": "Stripe test account",
-      "testAccountAria": "Stripe test connected account id",
-      "bindingTestAccount": "Binding...",
-      "bindTestAccount": "Bind test account"
+      "preview": "Preview withdrawal"
     },
     "task": {
       "claim": "Claim",
@@ -2055,20 +2042,11 @@
       "topupFailed": "Top-up failed.",
       "minWithdraw": "Withdrawal must be at least 10 coins.",
       "withdrawInsufficient": "Insufficient available coin balance.",
-      "withdrawSuccess": "Withdrawal sent to Stripe. Net {{amount}} coins, current balance {{balance}}.",
-      "withdrawFailed": "Stripe withdrawal failed.",
-      "bindTestAccountFirst": "Bind a Stripe test connected account before withdrawing.",
-      "invalidStripeAccount": "Enter a valid Stripe connected account id.",
-      "stripeAccountBound": "Stripe test account {{accountId}} bound.",
-      "stripeAccountBindFailed": "Could not bind this Stripe test account.",
-      "stripeConnectFailed": "Could not start Stripe onboarding.",
-      "stripeConnectRefresh": "Continue Stripe onboarding to enable withdrawals.",
-      "stripeConnectReturned": "Stripe account status refreshed.",
       "taskIncomplete": "Finish the task before claiming.",
       "alreadyClaimed": "You already claimed this task today.",
       "claimSuccess": "Earned {{amount}} coins.",
       "claimFailed": "Claim failed.",
-      "withdrawPreview": "Withdrawals are reserved for payment integration and no coins will be deducted."
+      "withdrawPreview": "Withdrawals are not implemented yet and no coins will be deducted."
     }
   },
   "betting": {

@@ -1197,11 +1197,6 @@
         "subtitle": "审计流水"
       }
     },
-    "pagination": {
-      "prev": "上一页",
-      "next": "下一页",
-      "page": "第 {{page}} / {{pages}} 页"
-    },
     "dashboard": {
       "aria": "后台总览",
       "kpis": {
@@ -2000,25 +1995,17 @@
     },
     "withdraw": {
       "title": "提现",
-      "sub": "手续费 35%，通过 Stripe Connect 出款。",
-      "subCertified": "平台认证费率：手续费 25%，通过 Stripe Connect 出款。",
+      "sub": "手续费 35% 预览。提现功能待实现。",
+      "subCertified": "平台认证费率预览：手续费 25%。提现功能待实现。",
       "amount": "提现数量",
       "amountAria": "提现 coins 数量",
       "available": "可提现",
       "rate": "手续费率",
       "fee": "手续费",
       "net": "预计到账",
-      "rmb": "Stripe 金额",
+      "rmb": "预估金额",
       "certifiedNote": "平台认证已为本次预览降低 10 个百分点手续费。",
-      "preview": "预览提现",
-      "connecting": "正在打开 Stripe...",
-      "pending": "提现中...",
-      "submit": "用 Stripe 提现",
-      "connectStripe": "连接 Stripe",
-      "testAccount": "Stripe 测试账户",
-      "testAccountAria": "Stripe 测试 Connected account ID",
-      "bindingTestAccount": "绑定中...",
-      "bindTestAccount": "绑定测试账户"
+      "preview": "预览提现"
     },
     "task": {
       "claim": "领取",
@@ -2048,20 +2035,11 @@
       "topupFailed": "充值失败。",
       "minWithdraw": "提现至少 10 coins。",
       "withdrawInsufficient": "可提现余额不足。",
-      "withdrawSuccess": "提现已提交给 Stripe，净额 {{amount}} coins，当前余额 {{balance}}。",
-      "withdrawFailed": "Stripe 提现失败。",
-      "bindTestAccountFirst": "请先绑定 Stripe 测试 Connected account。",
-      "invalidStripeAccount": "请输入有效的 Stripe Connected account ID。",
-      "stripeAccountBound": "已绑定 Stripe 测试账户 {{accountId}}。",
-      "stripeAccountBindFailed": "无法绑定这个 Stripe 测试账户。",
-      "stripeConnectFailed": "无法打开 Stripe 入驻流程。",
-      "stripeConnectRefresh": "请继续完成 Stripe 入驻后再提现。",
-      "stripeConnectReturned": "Stripe 账户状态已刷新。",
       "taskIncomplete": "任务还没完成，完成后就能领取。",
       "alreadyClaimed": "今天已经领取过这个任务。",
       "claimSuccess": "已获得 {{amount}} coins。",
       "claimFailed": "领取失败。",
-      "withdrawPreview": "提现支付接口预留中，当前不会扣除 coins。"
+      "withdrawPreview": "提现功能待实现，当前不会扣除 coins。"
     }
   },
   "betting": {

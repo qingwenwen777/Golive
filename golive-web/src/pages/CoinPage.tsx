@@ -18,13 +18,9 @@ import {
 } from 'lucide-react';
 import { useMe, useTopupCoins } from '@/api/auth';
 import {
-  useBindStripeTestAccount,
   useClaimDailyCoinTask,
   useCoinTransactions,
   useConfirmTopupCoins,
-  useStripeAccountLink,
-  useStripeAccountStatus,
-  useWithdrawCoins,
   type CoinTransaction,
   type CoinTransactionType,
 } from '@/api/coins';
@@ -46,7 +42,7 @@ type RecordFilter =
   | 'creator';
 
 const COINS_PER_CURRENCY_UNIT = 10;
-const STRIPE_DISPLAY_CURRENCY = 'USD';
+const DISPLAY_CURRENCY = 'USD';
 const MIN_TOPUP_COINS = 10;
 const MIN_WITHDRAW_COINS = 10;
 const QUICK_TOPUPS = [10, 50, 100, 500] as const;
@@ -120,15 +116,10 @@ export default function CoinPage() {
   const transactions = useCoinTransactions();
   const topup = useTopupCoins();
   const confirmTopup = useConfirmTopupCoins();
-  const stripeAccount = useStripeAccountStatus();
-  const stripeAccountLink = useStripeAccountLink();
-  const bindStripeTestAccount = useBindStripeTestAccount();
-  const withdraw = useWithdrawCoins();
   const claimTask = useClaimDailyCoinTask();
 
   const [topupText, setTopupText] = useState(String(MIN_TOPUP_COINS));
   const [withdrawText, setWithdrawText] = useState('10000');
-  const [testAccountText, setTestAccountText] = useState('');
   const [filter, setFilter] = useState<RecordFilter>('all');
   const [recordPage, setRecordPage] = useState(1);
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
@@ -153,10 +144,9 @@ export default function CoinPage() {
   useEffect(() => {
     const topupStatus = searchParams.get('stripe_topup');
     const sessionId = searchParams.get('session_id');
-    const connectStatus = searchParams.get('stripe_connect');
-    if (!topupStatus && !connectStatus) return;
+    if (!topupStatus) return;
 
-    const key = `${topupStatus ?? ''}:${sessionId ?? ''}:${connectStatus ?? ''}`;
+    const key = `${topupStatus}:${sessionId ?? ''}`;
     if (handledStripeReturn.current === key) return;
     handledStripeReturn.current = key;
 
@@ -164,7 +154,6 @@ export default function CoinPage() {
       const next = new URL(window.location.href);
       next.searchParams.delete('stripe_topup');
       next.searchParams.delete('session_id');
-      next.searchParams.delete('stripe_connect');
       window.history.replaceState({}, '', `${next.pathname}${next.search}${next.hash}`);
     };
 
@@ -206,21 +195,7 @@ export default function CoinPage() {
       );
       return;
     }
-
-    if (connectStatus) {
-      toast.info(
-        connectStatus === 'refresh'
-          ? t('coin.toast.stripeConnectRefresh', {
-              defaultValue: 'Continue Stripe onboarding to enable withdrawals.',
-            })
-          : t('coin.toast.stripeConnectReturned', {
-              defaultValue: 'Stripe account status refreshed.',
-            }),
-      );
-      void stripeAccount.refetch();
-      clearStripeParams();
-    }
-  }, [confirmTopup, searchParams, stripeAccount, t]);
+  }, [confirmTopup, searchParams, t]);
 
   const rows = transactions.data?.items ?? [];
   const monthKey = new Date().toISOString().slice(0, 7);
@@ -267,8 +242,6 @@ export default function CoinPage() {
   const withdrawFeeRate = platformCertified ? CERTIFIED_WITHDRAW_FEE_RATE : WITHDRAW_FEE_RATE;
   const withdrawFee = Math.floor(withdrawAmount * withdrawFeeRate);
   const withdrawNet = Math.max(0, withdrawAmount - withdrawFee);
-  const canWithdrawWithStripe = Boolean(stripeAccount.data?.canWithdraw);
-  const showTestAccountBind = Boolean(stripeAccount.data?.testMode && !canWithdrawWithStripe);
 
   const handleTopup = () => {
     if (!isAuthed) {
@@ -338,25 +311,6 @@ export default function CoinPage() {
     );
   };
 
-  const startStripeOnboarding = () => {
-    if (!isAuthed) {
-      openLogin();
-      return;
-    }
-    stripeAccountLink.mutate(undefined, {
-      onSuccess: (resp) => {
-        window.location.assign(resp.url);
-      },
-      onError: (err) =>
-        toast.error(
-          err.message ||
-            t('coin.toast.stripeConnectFailed', {
-              defaultValue: 'Could not start Stripe onboarding.',
-            }),
-        ),
-    });
-  };
-
   const handleWithdraw = () => {
     if (!isAuthed) {
       openLogin();
@@ -376,74 +330,10 @@ export default function CoinPage() {
       );
       return;
     }
-    if (!canWithdrawWithStripe) {
-      if (stripeAccount.data?.testMode) {
-        toast.info(
-          t('coin.toast.bindTestAccountFirst', {
-            defaultValue: 'Bind a Stripe test connected account before withdrawing.',
-          }),
-        );
-        return;
-      }
-      startStripeOnboarding();
-      return;
-    }
-    withdraw.mutate(
-      { amount: withdrawAmount },
-      {
-        onSuccess: (resp) => {
-          toast.success(
-            t('coin.toast.withdrawSuccess', {
-              amount: resp.netCoins.toLocaleString(),
-              balance: resp.user.coinBalance.toLocaleString(),
-              defaultValue:
-                'Withdrawal sent to Stripe. Net {{amount}} coins, current balance {{balance}}.',
-            }),
-          );
-        },
-        onError: (err) =>
-          toast.error(
-            err.message ||
-              t('coin.toast.withdrawFailed', { defaultValue: 'Stripe withdrawal failed.' }),
-          ),
-      },
-    );
-  };
-
-  const handleBindTestAccount = () => {
-    if (!isAuthed) {
-      openLogin();
-      return;
-    }
-    const accountId = testAccountText.trim();
-    if (!accountId.startsWith('acct_')) {
-      toast.error(
-        t('coin.toast.invalidStripeAccount', {
-          defaultValue: 'Enter a valid Stripe connected account id.',
-        }),
-      );
-      return;
-    }
-    bindStripeTestAccount.mutate(
-      { accountId },
-      {
-        onSuccess: (resp) => {
-          setTestAccountText(resp.account.accountId ?? accountId);
-          toast.success(
-            t('coin.toast.stripeAccountBound', {
-              accountId: resp.account.accountId ?? accountId,
-              defaultValue: 'Stripe test account {{accountId}} bound.',
-            }),
-          );
-        },
-        onError: (err) =>
-          toast.error(
-            err.message ||
-              t('coin.toast.stripeAccountBindFailed', {
-                defaultValue: 'Could not bind this Stripe test account.',
-              }),
-          ),
-      },
+    toast.info(
+      t('coin.toast.withdrawPreview', {
+        defaultValue: 'Withdrawals are not implemented yet and no coins will be deducted.',
+      }),
     );
   };
 
@@ -662,10 +552,10 @@ export default function CoinPage() {
                   {platformCertified
                     ? t('coin.withdraw.subCertified', {
                         defaultValue:
-                          'Platform certified rate: 25% fee. Paid through Stripe Connect.',
+                          'Platform certified rate preview: 25% fee. Withdrawal is not implemented yet.',
                       })
                     : t('coin.withdraw.sub', {
-                        defaultValue: '35% fee. Paid through Stripe Connect.',
+                        defaultValue: '35% fee preview. Withdrawal is not implemented yet.',
                       })}
                 </p>
               </div>
@@ -703,7 +593,7 @@ export default function CoinPage() {
                 <strong>{formatCoins(withdrawNet)}</strong>
               </span>
               <span>
-                {t('coin.withdraw.rmb', { defaultValue: 'Stripe amount' })}{' '}
+                {t('coin.withdraw.rmb', { defaultValue: 'Estimated value' })}{' '}
                 <strong>{formatFiat(withdrawNet, i18n.language)}</strong>
               </span>
             </div>
@@ -715,43 +605,12 @@ export default function CoinPage() {
                 })}
               </div>
             )}
-            {showTestAccountBind && (
-              <label className="gl-coin-input-label">
-                <span>
-                  {t('coin.withdraw.testAccount', { defaultValue: 'Stripe test account' })}
-                </span>
-                <div className="gl-coin-input">
-                  <input
-                    value={testAccountText}
-                    onChange={(event) => setTestAccountText(event.target.value)}
-                    placeholder="acct_..."
-                    aria-label={t('coin.withdraw.testAccountAria', {
-                      defaultValue: 'Stripe test connected account id',
-                    })}
-                  />
-                </div>
-              </label>
-            )}
             <button
               type="button"
               className="gl-secondary-btn gl-coin-wide"
-              onClick={showTestAccountBind ? handleBindTestAccount : handleWithdraw}
-              disabled={
-                withdraw.isPending ||
-                stripeAccountLink.isPending ||
-                stripeAccount.isPending ||
-                bindStripeTestAccount.isPending
-              }
+              onClick={handleWithdraw}
             >
-              {stripeAccountLink.isPending
-                ? t('coin.withdraw.connecting', { defaultValue: 'Opening Stripe...' })
-                : withdraw.isPending
-                  ? t('coin.withdraw.pending', { defaultValue: 'Withdrawing...' })
-                  : canWithdrawWithStripe
-                    ? t('coin.withdraw.submit', { defaultValue: 'Withdraw with Stripe' })
-                    : showTestAccountBind
-                      ? t('coin.withdraw.bindTestAccount', { defaultValue: 'Bind test account' })
-                      : t('coin.withdraw.connectStripe', { defaultValue: 'Connect Stripe' })}
+              {t('coin.withdraw.preview', { defaultValue: 'Preview withdrawal' })}
             </button>
           </section>
         </aside>
@@ -988,7 +847,7 @@ function formatFiat(coins: number, locale: string): string {
   const amount = Math.max(0, coins) / COINS_PER_CURRENCY_UNIT;
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: STRIPE_DISPLAY_CURRENCY,
+    currency: DISPLAY_CURRENCY,
     maximumFractionDigits: 2,
   }).format(amount);
 }

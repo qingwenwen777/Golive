@@ -1196,11 +1196,6 @@
         "subtitle": "監査履歴"
       }
     },
-    "pagination": {
-      "prev": "前へ",
-      "next": "次へ",
-      "page": "{{page}} / {{pages}} ページ"
-    },
     "dashboard": {
       "aria": "管理概要",
       "kpis": {
@@ -1999,25 +1994,17 @@
     },
     "withdraw": {
       "title": "出金",
-      "sub": "手数料 35%。Stripe Connect で送金します。",
-      "subCertified": "プラットフォーム認定レート: 手数料 25%。Stripe Connect で送金します。",
+      "sub": "手数料 35% のプレビューです。出金機能は未実装です。",
+      "subCertified": "認定クリエイター向け手数料 25% のプレビューです。出金機能は未実装です。",
       "amount": "出金数量",
       "amountAria": "出金する coins 数量",
       "available": "出金可能",
       "rate": "手数料率",
       "fee": "手数料",
       "net": "受取予定",
-      "rmb": "Stripe 金額",
+      "rmb": "概算金額",
       "certifiedNote": "プラットフォーム認定により、この手数料は 10 ポイント下がっています。",
-      "preview": "出金をプレビュー",
-      "connecting": "Stripe を開いています...",
-      "pending": "出金中...",
-      "submit": "Stripe で出金",
-      "connectStripe": "Stripe に接続",
-      "testAccount": "Stripe テストアカウント",
-      "testAccountAria": "Stripe テスト Connected account ID",
-      "bindingTestAccount": "連携中...",
-      "bindTestAccount": "テストアカウントを連携"
+      "preview": "出金プレビュー"
     },
     "task": {
       "claim": "受け取る",
@@ -2047,20 +2034,11 @@
       "topupFailed": "チャージに失敗しました。",
       "minWithdraw": "出金は 10 coins 以上です。",
       "withdrawInsufficient": "出金可能残高が不足しています。",
-      "withdrawSuccess": "出金を Stripe に送信しました。純額 {{amount}} coins、現在の残高 {{balance}}。",
-      "withdrawFailed": "Stripe 出金に失敗しました。",
-      "bindTestAccountFirst": "出金前に Stripe テスト Connected account を連携してください。",
-      "invalidStripeAccount": "有効な Stripe Connected account ID を入力してください。",
-      "stripeAccountBound": "Stripe テストアカウント {{accountId}} を連携しました。",
-      "stripeAccountBindFailed": "この Stripe テストアカウントを連携できませんでした。",
-      "stripeConnectFailed": "Stripe オンボーディングを開始できませんでした。",
-      "stripeConnectRefresh": "出金を有効にするには Stripe オンボーディングを続けてください。",
-      "stripeConnectReturned": "Stripe アカウント状態を更新しました。",
       "taskIncomplete": "タスク完了後に受け取れます。",
       "alreadyClaimed": "今日はこのタスクを受け取り済みです。",
       "claimSuccess": "{{amount}} coins を獲得しました。",
       "claimFailed": "受け取りに失敗しました。",
-      "withdrawPreview": "出金は決済連携待ちです。現在 coins は差し引かれません。"
+      "withdrawPreview": "出金機能は未実装です。現在 coins は差し引かれません。"
     }
   },
   "betting": {
