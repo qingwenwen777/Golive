@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { GoogleIcon } from '@/components/GoogleIcon';
 
 const GOOGLE_IDENTITY_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -209,19 +210,23 @@ export function GoogleIdentityButton({
         className={`gl-google-fallback${className ? ` ${className}` : ''}`}
         disabled
       >
-        {fallbackLabel}
+        <GoogleIcon size="small" />
+        <span>{fallbackLabel}</span>
       </button>
     );
   }
 
   return (
-    <div className={`gl-google-button-shell${className ? ` ${className}` : ''}`}>
+    <div
+      className={`gl-google-button-shell${ready ? ' is-ready' : ''}${
+        className ? ` ${className}` : ''
+      }`}
+    >
+      <span className="gl-google-fallback gl-google-visible-button" aria-hidden="true">
+        <GoogleIcon size="small" />
+        <span>{fallbackLabel}</span>
+      </span>
       <div ref={ref} className="gl-google-button" aria-label={fallbackLabel} />
-      {!ready && (
-        <button type="button" className="gl-google-fallback" disabled>
-          {fallbackLabel}
-        </button>
-      )}
     </div>
   );
 }

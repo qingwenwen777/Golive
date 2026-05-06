@@ -4042,34 +4042,48 @@ input:focus-visible,
 .gl-google-button,
 .gl-google-button > div,
 .gl-google-button iframe {
+  height: 100% !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
 }
 .gl-google-button {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0.01;
   overflow: hidden;
   border-radius: 999px;
+}
+.gl-google-button-shell:not(.is-ready) .gl-google-button {
+  pointer-events: none;
 }
 .gl-google-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  height: 42px;
   min-height: 42px;
   width: 100%;
   border: 1px solid var(--gl-border);
   border-radius: 999px;
-  background: var(--gl-bg);
-  color: var(--gl-text-2);
+  background: #fff;
+  color: #202124;
   font-size: 14px;
   font-weight: 750;
 }
 .gl-google-button-shell .gl-google-fallback {
   position: absolute;
   inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.gl-google-visible-button .gl-google-provider-icon {
+  box-shadow: none;
 }
 .gl-auth-form > .gl-google-button-shell {
-  align-self: center;
-  width: min(100%, 400px);
+  width: 100%;
 }
 .gl-auth-google-link {
   display: flex;
