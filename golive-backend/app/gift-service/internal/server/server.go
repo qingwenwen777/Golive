@@ -37,9 +37,11 @@ func NewRouter(d Deps) *gin.Engine {
 	r.GET("/gifts/fan-clubs/:creatorID/members", d.Gift.FanClubMembers)
 	r.GET("/bets/latest", d.Bet.Latest)
 
-	auth := handler.AuthRequired(d.JWTSecret)
+	var auth gin.HandlerFunc
 	if d.JWTKeys != nil {
 		auth = handler.AuthRequiredWithKeySet(d.JWTKeys)
+	} else {
+		auth = handler.AuthRequired(d.JWTSecret)
 	}
 	r.GET("/gifts/fan-badges/me", auth, d.Gift.FanBadges)
 	r.POST("/gifts/send", auth, d.Gift.Send)

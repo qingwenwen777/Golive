@@ -48,11 +48,14 @@ func NewRouter(d Deps) *gin.Engine {
 	srsH := handler.NewSRSHandler(d.Live)
 	coverH := handler.NewCoverUploadHandler(d.CoverDir, d.CoverPublicURL)
 
-	auth := handler.AuthRequired(d.JWTSecret)
-	optionalAuth := handler.OptionalAuth(d.JWTSecret)
+	var auth gin.HandlerFunc
+	var optionalAuth gin.HandlerFunc
 	if d.JWTKeys != nil {
 		auth = handler.AuthRequiredWithKeySet(d.JWTKeys)
 		optionalAuth = handler.OptionalAuthWithKeySet(d.JWTKeys)
+	} else {
+		auth = handler.AuthRequired(d.JWTSecret)
+		optionalAuth = handler.OptionalAuth(d.JWTSecret)
 	}
 
 	r.GET("/subscriptions", auth, socialH.ListSubscriptions)
