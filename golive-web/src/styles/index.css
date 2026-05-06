@@ -1133,6 +1133,305 @@ a {
   cursor: pointer;
 }
 
+.gl-prerender-shell {
+  min-height: 100%;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+}
+
+.gl-prerender-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--gl-border);
+  background: var(--gl-bg);
+  padding: 0 16px;
+}
+
+.gl-prerender-brand,
+.gl-prerender-topbar nav,
+.gl-prerender-actions,
+.gl-prerender-search {
+  display: flex;
+  align-items: center;
+}
+
+.gl-prerender-brand {
+  gap: 8px;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.gl-prerender-brand img {
+  width: 32px;
+  height: 32px;
+}
+
+.gl-prerender-topbar nav {
+  justify-self: end;
+  gap: 4px;
+}
+
+.gl-prerender-topbar nav a,
+.gl-prerender-sidebar a,
+.gl-prerender-actions a,
+.gl-prerender-search button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 850;
+}
+
+.gl-prerender-topbar nav a,
+.gl-prerender-sidebar a {
+  color: var(--gl-text-2);
+  padding: 0 12px;
+}
+
+.gl-prerender-topbar nav a:hover,
+.gl-prerender-sidebar a:hover {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+
+.gl-prerender-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+}
+
+.gl-prerender-sidebar {
+  position: sticky;
+  top: 56px;
+  display: flex;
+  height: calc(100vh - 56px);
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--gl-border);
+  background: var(--gl-bg);
+  padding: 12px;
+}
+
+.gl-prerender-sidebar a {
+  justify-content: flex-start;
+}
+
+.gl-prerender-main {
+  width: 100%;
+  max-width: 1320px;
+  padding: 28px 40px 48px;
+}
+
+.gl-prerender-hero {
+  display: grid;
+  gap: 12px;
+  max-width: 920px;
+  border-bottom: 1px solid var(--gl-border);
+  padding: 14px 0 30px;
+}
+
+.gl-prerender-hero.is-compact {
+  max-width: 820px;
+}
+
+.gl-prerender-kicker {
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.gl-prerender-hero h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.04;
+  font-weight: 950;
+}
+
+.gl-prerender-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--gl-text-2);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.gl-prerender-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.gl-prerender-actions a,
+.gl-prerender-search button {
+  border: 0;
+  background: var(--gl-btn-primary);
+  color: var(--gl-btn-primary-text);
+  padding: 0 14px;
+}
+
+.gl-prerender-actions a + a {
+  background: var(--gl-btn-secondary);
+  color: var(--gl-btn-secondary-text);
+}
+
+.gl-prerender-section {
+  margin-top: 32px;
+}
+
+.gl-prerender-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gl-prerender-section h2,
+.gl-prerender-card strong {
+  margin: 0;
+  color: var(--gl-text);
+  font-weight: 900;
+}
+
+.gl-prerender-section-head h2 {
+  font-size: 20px;
+}
+
+.gl-prerender-section-head span,
+.gl-prerender-card p,
+.gl-prerender-legal p {
+  color: var(--gl-text-2);
+}
+
+.gl-prerender-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.gl-prerender-card {
+  min-width: 0;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg-card);
+}
+
+.gl-prerender-card a {
+  display: grid;
+  gap: 9px;
+  min-height: 164px;
+  padding: 16px;
+}
+
+.gl-prerender-card span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+  font-weight: 950;
+}
+
+.gl-prerender-card strong {
+  font-size: 16px;
+}
+
+.gl-prerender-card p,
+.gl-prerender-legal p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.gl-prerender-search {
+  gap: 8px;
+  width: min(100%, 620px);
+  margin-top: 6px;
+}
+
+.gl-prerender-search input {
+  min-width: 0;
+  flex: 1;
+  height: 42px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  padding: 0 12px;
+}
+
+.gl-prerender-legal {
+  display: grid;
+  gap: 18px;
+  max-width: 920px;
+}
+
+.gl-prerender-legal article {
+  border-bottom: 1px solid var(--gl-border);
+  padding-bottom: 16px;
+}
+
+@media (max-width: 1023px) {
+  .gl-prerender-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .gl-prerender-sidebar {
+    display: none;
+  }
+
+  .gl-prerender-main {
+    padding-inline: 24px;
+  }
+
+  .gl-prerender-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .gl-prerender-topbar {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-block: 10px;
+  }
+
+  .gl-prerender-topbar nav {
+    justify-self: start;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .gl-prerender-main {
+    padding: 22px 14px 36px;
+  }
+
+  .gl-prerender-hero {
+    padding-top: 4px;
+  }
+
+  .gl-prerender-section-head,
+  .gl-prerender-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gl-prerender-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 button:focus-visible,
 input:focus-visible,
 .gl-card:focus-visible,
