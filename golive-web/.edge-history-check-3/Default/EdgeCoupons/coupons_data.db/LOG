@@ -1,5 +1,0 @@
-2026/05/01-03:45:24.150 5314 Creating DB C:\Users\xhb\Desktop\Golive\golive-web\.edge-history-check-3\Default\EdgeCoupons/coupons_data.db since it was missing.
-2026/05/01-03:45:24.160 5314 Reusing MANIFEST C:\Users\xhb\Desktop\Golive\golive-web\.edge-history-check-3\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
-2026/05/01-03:45:24.286 53cc Level-0 table #5: started
-2026/05/01-03:45:24.289 53cc Level-0 table #5: 682129 bytes OK
-2026/05/01-03:45:24.291 53cc Delete type=0 #3
