@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -19,7 +19,12 @@ import {
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
-import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
+import { removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
+import {
+  useLibraryMembership,
+  useRemoveUserLibraryItem,
+  useSaveUserLibraryItem,
+} from '@/api/library';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
@@ -47,16 +52,16 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const hasReplay = stream.status === 'ended' && Boolean(stream.replay?.canWatch);
   const isScheduled = stream.status === 'scheduled' || stream.status === 'publishing';
   const canOpen = isLive || hasReplay || isScheduled;
-  const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
+  const watchLaterMembership = useLibraryMembership(WATCH_LATER_KEY, stream.id, isAuthed);
+  const saveWatchLater = useSaveUserLibraryItem(WATCH_LATER_KEY);
+  const removeWatchLater = useRemoveUserLibraryItem(WATCH_LATER_KEY);
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const hoverStyle = useCoverHoverStyle(
     stream.cover,
     (hasChannelName ? channelName : title) || stream.id,
   );
 
-  useEffect(() => {
-    setSaved(isInLibrary(WATCH_LATER_KEY, stream.id));
-  }, [stream.id]);
+  const saved = watchLaterMembership.isMember;
 
   const handleOpen = () => {
     if (!canOpen) return;
@@ -66,13 +71,19 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
 
   const toggleWatchLater = () => {
     if (saved) {
-      removeFromLibrary(WATCH_LATER_KEY, stream.id);
-      setSaved(false);
+      if (isAuthed) removeWatchLater.mutate(stream.id);
+      else {
+        removeFromLibrary(WATCH_LATER_KEY, stream.id);
+        watchLaterMembership.setLocalMember(false);
+      }
       toast.success(t('liveRoom.removedWatchLater', { defaultValue: 'Removed from Watch later.' }));
       return;
     }
-    saveToLibrary(WATCH_LATER_KEY, stream);
-    setSaved(true);
+    if (isAuthed) saveWatchLater.mutate({ stream });
+    else {
+      saveToLibrary(WATCH_LATER_KEY, stream);
+      watchLaterMembership.setLocalMember(true);
+    }
     toast.success(t('liveRoom.savedWatchLater', { defaultValue: 'Saved to Watch later.' }));
   };
 

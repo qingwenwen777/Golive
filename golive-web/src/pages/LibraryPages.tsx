@@ -43,6 +43,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { useFanBadges } from '@/api/gift';
 import { useBlockedUsers, useUnblockUser, type BlockedUser } from '@/api/messages';
 import { useChannelPosts, useSubscriptionPosts } from '@/api/posts';
+import { useClearUserLibrary, useLibraryItems, useRemoveUserLibraryItem } from '@/api/library';
 import {
   useChannelAppointments,
   useReservedAppointments,
@@ -68,10 +69,8 @@ import {
   LIKED_STREAMS_KEY,
   WATCH_HISTORY_KEY,
   WATCH_LATER_KEY,
-  filterLibraryItemsByLiveRooms,
-  readLibrary,
+  clearLibrary,
   removeFromLibrary,
-  syncLibraryWithLiveRooms,
   type LibraryStream,
 } from '@/lib/liveLibrary';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -368,29 +367,11 @@ export function YouPage() {
   const fanBadges = useFanBadges(isAuthed, user?.id);
   const hydratedFanBadges = useHydratedFanBadges(fanBadges.data ?? []);
   const liveStreams = rooms.data?.items;
-  const history = useMemo(
-    () =>
-      liveStreams
-        ? filterLibraryItemsByLiveRooms(readLibrary(WATCH_HISTORY_KEY), liveStreams)
-        : readLibrary(WATCH_HISTORY_KEY),
-    [liveStreams],
-  );
+  const history = useLibraryItems(WATCH_HISTORY_KEY, isAuthed, liveStreams).items;
   const hydratedHistory = useReplayHydratedStreams(history);
-  const saved = useMemo(
-    () =>
-      liveStreams
-        ? filterLibraryItemsByLiveRooms(readLibrary(WATCH_LATER_KEY), liveStreams)
-        : readLibrary(WATCH_LATER_KEY),
-    [liveStreams],
-  );
+  const saved = useLibraryItems(WATCH_LATER_KEY, isAuthed, liveStreams).items;
   const hydratedSaved = useReplayHydratedStreams(saved);
-  const liked = useMemo(
-    () =>
-      liveStreams
-        ? filterLibraryItemsByLiveRooms(readLibrary(LIKED_STREAMS_KEY), liveStreams)
-        : readLibrary(LIKED_STREAMS_KEY),
-    [liveStreams],
-  );
+  const liked = useLibraryItems(LIKED_STREAMS_KEY, isAuthed, liveStreams).items;
   const hydratedLiked = useReplayHydratedStreams(liked);
   const displayName = userDisplayName(user);
   const ownLive = rooms.data?.items.find((stream) => stream.ownerId === user?.id);
@@ -1908,26 +1889,33 @@ function LibraryCollectionPage({
 }) {
   const { t } = useTranslation('pages');
   const navigate = useNavigate();
-  const [items, setItems] = useState<LibraryStream[]>(() => readLibrary(storageKey));
+  const isAuthed = useIsAuthed();
   const rooms = useRooms({ size: 100 });
-
-  useEffect(() => {
-    if (rooms.data?.items) {
-      setItems(syncLibraryWithLiveRooms(storageKey, rooms.data.items));
-      return;
-    }
-    setItems(readLibrary(storageKey));
-  }, [rooms.data?.items, storageKey]);
+  const { items, setLocalItems, isPending } = useLibraryItems(
+    storageKey,
+    isAuthed,
+    rooms.data?.items,
+  );
+  const removeUserLibraryItem = useRemoveUserLibraryItem(storageKey);
+  const clearUserLibrary = useClearUserLibrary(storageKey);
 
   const hydratedItems = useReplayHydratedStreams(items);
 
   const handleRemove = (streamId: string) => {
-    setItems(removeFromLibrary(storageKey, streamId));
+    if (isAuthed) {
+      removeUserLibraryItem.mutate(streamId);
+      return;
+    }
+    setLocalItems(removeFromLibrary(storageKey, streamId));
   };
 
   const handleClear = () => {
-    for (const item of items) removeFromLibrary(storageKey, item.id);
-    setItems([]);
+    if (isAuthed) {
+      clearUserLibrary.mutate();
+      return;
+    }
+    clearLibrary(storageKey);
+    setLocalItems([]);
   };
 
   const handleOpenFirstRoom = () => {
@@ -1964,7 +1952,18 @@ function LibraryCollectionPage({
         </aside>
 
         <div className="gl-yt-collection-main">
-          {hydratedItems.length === 0 ? (
+          {isPending ? (
+            <ol className="gl-yt-vlist" aria-busy="true">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <li className="gl-yt-vrow" key={index}>
+                  <span className="gl-yt-vrow-index">{index + 1}</span>
+                  <div className="gl-yt-vrow-card">
+                    <LiveCardSkeleton />
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : hydratedItems.length === 0 ? (
             <EmptyState icon={<Sparkles size={36} />} title={emptyTitle} sub={emptySub} />
           ) : (
             <ol className="gl-yt-vlist">
@@ -1989,7 +1988,7 @@ function LibraryCollectionPage({
         </div>
       </div>
 
-      {items.length === 0 && (
+      {!isPending && items.length === 0 && (
         <section className="gl-library-section gl-yt-explore">
           <div className="gl-section-title-row">
             <h2>{t('library.collection.exploreTitle')}</h2>

@@ -25,7 +25,7 @@ type RoomRepo struct {
 func NewRoomRepo(db *gorm.DB) *RoomRepo { return &RoomRepo{db: db} }
 
 func (r *RoomRepo) AutoMigrate() error {
-	if err := r.db.AutoMigrate(&model.Room{}, &model.RoomWatchEvent{}); err != nil {
+	if err := r.db.AutoMigrate(&model.Room{}, &model.RoomWatchEvent{}, &model.UserLibraryItem{}); err != nil {
 		return err
 	}
 	if err := ensureMySQLIndex(
@@ -467,6 +467,11 @@ type UserRevenuePreferenceRow struct {
 	Amount    int64
 }
 
+type UserLibraryRoom struct {
+	Item model.UserLibraryItem
+	Room model.Room
+}
+
 func (r *RoomRepo) RecordWatchEvent(ctx context.Context, event *model.RoomWatchEvent) error {
 	if event == nil || event.ID == "" || event.UserID == "" || event.RoomID == "" {
 		return nil
@@ -482,6 +487,123 @@ func (r *RoomRepo) RecordWatchEvent(ctx context.Context, event *model.RoomWatchE
 			"updated_at":      event.UpdatedAt,
 		}),
 	}).Create(event).Error
+}
+
+func (r *RoomRepo) RemoveWatchEvent(ctx context.Context, userID, roomID string) error {
+	if userID == "" || roomID == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).
+		Where("user_id = ? AND room_id = ?", userID, roomID).
+		Delete(&model.RoomWatchEvent{}).Error
+}
+
+func (r *RoomRepo) ClearWatchEvents(ctx context.Context, userID string) error {
+	if userID == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Delete(&model.RoomWatchEvent{}).Error
+}
+
+func (r *RoomRepo) UpsertUserLibraryItem(ctx context.Context, item *model.UserLibraryItem) error {
+	if item == nil || item.ID == "" || item.UserID == "" || item.Type == "" || item.RoomID == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "user_id"}, {Name: "type"}, {Name: "room_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"saved_at":   item.SavedAt,
+			"updated_at": item.UpdatedAt,
+		}),
+	}).Create(item).Error
+}
+
+func (r *RoomRepo) MergeUserLibraryItem(ctx context.Context, item *model.UserLibraryItem) error {
+	if item == nil || item.ID == "" || item.UserID == "" || item.Type == "" || item.RoomID == "" {
+		return nil
+	}
+	var existing model.UserLibraryItem
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND type = ? AND room_id = ?", item.UserID, item.Type, item.RoomID).
+		Take(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return r.db.WithContext(ctx).Create(item).Error
+	}
+	if err != nil {
+		return err
+	}
+	if !item.SavedAt.After(existing.SavedAt) {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(&model.UserLibraryItem{}).
+		Where("id = ?", existing.ID).
+		Updates(map[string]any{
+			"saved_at":   item.SavedAt,
+			"updated_at": item.UpdatedAt,
+		}).Error
+}
+
+func (r *RoomRepo) ListUserLibraryRooms(ctx context.Context, userID, libraryType string, limit int) ([]UserLibraryRoom, error) {
+	if userID == "" || libraryType == "" {
+		return nil, nil
+	}
+	if limit < 1 || limit > 100 {
+		limit = 60
+	}
+	var items []model.UserLibraryItem
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ? AND type = ?", userID, libraryType).
+		Order("saved_at DESC").
+		Limit(limit).
+		Find(&items).Error; err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.RoomID)
+	}
+	var rooms []model.Room
+	if err := r.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Find(&rooms).Error; err != nil {
+		return nil, err
+	}
+	roomsByID := make(map[string]model.Room, len(rooms))
+	for _, room := range rooms {
+		roomsByID[room.ID] = room
+	}
+	out := make([]UserLibraryRoom, 0, len(items))
+	for _, item := range items {
+		room, ok := roomsByID[item.RoomID]
+		if !ok {
+			continue
+		}
+		out = append(out, UserLibraryRoom{Item: item, Room: room})
+	}
+	return out, nil
+}
+
+func (r *RoomRepo) RemoveUserLibraryItem(ctx context.Context, userID, libraryType, roomID string) error {
+	if userID == "" || libraryType == "" || roomID == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).
+		Where("user_id = ? AND type = ? AND room_id = ?", userID, libraryType, roomID).
+		Delete(&model.UserLibraryItem{}).Error
+}
+
+func (r *RoomRepo) ClearUserLibrary(ctx context.Context, userID, libraryType string) error {
+	if userID == "" || libraryType == "" {
+		return nil
+	}
+	return r.db.WithContext(ctx).
+		Where("user_id = ? AND type = ?", userID, libraryType).
+		Delete(&model.UserLibraryItem{}).Error
 }
 
 func (r *RoomRepo) WatchCategoryRows(ctx context.Context, userID string, since time.Time) ([]WatchCategoryRow, error) {

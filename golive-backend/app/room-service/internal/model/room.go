@@ -78,6 +78,24 @@ type RoomWatchEvent struct {
 
 func (RoomWatchEvent) TableName() string { return "room_watch_events" }
 
+const (
+	LibraryTypeHistory    = "history"
+	LibraryTypeWatchLater = "watch_later"
+	LibraryTypeLiked      = "liked"
+)
+
+type UserLibraryItem struct {
+	ID        string    `gorm:"primaryKey;type:varchar(64)"`
+	UserID    string    `gorm:"type:varchar(36);not null;index:idx_user_library_user_type_time,priority:1;uniqueIndex:idx_user_library_user_type_room,priority:1"`
+	Type      string    `gorm:"type:varchar(20);not null;index:idx_user_library_user_type_time,priority:2;uniqueIndex:idx_user_library_user_type_room,priority:2"`
+	RoomID    string    `gorm:"type:varchar(64);not null;index;uniqueIndex:idx_user_library_user_type_room,priority:3"`
+	SavedAt   time.Time `gorm:"not null;index:idx_user_library_user_type_time,priority:3,sort:desc"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (UserLibraryItem) TableName() string { return "user_library_items" }
+
 // Stream is the DTO returned to the frontend. Field names + omitempty match
 // src/types/stream.ts. StreamKey is set ONLY for the publishing owner.
 // PlaybackURL is the public HTTP-FLV URL exposed to all viewers when live.

@@ -47,6 +47,61 @@ func (h *RoomHandler) RecordWatch(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+func (h *RoomHandler) ListLibrary(c *gin.Context) {
+	resp, err := h.svc.ListUserLibrary(c.Request.Context(), UserIDFromCtx(c), c.Param("type"))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) SaveLibraryItem(c *gin.Context) {
+	var req service.UserLibraryItemInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	resp, err := h.svc.SaveUserLibraryItem(c.Request.Context(), UserIDFromCtx(c), c.Param("type"), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) SyncLibrary(c *gin.Context) {
+	var req service.SyncUserLibraryReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	resp, err := h.svc.SyncUserLibrary(c.Request.Context(), UserIDFromCtx(c), c.Param("type"), req)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) RemoveLibraryItem(c *gin.Context) {
+	resp, err := h.svc.RemoveUserLibraryItem(c.Request.Context(), UserIDFromCtx(c), c.Param("type"), c.Param("id"))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *RoomHandler) ClearLibrary(c *gin.Context) {
+	resp, err := h.svc.ClearUserLibrary(c.Request.Context(), UserIDFromCtx(c), c.Param("type"))
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
 func (h *RoomHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	st, err := h.svc.Get(c.Request.Context(), id, UserIDFromCtx(c))

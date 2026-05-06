@@ -6,6 +6,8 @@
   keepPreviousData,
 } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
+import { LIKED_STREAMS_KEY, WATCH_HISTORY_KEY } from '@/lib/liveLibrary';
+import { userLibraryQueryKey } from '@/api/library';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 import type {
   PaginatedRooms,
@@ -117,6 +119,7 @@ export function useRecordRoomWatch(roomId: string) {
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['recommended-rooms'] });
+      void qc.invalidateQueries({ queryKey: userLibraryQueryKey(WATCH_HISTORY_KEY) });
     },
   });
 }
@@ -1071,6 +1074,7 @@ export function useLike(streamId: string) {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['like', streamId] });
+      void qc.invalidateQueries({ queryKey: userLibraryQueryKey(LIKED_STREAMS_KEY) });
     },
   });
 }

@@ -3,13 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Check, Clock3, ListPlus, Pencil, PlayCircle, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  useLibraryMembership,
+  useRemoveUserLibraryItem,
+  useSaveUserLibraryItem,
+} from '@/api/library';
 import { useReserveAppointment, useUnreserveAppointment } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
-import { isInLibrary, removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
+import { removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
@@ -44,12 +49,12 @@ export function AppointmentCard({
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const reserveAppointment = useReserveAppointment(appointment.id);
   const unreserveAppointment = useUnreserveAppointment(appointment.id);
+  const watchLaterMembership = useLibraryMembership(WATCH_LATER_KEY, appointment.roomId, isAuthed);
+  const saveWatchLater = useSaveUserLibraryItem(WATCH_LATER_KEY);
+  const removeWatchLater = useRemoveUserLibraryItem(WATCH_LATER_KEY);
   const [reserved, setReserved] = useState(appointment.reserved);
   const [waitingCount, setWaitingCount] = useState(
     appointment.waitingCount ?? appointment.reservationCount,
-  );
-  const [savedLater, setSavedLater] = useState(() =>
-    isInLibrary(WATCH_LATER_KEY, appointment.roomId),
   );
   const scheduled = useMemo(
     () =>
@@ -80,15 +85,10 @@ export function AppointmentCard({
   useEffect(() => {
     setReserved(appointment.reserved);
     setWaitingCount(appointment.waitingCount ?? appointment.reservationCount);
-    setSavedLater(isInLibrary(WATCH_LATER_KEY, appointment.roomId));
-  }, [
-    appointment.reserved,
-    appointment.reservationCount,
-    appointment.roomId,
-    appointment.waitingCount,
-  ]);
+  }, [appointment.reserved, appointment.reservationCount, appointment.waitingCount]);
 
   const reservationPending = reserveAppointment.isPending || unreserveAppointment.isPending;
+  const savedLater = watchLaterMembership.isMember;
   const reserveLabel = reserved
     ? t('liveRoom.quickUnreserve', { defaultValue: '取消预约' })
     : t('liveRoom.quickReserve', { defaultValue: '快速预约' });
@@ -150,13 +150,20 @@ export function AppointmentCard({
   const handleWatchLater = (event: MouseEvent<HTMLButtonElement>) => {
     stopQuickAction(event);
     if (savedLater) {
-      removeFromLibrary(WATCH_LATER_KEY, appointment.roomId);
-      setSavedLater(false);
+      if (isAuthed) removeWatchLater.mutate(appointment.roomId);
+      else {
+        removeFromLibrary(WATCH_LATER_KEY, appointment.roomId);
+        watchLaterMembership.setLocalMember(false);
+      }
       toast.success(t('liveRoom.removedWatchLater', { defaultValue: '已从稍后观看移除。' }));
       return;
     }
-    saveToLibrary(WATCH_LATER_KEY, appointmentToStream(appointment, waitingCount));
-    setSavedLater(true);
+    const stream = appointmentToStream(appointment, waitingCount);
+    if (isAuthed) saveWatchLater.mutate({ stream });
+    else {
+      saveToLibrary(WATCH_LATER_KEY, stream);
+      watchLaterMembership.setLocalMember(true);
+    }
     toast.success(t('liveRoom.savedWatchLater', { defaultValue: '已保存到稍后观看。' }));
   };
 

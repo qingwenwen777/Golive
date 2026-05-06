@@ -560,6 +560,9 @@ func (s *SocialService) Like(ctx context.Context, uid, streamID string) (*LikeSt
 	if prev == nil || !prev.Liked {
 		_ = s.notifyRoomLiked(ctx, uid, streamID)
 	}
+	if s.rooms != nil {
+		_ = s.saveLikedLibraryItem(ctx, uid, streamID)
+	}
 	return toLikeState(streamID, st), nil
 }
 
@@ -567,6 +570,9 @@ func (s *SocialService) Unlike(ctx context.Context, uid, streamID string) (*Like
 	st, err := s.social.Unlike(ctx, streamID, uid)
 	if err != nil {
 		return nil, err
+	}
+	if s.rooms != nil {
+		_ = s.removeLikedLibraryItem(ctx, uid, streamID)
 	}
 	return toLikeState(streamID, st), nil
 }
@@ -578,6 +584,9 @@ func (s *SocialService) Dislike(ctx context.Context, uid, streamID string) (*Lik
 	st, err := s.social.Dislike(ctx, streamID, uid)
 	if err != nil {
 		return nil, err
+	}
+	if s.rooms != nil {
+		_ = s.removeLikedLibraryItem(ctx, uid, streamID)
 	}
 	return toLikeState(streamID, st), nil
 }

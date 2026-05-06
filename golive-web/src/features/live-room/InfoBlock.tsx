@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,6 +11,11 @@ import { useLangStore } from '@/stores/useLangStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useFollowState, useFollow, useUnfollow, useLikeState, useLike } from '@/api/room';
+import {
+  useLibraryMembership,
+  useRemoveUserLibraryItem,
+  useSaveUserLibraryItem,
+} from '@/api/library';
 import { usePublicUser } from '@/api/auth';
 import {
   DropdownMenu,
@@ -25,7 +29,6 @@ import { copyText } from '@/lib/clipboard';
 import {
   LIKED_STREAMS_KEY,
   WATCH_LATER_KEY,
-  isInLibrary,
   removeFromLibrary,
   saveToLibrary,
 } from '@/lib/liveLibrary';
@@ -75,15 +78,12 @@ export function InfoBlock({
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
   const like = useLike(streamId);
-  const [saved, setSaved] = useState(() => isInLibrary(WATCH_LATER_KEY, stream.id));
-  const [localLiked, setLocalLiked] = useState(() => isInLibrary(LIKED_STREAMS_KEY, stream.id));
+  const watchLaterMembership = useLibraryMembership(WATCH_LATER_KEY, stream.id, isAuthed);
+  const likedMembership = useLibraryMembership(LIKED_STREAMS_KEY, stream.id, isAuthed);
+  const saveWatchLater = useSaveUserLibraryItem(WATCH_LATER_KEY);
+  const removeWatchLater = useRemoveUserLibraryItem(WATCH_LATER_KEY);
   const ownerProfile = usePublicUser(stream.ownerId ?? '');
   const ownerLevelInfo = isOwnChannel ? currentUser?.levelInfo : ownerProfile.data?.levelInfo;
-
-  useEffect(() => {
-    setSaved(isInLibrary(WATCH_LATER_KEY, stream.id));
-    setLocalLiked(isInLibrary(LIKED_STREAMS_KEY, stream.id));
-  }, [stream.id]);
 
   const subscribed = followState.data?.following ?? false;
   const subscriberCount = followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
@@ -93,8 +93,9 @@ export function InfoBlock({
   const likeInfo = likeState.data;
   const baseLikes = Math.floor(stream.viewers * 0.3);
   const likes = likeInfo?.likes ?? baseLikes;
-  const liked = likeInfo?.liked ?? localLiked;
+  const liked = likeInfo?.liked ?? likedMembership.isMember;
   const disliked = likeInfo?.disliked ?? false;
+  const saved = watchLaterMembership.isMember;
 
   const handleSubscribe = () => {
     if (isOwnChannel) return;
@@ -108,26 +109,30 @@ export function InfoBlock({
 
   const handleLike = () => {
     const nextLiked = !liked;
-    if (nextLiked) {
-      saveToLibrary(LIKED_STREAMS_KEY, stream);
-      setLikeBurstKey((value) => value + 1);
-      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
-    } else {
-      removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
-    }
-    setLocalLiked(nextLiked);
-
     if (!isAuthed) {
+      if (nextLiked) {
+        saveToLibrary(LIKED_STREAMS_KEY, stream);
+        likedMembership.setLocalMember(true);
+        setLikeBurstKey((value) => value + 1);
+        toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+      } else {
+        removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
+        likedMembership.setLocalMember(false);
+      }
       openLogin();
       return;
+    }
+    if (nextLiked) {
+      setLikeBurstKey((value) => value + 1);
+      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
     }
     like.mutate(liked ? 'unlike' : 'like');
   };
 
   const handleDislike = () => {
-    removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
-    setLocalLiked(false);
     if (!isAuthed) {
+      removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
+      likedMembership.setLocalMember(false);
       openLogin();
       return;
     }
@@ -136,13 +141,19 @@ export function InfoBlock({
 
   const handleSave = () => {
     if (saved) {
-      removeFromLibrary(WATCH_LATER_KEY, stream.id);
-      setSaved(false);
+      if (isAuthed) removeWatchLater.mutate(stream.id);
+      else {
+        removeFromLibrary(WATCH_LATER_KEY, stream.id);
+        watchLaterMembership.setLocalMember(false);
+      }
       toast.success(t('liveRoom.removedWatchLater', { defaultValue: 'Removed from Watch later.' }));
       return;
     }
-    saveToLibrary(WATCH_LATER_KEY, stream);
-    setSaved(true);
+    if (isAuthed) saveWatchLater.mutate({ stream });
+    else {
+      saveToLibrary(WATCH_LATER_KEY, stream);
+      watchLaterMembership.setLocalMember(true);
+    }
     toast.success(t('liveRoom.savedWatchLater', { defaultValue: 'Saved to Watch later.' }));
   };
 

@@ -186,7 +186,7 @@ func (s *RoomService) RecordWatch(ctx context.Context, viewerID, roomID string) 
 		return errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
 	}
 	now := s.now()
-	return s.rooms.RecordWatchEvent(ctx, &model.RoomWatchEvent{
+	if err := s.rooms.RecordWatchEvent(ctx, &model.RoomWatchEvent{
 		ID:            watchEventID(viewerID, room.ID),
 		UserID:        viewerID,
 		RoomID:        room.ID,
@@ -197,7 +197,10 @@ func (s *RoomService) RecordWatch(ctx context.Context, viewerID, roomID string) 
 		LastWatchedAt: now,
 		CreatedAt:     now,
 		UpdatedAt:     now,
-	})
+	}); err != nil {
+		return err
+	}
+	return s.saveHistoryLibraryItem(ctx, viewerID, room, now)
 }
 
 type giftPreferenceScores struct {

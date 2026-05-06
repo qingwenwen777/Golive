@@ -34,6 +34,7 @@ import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useLike, useLikeState, useRecordRoomWatch, useRoom, useStopLive } from '@/api/room';
+import { useLibraryMembership } from '@/api/library';
 import { useReplayMessages } from '@/api/chat';
 import { useLatestBet } from '@/api/bet';
 import {
@@ -372,8 +373,9 @@ export default function LiveRoomPage() {
 
   useEffect(() => {
     if (!stream || fanClubLocked || (!roomIsLive && !roomIsReplay)) return;
+    if (isAuthed) return;
     saveToLibrary(WATCH_HISTORY_KEY, stream, 'watchedAt');
-  }, [fanClubLocked, roomIsLive, roomIsReplay, stream]);
+  }, [fanClubLocked, isAuthed, roomIsLive, roomIsReplay, stream]);
 
   useEffect(() => {
     if (!isAuthed || !currentUser?.id || !stream || fanClubLocked || (!roomIsLive && !roomIsReplay))
@@ -1534,8 +1536,9 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const likeState = useLikeState(stream.id, isAuthed);
   const like = useLike(stream.id);
+  const likedMembership = useLibraryMembership(LIKED_STREAMS_KEY, stream.id, isAuthed);
   const channelName = streamChannelName(stream, currentUser);
-  const liked = likeState.data?.liked ?? false;
+  const liked = likeState.data?.liked ?? likedMembership.isMember;
   const likes =
     likeState.data?.likes ?? Math.max(0, Math.floor((stream.peakViewers ?? stream.viewers) * 0.3));
   const endedAt = stream.endedAt
@@ -1550,17 +1553,19 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
   const toggleLike = () => {
     const nextLiked = !liked;
     if (!isAuthed) {
-      openLogin(() => {
+      if (nextLiked) {
         saveToLibrary(LIKED_STREAMS_KEY, stream);
-        like.mutate('like');
-      });
+        likedMembership.setLocalMember(true);
+        toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+      } else {
+        removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
+        likedMembership.setLocalMember(false);
+      }
+      openLogin();
       return;
     }
     if (nextLiked) {
-      saveToLibrary(LIKED_STREAMS_KEY, stream);
       toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
-    } else {
-      removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
     }
     like.mutate(liked ? 'unlike' : 'like');
   };

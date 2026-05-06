@@ -10,7 +10,7 @@ export type LibraryStream = Stream & {
   watchedAt?: string;
 };
 
-const MAX_LIBRARY_ITEMS = 60;
+export const MAX_LIBRARY_ITEMS = 60;
 
 export function readLibrary(key: string): LibraryStream[] {
   if (typeof window === 'undefined') return [];
@@ -41,6 +41,10 @@ export function removeFromLibrary(key: string, streamId: string): LibraryStream[
   const next = readLibrary(key).filter((item) => item.id !== streamId);
   writeLibrary(key, next);
   return next;
+}
+
+export function clearLibrary(key: string): void {
+  writeLibrary(key, []);
 }
 
 export function removeStreamFromLibraries(
