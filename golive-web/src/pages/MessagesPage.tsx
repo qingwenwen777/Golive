@@ -76,6 +76,7 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
 type Translate = ReturnType<typeof useTranslation>['t'];
 const CHAT_PAGE_SIZE = 40;
+const CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT = 10;
 const CHAT_TIME_SEPARATOR_GAP_MS = 5 * 60 * 1000;
 type ChatNewNoticeMode = 'entry' | 'live';
 type ChatNewNotice = {
@@ -656,6 +657,8 @@ function useChatScroll<T extends { id: string }>(
   const previousScrollHeightRef = useRef(0);
   const requestedOlderRef = useRef(false);
   const newNoticeModeRef = useRef<ChatNewNoticeMode | null>(null);
+  const pendingLiveNewCountRef = useRef(0);
+  const pendingLiveTargetIdRef = useRef('');
   const [newNotice, setNewNotice] = useState<ChatNewNotice | null>(null);
   const setChatNewNotice = (notice: ChatNewNotice | null) => {
     newNoticeModeRef.current = notice?.mode ?? null;
@@ -670,6 +673,10 @@ function useChatScroll<T extends { id: string }>(
       return next;
     });
   };
+  const resetPendingLiveNewNotice = () => {
+    pendingLiveNewCountRef.current = 0;
+    pendingLiveTargetIdRef.current = '';
+  };
 
   useEffect(() => {
     previousLastIdRef.current = '';
@@ -677,6 +684,7 @@ function useChatScroll<T extends { id: string }>(
     loadingOlderRef.current = false;
     previousScrollHeightRef.current = 0;
     requestedOlderRef.current = false;
+    resetPendingLiveNewNotice();
     setChatNewNotice(null);
   }, [options.activeKey]);
 
@@ -688,7 +696,10 @@ function useChatScroll<T extends { id: string }>(
     const node = listRef.current;
     if (!node) return;
     nearBottomRef.current = distanceFromBottom(node) < 88;
-    if (nearBottomRef.current && newNoticeModeRef.current !== 'entry') setChatNewNotice(null);
+    if (nearBottomRef.current && newNoticeModeRef.current !== 'entry') {
+      resetPendingLiveNewNotice();
+      setChatNewNotice(null);
+    }
     if (
       node.scrollTop <= 72 &&
       options.hasNextPage &&
@@ -709,6 +720,7 @@ function useChatScroll<T extends { id: string }>(
     const lastId = items.at(-1)?.id ?? '';
     if (!node || !lastId) {
       previousLastIdRef.current = lastId;
+      resetPendingLiveNewNotice();
       setChatNewNotice(null);
       return;
     }
@@ -732,7 +744,7 @@ function useChatScroll<T extends { id: string }>(
       const entryUnread = Math.max(0, options.entryUnread ?? 0);
       if (entryUnread > 0) {
         const overflowing = node.scrollHeight > node.clientHeight + 12;
-        if (overflowing) {
+        if (overflowing && entryUnread >= CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT) {
           const firstUnreadIndex = Math.max(0, items.length - entryUnread);
           setChatNewNotice({
             count: entryUnread,
@@ -760,13 +772,28 @@ function useChatScroll<T extends { id: string }>(
           const nextNode = listRef.current;
           if (nextNode) nextNode.scrollTop = nextNode.scrollHeight;
         });
-        if (newNoticeModeRef.current !== 'entry') setChatNewNotice(null);
+        if (newNoticeModeRef.current !== 'entry') {
+          resetPendingLiveNewNotice();
+          setChatNewNotice(null);
+        }
       } else if (addedItems.length) {
-        updateChatNewNotice((current) => ({
-          count: (current?.mode === 'live' ? current.count : 0) + addedItems.length,
-          targetId: current?.mode === 'live' ? current.targetId : addedItems[0].id,
-          mode: 'live',
-        }));
+        updateChatNewNotice((current) => {
+          const targetId =
+            current?.mode === 'live'
+              ? current.targetId
+              : pendingLiveTargetIdRef.current || addedItems[0].id;
+          const nextCount =
+            (current?.mode === 'live' ? current.count : pendingLiveNewCountRef.current) +
+            addedItems.length;
+          pendingLiveTargetIdRef.current = targetId;
+          pendingLiveNewCountRef.current = nextCount;
+          if (nextCount < CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT) return null;
+          return {
+            count: nextCount,
+            targetId,
+            mode: 'live',
+          };
+        });
       }
     }
     previousLastIdRef.current = lastId;
@@ -774,6 +801,7 @@ function useChatScroll<T extends { id: string }>(
 
   const jumpToNew = () => {
     firstNewRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    resetPendingLiveNewNotice();
     setChatNewNotice(null);
   };
 
