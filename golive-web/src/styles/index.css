@@ -7753,7 +7753,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 .gl-admin-system-card {
   display: flex;
   min-width: 0;
-  min-height: 210px;
+  min-height: 156px;
   flex-direction: column;
   gap: 12px;
   border: 1px solid var(--gl-border);
@@ -7787,7 +7787,6 @@ html[lang='zh'] .gl-admin-action-select-head small {
   color: var(--gl-red);
 }
 .gl-admin-system-card-head div,
-.gl-admin-system-card p,
 .gl-admin-system-card small,
 .gl-admin-system-card a {
   min-width: 0;
@@ -7811,13 +7810,6 @@ html[lang='zh'] .gl-admin-action-select-head small {
   font-style: normal;
   font-weight: 950;
   line-height: 1.1;
-}
-.gl-admin-system-card p {
-  margin: 0;
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 750;
-  line-height: 1.5;
 }
 .gl-admin-system-card small {
   margin-top: auto;
@@ -7883,24 +7875,12 @@ html[lang='zh'] .gl-admin-action-select-head small {
   gap: 14px;
   padding: 14px;
 }
-.gl-admin-system-form > div:first-child span {
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 850;
-}
 .gl-admin-system-form h3 {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--gl-text);
   font-size: 18px;
   font-weight: 950;
   letter-spacing: 0;
-}
-.gl-admin-system-form p {
-  margin: 6px 0 0;
-  color: var(--gl-text-2);
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1.5;
 }
 .gl-admin-system-form-grid {
   display: grid;
@@ -7991,8 +7971,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 .gl-admin-system-runtime-row div {
   min-width: 0;
 }
-.gl-admin-system-runtime-row strong,
-.gl-admin-system-runtime-row span {
+.gl-admin-system-runtime-row strong {
   display: block;
   min-width: 0;
   overflow: hidden;
@@ -8003,12 +7982,6 @@ html[lang='zh'] .gl-admin-action-select-head small {
   color: var(--gl-text);
   font-size: 14px;
   font-weight: 950;
-}
-.gl-admin-system-runtime-row span {
-  margin-top: 3px;
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 750;
 }
 .gl-admin-system-runtime-row code {
   max-width: 420px;

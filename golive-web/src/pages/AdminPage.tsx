@@ -2429,33 +2429,6 @@ function systemRuntimeLabel(key: string, fallback: string, t: Translate) {
   return map[key] ?? fallback;
 }
 
-function systemRuntimeDescription(key: string, fallback: string | undefined, t: Translate) {
-  const map: Record<string, string> = {
-    service: t('admin.system.runtime.serviceDesc', { defaultValue: '承载审核与系统策略的后端服务。' }),
-    log_level: t('admin.system.runtime.logLevelDesc', { defaultValue: '来自服务配置文件的运行日志级别。' }),
-    flv_base: t('admin.system.runtime.flvBaseDesc', { defaultValue: '直播间播放地址前缀。' }),
-    stream_key_ttl: t('admin.system.runtime.streamKeyTtlDesc', {
-      defaultValue: '主播推流密钥的有效窗口。',
-    }),
-    replay_record_dir: t('admin.system.runtime.replayRecordDirDesc', {
-      defaultValue: '服务端生成回放文件的位置。',
-    }),
-    replay_upload_timeout: t('admin.system.runtime.replayUploadTimeoutDesc', {
-      defaultValue: '回放上传到外部存储的最大等待时间。',
-    }),
-    bunny_stream: t('admin.system.runtime.bunnyStreamDesc', {
-      defaultValue: '只展示是否配置，密钥不会在后台暴露。',
-    }),
-    cover_public_url: t('admin.system.runtime.coverPublicUrlDesc', {
-      defaultValue: '直播封面上传后的公开访问前缀。',
-    }),
-    post_public_url: t('admin.system.runtime.postPublicUrlDesc', {
-      defaultValue: '动态图片上传后的公开访问前缀。',
-    }),
-  };
-  return map[key] ?? fallback ?? '';
-}
-
 function systemRuntimeValue(key: string, value: string, t: Translate) {
   if (key === 'bunny_stream') {
     if (value === 'configured') {
@@ -3933,14 +3906,7 @@ function SystemPage({
       <section className="gl-admin-panel gl-admin-system-panel">
         <div className="gl-admin-panel-head">
           <div>
-            <span>{t('admin.system.eyebrow', { defaultValue: 'System control' })}</span>
-            <h2>{t('admin.system.title', { defaultValue: '策略、服务与运行配置' })}</h2>
-            <p>
-              {t('admin.system.subtitle', {
-                defaultValue:
-                  '集中查看平台开关，调整真正会即时生效的审核策略，并跳转到已有业务后台处理细项。',
-              })}
-            </p>
+            <h2>{t('admin.system.title', { defaultValue: '系统配置' })}</h2>
           </div>
         </div>
         <div className="gl-admin-economy-tabs gl-admin-system-tabs" role="tablist">
@@ -3966,9 +3932,6 @@ function SystemPage({
                 icon={Ticket}
                 title={t('admin.system.cards.registration.title', { defaultValue: '注册访问' })}
                 value={registrationPolicyLabel(data?.registrationPolicy, t)}
-                description={t('admin.system.cards.registration.desc', {
-                  defaultValue: '注册接口当前要求邀请码，邀请码的创建和回收仍由用户管理承接。',
-                })}
                 meta={t('admin.system.cards.registration.meta', {
                   available: loading ? '-' : availableInvites,
                   total: loading ? '-' : inviteItems.length,
@@ -3987,9 +3950,6 @@ function SystemPage({
                       ? t('admin.system.values.enabled', { defaultValue: '启用' })
                       : t('admin.system.values.disabled', { defaultValue: '停用' })
                 }
-                description={t('admin.system.cards.live.desc', {
-                  defaultValue: '开播权限通过主播申请和平台认证流转，避免后台一键绕过审核链路。',
-                })}
                 meta={t('admin.system.cards.live.meta', {
                   pending: loading ? '-' : metrics.pendingApplications,
                   approved: loading ? '-' : metrics.approvedCreators,
@@ -4003,9 +3963,6 @@ function SystemPage({
                 icon={FileCheck2}
                 title={t('admin.system.cards.review.title', { defaultValue: '内容审核' })}
                 value={contentPolicyLabel(data?.contentPolicyLevel, t)}
-                description={t('admin.system.cards.review.desc', {
-                  defaultValue: '举报领取、处置动作、敏感词和全站禁言都已接入审计记录。',
-                })}
                 meta={t('admin.system.cards.review.meta', {
                   timeout: data?.reportReviewTimeoutMinutes ?? '-',
                   mute: muteDurationLabel(data?.defaultSiteMuteMinutes, t),
@@ -4018,10 +3975,6 @@ function SystemPage({
                 icon={Server}
                 title={t('admin.system.cards.services.title', { defaultValue: '服务健康' })}
                 value={overviewLoading ? '-' : `${healthOk}/${healthTotal || 0}`}
-                description={t('admin.system.cards.services.desc', {
-                  defaultValue:
-                    '服务健康来自后端实时探测，包含网关、房间、用户、礼物、聊天、IM 与存储依赖。',
-                })}
                 meta={
                   healthDown > 0
                     ? t('admin.system.cards.services.down', {
@@ -4043,17 +3996,14 @@ function SystemPage({
             <div className="gl-admin-detail-list">
               <AdminDetailRow
                 label={t('admin.system.access.registration', { defaultValue: '注册策略' })}
-                value={t('admin.system.access.registrationValue', {
-                  value: registrationPolicyLabel(data?.registrationPolicy, t),
-                  defaultValue: '{{value}}，注册与 Google 注册都要求邀请码。',
-                })}
+                value={registrationPolicyLabel(data?.registrationPolicy, t)}
               />
               <AdminDetailRow
                 label={t('admin.system.access.invites', { defaultValue: '邀请码池' })}
                 value={t('admin.system.access.invitesValue', {
                   available: loading ? '-' : availableInvites,
                   total: loading ? '-' : inviteItems.length,
-                  defaultValue: '{{available}} 可用，{{total}} 总计。',
+                  defaultValue: '{{available}} 可用 / {{total}} 总计',
                 })}
               />
               <AdminDetailRow
@@ -4061,7 +4011,7 @@ function SystemPage({
                 value={t('admin.system.access.liveReviewValue', {
                   pending: loading ? '-' : metrics.pendingApplications,
                   approved: loading ? '-' : metrics.approvedCreators,
-                  defaultValue: '{{pending}} 个待审核申请，{{approved}} 位主播已授权。',
+                  defaultValue: '{{pending}} 待审核 / {{approved}} 已授权',
                 })}
               />
             </div>
@@ -4083,16 +4033,7 @@ function SystemPage({
             <div className="gl-admin-system-review-grid">
               <div className="gl-admin-system-form">
                 <div>
-                  <span>
-                    {t('admin.system.review.eyebrow', { defaultValue: 'Moderation policy' })}
-                  </span>
-                  <h3>{t('admin.system.review.title', { defaultValue: '可即时生效的审核策略' })}</h3>
-                  <p>
-                    {t('admin.system.review.body', {
-                      defaultValue:
-                        '这里只放真正接入后端逻辑的配置，保存后会写入系统日志并影响新的审核操作。',
-                    })}
-                  </p>
+                  <h3>{t('admin.system.review.title', { defaultValue: '审核策略' })}</h3>
                 </div>
                 <div className="gl-admin-system-form-grid">
                   <label>
@@ -4138,7 +4079,7 @@ function SystemPage({
                     maxLength={240}
                     onChange={(event) => setChangeNote(event.target.value)}
                     placeholder={t('admin.system.review.notePlaceholder', {
-                      defaultValue: '可选，写给系统日志看的说明',
+                      defaultValue: '可选',
                     })}
                     disabled={updateSettings.isPending}
                   />
@@ -4147,11 +4088,7 @@ function SystemPage({
                   <button
                     type="button"
                     onClick={saveReviewPolicy}
-                    disabled={
-                      settings.isLoading ||
-                      updateSettings.isPending ||
-                      !dirty
-                    }
+                    disabled={settings.isLoading || updateSettings.isPending || !dirty}
                   >
                     <Save size={16} />
                     {updateSettings.isPending
@@ -4174,17 +4111,19 @@ function SystemPage({
                   value={contentPolicyLabel(data?.contentPolicyLevel, t)}
                 />
                 <AdminDetailRow
-                  label={t('admin.system.review.actions', { defaultValue: '举报处置动作' })}
-                  value={t('admin.system.review.actionsValue', {
-                    defaultValue:
-                      '领取、驳回、删除内容、警告用户、警告直播间、全站禁言、封禁用户、强制下播。',
-                  })}
+                  label={t('admin.system.review.currentTimeout', { defaultValue: '当前锁定时长' })}
+                  value={
+                    data
+                      ? t('admin.system.review.minutes', {
+                          count: data.reportReviewTimeoutMinutes,
+                          defaultValue: '{{count}} 分钟',
+                        })
+                      : '-'
+                  }
                 />
                 <AdminDetailRow
-                  label={t('admin.system.review.audit', { defaultValue: '审计记录' })}
-                  value={t('admin.system.review.auditValue', {
-                    defaultValue: '策略保存和审核处置都会写入操作日志。',
-                  })}
+                  label={t('admin.system.review.currentMute', { defaultValue: '当前默认禁言' })}
+                  value={muteDurationLabel(data?.defaultSiteMuteMinutes, t)}
                 />
               </div>
             </div>
@@ -4233,13 +4172,12 @@ function SystemPage({
                 />
               ) : (
                 (data?.runtime ?? []).map((item) => (
-                <div className="gl-admin-system-runtime-row" key={item.key}>
-                  <div>
-                    <strong>{systemRuntimeLabel(item.key, item.label, t)}</strong>
-                    <span>{systemRuntimeDescription(item.key, item.description, t)}</span>
+                  <div className="gl-admin-system-runtime-row" key={item.key}>
+                    <div>
+                      <strong>{systemRuntimeLabel(item.key, item.label, t)}</strong>
+                    </div>
+                    <code>{systemRuntimeValue(item.key, item.value, t)}</code>
                   </div>
-                  <code>{systemRuntimeValue(item.key, item.value, t)}</code>
-                </div>
                 ))
               )}
               {!settings.isLoading && (data?.runtime ?? []).length === 0 && (
@@ -4295,7 +4233,6 @@ function SystemPolicyCard({
   icon: Icon,
   title,
   value,
-  description,
   meta,
   to,
   action,
@@ -4304,7 +4241,6 @@ function SystemPolicyCard({
   icon: AdminIcon;
   title: string;
   value: string | number;
-  description: string;
   meta: string;
   to: string;
   action: string;
@@ -4323,7 +4259,6 @@ function SystemPolicyCard({
           <em>{value}</em>
         </div>
       </div>
-      <p>{description}</p>
       <small>{meta}</small>
       <Link to={to}>
         {action}

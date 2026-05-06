@@ -1524,6 +1524,116 @@
         }
       }
     },
+    "system": {
+      "title": "系统配置",
+      "aria": "系统配置概览",
+      "tabs": {
+        "overview": "概览",
+        "access": "访问策略",
+        "review": "审核策略",
+        "services": "服务状态",
+        "runtime": "运行配置",
+        "logs": "系统日志"
+      },
+      "kpis": {
+        "registration": "注册策略",
+        "liveReview": "开播审核",
+        "contentPolicy": "内容策略",
+        "serviceStatus": "服务状态"
+      },
+      "values": {
+        "enabled": "启用",
+        "disabled": "停用"
+      },
+      "policy": {
+        "inviteOnly": "邀请制",
+        "public": "公开注册",
+        "closed": "关闭注册",
+        "strict": "严格",
+        "standard": "标准",
+        "relaxed": "宽松",
+        "days": "{{count}} 天",
+        "hours": "{{count}} 小时",
+        "minutes": "{{count}} 分钟"
+      },
+      "cards": {
+        "registration": {
+          "title": "注册访问",
+          "meta": "{{available}} 可用 / {{total}} 总邀请码",
+          "action": "管理邀请码"
+        },
+        "live": {
+          "title": "主播权限",
+          "meta": "{{pending}} 待审核 / {{approved}} 已授权",
+          "action": "处理申请"
+        },
+        "review": {
+          "title": "内容审核",
+          "meta": "领取锁定 {{timeout}} 分钟 / 默认禁言 {{mute}}",
+          "action": "进入审核"
+        },
+        "services": {
+          "title": "服务健康",
+          "down": "{{count}} 个服务异常",
+          "ok": "当前无异常服务",
+          "action": "查看总览"
+        }
+      },
+      "access": {
+        "registration": "注册策略",
+        "invites": "邀请码池",
+        "invitesValue": "{{available}} 可用 / {{total}} 总计",
+        "liveReview": "开播审核",
+        "liveReviewValue": "{{pending}} 待审核 / {{approved}} 已授权"
+      },
+      "actions": {
+        "invites": "管理邀请码",
+        "creators": "管理主播权限"
+      },
+      "review": {
+        "title": "审核策略",
+        "invalid": "配置值无效。",
+        "noChange": "没有需要保存的变更。",
+        "confirm": "保存审核策略变更？",
+        "saved": "系统策略已更新。",
+        "saveFailed": "系统策略更新失败。",
+        "timeout": "举报领取锁定时长",
+        "minutes": "{{count}} 分钟",
+        "defaultMute": "默认全站禁言",
+        "note": "变更说明",
+        "notePlaceholder": "可选",
+        "saving": "保存中",
+        "save": "保存策略",
+        "updatedAt": "最近更新 {{time}}",
+        "defaultState": "当前使用默认策略",
+        "contentPolicy": "内容策略等级",
+        "currentTimeout": "当前锁定时长",
+        "currentMute": "当前默认禁言"
+      },
+      "services": {
+        "loading": "正在加载服务状态...",
+        "empty": "暂无服务健康数据。"
+      },
+      "runtime": {
+        "service": "服务",
+        "logLevel": "日志级别",
+        "flvBase": "HTTP-FLV 地址",
+        "streamKeyTtl": "推流密钥有效期",
+        "replayRecordDir": "回放录制目录",
+        "replayUploadTimeout": "回放上传超时",
+        "bunnyStream": "Bunny Stream",
+        "coverPublicUrl": "封面公开路径",
+        "postPublicUrl": "动态图片路径",
+        "configured": "已配置",
+        "notConfigured": "未配置",
+        "loading": "正在加载运行配置...",
+        "empty": "暂无运行配置。"
+      },
+      "logs": {
+        "loading": "正在加载系统日志...",
+        "empty": "暂无系统配置日志。"
+      }
+    },
     "logs": {
       "aria": "操作日志概览",
       "eyebrow": "日志",
@@ -1582,7 +1692,8 @@
         "platformApplicationReject": "拒绝认证申请",
         "livePermissionApprove": "开启开播权限",
         "livePermissionReject": "关闭开播权限",
-        "adminCreate": "创建管理员账号"
+        "adminCreate": "创建管理员账号",
+        "systemSettingsUpdate": "更新系统配置"
       }
     },
     "exit": "退出后台",

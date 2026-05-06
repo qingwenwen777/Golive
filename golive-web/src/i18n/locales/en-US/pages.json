@@ -1523,6 +1523,124 @@
         }
       }
     },
+    "system": {
+      "title": "System settings",
+      "aria": "System settings summary",
+      "tabs": {
+        "overview": "Overview",
+        "access": "Access",
+        "review": "Review",
+        "services": "Services",
+        "runtime": "Runtime",
+        "logs": "Logs"
+      },
+      "kpis": {
+        "registration": "Registration",
+        "liveReview": "Live review",
+        "contentPolicy": "Content policy",
+        "serviceStatus": "Service status"
+      },
+      "values": {
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "policy": {
+        "inviteOnly": "Invite only",
+        "public": "Public signup",
+        "closed": "Closed signup",
+        "strict": "Strict",
+        "standard": "Standard",
+        "relaxed": "Relaxed",
+        "days": "{{count}} days",
+        "hours": "{{count}} hours",
+        "minutes": "{{count}} minutes",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "hours_one": "{{count}} hour",
+        "hours_other": "{{count}} hours",
+        "minutes_one": "{{count}} minute",
+        "minutes_other": "{{count}} minutes"
+      },
+      "cards": {
+        "registration": {
+          "title": "Registration",
+          "meta": "{{available}} available / {{total}} total invites",
+          "action": "Manage invites"
+        },
+        "live": {
+          "title": "Creator access",
+          "meta": "{{pending}} pending / {{approved}} approved",
+          "action": "Review requests"
+        },
+        "review": {
+          "title": "Content review",
+          "meta": "Claim lock {{timeout}} min / default mute {{mute}}",
+          "action": "Open review"
+        },
+        "services": {
+          "title": "Service health",
+          "down": "{{count}} services down",
+          "ok": "No service issues",
+          "action": "View dashboard"
+        }
+      },
+      "access": {
+        "registration": "Registration policy",
+        "invites": "Invite pool",
+        "invitesValue": "{{available}} available / {{total}} total",
+        "liveReview": "Live review",
+        "liveReviewValue": "{{pending}} pending / {{approved}} approved"
+      },
+      "actions": {
+        "invites": "Manage invites",
+        "creators": "Manage creator access"
+      },
+      "review": {
+        "title": "Review policy",
+        "invalid": "Invalid setting value.",
+        "noChange": "No changes to save.",
+        "confirm": "Save review policy changes?",
+        "saved": "System policy updated.",
+        "saveFailed": "Failed to update system policy.",
+        "timeout": "Report claim lock",
+        "minutes": "{{count}} minutes",
+        "defaultMute": "Default site mute",
+        "note": "Change note",
+        "notePlaceholder": "Optional",
+        "saving": "Saving",
+        "save": "Save policy",
+        "updatedAt": "Updated {{time}}",
+        "defaultState": "Default policy in use",
+        "contentPolicy": "Content policy level",
+        "currentTimeout": "Current lock",
+        "currentMute": "Current default mute",
+        "minutes_one": "{{count}} minute",
+        "minutes_other": "{{count}} minutes"
+      },
+      "services": {
+        "loading": "Loading service status...",
+        "empty": "No service health data."
+      },
+      "runtime": {
+        "service": "Service",
+        "logLevel": "Log level",
+        "flvBase": "HTTP-FLV URL",
+        "streamKeyTtl": "Stream key TTL",
+        "replayRecordDir": "Replay record dir",
+        "replayUploadTimeout": "Replay upload timeout",
+        "bunnyStream": "Bunny Stream",
+        "coverPublicUrl": "Cover public path",
+        "postPublicUrl": "Post image path",
+        "configured": "Configured",
+        "notConfigured": "Not configured",
+        "loading": "Loading runtime config...",
+        "empty": "No runtime config."
+      },
+      "logs": {
+        "loading": "Loading system logs...",
+        "empty": "No system setting logs."
+      }
+    },
     "logs": {
       "aria": "Action logs summary",
       "eyebrow": "Logs",
@@ -1581,7 +1699,8 @@
         "platformApplicationReject": "Reject certification application",
         "livePermissionApprove": "Enable live permission",
         "livePermissionReject": "Disable live permission",
-        "adminCreate": "Create admin account"
+        "adminCreate": "Create admin account",
+        "systemSettingsUpdate": "Update system settings"
       }
     },
     "exit": "Exit admin",

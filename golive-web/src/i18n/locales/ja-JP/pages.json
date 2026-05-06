@@ -1523,6 +1523,116 @@
         }
       }
     },
+    "system": {
+      "title": "システム設定",
+      "aria": "システム設定概要",
+      "tabs": {
+        "overview": "概要",
+        "access": "アクセス",
+        "review": "審査設定",
+        "services": "サービス状態",
+        "runtime": "実行設定",
+        "logs": "システムログ"
+      },
+      "kpis": {
+        "registration": "登録ポリシー",
+        "liveReview": "配信審査",
+        "contentPolicy": "コンテンツ方針",
+        "serviceStatus": "サービス状態"
+      },
+      "values": {
+        "enabled": "有効",
+        "disabled": "無効"
+      },
+      "policy": {
+        "inviteOnly": "招待制",
+        "public": "公開登録",
+        "closed": "登録停止",
+        "strict": "厳格",
+        "standard": "標準",
+        "relaxed": "緩め",
+        "days": "{{count}} 日",
+        "hours": "{{count}} 時間",
+        "minutes": "{{count}} 分"
+      },
+      "cards": {
+        "registration": {
+          "title": "登録アクセス",
+          "meta": "{{available}} 利用可 / {{total}} 招待コード",
+          "action": "招待コード管理"
+        },
+        "live": {
+          "title": "配信権限",
+          "meta": "{{pending}} 未審査 / {{approved}} 承認済み",
+          "action": "申請を確認"
+        },
+        "review": {
+          "title": "コンテンツ審査",
+          "meta": "ロック {{timeout}} 分 / 既定ミュート {{mute}}",
+          "action": "審査へ"
+        },
+        "services": {
+          "title": "サービスヘルス",
+          "down": "{{count}} 件の異常",
+          "ok": "異常なし",
+          "action": "ダッシュボード"
+        }
+      },
+      "access": {
+        "registration": "登録ポリシー",
+        "invites": "招待コード",
+        "invitesValue": "{{available}} 利用可 / {{total}} 合計",
+        "liveReview": "配信審査",
+        "liveReviewValue": "{{pending}} 未審査 / {{approved}} 承認済み"
+      },
+      "actions": {
+        "invites": "招待コード管理",
+        "creators": "配信権限管理"
+      },
+      "review": {
+        "title": "審査設定",
+        "invalid": "設定値が無効です。",
+        "noChange": "保存する変更はありません。",
+        "confirm": "審査設定を保存しますか？",
+        "saved": "システム設定を更新しました。",
+        "saveFailed": "システム設定の更新に失敗しました。",
+        "timeout": "通報取得ロック",
+        "minutes": "{{count}} 分",
+        "defaultMute": "既定の全体ミュート",
+        "note": "変更メモ",
+        "notePlaceholder": "任意",
+        "saving": "保存中",
+        "save": "保存",
+        "updatedAt": "最終更新 {{time}}",
+        "defaultState": "既定設定を使用中",
+        "contentPolicy": "コンテンツ方針",
+        "currentTimeout": "現在のロック",
+        "currentMute": "現在の既定ミュート"
+      },
+      "services": {
+        "loading": "サービス状態を読み込み中...",
+        "empty": "サービスヘルスデータはありません。"
+      },
+      "runtime": {
+        "service": "サービス",
+        "logLevel": "ログレベル",
+        "flvBase": "HTTP-FLV URL",
+        "streamKeyTtl": "配信キー有効期限",
+        "replayRecordDir": "リプレイ保存先",
+        "replayUploadTimeout": "リプレイアップロード期限",
+        "bunnyStream": "Bunny Stream",
+        "coverPublicUrl": "カバー公開パス",
+        "postPublicUrl": "投稿画像パス",
+        "configured": "設定済み",
+        "notConfigured": "未設定",
+        "loading": "実行設定を読み込み中...",
+        "empty": "実行設定はありません。"
+      },
+      "logs": {
+        "loading": "システムログを読み込み中...",
+        "empty": "システム設定ログはありません。"
+      }
+    },
     "logs": {
       "aria": "操作ログ概要",
       "eyebrow": "ログ",
@@ -1581,7 +1691,8 @@
         "platformApplicationReject": "認証申請を却下",
         "livePermissionApprove": "配信権限を有効化",
         "livePermissionReject": "配信権限を無効化",
-        "adminCreate": "管理者アカウント作成"
+        "adminCreate": "管理者アカウント作成",
+        "systemSettingsUpdate": "システム設定更新"
       }
     },
     "exit": "管理画面を終了",
