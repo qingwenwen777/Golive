@@ -30,7 +30,9 @@ import {
   Users,
   Zap,
   Bell,
+  Check,
   Clock3,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -83,6 +85,12 @@ import { Avatar } from '@/components/Avatar';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
@@ -1321,23 +1329,15 @@ export function CreatorAppointmentsPage() {
                       onChange={(event) => setTitle(event.target.value)}
                     />
                   </label>
-                  <label className="gl-creator-field">
+                  <div className="gl-creator-field gl-appointment-category-field">
                     <span>{t('createLive.fields.category')}</span>
-                    <select
-                      className="gl-appointment-category-select"
+                    <AppointmentCategorySelect
+                      categories={categories}
                       value={category}
-                      onChange={(event) => setCategory(event.target.value)}
-                      required
-                    >
-                      {categories.map((item) => (
-                        <option key={item} value={item}>
-                          {t(`createLive.categories.${categoryKey(item)}`, {
-                            defaultValue: item,
-                          })}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      onChange={setCategory}
+                      label={t('createLive.fields.category')}
+                    />
+                  </div>
                 </div>
                 <label className="gl-creator-field">
                   <span>{t('createLive.fields.description')}</span>
@@ -2167,6 +2167,49 @@ function AppointmentStudioRow({
         });
       }}
     />
+  );
+}
+
+function AppointmentCategorySelect({
+  categories,
+  value,
+  onChange,
+  label,
+}: {
+  categories: string[];
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  const { t } = useTranslation('pages');
+  const currentLabel = t(`createLive.categories.${categoryKey(value)}`, { defaultValue: value });
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="gl-category-select-trigger" aria-label={label}>
+          <span className="gl-category-select-current">{currentLabel}</span>
+          <ChevronDown size={17} aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={6} className="gl-category-select-content">
+        {categories.map((item) => {
+          const selected = item === value;
+          return (
+            <DropdownMenuItem
+              key={item}
+              className={cn('gl-category-select-item', selected && 'is-selected')}
+              onSelect={() => onChange(item)}
+            >
+              <span className="gl-category-select-check" aria-hidden="true">
+                {selected && <Check size={14} />}
+              </span>
+              <span>{t(`createLive.categories.${categoryKey(item)}`, { defaultValue: item })}</span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
