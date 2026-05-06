@@ -396,6 +396,20 @@ export function useAdminUpdateUserProfile(id: string) {
   });
 }
 
+export function useAdminUpdateUserEmail(id: string) {
+  return useAdminUserMutation<{ email: string }>(async (payload) => {
+    const { data } = await http.patch(`/admin/users/${encodeURIComponent(id)}/email`, payload);
+    return data;
+  });
+}
+
+export function useAdminUpdateUserPassword(id: string) {
+  return useAdminUserMutation<{ password: string }>(async (payload) => {
+    const { data } = await http.patch(`/admin/users/${encodeURIComponent(id)}/password`, payload);
+    return data;
+  });
+}
+
 export function useAdminUpdateUserRole(id: string) {
   return useAdminUserMutation<{ role: AdminUserRole }>(async (payload) => {
     const { data } = await http.patch(`/admin/users/${encodeURIComponent(id)}/role`, payload);

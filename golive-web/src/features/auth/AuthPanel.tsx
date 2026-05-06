@@ -29,6 +29,7 @@ type AuthMode = 'signin' | 'signup' | 'reset';
 const PASSWORD_RULE_TEXT = '至少 8 位，包含英文和数字';
 const PASSWORD_PATTERN = '(?=.*[A-Za-z])(?=.*[0-9]).{8,}';
 const PASSWORD_RULE_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+const EMAIL_CODE_COOLDOWN_SECONDS = 60;
 
 export interface AuthPanelProps {
   className?: string;
@@ -135,12 +136,14 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [emailCode, setEmailCode] = useState('');
+  const [registerEmailCodeCooldown, setRegisterEmailCodeCooldown] = useState(0);
   const [inviteCode, setInviteCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetUsername, setResetUsername] = useState('');
   const [resetEmail, setResetEmail] = useState('');
   const [resetEmailCode, setResetEmailCode] = useState('');
+  const [resetEmailCodeCooldown, setResetEmailCodeCooldown] = useState(0);
   const [resetPassword, setResetPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
   const [captchaId, setCaptchaId] = useState('');
@@ -232,9 +235,39 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
+  useEffect(() => {
+    if (registerEmailCodeCooldown <= 0 && resetEmailCodeCooldown <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setRegisterEmailCodeCooldown((seconds) => Math.max(0, seconds - 1));
+      setResetEmailCodeCooldown((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [registerEmailCodeCooldown, resetEmailCodeCooldown]);
+
+  const setEmailCodeCooldown = (purpose: 'register' | 'password_reset') => {
+    if (purpose === 'register') {
+      setRegisterEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
+      return;
+    }
+    setResetEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
+  };
+
+  const emailCodeButtonText = (cooldown: number) => {
+    if (sendEmailCodeMut.isPending) return t('auth.sendingCode', { defaultValue: 'Sending...' });
+    if (cooldown > 0) {
+      return t('auth.sendCodeCountdown', {
+        seconds: cooldown,
+        defaultValue: 'Resend in {{seconds}}s',
+      });
+    }
+    return t('auth.sendCode', { defaultValue: 'Send code' });
+  };
+
   const sendEmailCode = (purpose: 'register' | 'password_reset') => {
     setError(null);
     setSuccess(null);
+    const cooldown = purpose === 'register' ? registerEmailCodeCooldown : resetEmailCodeCooldown;
+    if (cooldown > 0) return;
     if (purpose === 'register') {
       const cleanEmail = email.trim();
       if (!cleanEmail) {
@@ -244,10 +277,12 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       sendEmailCodeMut.mutate(
         { purpose, email: cleanEmail },
         {
-          onSuccess: () =>
+          onSuccess: () => {
+            setEmailCodeCooldown(purpose);
             setSuccess(
               t('auth.emailCodeSent', { defaultValue: 'Verification code has been sent.' }),
-            ),
+            );
+          },
           onError: (err: Error) => setError(authErrorMessage(err, mode, t)),
         },
       );
@@ -267,8 +302,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     sendEmailCodeMut.mutate(
       { purpose, username: cleanUsername, email: cleanEmail },
       {
-        onSuccess: () =>
-          setSuccess(t('auth.emailCodeSent', { defaultValue: 'Verification code has been sent.' })),
+        onSuccess: () => {
+          setEmailCodeCooldown(purpose);
+          setSuccess(t('auth.emailCodeSent', { defaultValue: 'Verification code has been sent.' }));
+        },
         onError: (err: Error) => setError(authErrorMessage(err, mode, t)),
       },
     );
@@ -641,12 +678,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                 <button
                   type="button"
                   className="gl-auth-code-send"
-                  disabled={sendEmailCodeMut.isPending}
+                  disabled={sendEmailCodeMut.isPending || resetEmailCodeCooldown > 0}
                   onClick={() => sendEmailCode('password_reset')}
                 >
-                  {sendEmailCodeMut.isPending
-                    ? t('auth.sendingCode', { defaultValue: 'Sending...' })
-                    : t('auth.sendCode', { defaultValue: 'Send code' })}
+                  {emailCodeButtonText(resetEmailCodeCooldown)}
                 </button>
               </span>
             </label>
@@ -747,12 +782,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                     <button
                       type="button"
                       className="gl-auth-code-send"
-                      disabled={sendEmailCodeMut.isPending}
+                      disabled={sendEmailCodeMut.isPending || registerEmailCodeCooldown > 0}
                       onClick={() => sendEmailCode('register')}
                     >
-                      {sendEmailCodeMut.isPending
-                        ? t('auth.sendingCode', { defaultValue: 'Sending...' })
-                        : t('auth.sendCode', { defaultValue: 'Send code' })}
+                      {emailCodeButtonText(registerEmailCodeCooldown)}
                     </button>
                   </span>
                 </label>

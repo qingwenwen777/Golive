@@ -262,6 +262,74 @@ func (h *AdminHandler) UpdateUserProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
 }
 
+type adminUpdateUserEmailReq struct {
+	Email string `json:"email" binding:"required"`
+}
+
+func (h *AdminHandler) UpdateUserEmail(c *gin.Context) {
+	var req adminUpdateUserEmailReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	email, ok := service.NormalizeEmail(req.Email)
+	if !ok {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	u, err := h.users.UpdateEmail(c.Request.Context(), c.Param("id"), email)
+	if errors.Is(err, repo.ErrEmailTaken) {
+		errcode.Respond(c, service.ErrEmailTaken)
+		return
+	}
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "user_email_update", "user", u.ID, u.DisplayName, u.ID, u.DisplayName, "updated user email")
+	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
+}
+
+type adminUpdateUserPasswordReq struct {
+	Password string `json:"password" binding:"required"`
+}
+
+func (h *AdminHandler) UpdateUserPassword(c *gin.Context) {
+	var req adminUpdateUserPasswordReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, service.ErrInvalidPassword)
+		return
+	}
+	if err := service.ValidatePasswordPolicy(req.Password); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	u, err := h.users.FindByID(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	hash, err := service.HashPassword(req.Password)
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	if err := h.users.UpdatePasswordHash(c.Request.Context(), u.ID, hash); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	h.logAdminAudit(c, model.AdminAuditCategoryPermission, "user_password_update", "user", u.ID, u.DisplayName, u.ID, u.DisplayName, "updated user password")
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 type adminUpdateUserRoleReq struct {
 	Role string `json:"role" binding:"required"`
 }

@@ -42,10 +42,6 @@ export interface SendEmailCodePayload {
   username?: string;
 }
 
-export interface SendEmailChangeCodePayload {
-  email: string;
-}
-
 export interface GoogleCredentialPayload {
   credential: string;
 }
@@ -266,11 +262,11 @@ export function useChangePassword() {
 }
 
 export function useSendEmailChangeCode() {
-  return useMutation<{ ok: boolean; expiresIn: number }, Error, SendEmailChangeCodePayload>({
-    mutationFn: async (payload) => {
+  return useMutation<{ ok: boolean; expiresIn: number }, Error, void>({
+    mutationFn: async () => {
       const { data } = await http.post<{ ok: boolean; expiresIn: number }>(
         '/users/me/email/code',
-        payload,
+        {},
       );
       return data;
     },

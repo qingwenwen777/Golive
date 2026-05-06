@@ -97,3 +97,34 @@ func TestChangePasswordRequiresCurrentPassword(t *testing.T) {
 	_, err = auth.Login(context.Background(), "demo", "new-secret1")
 	require.NoError(t, err)
 }
+
+func TestAdminCanUpdateUserEmailAndPassword(t *testing.T) {
+	router, users, auth := newCoinsTestRouter(t)
+	ctx := context.Background()
+	admin, err := auth.Register(ctx, "admin", "secret123", "Admin")
+	require.NoError(t, err)
+	require.NoError(t, users.EnsureAdmin(ctx, "admin"))
+	target, err := auth.Register(ctx, "target", "oldpass", "Target User")
+	require.NoError(t, err)
+
+	emailReq := httptest.NewRequest(http.MethodPatch, "/admin/users/"+target.User.ID+"/email", bytes.NewBufferString(`{"email":"target-new@example.com"}`))
+	emailReq.Header.Set("Authorization", "Bearer "+admin.Token)
+	emailReq.Header.Set("Content-Type", "application/json")
+	emailRec := httptest.NewRecorder()
+	router.ServeHTTP(emailRec, emailReq)
+	require.Equal(t, http.StatusOK, emailRec.Code)
+
+	updated, err := users.FindByID(ctx, target.User.ID)
+	require.NoError(t, err)
+	require.Equal(t, "target-new@example.com", updated.Email)
+
+	passwordReq := httptest.NewRequest(http.MethodPatch, "/admin/users/"+target.User.ID+"/password", bytes.NewBufferString(`{"password":"newpass123"}`))
+	passwordReq.Header.Set("Authorization", "Bearer "+admin.Token)
+	passwordReq.Header.Set("Content-Type", "application/json")
+	passwordRec := httptest.NewRecorder()
+	router.ServeHTTP(passwordRec, passwordReq)
+	require.Equal(t, http.StatusOK, passwordRec.Code)
+
+	_, err = auth.Login(ctx, "target", "newpass123")
+	require.NoError(t, err)
+}

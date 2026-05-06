@@ -17,6 +17,7 @@ import {
   Gift as GiftIcon,
   Gauge,
   History,
+  KeyRound,
   ListFilter,
   LogOut,
   Pencil,
@@ -89,6 +90,8 @@ import {
   useAdminSystemSettings,
   useUpdateAdminSystemSettings,
   useAdminUpdateGift,
+  useAdminUpdateUserEmail,
+  useAdminUpdateUserPassword,
   useAdminReviewUnbanAppeal,
   useAdminUpdateUserProfile,
   useAdminUpdateUserRole,
@@ -510,7 +513,9 @@ export default function AdminPage() {
               overviewLoading={overview.isLoading}
               metrics={metrics}
               inviteItems={inviteItems}
-              loading={apps.isLoading || platformApps.isLoading || creators.isLoading || invites.isLoading}
+              loading={
+                apps.isLoading || platformApps.isLoading || creators.isLoading || invites.isLoading
+              }
             />
           )}
           {currentModule === 'logs' && <LogsPage />}
@@ -954,6 +959,8 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
   const [tab, setTab] = useState<'profile' | 'coins' | 'lives' | 'reports' | 'appeals'>('profile');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [banReason, setBanReason] = useState('');
   const [coinAction, setCoinAction] = useState<CoinAdjustAction>('add');
   const [coinAmount, setCoinAmount] = useState('100');
@@ -961,6 +968,8 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
   const [appealNote, setAppealNote] = useState('');
   const detail = useAdminUserDetail(userId, Boolean(userId));
   const updateProfile = useAdminUpdateUserProfile(userId);
+  const updateEmail = useAdminUpdateUserEmail(userId);
+  const updatePassword = useAdminUpdateUserPassword(userId);
   const updateRole = useAdminUpdateUserRole(userId);
   const setBan = useAdminSetUserBan(userId);
   const adjustCoins = useAdminAdjustUserCoins(userId);
@@ -970,6 +979,8 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
     if (!user) return;
     setUsername(user.username);
     setDisplayName(user.displayName || user.username);
+    setEmail(user.email || '');
+    setPassword('');
     setBanReason(user.banReason || '');
     setAppealNote('');
     setTab('profile');
@@ -1008,6 +1019,46 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
         onError: (err) => toast.error(apiErrorMessage(err)),
       },
     );
+  };
+  const submitSecurity = async () => {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+    const tasks: Promise<unknown>[] = [];
+    if (cleanEmail !== (user.email || '').trim()) {
+      if (!cleanEmail) {
+        toast.error(
+          t('admin.users.detail.invalidEmail', { defaultValue: 'Enter a valid email address.' }),
+        );
+        return;
+      }
+      tasks.push(updateEmail.mutateAsync({ email: cleanEmail }));
+    }
+    if (cleanPassword) {
+      if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(cleanPassword)) {
+        toast.error(
+          t('admin.users.detail.invalidPassword', {
+            defaultValue: 'Password must be at least 8 characters and include letters and numbers.',
+          }),
+        );
+        return;
+      }
+      tasks.push(updatePassword.mutateAsync({ password: cleanPassword }));
+    }
+    if (tasks.length === 0) {
+      toast.info(
+        t('admin.users.detail.noSecurityChanges', { defaultValue: 'No changes to save.' }),
+      );
+      return;
+    }
+    try {
+      await Promise.all(tasks);
+      setPassword('');
+      toast.success(
+        t('admin.users.detail.securitySaved', { defaultValue: 'Email and password updated.' }),
+      );
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    }
   };
   const submitRole = (role: string) => {
     updateRole.mutate(
@@ -1100,6 +1151,39 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
             <button type="button" onClick={submitProfile} disabled={updateProfile.isPending}>
               <Save size={15} />
               {t('admin.users.detail.saveProfile', { defaultValue: 'Save profile' })}
+            </button>
+          </div>
+          <div className="gl-admin-user-form">
+            <label>
+              <span>{t('admin.users.detail.boundEmail', { defaultValue: 'Bound email' })}</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={t('admin.users.detail.emailPlaceholder', {
+                  defaultValue: 'user@example.com',
+                })}
+              />
+            </label>
+            <label>
+              <span>{t('admin.users.detail.newPassword', { defaultValue: 'New password' })}</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={t('admin.users.detail.passwordPlaceholder', {
+                  defaultValue: 'Leave blank to keep unchanged',
+                })}
+                autoComplete="new-password"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={submitSecurity}
+              disabled={updateEmail.isPending || updatePassword.isPending}
+            >
+              <KeyRound size={15} />
+              {t('admin.users.detail.saveSecurity', { defaultValue: 'Save security' })}
             </button>
           </div>
           <div className="gl-admin-user-form is-compact">
@@ -2771,6 +2855,12 @@ function auditActionLabel(value: string, t: Translate) {
     user_profile_update: t('admin.logs.actions.userProfileUpdate', {
       defaultValue: 'Update user profile',
     }),
+    user_email_update: t('admin.logs.actions.userEmailUpdate', {
+      defaultValue: 'Update user email',
+    }),
+    user_password_update: t('admin.logs.actions.userPasswordUpdate', {
+      defaultValue: 'Reset user password',
+    }),
     user_role_update: t('admin.logs.actions.userRoleUpdate', {
       defaultValue: 'Update user role',
     }),
@@ -3465,8 +3555,8 @@ function EconomyBetsPanel() {
                   <span>
                     {t('admin.economy.bets.winOption', { defaultValue: 'Win' })} {item.winCount} (
                     {formatCoins(item.winPool)}) /{' '}
-                    {t('admin.economy.bets.loseOption', { defaultValue: 'Lose' })}{' '}
-                    {item.loseCount} ({formatCoins(item.losePool)})
+                    {t('admin.economy.bets.loseOption', { defaultValue: 'Lose' })} {item.loseCount}{' '}
+                    ({formatCoins(item.losePool)})
                   </span>
                 </div>
                 <span className={`gl-admin-status is-${statusTone(item.status)}`}>
@@ -3669,7 +3759,8 @@ function AdminPager({
           defaultValue: 'Page {{page}} / {{pages}}',
           page,
           pages: maxPage,
-        })} / {total}
+        })}{' '}
+        / {total}
       </span>
       <button type="button" disabled={page >= maxPage} onClick={() => onPage(page + 1)}>
         {t('admin.pagination.next', { defaultValue: 'Next' })}
@@ -3821,8 +3912,8 @@ function SystemPage({
   const defaultMuteNumber = Number(defaultMute);
   const dirty = Boolean(
     data &&
-      (reviewTimeoutNumber !== data.reportReviewTimeoutMinutes ||
-        defaultMuteNumber !== data.defaultSiteMuteMinutes),
+    (reviewTimeoutNumber !== data.reportReviewTimeoutMinutes ||
+      defaultMuteNumber !== data.defaultSiteMuteMinutes),
   );
 
   const saveReviewPolicy = () => {
@@ -4135,7 +4226,9 @@ function SystemPage({
             <div className="gl-admin-health-grid">
               {overviewLoading ? (
                 <AdminEmptyState
-                  label={t('admin.system.services.loading', { defaultValue: '正在加载服务状态...' })}
+                  label={t('admin.system.services.loading', {
+                    defaultValue: '正在加载服务状态...',
+                  })}
                 />
               ) : healthItems.length === 0 ? (
                 <AdminEmptyState

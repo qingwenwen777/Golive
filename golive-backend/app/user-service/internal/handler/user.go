@@ -169,35 +169,27 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-type sendEmailChangeCodeReq struct {
-	Email string `json:"email" binding:"required"`
-}
-
 func (h *UserHandler) SendEmailChangeCode(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	var req sendEmailChangeCodeReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
-		return
-	}
-	cleanEmail, ok := service.NormalizeEmail(req.Email)
-	if !ok {
-		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
-		return
-	}
 	if h.emailCodes == nil {
 		errcode.Respond(c, service.ErrEmailNotConfigured)
 		return
 	}
-	if _, err := h.users.FindByID(c.Request.Context(), uid); err != nil {
+	u, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	resp, err := h.emailCodes.Send(c.Request.Context(), service.EmailPurposeEmailChange, cleanEmail)
+	oldEmail, ok := service.NormalizeEmail(u.Email)
+	if !ok {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	resp, err := h.emailCodes.Send(c.Request.Context(), service.EmailPurposeEmailChange, oldEmail)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
@@ -230,7 +222,17 @@ func (h *UserHandler) UpdateEmail(c *gin.Context) {
 		errcode.Respond(c, service.ErrEmailNotConfigured)
 		return
 	}
-	if err := h.emailCodes.Verify(c.Request.Context(), service.EmailPurposeEmailChange, cleanEmail, req.EmailCode); err != nil {
+	current, err := h.users.FindByID(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, service.ErrUnauthorized)
+		return
+	}
+	oldEmail, ok := service.NormalizeEmail(current.Email)
+	if !ok {
+		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
+		return
+	}
+	if err := h.emailCodes.Verify(c.Request.Context(), service.EmailPurposeEmailChange, oldEmail, req.EmailCode); err != nil {
 		errcode.Respond(c, err)
 		return
 	}

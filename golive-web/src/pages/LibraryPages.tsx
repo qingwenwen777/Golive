@@ -800,6 +800,8 @@ export function LikedPage() {
 
 type SettingsTab = 'profile' | 'security' | 'preferences' | 'blacklist';
 
+const EMAIL_CODE_COOLDOWN_SECONDS = 60;
+
 export function SettingsPage() {
   const { t, i18n } = useTranslation('pages');
   const navigate = useNavigate();
@@ -828,6 +830,7 @@ export function SettingsPage() {
   const [emailEditing, setEmailEditing] = useState(false);
   const [emailDraft, setEmailDraft] = useState('');
   const [emailCode, setEmailCode] = useState('');
+  const [emailCodeCooldown, setEmailCodeCooldown] = useState(0);
   const [googleUnbindPassword, setGoogleUnbindPassword] = useState('');
   const currentUser = me.data ?? user;
   const displayName = userDisplayName(currentUser);
@@ -842,6 +845,14 @@ export function SettingsPage() {
   useEffect(() => {
     if (!emailEditing) setEmailDraft(currentUser?.email ?? '');
   }, [currentUser?.email, emailEditing]);
+
+  useEffect(() => {
+    if (emailCodeCooldown <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setEmailCodeCooldown((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [emailCodeCooldown]);
 
   const tabs: Array<{ id: SettingsTab; label: string; sub: string; icon: ReactNode }> = [
     {
@@ -930,25 +941,26 @@ export function SettingsPage() {
       openLogin();
       return;
     }
-    const email = emailDraft.trim();
-    if (!email) {
+    if (emailCodeCooldown > 0) return;
+    if (!currentUser?.email) {
       toast.error(
-        t('library.settings.errors.invalidEmail', { defaultValue: 'Enter a valid email address.' }),
+        t('library.settings.errors.boundEmailMissing', {
+          defaultValue: 'No current email is bound to this account.',
+        }),
       );
       return;
     }
-    sendEmailChangeCode.mutate(
-      { email },
-      {
-        onSuccess: () =>
-          toast.success(
-            t('library.settings.security.emailCodeSent', {
-              defaultValue: 'Verification code sent.',
-            }),
-          ),
-        onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
+    sendEmailChangeCode.mutate(undefined, {
+      onSuccess: () => {
+        setEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
+        toast.success(
+          t('library.settings.security.emailCodeSent', {
+            defaultValue: 'Verification code sent to your current email.',
+          }),
+        );
       },
-    );
+      onError: (err) => toast.error(settingsErrorMessage(err, t, i18n.language)),
+    });
   };
 
   const submitEmailChange = (event: FormEvent<HTMLFormElement>) => {
@@ -972,6 +984,7 @@ export function SettingsPage() {
       {
         onSuccess: () => {
           setEmailCode('');
+          setEmailCodeCooldown(0);
           setEmailEditing(false);
           toast.success(
             t('library.settings.security.emailUpdated', {
@@ -1097,6 +1110,7 @@ export function SettingsPage() {
               emailCode={emailCode}
               emailPending={updateEmail.isPending}
               emailCodePending={sendEmailChangeCode.isPending}
+              emailCodeCooldown={emailCodeCooldown}
               googleLinked={Boolean(currentUser?.googleLinked)}
               googlePending={bindGoogle.isPending}
               googleUnlinkPending={unbindGoogle.isPending}
@@ -1362,6 +1376,7 @@ function SecuritySettings({
   emailCode,
   emailPending,
   emailCodePending,
+  emailCodeCooldown,
   googleLinked,
   googlePending,
   googleUnlinkPending,
@@ -1390,6 +1405,7 @@ function SecuritySettings({
   emailCode: string;
   emailPending: boolean;
   emailCodePending: boolean;
+  emailCodeCooldown: number;
   googleLinked: boolean;
   googlePending: boolean;
   googleUnlinkPending: boolean;
@@ -1409,6 +1425,18 @@ function SecuritySettings({
   onGoogleUnavailable: () => void;
 }) {
   const { t, i18n } = useTranslation('pages');
+  const emailCodeButtonLabel = emailCodePending
+    ? t('library.settings.security.emailCodeSending', {
+        defaultValue: 'Sending...',
+      })
+    : emailCodeCooldown > 0
+      ? t('library.settings.security.emailCodeCountdown', {
+          seconds: emailCodeCooldown,
+          defaultValue: 'Resend in {{seconds}}s',
+        })
+      : t('library.settings.security.emailCodeSend', {
+          defaultValue: 'Send code',
+        });
   return (
     <>
       <form className="gl-settings-card gl-settings-form" onSubmit={onSubmit}>
@@ -1478,7 +1506,8 @@ function SecuritySettings({
             <h2>{t('library.settings.security.emailTitle', { defaultValue: 'Email binding' })}</h2>
             <p>
               {t('library.settings.security.emailSub', {
-                defaultValue: 'Use a verified email for account recovery and security checks.',
+                defaultValue:
+                  'Send a code to your current email before saving a new email address.',
               })}
             </p>
           </div>
@@ -1516,7 +1545,7 @@ function SecuritySettings({
               <label className="gl-settings-field">
                 <span>
                   {t('library.settings.security.emailCode', {
-                    defaultValue: 'Verification code',
+                    defaultValue: 'Current email code',
                   })}
                 </span>
                 <span className="gl-settings-code-row">
@@ -1532,16 +1561,10 @@ function SecuritySettings({
                   <button
                     className="gl-settings-button"
                     type="button"
-                    disabled={emailCodePending}
+                    disabled={emailCodePending || emailCodeCooldown > 0}
                     onClick={onEmailCodeRequest}
                   >
-                    {emailCodePending
-                      ? t('library.settings.security.emailCodeSending', {
-                          defaultValue: 'Sending...',
-                        })
-                      : t('library.settings.security.emailCodeSend', {
-                          defaultValue: 'Send code',
-                        })}
+                    {emailCodeButtonLabel}
                   </button>
                 </span>
               </label>
