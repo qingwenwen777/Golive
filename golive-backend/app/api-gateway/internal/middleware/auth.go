@@ -22,7 +22,7 @@ type PublicRoute struct {
 	Path   string
 }
 
-// JWT validates access tokens with a single legacy HS256 secret.
+// JWT validates access tokens with a single shared secret.
 func JWT(secret string, public []PublicRoute) gin.HandlerFunc {
 	keys, err := jwtauth.NewKeySet(secret, "", nil)
 	if err != nil {

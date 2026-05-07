@@ -62,9 +62,11 @@ type CSRFCfg struct {
 }
 
 type RateLimitCfg struct {
-	Enabled    bool    `mapstructure:"enabled"`
-	RatePerSec float64 `mapstructure:"rate_per_sec"`
-	Burst      int     `mapstructure:"burst"`
+	Enabled        bool    `mapstructure:"enabled"`
+	RatePerSec     float64 `mapstructure:"rate_per_sec"`
+	Burst          int     `mapstructure:"burst"`
+	AuthRatePerSec float64 `mapstructure:"auth_rate_per_sec"`
+	AuthBurst      int     `mapstructure:"auth_burst"`
 }
 
 func Load(path string) (*Config, error) {

@@ -459,7 +459,7 @@ func (s *AuthService) ParseAccess(token string) (string, error) {
 	return s.parseAccess(token)
 }
 
-// signAccess produces an HS256 JWT with sub=userID, exp=now+accessTTL.
+// signAccess produces an access JWT with sub=userID, exp=now+accessTTL.
 func (s *AuthService) signAccess(userID string) (string, error) {
 	return s.jwtKeys.SignAccess(userID, s.now(), s.accessTTL)
 }

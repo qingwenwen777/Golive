@@ -3,6 +3,7 @@ package middleware
 import (
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,8 @@ const (
 	rateLimitBucketTTL        = 10 * time.Minute
 	rateLimitCleanupInterval  = time.Minute
 	rateLimitMaxBucketEntries = 100_000
+	defaultAuthRatePerSec     = 0.3
+	defaultAuthBurst          = 6
 )
 
 type rateLimitBucket struct {
@@ -30,7 +33,7 @@ type rateLimitStore struct {
 	maxEntries int
 }
 
-// RateLimit enforces a per-IP token bucket. Suitable for a single-instance
+// RateLimit enforces a per-client token bucket. Suitable for a single-instance
 // MVP; swap for Redis-backed when we shard.
 //
 // 429 responses match the gateway's unified shape via plain JSON write to
@@ -48,6 +51,35 @@ func RateLimit(ratePerSec float64, burst int) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"message": "Too Many Requests",
 				"reason":  "rate_limited",
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
+// AuthRateLimit adds a stricter per-client bucket for credential and token
+// issuance routes. It is layered with the broader global limiter.
+func AuthRateLimit(ratePerSec float64, burst int) gin.HandlerFunc {
+	if ratePerSec <= 0 {
+		ratePerSec = defaultAuthRatePerSec
+	}
+	if burst <= 0 {
+		burst = defaultAuthBurst
+	}
+	store := newRateLimitStore(ratePerSec, burst, rateLimitBucketTTL, rateLimitMaxBucketEntries)
+	store.startJanitor(rateLimitCleanupInterval)
+
+	return func(c *gin.Context) {
+		if !isAuthLimitedRoute(c.Request.Method, c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+		ip := clientIP(c)
+		if !store.get(ip, time.Now()).Allow() {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"message": "Too Many Requests",
+				"reason":  "auth_rate_limited",
 			})
 			return
 		}
@@ -135,12 +167,59 @@ func (s *rateLimitStore) evictOldestLocked() {
 }
 
 func clientIP(c *gin.Context) string {
-	// gin.ClientIP honors X-Forwarded-For when TrustedProxies is set; we
-	// haven't configured it, so this falls back to RemoteAddr — exactly
-	// what we want for an edge gateway behind no other LB.
+	if ip := headerClientIP(c.GetHeader("X-Forwarded-For")); ip != "" {
+		return ip
+	}
+	if ip := headerClientIP(c.GetHeader("X-Real-IP")); ip != "" {
+		return ip
+	}
 	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
 	if err != nil {
 		return c.Request.RemoteAddr
 	}
 	return host
+}
+
+func headerClientIP(raw string) string {
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if host, _, err := net.SplitHostPort(part); err == nil {
+			part = host
+		}
+		ip := net.ParseIP(part)
+		if ip == nil || ip.IsUnspecified() {
+			continue
+		}
+		return ip.String()
+	}
+	return ""
+}
+
+func isAuthLimitedRoute(method, path string) bool {
+	path = strings.TrimRight(path, "/")
+	if method == http.MethodGet && path == "/api/auth/captcha" {
+		return true
+	}
+	if method != http.MethodPost {
+		return false
+	}
+	switch path {
+	case "/api/auth/email-code",
+		"/api/auth/google/bind",
+		"/api/auth/google/link-existing",
+		"/api/auth/google/login",
+		"/api/auth/google/register",
+		"/api/auth/google/unbind",
+		"/api/auth/login",
+		"/api/auth/logout",
+		"/api/auth/password/reset",
+		"/api/auth/refresh",
+		"/api/auth/register":
+		return true
+	default:
+		return false
+	}
 }

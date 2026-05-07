@@ -66,6 +66,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 	r.Use(middleware.RequestID())
 	if cfg.RateLimit.Enabled {
 		r.Use(middleware.RateLimit(cfg.RateLimit.RatePerSec, cfg.RateLimit.Burst))
+		r.Use(middleware.AuthRateLimit(cfg.RateLimit.AuthRatePerSec, cfg.RateLimit.AuthBurst))
 	}
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {

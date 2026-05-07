@@ -26,6 +26,8 @@ const (
 	EmailPurposeRegister      = "register"
 	EmailPurposePasswordReset = "password_reset"
 	EmailPurposeEmailChange   = "email_change"
+
+	emailCodeMaxVerifyFailures = 5
 )
 
 var (
@@ -95,8 +97,9 @@ func (s *EmailCodeService) Send(ctx context.Context, purpose, email string) (*Em
 	if err := s.rdb.Set(ctx, emailCodeKey(target), code, s.ttl).Err(); err != nil {
 		return nil, err
 	}
+	_ = s.rdb.Del(ctx, emailCodeFailKey(target)).Err()
 	if err := s.mailer.SendVerificationCode(ctx, cleanEmail, code, s.ttl); err != nil {
-		_ = s.rdb.Del(ctx, emailCodeKey(target), emailCodeRateKey(target)).Err()
+		_ = s.rdb.Del(ctx, emailCodeKey(target), emailCodeRateKey(target), emailCodeFailKey(target)).Err()
 		return nil, ErrEmailSendFailed
 	}
 	return &EmailCodeSendResult{OK: true, ExpiresIn: int(s.ttl.Seconds())}, nil
@@ -122,9 +125,33 @@ func (s *EmailCodeService) Verify(ctx context.Context, purpose, email, code stri
 		return ErrInvalidEmailCode
 	}
 	if subtle.ConstantTimeCompare([]byte(cleanCode), []byte(expected)) != 1 {
+		if err := s.recordEmailCodeVerifyFailure(ctx, target); err != nil {
+			return err
+		}
 		return ErrInvalidEmailCode
 	}
-	_ = s.rdb.Del(ctx, emailCodeKey(target), emailCodeRateKey(target)).Err()
+	_ = s.rdb.Del(ctx, emailCodeKey(target), emailCodeRateKey(target), emailCodeFailKey(target)).Err()
+	return nil
+}
+
+func (s *EmailCodeService) recordEmailCodeVerifyFailure(ctx context.Context, target string) error {
+	failKey := emailCodeFailKey(target)
+	count, err := s.rdb.Incr(ctx, failKey).Result()
+	if err != nil {
+		return err
+	}
+	if count == 1 {
+		ttl := s.ttl
+		if codeTTL, err := s.rdb.TTL(ctx, emailCodeKey(target)).Result(); err == nil && codeTTL > 0 {
+			ttl = codeTTL
+		}
+		if err := s.rdb.Expire(ctx, failKey, ttl).Err(); err != nil {
+			return err
+		}
+	}
+	if count >= emailCodeMaxVerifyFailures {
+		return s.rdb.Del(ctx, emailCodeKey(target), failKey).Err()
+	}
 	return nil
 }
 
@@ -152,6 +179,10 @@ func emailCodeKey(target string) string {
 
 func emailCodeRateKey(target string) string {
 	return "email_code_rate:" + target
+}
+
+func emailCodeFailKey(target string) string {
+	return "email_code_fail:" + target
 }
 
 func randomEmailCode(length int) (string, error) {

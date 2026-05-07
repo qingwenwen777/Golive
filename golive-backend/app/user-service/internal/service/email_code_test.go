@@ -50,3 +50,16 @@ func TestEmailCodeSendRateLimit(t *testing.T) {
 	_, err = codes.Send(context.Background(), service.EmailPurposePasswordReset, "user@example.com")
 	require.ErrorIs(t, err, service.ErrEmailCodeTooSoon)
 }
+
+func TestEmailCodeVerifyInvalidatesAfterTooManyFailures(t *testing.T) {
+	_, rdb := newMiniredis(t)
+	mailer := &captureMailer{}
+	codes := service.NewEmailCodeService(rdb, mailer, 10*time.Minute, time.Minute)
+
+	_, err := codes.Send(context.Background(), service.EmailPurposePasswordReset, "user@example.com")
+	require.NoError(t, err)
+	for i := 0; i < 5; i++ {
+		require.ErrorIs(t, codes.Verify(context.Background(), service.EmailPurposePasswordReset, "user@example.com", "000000"), service.ErrInvalidEmailCode)
+	}
+	require.ErrorIs(t, codes.Verify(context.Background(), service.EmailPurposePasswordReset, "user@example.com", mailer.code), service.ErrInvalidEmailCode)
+}

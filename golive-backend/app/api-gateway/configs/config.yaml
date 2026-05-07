@@ -40,3 +40,5 @@ ratelimit:
   enabled: true
   rate_per_sec: 100
   burst: 200
+  auth_rate_per_sec: 0.3
+  auth_burst: 6
