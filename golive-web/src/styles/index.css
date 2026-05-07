@@ -2712,7 +2712,7 @@ input:focus-visible,
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 26px;
+  border-radius: 34px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 251, 0.98)), var(--gl-bg);
   color: #0f0f0f;
@@ -3012,7 +3012,7 @@ input:focus-visible,
 @media (max-width: 720px) {
   .gl-share-dialog {
     width: min(100vw - 18px, 540px);
-    border-radius: 24px;
+    border-radius: 32px;
   }
 
   .gl-share-dialog > button {
