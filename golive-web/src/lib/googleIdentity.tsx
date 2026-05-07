@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GoogleIcon } from '@/components/GoogleIcon';
+import { cn } from '@/lib/cn';
 
 const GOOGLE_IDENTITY_SRC = 'https://accounts.google.com/gsi/client';
 
@@ -216,9 +217,7 @@ export function GoogleIdentityButton({
 
   return (
     <div
-      className={`gl-google-button-shell${ready ? 'is-ready' : ''}${
-        className ? ` ${className}` : ''
-      }`}
+      className={cn('gl-google-button-shell', ready && 'is-ready', className)}
     >
       <span className="gl-google-fallback gl-google-visible-button" aria-hidden="true">
         <GoogleIcon size="small" />
