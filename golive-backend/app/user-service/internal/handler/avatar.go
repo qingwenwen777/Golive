@@ -44,8 +44,13 @@ func (h *AvatarUploadHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	uploadimage.LimitRequestBody(c.Writer, c.Request, maxAvatarSize)
 	file, err := c.FormFile("file")
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "avatar must be 5MB or smaller"))
+			return
+		}
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "avatar file is required"))
 		return
 	}
@@ -58,9 +63,14 @@ func (h *AvatarUploadHandler) Upload(c *gin.Context) {
 	name, err := uploadimage.SaveOptimized(file, h.dir, base, "", uploadimage.Options{
 		MaxWidth:  512,
 		MaxHeight: 512,
+		MaxBytes:  maxAvatarSize,
 		Quality:   94,
 	})
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "avatar must be 5MB or smaller"))
+			return
+		}
 		if uploadimage.IsInvalidUpload(err) {
 			errcode.Respond(c, errcode.New(http.StatusBadRequest, "avatar must be a valid jpg, png, webp, or gif"))
 			return

@@ -130,6 +130,25 @@ func TestSaveOptimizedRejectsImagesAbovePixelLimit(t *testing.T) {
 	}
 }
 
+func TestSaveOptimizedRejectsUploadsAboveByteLimit(t *testing.T) {
+	original := pngBytes(t, 64, 64)
+	file := multipartFileHeader(t, "cover.png", "image/png", original)
+	dir := t.TempDir()
+
+	name, err := SaveOptimized(file, dir, "cover", ".png", Options{
+		MaxWidth:  512,
+		MaxHeight: 512,
+		MaxBytes:  int64(len(original) - 1),
+		Quality:   92,
+	})
+	if !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("SaveOptimized error = %v, want ErrTooLarge", err)
+	}
+	if name != "" {
+		t.Fatalf("name = %q, want empty", name)
+	}
+}
+
 func TestSaveOptimizedUsesDetectedFormatInsteadOfHeader(t *testing.T) {
 	original := jpegBytes(t, 16, 16)
 	file := multipartFileHeader(t, "avatar.png", "image/png", original)

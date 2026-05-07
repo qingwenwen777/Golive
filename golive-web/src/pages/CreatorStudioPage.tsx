@@ -2001,7 +2001,9 @@ export function CreatorFanGroupsPage() {
           }),
         ),
       onError: (err) =>
-        toast.error(err.message || t('studio.fanGroups.syncFailed', { defaultValue: '同步群聊失败。' })),
+        toast.error(
+          err.message || t('studio.fanGroups.syncFailed', { defaultValue: '同步群聊失败。' }),
+        ),
     });
   };
 
@@ -2021,9 +2023,12 @@ export function CreatorFanGroupsPage() {
     updateMember.mutate(
       { groupId: group.id, userId: member.user.id, ...patch },
       {
-        onSuccess: () => toast.success(t(successKey, { name: member.user.name, defaultValue: fallback })),
+        onSuccess: () =>
+          toast.success(t(successKey, { name: member.user.name, defaultValue: fallback })),
         onError: (err) =>
-          toast.error(err.message || t('studio.fanGroups.updateFailed', { defaultValue: '更新群成员失败。' })),
+          toast.error(
+            err.message || t('studio.fanGroups.updateFailed', { defaultValue: '更新群成员失败。' }),
+          ),
       },
     );
   };
@@ -2163,7 +2168,9 @@ export function CreatorFanGroupsPage() {
         ) : (
           <div className="gl-creator-panel gl-fan-group-panel">
             <div className="gl-creator-empty-soft">
-              {t('studio.fanGroups.empty', { defaultValue: '还没有粉丝团群聊，先同步粉丝团成员。' })}
+              {t('studio.fanGroups.empty', {
+                defaultValue: '还没有粉丝团群聊，先同步粉丝团成员。',
+              })}
             </div>
           </div>
         )}
@@ -2203,7 +2210,12 @@ function FanGroupPanel({
     <article className="gl-creator-panel gl-fan-group-panel">
       <div className="gl-creator-panel-head">
         <div>
-          <span>{t('studio.fanGroups.groupNo', { no: group.groupNo, defaultValue: `第 ${group.groupNo} 群` })}</span>
+          <span>
+            {t('studio.fanGroups.groupNo', {
+              no: group.groupNo,
+              defaultValue: `第 ${group.groupNo} 群`,
+            })}
+          </span>
           <h2>{group.name}</h2>
         </div>
         <div className="gl-fan-group-meta">
@@ -2222,7 +2234,11 @@ function FanGroupPanel({
               <Avatar name={member.user.name} src={member.user.avatar} size={34} />
               <span>
                 <b>{member.user.name}</b>
-                <small>{member.rejoinRequestedAt ? formatFanGroupDate(member.rejoinRequestedAt, locale) : '等待审批'}</small>
+                <small>
+                  {member.rejoinRequestedAt
+                    ? formatFanGroupDate(member.rejoinRequestedAt, locale)
+                    : '等待审批'}
+                </small>
               </span>
               <button
                 type="button"
@@ -2950,17 +2966,19 @@ export function CreatorLiveConsolePage() {
     if (!stream) return null;
     return publisherSessionFromStream(stream) ?? matchingStoredSession(stream.id);
   }, [stream]);
+  const { refetch: refetchRoom } = room;
+  const { refetch: refetchLiveRooms } = liveRooms;
 
   useEffect(() => {
     if (!id) return;
-    void room.refetch();
-    void liveRooms.refetch();
+    void refetchRoom();
+    void refetchLiveRooms();
     const timer = window.setInterval(() => {
-      void room.refetch();
-      void liveRooms.refetch();
+      void refetchRoom();
+      void refetchLiveRooms();
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [id, liveRooms.refetch, room.refetch]);
+  }, [id, refetchLiveRooms, refetchRoom]);
 
   useEffect(() => {
     if (!stream?.streamKey || !ownsStream) return;

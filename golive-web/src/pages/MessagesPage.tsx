@@ -1,5 +1,6 @@
 import {
   Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -685,26 +686,35 @@ function useChatScroll<T extends { id: string }>(
   const pendingLiveTargetIdRef = useRef('');
   const [newNotice, setNewNotice] = useState<ChatNewNotice | null>(null);
   const [highlightedId, setHighlightedId] = useState('');
-  const setChatNewNotice = (notice: ChatNewNotice | null) => {
+  const {
+    activeKey,
+    entryUnread,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    onEntryNoticeConsumed,
+  } = options;
+  const setChatNewNotice = useCallback((notice: ChatNewNotice | null) => {
     newNoticeModeRef.current = notice?.mode ?? null;
     newNoticeRef.current = notice;
     setNewNotice(notice);
-  };
-  const updateChatNewNotice = (
-    updater: (current: ChatNewNotice | null) => ChatNewNotice | null,
-  ) => {
-    setNewNotice((current) => {
-      const next = updater(current);
-      newNoticeModeRef.current = next?.mode ?? null;
-      newNoticeRef.current = next;
-      return next;
-    });
-  };
-  const resetPendingLiveNewNotice = () => {
+  }, []);
+  const updateChatNewNotice = useCallback(
+    (updater: (current: ChatNewNotice | null) => ChatNewNotice | null) => {
+      setNewNotice((current) => {
+        const next = updater(current);
+        newNoticeModeRef.current = next?.mode ?? null;
+        newNoticeRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+  const resetPendingLiveNewNotice = useCallback(() => {
     pendingLiveNewCountRef.current = 0;
     pendingLiveTargetIdRef.current = '';
-  };
-  const highlightMessage = (id: string) => {
+  }, []);
+  const highlightMessage = useCallback((id: string) => {
     if (!id) return;
     if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
     setHighlightedId(id);
@@ -712,35 +722,35 @@ function useChatScroll<T extends { id: string }>(
       setHighlightedId('');
       highlightTimerRef.current = null;
     }, 1700);
-  };
-  const syncEntryNoticeTarget = (nextItems = itemsRef.current) => {
-    const notice = newNoticeRef.current;
-    if (!notice || notice.mode !== 'entry') return;
-    const targetId = firstUnreadTargetId(nextItems, notice.count) || notice.targetId;
-    if (targetId && targetId !== notice.targetId) {
-      setChatNewNotice({ ...notice, targetId });
-    }
-  };
-  const needsOlderMessagesForJump = () => {
+  }, []);
+  const syncEntryNoticeTarget = useCallback(
+    (nextItems = itemsRef.current) => {
+      const notice = newNoticeRef.current;
+      if (!notice || notice.mode !== 'entry') return;
+      const targetId = firstUnreadTargetId(nextItems, notice.count) || notice.targetId;
+      if (targetId && targetId !== notice.targetId) {
+        setChatNewNotice({ ...notice, targetId });
+      }
+    },
+    [setChatNewNotice],
+  );
+  const needsOlderMessagesForJump = useCallback(() => {
     const notice = newNoticeRef.current;
     return Boolean(
-      notice &&
-      notice.mode === 'entry' &&
-      notice.count > itemsRef.current.length &&
-      options.hasNextPage,
+      notice && notice.mode === 'entry' && notice.count > itemsRef.current.length && hasNextPage,
     );
-  };
-  const fetchOlderForPendingJump = () => {
-    if (!needsOlderMessagesForJump() || options.isFetchingNextPage || requestedOlderRef.current) {
+  }, [hasNextPage]);
+  const fetchOlderForPendingJump = useCallback(() => {
+    if (!needsOlderMessagesForJump() || isFetchingNextPage || requestedOlderRef.current) {
       return false;
     }
     requestedOlderRef.current = true;
-    void options.fetchNextPage().finally(() => {
+    void fetchNextPage().finally(() => {
       requestedOlderRef.current = false;
     });
     return true;
-  };
-  const scrollToNewTarget = () => {
+  }, [fetchNextPage, isFetchingNextPage, needsOlderMessagesForJump]);
+  const scrollToNewTarget = useCallback(() => {
     const notice = newNoticeRef.current;
     if (!notice) return;
     syncEntryNoticeTarget();
@@ -755,39 +765,45 @@ function useChatScroll<T extends { id: string }>(
       resetPendingLiveNewNotice();
       setChatNewNotice(null);
     });
-  };
-  const continuePendingJump = (nextItems = itemsRef.current) => {
-    if (!pendingJumpRef.current) return;
-    syncEntryNoticeTarget(nextItems);
-    if (needsOlderMessagesForJump()) {
-      void fetchOlderForPendingJump();
-      return;
-    }
-    scrollToNewTarget();
-  };
-  const showEntryNoticeIfNeeded = (nextItems = itemsRef.current) => {
-    const node = listRef.current;
-    const lastId = nextItems.at(-1)?.id ?? '';
-    const entryUnread = Math.max(0, options.entryUnread ?? 0);
-    if (!node || !lastId || entryUnread <= 0) return false;
+  }, [highlightMessage, resetPendingLiveNewNotice, setChatNewNotice, syncEntryNoticeTarget]);
+  const continuePendingJump = useCallback(
+    (nextItems = itemsRef.current) => {
+      if (!pendingJumpRef.current) return;
+      syncEntryNoticeTarget(nextItems);
+      if (needsOlderMessagesForJump()) {
+        void fetchOlderForPendingJump();
+        return;
+      }
+      scrollToNewTarget();
+    },
+    [fetchOlderForPendingJump, needsOlderMessagesForJump, scrollToNewTarget, syncEntryNoticeTarget],
+  );
+  const showEntryNoticeIfNeeded = useCallback(
+    (nextItems = itemsRef.current) => {
+      const node = listRef.current;
+      const lastId = nextItems.at(-1)?.id ?? '';
+      const normalizedEntryUnread = Math.max(0, entryUnread ?? 0);
+      if (!node || !lastId || normalizedEntryUnread <= 0) return false;
 
-    const noticeKey = `${options.activeKey}:${entryUnread}:${lastId}`;
-    if (consumedEntryNoticeKeyRef.current === noticeKey) return false;
+      const noticeKey = `${activeKey}:${normalizedEntryUnread}:${lastId}`;
+      if (consumedEntryNoticeKeyRef.current === noticeKey) return false;
 
-    const overflowing = node.scrollHeight > node.clientHeight + 12;
-    if (overflowing && entryUnread >= CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT) {
-      setChatNewNotice({
-        count: entryUnread,
-        targetId: firstUnreadTargetId(nextItems, entryUnread) || lastId,
-        mode: 'entry',
-      });
-    } else {
-      setChatNewNotice(null);
-    }
-    consumedEntryNoticeKeyRef.current = noticeKey;
-    options.onEntryNoticeConsumed?.();
-    return true;
-  };
+      const overflowing = node.scrollHeight > node.clientHeight + 12;
+      if (overflowing && normalizedEntryUnread >= CHAT_NEW_MESSAGE_NOTICE_MIN_COUNT) {
+        setChatNewNotice({
+          count: normalizedEntryUnread,
+          targetId: firstUnreadTargetId(nextItems, normalizedEntryUnread) || lastId,
+          mode: 'entry',
+        });
+      } else {
+        setChatNewNotice(null);
+      }
+      consumedEntryNoticeKeyRef.current = noticeKey;
+      onEntryNoticeConsumed?.();
+      return true;
+    },
+    [activeKey, entryUnread, onEntryNoticeConsumed, setChatNewNotice],
+  );
 
   useEffect(() => {
     previousLastIdRef.current = '';
@@ -800,7 +816,7 @@ function useChatScroll<T extends { id: string }>(
     resetPendingLiveNewNotice();
     setHighlightedId('');
     setChatNewNotice(null);
-  }, [options.activeKey]);
+  }, [activeKey, resetPendingLiveNewNotice, setChatNewNotice]);
 
   useEffect(() => {
     return () => {
@@ -809,8 +825,8 @@ function useChatScroll<T extends { id: string }>(
   }, []);
 
   useEffect(() => {
-    if (!options.isFetchingNextPage) requestedOlderRef.current = false;
-  }, [options.isFetchingNextPage]);
+    if (!isFetchingNextPage) requestedOlderRef.current = false;
+  }, [isFetchingNextPage]);
 
   const onScroll = () => {
     const node = listRef.current;
@@ -820,16 +836,11 @@ function useChatScroll<T extends { id: string }>(
       resetPendingLiveNewNotice();
       setChatNewNotice(null);
     }
-    if (
-      node.scrollTop <= 72 &&
-      options.hasNextPage &&
-      !options.isFetchingNextPage &&
-      !requestedOlderRef.current
-    ) {
+    if (node.scrollTop <= 72 && hasNextPage && !isFetchingNextPage && !requestedOlderRef.current) {
       requestedOlderRef.current = true;
       loadingOlderRef.current = true;
       previousScrollHeightRef.current = node.scrollHeight;
-      void options.fetchNextPage().finally(() => {
+      void fetchNextPage().finally(() => {
         requestedOlderRef.current = false;
       });
     }
@@ -908,14 +919,23 @@ function useChatScroll<T extends { id: string }>(
     syncEntryNoticeTarget(items);
     continuePendingJump(items);
     previousLastIdRef.current = lastId;
-  }, [items, options.activeKey]);
+  }, [
+    activeKey,
+    continuePendingJump,
+    items,
+    resetPendingLiveNewNotice,
+    setChatNewNotice,
+    showEntryNoticeIfNeeded,
+    syncEntryNoticeTarget,
+    updateChatNewNotice,
+  ]);
 
   useEffect(() => {
-    if (!previousLastIdRef.current || Math.max(0, options.entryUnread ?? 0) <= 0) return;
+    if (!previousLastIdRef.current || Math.max(0, entryUnread ?? 0) <= 0) return;
     window.requestAnimationFrame(() => {
       showEntryNoticeIfNeeded(itemsRef.current);
     });
-  }, [options.entryUnread, options.activeKey]);
+  }, [activeKey, entryUnread, showEntryNoticeIfNeeded]);
 
   const jumpToNew = () => {
     if (!newNoticeRef.current) return;

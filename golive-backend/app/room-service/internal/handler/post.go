@@ -15,6 +15,8 @@ import (
 	"github.com/qingwenwen777/golive/pkg/uploadimage"
 )
 
+const maxPostImageSize = 5 << 20
+
 type PostHandler struct {
 	svc        *service.PostService
 	permission service.LivePermissionChecker
@@ -146,12 +148,17 @@ func (h *PostHandler) UploadImage(c *gin.Context) {
 		}
 	}
 
+	uploadimage.LimitRequestBody(c.Writer, c.Request, maxPostImageSize)
 	file, err := c.FormFile("file")
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image must be 5MB or smaller"))
+			return
+		}
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image is required"))
 		return
 	}
-	if file.Size <= 0 || file.Size > 5<<20 {
+	if file.Size <= 0 || file.Size > maxPostImageSize {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image must be 5MB or smaller"))
 		return
 	}
@@ -160,9 +167,14 @@ func (h *PostHandler) UploadImage(c *gin.Context) {
 	name, err := uploadimage.SaveOptimized(file, h.imageDir, base, "", uploadimage.Options{
 		MaxWidth:  1600,
 		MaxHeight: 1600,
+		MaxBytes:  maxPostImageSize,
 		Quality:   92,
 	})
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image must be 5MB or smaller"))
+			return
+		}
 		if uploadimage.IsInvalidUpload(err) {
 			errcode.Respond(c, errcode.New(http.StatusBadRequest, "post image must be a valid jpg, png, webp, or gif"))
 			return

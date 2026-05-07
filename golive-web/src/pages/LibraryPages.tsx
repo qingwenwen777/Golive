@@ -90,7 +90,7 @@ export function SubscriptionsPage() {
   const subscriptions = useSubscriptions(isAuthed);
   const subscriptionAppointments = useSubscriptionAppointments(isAuthed, appointmentPage, 8);
   const subscriptionPosts = useSubscriptionPosts(isAuthed, 8);
-  const channels = subscriptions.data?.items ?? [];
+  const channels = useMemo(() => subscriptions.data?.items ?? [], [subscriptions.data?.items]);
   const selectedChannel = useMemo(
     () => channels.find((channel) => channel.channelId === selectedChannelId),
     [channels, selectedChannelId],

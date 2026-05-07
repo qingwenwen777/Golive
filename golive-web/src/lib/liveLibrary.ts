@@ -94,7 +94,9 @@ function writeLibrary(key: string, items: LibraryStream[]): void {
 }
 
 function markStreamNotLive(stream: LibraryStream): LibraryStream {
-  const { playbackUrl: _playbackUrl, streamKey: _streamKey, ...rest } = stream;
+  const rest = { ...stream };
+  delete rest.playbackUrl;
+  delete rest.streamKey;
   return {
     ...rest,
     viewers: 0,

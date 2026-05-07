@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GoogleIcon } from '@/components/GoogleIcon';
 
@@ -47,10 +48,7 @@ const GOOGLE_BUTTON_MAX_WIDTH = 400;
 
 function clampGoogleButtonWidth(width: number): number {
   if (!Number.isFinite(width) || width <= 0) return 320;
-  return Math.max(
-    GOOGLE_BUTTON_MIN_WIDTH,
-    Math.min(GOOGLE_BUTTON_MAX_WIDTH, Math.floor(width)),
-  );
+  return Math.max(GOOGLE_BUTTON_MIN_WIDTH, Math.min(GOOGLE_BUTTON_MAX_WIDTH, Math.floor(width)));
 }
 
 export function googleClientId(): string {
@@ -218,7 +216,7 @@ export function GoogleIdentityButton({
 
   return (
     <div
-      className={`gl-google-button-shell${ready ? ' is-ready' : ''}${
+      className={`gl-google-button-shell${ready ? 'is-ready' : ''}${
         className ? ` ${className}` : ''
       }`}
     >

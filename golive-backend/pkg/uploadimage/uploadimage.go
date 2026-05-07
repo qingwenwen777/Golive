@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -21,15 +22,26 @@ import (
 var (
 	ErrUnsupportedType = errors.New("unsupported image type")
 	ErrInvalidImage    = errors.New("invalid image")
+	ErrTooLarge        = errors.New("image too large")
 )
 
 const defaultMaxPixels int64 = 20_000_000
+const defaultMaxUploadBytes int64 = 10 << 20
+const multipartBodyOverheadBytes int64 = 1 << 20
 
 type Options struct {
 	MaxWidth  int
 	MaxHeight int
 	MaxPixels int64
+	MaxBytes  int64
 	Quality   int
+}
+
+func LimitRequestBody(w http.ResponseWriter, r *http.Request, maxFileBytes int64) {
+	if maxFileBytes <= 0 {
+		maxFileBytes = defaultMaxUploadBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxFileBytes+multipartBodyOverheadBytes)
 }
 
 func SaveOptimized(file *multipart.FileHeader, dir, basename, _ string, opts Options) (string, error) {
@@ -37,7 +49,7 @@ func SaveOptimized(file *multipart.FileHeader, dir, basename, _ string, opts Opt
 		return "", err
 	}
 
-	data, err := readUpload(file)
+	data, err := readUpload(file, opts.MaxBytes)
 	if err != nil {
 		return "", err
 	}
@@ -104,17 +116,35 @@ func SaveOptimized(file *multipart.FileHeader, dir, basename, _ string, opts Opt
 	return name, os.WriteFile(filepath.Join(dir, name), encoded.Bytes(), 0o644)
 }
 
-func readUpload(file *multipart.FileHeader) ([]byte, error) {
+func readUpload(file *multipart.FileHeader, maxBytes int64) ([]byte, error) {
+	if maxBytes <= 0 {
+		maxBytes = defaultMaxUploadBytes
+	}
+	if file.Size > maxBytes {
+		return nil, ErrTooLarge
+	}
 	src, err := file.Open()
 	if err != nil {
 		return nil, err
 	}
 	defer src.Close()
-	return io.ReadAll(src)
+	data, err := io.ReadAll(io.LimitReader(src, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, ErrTooLarge
+	}
+	return data, nil
 }
 
 func IsInvalidUpload(err error) bool {
 	return errors.Is(err, ErrUnsupportedType) || errors.Is(err, ErrInvalidImage)
+}
+
+func IsTooLarge(err error) bool {
+	var maxBytesErr *http.MaxBytesError
+	return errors.Is(err, ErrTooLarge) || errors.As(err, &maxBytesErr)
 }
 
 func detectAllowedExt(data []byte) (string, bool) {

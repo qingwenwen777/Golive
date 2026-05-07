@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useMemo, useState, type ChangeEvent, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
@@ -239,10 +240,13 @@ export default function AdminPage() {
   const deleteInvite = useDeleteInviteCode();
   const overview = useAdminOverview(canUseAdminApis);
 
-  const appItems = apps.data?.items ?? [];
-  const platformAppItems = platformApps.data?.items ?? [];
-  const creatorItems = creators.data?.items ?? [];
-  const inviteItems = invites.data?.items ?? [];
+  const appItems = useMemo(() => apps.data?.items ?? [], [apps.data?.items]);
+  const platformAppItems = useMemo(
+    () => platformApps.data?.items ?? [],
+    [platformApps.data?.items],
+  );
+  const creatorItems = useMemo(() => creators.data?.items ?? [], [creators.data?.items]);
+  const inviteItems = useMemo(() => invites.data?.items ?? [], [invites.data?.items]);
   const metrics = useMemo<AdminMetrics>(
     () => ({
       pendingApplications:
@@ -253,7 +257,7 @@ export default function AdminPage() {
       totalApplications: appItems.length + platformAppItems.length,
       totalInvites: inviteItems.length,
     }),
-    [appItems, creatorItems.length, inviteItems, platformAppItems],
+    [appItems, creatorItems, inviteItems, platformAppItems],
   );
 
   if (!onAdminRoute) {
@@ -1002,7 +1006,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
     setAppealPage(1);
     setAppealNote('');
     setTab('profile');
-  }, [user?.id]);
+  }, [user]);
 
   if (!userId) {
     return (
@@ -1641,7 +1645,7 @@ function ContentPage() {
   const deleteWord = useDeleteBlockedWord();
   const importWords = useImportBlockedWords();
 
-  const items = reports.data?.items ?? [];
+  const items = useMemo(() => reports.data?.items ?? [], [reports.data?.items]);
   const selected = selectedId ? (items.find((item) => item.id === selectedId) ?? null) : null;
   const reportDetail = useAdminReportDetail(selectedId, detailOpen && Boolean(selectedId));
   const detail = reportDetail.data ?? selected;
@@ -3714,7 +3718,7 @@ function EconomyReportsPanel() {
   const { t } = useTranslation('pages');
   const [period, setPeriod] = useState<AdminReportPeriod>('day');
   const reports = useAdminRevenueReports({ period });
-  const items = reports.data?.items ?? [];
+  const items = useMemo(() => reports.data?.items ?? [], [reports.data?.items]);
   const totals = useMemo(
     () =>
       items.reduce(
@@ -3996,7 +4000,7 @@ function SystemPage({
     setReviewTimeout(String(data.reportReviewTimeoutMinutes));
     setDefaultMute(String(data.defaultSiteMuteMinutes));
     setChangeNote('');
-  }, [data?.reportReviewTimeoutMinutes, data?.defaultSiteMuteMinutes]);
+  }, [data]);
 
   const healthItems = overview?.health ?? [];
   const healthOk = healthItems.filter((item) => item.status === 'ok').length;

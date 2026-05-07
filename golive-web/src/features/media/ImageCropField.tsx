@@ -1,9 +1,11 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   type ChangeEvent,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type WheelEvent as ReactWheelEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -96,7 +98,7 @@ export function ImageCropField({
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [dragging, setDragging] = useState(false);
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     imageRef.current = null;
     dragRef.current = null;
     setDragging(false);
@@ -106,25 +108,26 @@ export function ImageCropField({
       URL.revokeObjectURL(fileUrlRef.current);
       fileUrlRef.current = '';
     }
-  };
+  }, [onSelectionChange]);
 
   useEffect(() => {
     if (!active) {
       clearSelection();
       onError(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, clearSelection, onError]);
 
   useEffect(() => {
     onSelectionChange(selection);
   }, [onSelectionChange, selection]);
 
-  useEffect(() => () => clearSelection(), []);
+  useEffect(() => () => clearSelection(), [clearSelection]);
+
+  const selectionUrl = selection?.url;
 
   useEffect(() => {
     const stage = stageRef.current;
-    if (!stage || !selection) {
+    if (!stage || !selectionUrl) {
       setStageSize({ width: 0, height: 0 });
       return;
     }
@@ -146,7 +149,7 @@ export function ImageCropField({
       observer?.disconnect();
       window.removeEventListener('resize', updateSize);
     };
-  }, [selection?.url]);
+  }, [selectionUrl]);
 
   const editorGeometry = selection
     ? resolveEditorGeometry(selection, config.aspectRatio, stageSize.width, stageSize.height)
@@ -223,8 +226,10 @@ export function ImageCropField({
     const stage = stageRef.current;
     if (!stage) return;
     const stageRect = stage.getBoundingClientRect();
-    const pointerX = (event.clientX - stageRect.left - editorGeometry.imageLeft) / editorGeometry.scale;
-    const pointerY = (event.clientY - stageRect.top - editorGeometry.imageTop) / editorGeometry.scale;
+    const pointerX =
+      (event.clientX - stageRect.left - editorGeometry.imageLeft) / editorGeometry.scale;
+    const pointerY =
+      (event.clientY - stageRect.top - editorGeometry.imageTop) / editorGeometry.scale;
     const direction = event.deltaY < 0 ? 1.08 : 0.92;
 
     setSelection((current) => {
@@ -312,7 +317,11 @@ export function ImageCropField({
     <div className={cn('gl-image-crop-field', selection && 'is-editing', className)}>
       <div
         ref={stageRef}
-        className={cn('gl-image-crop-stage', selection && 'is-editor', shape === 'circle' && !selection && 'is-circle')}
+        className={cn(
+          'gl-image-crop-stage',
+          selection && 'is-editor',
+          shape === 'circle' && !selection && 'is-circle',
+        )}
         onClick={selection ? undefined : openPicker}
       >
         {selection ? (
@@ -328,7 +337,11 @@ export function ImageCropField({
               <button
                 type="button"
                 aria-label="Crop area"
-                className={cn('gl-image-crop-frame', shape === 'circle' && 'is-circle', dragging && 'is-dragging')}
+                className={cn(
+                  'gl-image-crop-frame',
+                  shape === 'circle' && 'is-circle',
+                  dragging && 'is-dragging',
+                )}
                 style={frameStyle}
                 onPointerDown={handleFramePointerDown}
                 onPointerMove={handleFramePointerMove}
@@ -421,17 +434,7 @@ function drawCroppedImage(
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(
-    image,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
+  ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
 }
 
 function resolveEditorGeometry(
@@ -442,7 +445,10 @@ function resolveEditorGeometry(
 ): EditorGeometry | null {
   if (stageWidth <= 0 || stageHeight <= 0) return null;
 
-  const scale = Math.min(stageWidth / selection.naturalWidth, stageHeight / selection.naturalHeight);
+  const scale = Math.min(
+    stageWidth / selection.naturalWidth,
+    stageHeight / selection.naturalHeight,
+  );
   if (!Number.isFinite(scale) || scale <= 0) return null;
 
   const imageWidth = selection.naturalWidth * scale;

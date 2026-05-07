@@ -44,8 +44,13 @@ func (h *CoverUploadHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	uploadimage.LimitRequestBody(c.Writer, c.Request, maxCoverSize)
 	file, err := c.FormFile("file")
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "cover must be 5MB or smaller"))
+			return
+		}
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "cover file is required"))
 		return
 	}
@@ -58,9 +63,14 @@ func (h *CoverUploadHandler) Upload(c *gin.Context) {
 	name, err := uploadimage.SaveOptimized(file, h.dir, base, "", uploadimage.Options{
 		MaxWidth:  1600,
 		MaxHeight: 900,
+		MaxBytes:  maxCoverSize,
 		Quality:   93,
 	})
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "cover must be 5MB or smaller"))
+			return
+		}
 		if uploadimage.IsInvalidUpload(err) {
 			errcode.Respond(c, errcode.New(http.StatusBadRequest, "cover must be a valid jpg, png, webp, or gif"))
 			return

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { forwardRef } from 'react';
 import type { LucideIcon, LucideProps } from 'lucide-react';
 import {
@@ -54,16 +55,7 @@ export interface IconSet {
 }
 
 const WatchLater = forwardRef<SVGSVGElement, LucideProps>(
-  (
-    {
-      color = 'currentColor',
-      size = 24,
-      strokeWidth = 2,
-      absoluteStrokeWidth,
-      ...props
-    },
-    ref,
-  ) => {
+  ({ color = 'currentColor', size = 24, strokeWidth = 2, absoluteStrokeWidth, ...props }, ref) => {
     const computedStrokeWidth =
       absoluteStrokeWidth && typeof size === 'number'
         ? (Number(strokeWidth) * 24) / size

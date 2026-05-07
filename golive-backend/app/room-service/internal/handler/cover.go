@@ -13,6 +13,8 @@ import (
 	"github.com/qingwenwen777/golive/pkg/uploadimage"
 )
 
+const maxCoverSize = 5 << 20
+
 type CoverUploadHandler struct {
 	dir       string
 	publicURL string
@@ -34,12 +36,17 @@ func (h *CoverUploadHandler) Upload(c *gin.Context) {
 		return
 	}
 
+	uploadimage.LimitRequestBody(c.Writer, c.Request, maxCoverSize)
 	file, err := c.FormFile("file")
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(400, "cover must be 5MB or smaller"))
+			return
+		}
 		errcode.Respond(c, errcode.New(400, "cover file is required"))
 		return
 	}
-	if file.Size <= 0 || file.Size > 5<<20 {
+	if file.Size <= 0 || file.Size > maxCoverSize {
 		errcode.Respond(c, errcode.New(400, "cover must be 5MB or smaller"))
 		return
 	}
@@ -48,9 +55,14 @@ func (h *CoverUploadHandler) Upload(c *gin.Context) {
 	name, err := uploadimage.SaveOptimized(file, h.dir, base, "", uploadimage.Options{
 		MaxWidth:  1280,
 		MaxHeight: 720,
+		MaxBytes:  maxCoverSize,
 		Quality:   93,
 	})
 	if err != nil {
+		if uploadimage.IsTooLarge(err) {
+			errcode.Respond(c, errcode.New(400, "cover must be 5MB or smaller"))
+			return
+		}
 		if uploadimage.IsInvalidUpload(err) {
 			errcode.Respond(c, errcode.New(400, "cover must be a valid jpg, png, webp, or gif"))
 			return

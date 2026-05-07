@@ -197,7 +197,7 @@ export default function CoinPage() {
     }
   }, [confirmTopup, searchParams, t]);
 
-  const rows = transactions.data?.items ?? [];
+  const rows = useMemo(() => transactions.data?.items ?? [], [transactions.data?.items]);
   const monthKey = new Date().toISOString().slice(0, 7);
   const monthRows = rows.filter((item) => item.createdAt.slice(0, 7) === monthKey);
   const monthSpend = Math.abs(sum(monthRows.filter((item) => item.amount < 0)));

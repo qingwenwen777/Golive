@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -105,7 +106,7 @@ export default function ChannelPage() {
     () => resolveProfile(profileLookupKey, publicUser.data, authUser),
     [authUser, profileLookupKey, publicUser.data],
   );
-  const streams = rooms.data?.items ?? [];
+  const streams = useMemo(() => rooms.data?.items ?? [], [rooms.data?.items]);
   const channelStreams = useMemo(
     () => streams.filter((stream) => matchesChannel(stream, channelKey, profile)),
     [channelKey, profile, streams],
@@ -395,9 +396,7 @@ export default function ChannelPage() {
                     onClick={handleSubscribe}
                   >
                     {followState.data?.following ? <Bell size={16} /> : <UserPlus size={16} />}
-                    {followState.data?.following
-                      ? t('channel.subscribed')
-                      : t('channel.subscribe')}
+                    {followState.data?.following ? t('channel.subscribed') : t('channel.subscribe')}
                   </button>
                   <button
                     className="gl-secondary-btn"

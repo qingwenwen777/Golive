@@ -1,10 +1,5 @@
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ImgHTMLAttributes,
-} from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { useCallback, useLayoutEffect, useRef, useState, type ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 
 type ImageStatus = 'idle' | 'loading' | 'loaded' | 'error';

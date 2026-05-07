@@ -13,13 +13,7 @@ const DEFAULT_AMOUNT = 1000;
 const MAX_QUESTION_LENGTH = 80;
 const OPTIONS: BetOption[] = ['win', 'lose'];
 
-export function BettingPanel({
-  roomId,
-  ownsStream,
-}: {
-  roomId: string;
-  ownsStream: boolean;
-}) {
+export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStream: boolean }) {
   const { t } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
@@ -34,7 +28,7 @@ export function BettingPanel({
   const [now, setNow] = useState(() => Date.now());
 
   const round = latest.data?.round ?? null;
-  const summary = latest.data?.summary ?? [];
+  const summary = useMemo(() => latest.data?.summary ?? [], [latest.data?.summary]);
   const myWager = latest.data?.myWager;
   const balance = me.data?.coinBalance ?? 0;
 
@@ -47,8 +41,9 @@ export function BettingPanel({
   const remainingMs = round ? new Date(round.closeAt).getTime() - now : 0;
   const accepting = Boolean(round && round.status === 'open' && remainingMs > 0);
   const effectiveStatus = round?.status === 'open' && remainingMs <= 0 ? 'closed' : round?.status;
-  const totalPool = summary.reduce((sum, item) => sum + item.total, 0);
-  const canOpenRound = ownsStream && (!round || round.status === 'settled' || round.status === 'cancelled');
+  const totalPool = useMemo(() => summary.reduce((sum, item) => sum + item.total, 0), [summary]);
+  const canOpenRound =
+    ownsStream && (!round || round.status === 'settled' || round.status === 'cancelled');
   const optionMap = useMemo(
     () => new Map(summary.map((item) => [item.option, item] as const)),
     [summary],
@@ -66,7 +61,11 @@ export function BettingPanel({
       {
         onSuccess: () => {
           setQuestion('');
-          toast.success(t('betting.openSuccess', { defaultValue: 'Bet opened. It closes automatically in 60 seconds.' }));
+          toast.success(
+            t('betting.openSuccess', {
+              defaultValue: 'Bet opened. It closes automatically in 60 seconds.',
+            }),
+          );
         },
         onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
       },
@@ -128,7 +127,12 @@ export function BettingPanel({
     cancelBet.mutate(
       { roundId: round.id },
       {
-        onSuccess: () => toast.success(t('betting.cancelSuccess', { defaultValue: 'Bet cancelled. Wagered coins were refunded.' })),
+        onSuccess: () =>
+          toast.success(
+            t('betting.cancelSuccess', {
+              defaultValue: 'Bet cancelled. Wagered coins were refunded.',
+            }),
+          ),
         onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
       },
     );
@@ -144,7 +148,10 @@ export function BettingPanel({
         </div>
         <div>
           <h2>{t('betting.title', { defaultValue: 'Betting' })}</h2>
-          <p>{round?.question ?? t('betting.emptyHint', { defaultValue: 'Enter a title to open a bet for viewers.' })}</p>
+          <p>
+            {round?.question ??
+              t('betting.emptyHint', { defaultValue: 'Enter a title to open a bet for viewers.' })}
+          </p>
         </div>
         {round && (
           <span className={cn('gl-bet-status', `is-${effectiveStatus}`)}>
@@ -346,7 +353,11 @@ function BetOptionButton({
   return (
     <button
       type="button"
-      className={cn('gl-bet-option', option === 'win' ? 'is-win' : 'is-lose', active && 'is-active')}
+      className={cn(
+        'gl-bet-option',
+        option === 'win' ? 'is-win' : 'is-lose',
+        active && 'is-active',
+      )}
       disabled={disabled}
       onClick={onClick}
     >
@@ -394,10 +405,14 @@ function betErrorText(
     return t('betting.errorAlreadyPlaced', { defaultValue: 'You already placed a bet.' });
   }
   if (reason === 'bet_no_winners') {
-    return t('betting.errorNoWinners', { defaultValue: 'No winner for this result. Cancel to refund.' });
+    return t('betting.errorNoWinners', {
+      defaultValue: 'No winner for this result. Cancel to refund.',
+    });
   }
   if (reason === 'bad_bet_question') {
-    return t('betting.errorBadQuestion', { defaultValue: 'Bet title is required and must be 80 characters or fewer.' });
+    return t('betting.errorBadQuestion', {
+      defaultValue: 'Bet title is required and must be 80 characters or fewer.',
+    });
   }
   if (reason === 'forbidden') {
     return t('betting.errorForbidden', { defaultValue: 'Only the streamer can manage betting.' });
