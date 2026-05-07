@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useLiveRoomUiStore } from '@/features/live-room/useLiveRoomUiStore';
 
 export interface FlyingGift {
   id: string;
@@ -29,6 +30,13 @@ export function FlyingGiftLayer({ items, onDone }: FlyingGiftLayerProps) {
   );
 }
 
+export function FlyingGiftOverlay() {
+  const items = useLiveRoomUiStore((s) => s.flying);
+  const removeFlyingGift = useLiveRoomUiStore((s) => s.removeFlyingGift);
+
+  return <FlyingGiftLayer items={items} onDone={removeFlyingGift} />;
+}
+
 function FlyingGiftItem({ item, onDone }: { item: FlyingGift; onDone: () => void }) {
   useEffect(() => {
     const t = window.setTimeout(onDone, 3100);
@@ -40,7 +48,9 @@ function FlyingGiftItem({ item, onDone }: { item: FlyingGift; onDone: () => void
       className="absolute bottom-6 right-6 flex flex-col items-center gap-1 text-center"
       style={{ animation: 'gl-gift-fly 3s cubic-bezier(0.2, 0.7, 0.3, 1) forwards' }}
     >
-      <span className="text-6xl drop-shadow-lg" aria-hidden>{item.icon}</span>
+      <span className="text-6xl drop-shadow-lg" aria-hidden>
+        {item.icon}
+      </span>
       <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
         {item.label}
       </span>

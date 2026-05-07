@@ -2,6 +2,8 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  memo,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -128,6 +130,12 @@ const EMOJI_GROUPS = [
 
 const MAX_CHAT_CHARS = 200;
 const CHAT_BOTTOM_THRESHOLD_PX = 48;
+const CHAT_VIRTUAL_OVERSCAN_PX = 360;
+const CHAT_ROW_ESTIMATE_PX = 40;
+const CHAT_OWNER_ROW_ESTIMATE_PX = 56;
+const CHAT_NOTICE_ESTIMATE_PX = 68;
+const CHAT_GIFT_ESTIMATE_PX = 76;
+const CHAT_SUPER_CHAT_ESTIMATE_PX = 112;
 
 const SC_PIN_REFRESH_MS = 1000;
 
@@ -232,7 +240,23 @@ function isNearChatBottom(el: HTMLDivElement) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= CHAT_BOTTOM_THRESHOLD_PX;
 }
 
-function ChatRow({
+function estimatedMessageHeight(message: Message, ownerId?: string, ownerName?: string): number {
+  if (message.kind === 'system') {
+    return CHAT_NOTICE_ESTIMATE_PX + Math.max(0, Math.ceil(charCount(message.text) / 42) - 1) * 18;
+  }
+  if (message.kind === 'gift') return CHAT_GIFT_ESTIMATE_PX;
+  if (message.kind === 'super_chat') {
+    return (
+      CHAT_SUPER_CHAT_ESTIMATE_PX + Math.max(0, Math.ceil(charCount(message.text) / 38) - 1) * 20
+    );
+  }
+  const base = isOwnerMessage(message, ownerId, ownerName)
+    ? CHAT_OWNER_ROW_ESTIMATE_PX
+    : CHAT_ROW_ESTIMATE_PX;
+  return base + Math.max(0, Math.ceil(charCount(message.text) / 42) - 1) * 18;
+}
+
+const ChatRow = memo(function ChatRow({
   m,
   isOwner,
   isFan,
@@ -359,9 +383,9 @@ function ChatRow({
       </div>
     </div>
   );
-}
+});
 
-function SuperChatCard({
+const SuperChatCard = memo(function SuperChatCard({
   m,
   menuOpen,
   onToggleMenu,
@@ -389,11 +413,7 @@ function SuperChatCard({
         )}
         <span className="gl-sc-amt">{formatYenAmount(m.amount)}</span>
         <span className="gl-sc-menu-wrap">
-          <button
-            type="button"
-            aria-label={t('report.moreActions')}
-            onClick={onToggleMenu}
-          >
+          <button type="button" aria-label={t('report.moreActions')} onClick={onToggleMenu}>
             <MoreVertical size={15} />
           </button>
           {menuOpen && (
@@ -419,7 +439,7 @@ function SuperChatCard({
       )}
     </div>
   );
-}
+});
 
 function PinnedSuperChatPill({
   m,
@@ -494,15 +514,15 @@ function PinnedSuperChatBubble({ m, locale }: { m: SuperChatMessage; locale: str
   );
 }
 
-function SystemNotice({ m }: { m: SystemMessage }) {
+const SystemNotice = memo(function SystemNotice({ m }: { m: SystemMessage }) {
   return (
     <div className="gl-chat-notice">
       <div className="gl-chat-notice-body">{m.text}</div>
     </div>
   );
-}
+});
 
-function GiftNotice({ m }: { m: GiftMessage }) {
+const GiftNotice = memo(function GiftNotice({ m }: { m: GiftMessage }) {
   const { t } = useTranslation('pages');
   const count = m.count ?? 1;
   const meta = giftMeta(m.giftName);
@@ -530,7 +550,7 @@ function GiftNotice({ m }: { m: GiftMessage }) {
       </div>
     </div>
   );
-}
+});
 
 function formatContribution(value: number, locale: string): string {
   return Math.max(0, Math.floor(value)).toLocaleString(locale);
@@ -622,7 +642,124 @@ function ViewerRankList({
   );
 }
 
-export function Chat({
+const VirtualMessageItem = memo(function VirtualMessageItem({
+  message,
+  offsetTop,
+  height,
+  ownerId,
+  ownerName,
+  roomId,
+  canModerate,
+  menuOpen,
+  onToggleMenu,
+  onCloseMenu,
+  onOpenModeration,
+  onReportMessage,
+}: {
+  message: Message;
+  offsetTop: number;
+  height: number;
+  ownerId?: string;
+  ownerName?: string;
+  roomId?: string;
+  canModerate?: boolean;
+  menuOpen: boolean;
+  onToggleMenu: (id: string) => void;
+  onCloseMenu: () => void;
+  onOpenModeration?: (target: ChatModerationTarget) => void;
+  onReportMessage?: (target: ReportTargetDraft) => void;
+}) {
+  const style: CSSProperties = {
+    position: 'absolute',
+    top: offsetTop,
+    left: 0,
+    right: 0,
+    minHeight: height,
+  };
+
+  if (message.kind === 'system') {
+    return (
+      <div className="gl-chat-virtual-row" style={style}>
+        <SystemNotice m={message} />
+      </div>
+    );
+  }
+
+  if (message.kind === 'gift') {
+    return (
+      <div className="gl-chat-virtual-row" style={style}>
+        <GiftNotice m={message} />
+      </div>
+    );
+  }
+
+  if (message.kind === 'super_chat') {
+    const menuId = `super_chat:${message.id}`;
+    return (
+      <div className="gl-chat-virtual-row" style={style}>
+        <SuperChatCard
+          m={message}
+          menuOpen={menuOpen}
+          onToggleMenu={() => onToggleMenu(menuId)}
+          onCloseMenu={onCloseMenu}
+          onReport={(target) =>
+            onReportMessage?.({
+              targetType: 'super_chat',
+              targetId: target.id,
+              targetUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+              roomId,
+              channelId: ownerId ? `ch-${ownerId}` : undefined,
+              targetOwnerId: ownerId,
+              targetOwnerName: ownerName,
+              targetUserId: target.userId,
+              targetUserName: target.user,
+              targetTitle: ownerName,
+              targetText: target.text,
+            })
+          }
+        />
+      </div>
+    );
+  }
+
+  const chat = message as ChatMessage;
+  const isOwner = isOwnerMessage(chat, ownerId, ownerName);
+  const isFan =
+    !isOwner && Boolean(ownerId && chat.fanBadge && chat.fanBadge.creatorId === ownerId);
+  const menuId = `chat:${chat.id}`;
+
+  return (
+    <div className="gl-chat-virtual-row" style={style}>
+      <ChatRow
+        m={chat}
+        isOwner={isOwner}
+        isFan={isFan}
+        canModerate={canModerate}
+        menuOpen={menuOpen}
+        onToggleMenu={() => onToggleMenu(menuId)}
+        onCloseMenu={onCloseMenu}
+        onOpenModeration={onOpenModeration}
+        onReportMessage={(target) =>
+          onReportMessage?.({
+            targetType: 'danmu',
+            targetId: target.messageId,
+            targetUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+            roomId,
+            channelId: ownerId ? `ch-${ownerId}` : undefined,
+            targetOwnerId: ownerId,
+            targetOwnerName: ownerName,
+            targetUserId: target.userId,
+            targetUserName: target.user,
+            targetTitle: ownerName,
+            targetText: target.text,
+          })
+        }
+      />
+    </div>
+  );
+});
+
+export const Chat = memo(function Chat({
   messages,
   viewers = [],
   viewerTotal,
@@ -667,6 +804,7 @@ export function Chat({
   });
   const [newMessageCount, setNewMessageCount] = useState(0);
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [listViewport, setListViewport] = useState({ scrollTop: 0, height: 0 });
   // Track IME composition so Enter during candidate selection (CJK input
   // methods) does not submit a half-finished message.
   const composingRef = useRef(false);
@@ -674,10 +812,11 @@ export function Chat({
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const effectiveTab = showViewersTab ? activeTab : 'chat';
-  const toggleActionMenu = (id: string) => {
+  const closeActionMenu = useCallback(() => setOpenActionMenuId(null), []);
+  const toggleActionMenu = useCallback((id: string) => {
     setExpandedPinnedId(null);
     setOpenActionMenuId((current) => (current === id ? null : id));
-  };
+  }, []);
 
   const trySend = () => {
     if (readOnly) return;
@@ -737,13 +876,29 @@ export function Chat({
     });
   };
 
-  const scrollChatToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+  const updateListViewport = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior });
-    stickToBottomRef.current = true;
-    setNewMessageCount(0);
+    const next = {
+      scrollTop: el.scrollTop,
+      height: el.clientHeight,
+    };
+    setListViewport((current) =>
+      current.scrollTop === next.scrollTop && current.height === next.height ? current : next,
+    );
   }, []);
+
+  const scrollChatToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto') => {
+      const el = listRef.current;
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior });
+      stickToBottomRef.current = true;
+      setNewMessageCount(0);
+      window.requestAnimationFrame(updateListViewport);
+    },
+    [updateListViewport],
+  );
 
   const handleChatScroll = () => {
     const el = listRef.current;
@@ -751,6 +906,7 @@ export function Chat({
     const nearBottom = isNearChatBottom(el);
     stickToBottomRef.current = nearBottom;
     if (nearBottom) setNewMessageCount(0);
+    updateListViewport();
   };
 
   const updatePinnedScrollState = useCallback(() => {
@@ -824,6 +980,16 @@ export function Chat({
       setNewMessageCount((count) => count + newCount);
     }
   }, [effectiveTab, messages.length, scrollChatToBottom]);
+
+  useLayoutEffect(() => {
+    if (effectiveTab !== 'chat') return undefined;
+    updateListViewport();
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(updateListViewport);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [effectiveTab, updateListViewport]);
 
   useEffect(() => {
     if (!showViewersTab && activeTab !== 'chat') {
@@ -901,6 +1067,27 @@ export function Chat({
     })
     .filter((item) => item.remainingMs > 0)
     .sort(comparePinnedSuperChats);
+  const virtualLayout = useMemo(() => {
+    let offsetTop = 0;
+    const rows = messages.map((message) => {
+      const height = estimatedMessageHeight(message, ownerId, ownerName);
+      const row = { message, offsetTop, height };
+      offsetTop += height;
+      return row;
+    });
+    return {
+      rows,
+      totalHeight: offsetTop,
+    };
+  }, [messages, ownerId, ownerName]);
+  const visibleVirtualRows = useMemo(() => {
+    if (listViewport.height <= 0) return virtualLayout.rows;
+    const start = Math.max(0, listViewport.scrollTop - CHAT_VIRTUAL_OVERSCAN_PX);
+    const end = listViewport.scrollTop + listViewport.height + CHAT_VIRTUAL_OVERSCAN_PX;
+    return virtualLayout.rows.filter(
+      (row) => row.offsetTop + row.height >= start && row.offsetTop <= end,
+    );
+  }, [listViewport.height, listViewport.scrollTop, virtualLayout]);
 
   useLayoutEffect(() => {
     updatePinnedScrollState();
@@ -1053,70 +1240,30 @@ export function Chat({
       )}
       {effectiveTab === 'chat' ? (
         <div className="gl-chat-list" ref={listRef} onScroll={handleChatScroll}>
-          {messages.map((m) => {
-            if (m.kind === 'system') return <SystemNotice key={m.id} m={m} />;
-            if (m.kind === 'gift') return <GiftNotice key={m.id} m={m} />;
-            if (m.kind === 'super_chat') {
-              const menuId = `super_chat:${m.id}`;
+          <div className="gl-chat-virtual-space" style={{ height: virtualLayout.totalHeight }}>
+            {visibleVirtualRows.map((row) => {
+              const message = row.message;
+              const menuId =
+                message.kind === 'super_chat' ? `super_chat:${message.id}` : `chat:${message.id}`;
               return (
-                <SuperChatCard
-                  key={m.id}
-                  m={m}
+                <VirtualMessageItem
+                  key={message.id}
+                  message={message}
+                  offsetTop={row.offsetTop}
+                  height={row.height}
+                  ownerId={ownerId}
+                  ownerName={ownerName}
+                  roomId={roomId}
+                  canModerate={canModerate}
                   menuOpen={openActionMenuId === menuId}
-                  onToggleMenu={() => toggleActionMenu(menuId)}
-                  onCloseMenu={() => setOpenActionMenuId(null)}
-                  onReport={(target) =>
-                    onReportMessage?.({
-                      targetType: 'super_chat',
-                      targetId: target.id,
-                      targetUrl: typeof window !== 'undefined' ? window.location.href : undefined,
-                      roomId,
-                      channelId: ownerId ? `ch-${ownerId}` : undefined,
-                      targetOwnerId: ownerId,
-                      targetOwnerName: ownerName,
-                      targetUserId: target.userId,
-                      targetUserName: target.user,
-                      targetTitle: ownerName,
-                      targetText: target.text,
-                    })
-                  }
+                  onToggleMenu={toggleActionMenu}
+                  onCloseMenu={closeActionMenu}
+                  onOpenModeration={onOpenModeration}
+                  onReportMessage={onReportMessage}
                 />
               );
-            }
-            const chat = m as ChatMessage;
-            const isOwner = isOwnerMessage(chat, ownerId, ownerName);
-            const isFan =
-              !isOwner && Boolean(ownerId && chat.fanBadge && chat.fanBadge.creatorId === ownerId);
-            const menuId = `chat:${chat.id}`;
-            return (
-              <ChatRow
-                key={m.id}
-                m={chat}
-                isOwner={isOwner}
-                isFan={isFan}
-                canModerate={canModerate}
-                menuOpen={openActionMenuId === menuId}
-                onToggleMenu={() => toggleActionMenu(menuId)}
-                onCloseMenu={() => setOpenActionMenuId(null)}
-                onOpenModeration={onOpenModeration}
-                onReportMessage={(target) =>
-                  onReportMessage?.({
-                    targetType: 'danmu',
-                    targetId: target.messageId,
-                    targetUrl: typeof window !== 'undefined' ? window.location.href : undefined,
-                    roomId,
-                    channelId: ownerId ? `ch-${ownerId}` : undefined,
-                    targetOwnerId: ownerId,
-                    targetOwnerName: ownerName,
-                    targetUserId: target.userId,
-                    targetUserName: target.user,
-                    targetTitle: ownerName,
-                    targetText: target.text,
-                  })
-                }
-              />
-            );
-          })}
+            })}
+          </div>
         </div>
       ) : (
         <ViewerRankList
@@ -1327,4 +1474,4 @@ export function Chat({
       )}
     </aside>
   );
-}
+});

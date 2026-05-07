@@ -1225,6 +1225,14 @@
   scrollbar-width: thin;
   scrollbar-color: #ccc transparent;
 }
+.gl-chat-virtual-space {
+  position: relative;
+  min-height: 100%;
+}
+.gl-chat-virtual-row {
+  position: absolute;
+  width: 100%;
+}
 .dark .gl-chat-list {
   scrollbar-color: #555 transparent;
 }

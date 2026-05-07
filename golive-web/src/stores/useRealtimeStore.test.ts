@@ -40,17 +40,29 @@ describe('useRealtimeStore', () => {
     });
   });
 
+  it('uses a message index to merge duplicate appends in place', () => {
+    useRealtimeStore.getState().appendMessage('room-1', chat('m1', { text: 'first' }));
+    useRealtimeStore.getState().appendMessage('room-1', chat('m1', { text: 'second' }));
+
+    const slice = useRealtimeStore.getState().rooms['room-1'];
+    expect(slice.messages).toHaveLength(1);
+    expect(slice.messages[0]).toMatchObject({ id: 'm1', text: 'second' });
+    expect(slice.messageIndex.m1).toBe(0);
+  });
+
   it('optimistically updates viewer contribution ranking', () => {
     useRealtimeStore.getState().setViewers('room-1', [
       { userId: 'u1', user: 'aaaa', contribution: 20 },
       { userId: 'u2', user: 'bbbb', contribution: 10 },
     ]);
 
-    useRealtimeStore.getState().incrementViewerContribution(
-      'room-1',
-      { userId: 'u1', user: 'aaaa', avatar: '/a.png', contribution: 0 },
-      50,
-    );
+    useRealtimeStore
+      .getState()
+      .incrementViewerContribution(
+        'room-1',
+        { userId: 'u1', user: 'aaaa', avatar: '/a.png', contribution: 0 },
+        50,
+      );
 
     expect(useRealtimeStore.getState().rooms['room-1'].viewers).toEqual([
       { userId: 'u1', user: 'aaaa', avatar: '/a.png', contribution: 70 },
@@ -59,11 +71,9 @@ describe('useRealtimeStore', () => {
   });
 
   it('adds the sender to viewer ranking if the server list has not arrived yet', () => {
-    useRealtimeStore.getState().incrementViewerContribution(
-      'room-1',
-      { userId: 'u1', user: 'aaaa', contribution: 0 },
-      50,
-    );
+    useRealtimeStore
+      .getState()
+      .incrementViewerContribution('room-1', { userId: 'u1', user: 'aaaa', contribution: 0 }, 50);
 
     expect(useRealtimeStore.getState().rooms['room-1'].viewers).toMatchObject([
       { userId: 'u1', user: 'aaaa', contribution: 50 },

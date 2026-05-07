@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadRecentChatMessages, saveRecentChatMessage } from './recentChatCache';
+import {
+  loadRecentChatMessages,
+  resetRecentChatCacheForTest,
+  saveRecentChatMessage,
+} from './recentChatCache';
 import type { ChatMessage } from '@/types/message';
 
 function message(id: string, ts: number): ChatMessage {
@@ -16,6 +20,7 @@ describe('recentChatCache', () => {
   let store: Record<string, string>;
 
   beforeEach(() => {
+    resetRecentChatCacheForTest();
     store = {};
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => store[key] ?? null,

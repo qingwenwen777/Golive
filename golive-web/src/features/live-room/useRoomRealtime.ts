@@ -261,11 +261,10 @@ export function useRoomRealtime(
           userLevel: parsed.userLevel,
           ts: parsed.ts ?? now,
         };
-        const alreadySeen = useRealtimeStore
-          .getState()
-          .rooms[roomId]?.messages.some((x) => x.id === msg.id);
+        const alreadySeen =
+          useRealtimeStore.getState().rooms[roomId]?.messageIndex[msg.id] !== undefined;
         appendMessage(roomId, msg);
-        saveRecentChatMessage(roomId, msg);
+        if (!alreadySeen) saveRecentChatMessage(roomId, msg);
         if (!alreadySeen && danmuOnRef.current) {
           appendBullet(roomId, {
             id: genId('b'),

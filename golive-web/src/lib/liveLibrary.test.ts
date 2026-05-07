@@ -11,6 +11,7 @@ import {
   markStreamEndedInLibraries,
   readLibrary,
   removeStreamFromLibraries,
+  resetLiveLibraryCacheForTest,
   saveToLibrary,
   syncLibraryWithLiveRooms,
 } from './liveLibrary';
@@ -39,6 +40,7 @@ function stream(id: string, patch: Partial<Stream> = {}): Stream {
 describe('liveLibrary', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    resetLiveLibraryCacheForTest();
     window.localStorage.clear();
   });
 

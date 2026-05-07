@@ -27,9 +27,10 @@ import { InfoBlock } from '@/features/live-room/InfoBlock';
 import { GiftPanel } from '@/features/live-room/GiftPanel';
 import { SuperChatDialog } from '@/features/live-room/SuperChatDialog';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
-import { FlyingGiftLayer, type FlyingGift } from '@/features/live-room/FlyingGiftLayer';
+import { FlyingGiftOverlay } from '@/features/live-room/FlyingGiftLayer';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
+import { useLiveRoomUiStore } from '@/features/live-room/useLiveRoomUiStore';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -102,9 +103,10 @@ export default function LiveRoomPage() {
   const [mobileComposerFocused, setMobileComposerFocused] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [superChatOpen, setSuperChatOpen] = useState(false);
-  const [moderationTarget, setModerationTarget] = useState<ChatModerationTarget | null>(null);
-  const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
-  const [flying, setFlying] = useState<FlyingGift[]>([]);
+  const pushFlyingGift = useLiveRoomUiStore((s) => s.pushFlyingGift);
+  const openModeration = useLiveRoomUiStore((s) => s.openModeration);
+  const openReport = useLiveRoomUiStore((s) => s.openReport);
+  const resetRoomUi = useLiveRoomUiStore((s) => s.resetRoomUi);
   const isAuthed = useIsAuthed();
   const authHydrated = useAuthHydrated();
   const currentUser = useAuthStore((s) => s.user);
@@ -176,32 +178,25 @@ export default function LiveRoomPage() {
     roomId,
     Boolean(isAuthed && roomCanWatch && roomId),
   );
-  const muteUser = useMuteRoomUser(roomId);
-  const unmuteUser = useUnmuteRoomUser(roomId);
   const moderationRole =
     currentUser?.id && stream?.ownerId === currentUser.id
       ? 'owner'
       : (moderationState.data?.role ?? 'viewer');
   const canModerate = moderationRole === 'owner' || moderationRole === 'moderator';
-  const targetMuteState = useRoomMuteState(
-    roomId,
-    moderationTarget?.userId ?? '',
-    Boolean(moderationTarget && canModerate && roomId),
-  );
   const openReportTarget = useCallback(
     (target: ReportTargetDraft) => {
       if (!isAuthed) {
-        openLogin(() => setReportTarget(target));
+        openLogin(() => openReport(target));
         return;
       }
-      setReportTarget(target);
+      openReport(target);
     },
-    [isAuthed, openLogin],
+    [isAuthed, openLogin, openReport],
   );
   const chatModerationProps = {
     canModerate,
     chatMuted: Boolean(moderationState.data?.muted),
-    onOpenModeration: setModerationTarget,
+    onOpenModeration: openModeration,
     onReportMessage: openReportTarget,
     ...(endTransition
       ? {
@@ -211,53 +206,6 @@ export default function LiveRoomPage() {
           }),
         }
       : {}),
-  };
-  const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
-    if (!moderationTarget) return;
-    muteUser.mutate(
-      {
-        targetUserId: moderationTarget.userId,
-        targetName: moderationTarget.user,
-        targetAvatar: moderationTarget.avatar,
-        durationMinutes,
-      },
-      {
-        onSuccess: (resp) => {
-          toast.success(
-            t('liveRoom.moderation.muted', {
-              user: resp.targetName,
-              minutes: resp.durationMinutes,
-              defaultValue: `${resp.targetName} muted for ${resp.durationMinutes} minutes.`,
-            }),
-          );
-          setModerationTarget(null);
-        },
-        onError: (err) =>
-          toast.error(
-            err.message ||
-              t('liveRoom.moderation.muteFailed', { defaultValue: 'Could not mute this user.' }),
-          ),
-      },
-    );
-  };
-  const submitUnmute = () => {
-    if (!moderationTarget) return;
-    unmuteUser.mutate(moderationTarget.userId, {
-      onSuccess: () => {
-        toast.success(
-          t('liveRoom.moderation.unmuted', {
-            user: moderationTarget.user,
-            defaultValue: `${moderationTarget.user} 已解除禁言。`,
-          }),
-        );
-        setModerationTarget(null);
-      },
-      onError: (err) =>
-        toast.error(
-          err.message ||
-            t('liveRoom.moderation.unmuteFailed', { defaultValue: '无法解除该用户的禁言。' }),
-        ),
-    });
   };
 
   const handleLiveEnded = useCallback(() => {
@@ -321,7 +269,8 @@ export default function LiveRoomPage() {
       endTransitionTimerRef.current = null;
     }
     setEndTransition(null);
-  }, [id]);
+    resetRoomUi();
+  }, [id, resetRoomUi]);
 
   useEffect(() => {
     return () => {
@@ -402,14 +351,15 @@ export default function LiveRoomPage() {
 
   useEffect(() => {
     if (!stream) return;
+    if (roomCanWatch && readyState === 'open') return;
     const timer = window.setInterval(
       () => {
         void refetch();
       },
-      roomIsLive ? 5000 : 3000,
+      roomIsLive ? 30_000 : 15_000,
     );
     return () => window.clearInterval(timer);
-  }, [refetch, roomIsLive, stream]);
+  }, [readyState, refetch, roomCanWatch, roomIsLive, stream]);
 
   if (isPending) {
     return (
@@ -577,29 +527,14 @@ export default function LiveRoomPage() {
     });
   };
   const moderationDialog = (
-    <MuteUserDialog
-      target={moderationTarget}
+    <LiveRoomModerationDialog
+      roomId={roomId}
       actorRole={moderationRole}
       currentUserId={currentUser?.id}
-      muted={Boolean(targetMuteState.data?.muted)}
-      statePending={targetMuteState.isFetching}
-      pending={muteUser.isPending || unmuteUser.isPending}
-      onOpenChange={(open) => {
-        if (!open) setModerationTarget(null);
-      }}
-      onMute={submitMute}
-      onUnmute={submitUnmute}
+      enabled={canModerate}
     />
   );
-  const reportDialog = (
-    <ReportDialog
-      open={Boolean(reportTarget)}
-      target={reportTarget}
-      onOpenChange={(open) => {
-        if (!open) setReportTarget(null);
-      }}
-    />
-  );
+  const reportDialog = <LiveRoomReportDialog />;
   const lockedInteractionLabel = t('liveRoom.fanClubExclusive.giftLocked', {
     defaultValue: 'Join the fan club to send gifts in this room.',
   });
@@ -1037,14 +972,11 @@ export default function LiveRoomPage() {
               );
             }
             updateLocalFanBadge(totalCoin, gift.id === 'fan_light');
-            setFlying((prev) => [
-              ...prev,
-              {
-                id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                icon: gift.icon,
-                label: `${giftName} x${count}`,
-              },
-            ]);
+            pushFlyingGift({
+              id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              icon: gift.icon,
+              label: `${giftName} x${count}`,
+            });
             appendMessage(roomId, {
               id: `gift:${requestId}`,
               kind: 'gift',
@@ -1066,10 +998,7 @@ export default function LiveRoomPage() {
 
         <SuperChatDialog open={superChatOpen} onOpenChange={setSuperChatOpen} roomId={roomId} />
 
-        <FlyingGiftLayer
-          items={flying}
-          onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
-        />
+        <FlyingGiftOverlay />
         {reportDialog}
         {moderationDialog}
       </>
@@ -1251,14 +1180,11 @@ export default function LiveRoomPage() {
             );
           }
           updateLocalFanBadge(totalCoin, gift.id === 'fan_light');
-          setFlying((prev) => [
-            ...prev,
-            {
-              id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              icon: gift.icon,
-              label: `${giftName} x${count}`,
-            },
-          ]);
+          pushFlyingGift({
+            id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            icon: gift.icon,
+            label: `${giftName} x${count}`,
+          });
           appendMessage(roomId, {
             id: `gift:${requestId}`,
             kind: 'gift',
@@ -1280,10 +1206,7 @@ export default function LiveRoomPage() {
 
       <SuperChatDialog open={superChatOpen} onOpenChange={setSuperChatOpen} roomId={roomId} />
 
-      <FlyingGiftLayer
-        items={flying}
-        onDone={(fid) => setFlying((prev) => prev.filter((f) => f.id !== fid))}
-      />
+      <FlyingGiftOverlay />
       {reportDialog}
       {moderationDialog}
     </>
@@ -1870,6 +1793,109 @@ function BetEntryNotice({ question, onClick }: { question: string; onClick: () =
   );
 }
 
+function LiveRoomReportDialog() {
+  const reportTarget = useLiveRoomUiStore((s) => s.reportTarget);
+  const closeReport = useLiveRoomUiStore((s) => s.closeReport);
+
+  return (
+    <ReportDialog
+      open={Boolean(reportTarget)}
+      target={reportTarget}
+      onOpenChange={(open) => {
+        if (!open) closeReport();
+      }}
+    />
+  );
+}
+
+function LiveRoomModerationDialog({
+  roomId,
+  actorRole,
+  currentUserId,
+  enabled,
+}: {
+  roomId: string;
+  actorRole: string;
+  currentUserId?: string;
+  enabled: boolean;
+}) {
+  const { t } = useTranslation('pages');
+  const moderationTarget = useLiveRoomUiStore((s) => s.moderationTarget);
+  const closeModeration = useLiveRoomUiStore((s) => s.closeModeration);
+  const targetMuteState = useRoomMuteState(
+    roomId,
+    moderationTarget?.userId ?? '',
+    Boolean(enabled && moderationTarget && roomId),
+  );
+  const muteUser = useMuteRoomUser(roomId);
+  const unmuteUser = useUnmuteRoomUser(roomId);
+
+  const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
+    if (!moderationTarget) return;
+    muteUser.mutate(
+      {
+        targetUserId: moderationTarget.userId,
+        targetName: moderationTarget.user,
+        targetAvatar: moderationTarget.avatar,
+        durationMinutes,
+      },
+      {
+        onSuccess: (resp) => {
+          toast.success(
+            t('liveRoom.moderation.muted', {
+              user: resp.targetName,
+              minutes: resp.durationMinutes,
+              defaultValue: `${resp.targetName} muted for ${resp.durationMinutes} minutes.`,
+            }),
+          );
+          closeModeration();
+        },
+        onError: (err) =>
+          toast.error(
+            err.message ||
+              t('liveRoom.moderation.muteFailed', { defaultValue: 'Could not mute this user.' }),
+          ),
+      },
+    );
+  };
+
+  const submitUnmute = () => {
+    if (!moderationTarget) return;
+    unmuteUser.mutate(moderationTarget.userId, {
+      onSuccess: () => {
+        toast.success(
+          t('liveRoom.moderation.unmuted', {
+            user: moderationTarget.user,
+            defaultValue: `${moderationTarget.user} was unmuted.`,
+          }),
+        );
+        closeModeration();
+      },
+      onError: (err) =>
+        toast.error(
+          err.message ||
+            t('liveRoom.moderation.unmuteFailed', { defaultValue: 'Could not unmute this user.' }),
+        ),
+    });
+  };
+
+  return (
+    <MuteUserDialog
+      target={moderationTarget}
+      actorRole={actorRole}
+      currentUserId={currentUserId}
+      muted={Boolean(targetMuteState.data?.muted)}
+      statePending={targetMuteState.isFetching}
+      pending={muteUser.isPending || unmuteUser.isPending}
+      onOpenChange={(open) => {
+        if (!open) closeModeration();
+      }}
+      onMute={submitMute}
+      onUnmute={submitUnmute}
+    />
+  );
+}
+
 function MuteUserDialog({
   target,
   actorRole,
@@ -1909,7 +1935,6 @@ function MuteUserDialog({
             defaultValue: '该用户当前已被禁言，可解除禁言。',
           })
         : t('liveRoom.moderation.pickDuration', { defaultValue: '选择禁言时长' });
-
   return (
     <Dialog open={Boolean(target)} onOpenChange={onOpenChange}>
       <DialogContent className="gl-mute-dialog">

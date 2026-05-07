@@ -19,6 +19,7 @@ export interface RoomViewer {
 
 interface RoomSlice {
   messages: Message[];
+  messageIndex: Record<string, number>;
   bullets: Bullet[];
   viewerCount: number;
   viewers: RoomViewer[];
@@ -29,7 +30,22 @@ const MESSAGE_CAP = 500;
 const BULLET_CAP = 40;
 
 function emptySlice(): RoomSlice {
-  return { messages: [], bullets: [], viewerCount: 0, viewers: [], lastServerTs: 0 };
+  return {
+    messages: [],
+    messageIndex: {},
+    bullets: [],
+    viewerCount: 0,
+    viewers: [],
+    lastServerTs: 0,
+  };
+}
+
+function indexMessages(messages: Message[]): Record<string, number> {
+  const index: Record<string, number> = {};
+  messages.forEach((message, position) => {
+    index[message.id] = position;
+  });
+  return index;
 }
 
 function mergeMessageFields(current: Message | undefined, incoming: Message): Message {
@@ -80,20 +96,28 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
   appendMessage: (roomId, m) =>
     set((state) =>
       updateRoom(state, roomId, (slice) => {
-        if (slice.messages.some((x) => x.id === m.id)) {
-          const messages = slice.messages.map((x) =>
-            x.id === m.id ? mergeMessageFields(x, m) : x,
-          );
+        const existingIndex = slice.messageIndex[m.id];
+        if (existingIndex !== undefined) {
+          const current = slice.messages[existingIndex];
+          const messages = slice.messages.slice();
+          messages[existingIndex] = mergeMessageFields(current, m);
           return {
             ...slice,
             messages,
             lastServerTs: Math.max(slice.lastServerTs, m.ts),
           };
         }
-        const next = [...slice.messages, m];
+        const next =
+          slice.messages.length >= MESSAGE_CAP
+            ? [...slice.messages.slice(1), m]
+            : [...slice.messages, m];
         return {
           ...slice,
-          messages: next.length > MESSAGE_CAP ? next.slice(next.length - MESSAGE_CAP) : next,
+          messages: next,
+          messageIndex:
+            next.length === slice.messages.length
+              ? indexMessages(next)
+              : { ...slice.messageIndex, [m.id]: next.length - 1 },
           lastServerTs: Math.max(slice.lastServerTs, m.ts),
         };
       }),
@@ -114,6 +138,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
         return {
           ...slice,
           messages: capped,
+          messageIndex: indexMessages(capped),
           lastServerTs: capped.reduce(
             (max, message) => Math.max(max, message.ts),
             slice.lastServerTs,
@@ -123,17 +148,25 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
     ),
   replaceMessage: (roomId, id, m) =>
     set((state) =>
-      updateRoom(state, roomId, (slice) => ({
-        ...slice,
-        messages: slice.messages.map((x) => (x.id === id ? m : x)),
-      })),
+      updateRoom(state, roomId, (slice) => {
+        const messages = slice.messages.map((x) => (x.id === id ? m : x));
+        return {
+          ...slice,
+          messages,
+          messageIndex: indexMessages(messages),
+        };
+      }),
     ),
   removeMessage: (roomId, id) =>
     set((state) =>
-      updateRoom(state, roomId, (slice) => ({
-        ...slice,
-        messages: slice.messages.filter((x) => x.id !== id),
-      })),
+      updateRoom(state, roomId, (slice) => {
+        const messages = slice.messages.filter((x) => x.id !== id);
+        return {
+          ...slice,
+          messages,
+          messageIndex: indexMessages(messages),
+        };
+      }),
     ),
   appendBullet: (roomId, b) =>
     set((state) =>

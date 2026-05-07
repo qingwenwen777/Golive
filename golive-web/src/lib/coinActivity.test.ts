@@ -7,12 +7,14 @@ import {
   coinTodayKey,
   markDailyCoinRoomWatched,
   readDailyCoinActivity,
+  resetDailyCoinActivityCacheForTest,
 } from './coinActivity';
 
 const storageKey = `${COIN_ACTIVITY_KEY_PREFIX}:user-1`;
 
 describe('coinActivity', () => {
   beforeEach(() => {
+    resetDailyCoinActivityCacheForTest();
     window.localStorage.clear();
   });
 
