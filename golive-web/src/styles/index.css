@@ -2231,9 +2231,27 @@ input:focus-visible,
 .gl-avatar-fallback {
   position: relative;
   z-index: 1;
-  line-height: 1;
-  text-transform: uppercase;
-  user-select: none;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.18));
+  opacity: 0.96;
+}
+.gl-avatar-fallback-head,
+.gl-avatar-fallback-body,
+.gl-avatar-fallback-glow {
+  vector-effect: non-scaling-stroke;
+}
+.gl-avatar-fallback-head {
+  fill: rgb(255 255 255 / 0.93);
+}
+.gl-avatar-fallback-body {
+  stroke: rgb(255 255 255 / 0.93);
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.gl-avatar-fallback-glow {
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-width: 3;
+  stroke-linecap: round;
 }
 .gl-card-cover.has-image::before,
 .gl-card-cover.is-placeholder::before,

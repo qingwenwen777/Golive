@@ -15,7 +15,6 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
   const imageSrc = normalizeAvatarSrc(src);
   const [loaded, setLoaded] = useState(() => isLoadableImageReady(imageSrc));
   const showImage = Boolean(imageSrc && !failed);
-  const fallbackLabel = avatarFallbackLabel(name);
   const fallbackColor = avatarFallbackColor(name);
   const style: CSSProperties = {
     width: size,
@@ -60,9 +59,7 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
           onError={() => setFailed(true)}
         />
       ) : (
-        <span className="gl-avatar-fallback" aria-hidden="true">
-          {fallbackLabel}
-        </span>
+        <DefaultAvatarIcon size={size} />
       )}
     </div>
   );
@@ -79,21 +76,6 @@ const FALLBACK_COLORS = [
   '#0369a1',
 ];
 
-function avatarFallbackLabel(name: string): string {
-  const clean = name.trim();
-  if (!clean) return '?';
-
-  const words = clean.split(/[\s._@-]+/).filter(Boolean);
-  const initials = words
-    .map((word) => word.match(/[a-z0-9]/i)?.[0] ?? '')
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('');
-  if (initials) return initials.toUpperCase();
-
-  return Array.from(clean.replace(/\s+/g, ''))[0]?.toUpperCase() ?? '?';
-}
-
 function avatarFallbackColor(name: string): string {
   const seed = name.trim() || 'golive';
   let hash = 0;
@@ -101,6 +83,28 @@ function avatarFallbackColor(name: string): string {
     hash = (hash * 31 + char.charCodeAt(0)) | 0;
   }
   return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
+}
+
+function DefaultAvatarIcon({ size }: { size: number }) {
+  const iconSize = Math.round(size * 0.74);
+  return (
+    <svg
+      className="gl-avatar-fallback"
+      width={iconSize}
+      height={iconSize}
+      viewBox="0 0 64 64"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle className="gl-avatar-fallback-head" cx="32" cy="23" r="12" />
+      <path className="gl-avatar-fallback-body" d="M12 56c2.8-12.4 10.5-19 20-19s17.2 6.6 20 19" />
+      <path
+        className="gl-avatar-fallback-glow"
+        d="M20 45c3.4-4 7.4-6 12-6 4.4 0 8.3 1.9 11.8 5.7"
+      />
+    </svg>
+  );
 }
 
 function normalizeAvatarSrc(src: string | undefined): string {

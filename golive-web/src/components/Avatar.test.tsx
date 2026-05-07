@@ -8,28 +8,22 @@ import { LoadableImage } from './LoadableImage';
 describe('Avatar', () => {
   afterEach(() => cleanup());
 
-  it('shows initials when no avatar image is available', () => {
+  it('shows a person-shaped fallback when no avatar image is available', () => {
     render(<Avatar name="Luna Nova" src="" />);
 
     const avatar = screen.getByLabelText('Luna Nova');
     expect(avatar.querySelector('img')).toBeNull();
-    expect(screen.getByText('LN')).toBeTruthy();
+    expect(avatar.querySelector('svg.gl-avatar-fallback')).toBeTruthy();
   });
 
-  it('uses the first visible character for non-latin names', () => {
-    render(<Avatar name="小白" />);
-
-    expect(screen.getByText('小')).toBeTruthy();
-  });
-
-  it('falls back to initials when the avatar image fails to load', () => {
+  it('falls back to the default person icon when the avatar image fails to load', () => {
     render(<Avatar name="Luna" src="/missing-avatar.png" />);
 
     const image = screen.getByLabelText('Luna').querySelector('img');
     expect(image).toBeTruthy();
     fireEvent.error(image as HTMLImageElement);
 
-    expect(screen.getByText('L')).toBeTruthy();
+    expect(screen.getByLabelText('Luna').querySelector('svg.gl-avatar-fallback')).toBeTruthy();
   });
 
   it('reuses a previously loaded avatar without showing the loading shimmer again', () => {
