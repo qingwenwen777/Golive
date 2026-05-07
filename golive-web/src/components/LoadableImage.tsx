@@ -19,6 +19,7 @@ const readyImageSrcs = new Set<string>();
 const optimizedImageSrcs = new Map<string, string>();
 const missingOptimizedImageSrcs = new Set<string>();
 const missingOptimizedFormatScopes = new Set<string>();
+const generatedPlaceholderStyles = new Map<string, CSSProperties>();
 const DEFAULT_LAZY_ROOT_MARGIN = '600px 0px';
 const DEFAULT_LAZY_THRESHOLD = 0.01;
 const DEFAULT_FORMATS: readonly PreferredImageFormat[] = ['avif', 'webp'];
@@ -57,6 +58,56 @@ function thresholdKey(threshold: number | number[]) {
 
 function cssUrl(value: string) {
   return `url("${value.replace(/"/g, '\\"')}")`;
+}
+
+function imageHash(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function hsl(hash: number, offset: number, saturationBase = 48, lightnessBase = 42) {
+  const hue = (hash + offset) % 360;
+  const saturation = saturationBase + ((hash >>> 8) % 18);
+  const lightness = lightnessBase + ((hash >>> 16) % 16);
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+}
+
+export function generatedImagePlaceholderStyle(src: string): CSSProperties {
+  const cached = generatedPlaceholderStyles.get(src);
+  if (cached) return cached;
+
+  const hash = imageHash(src);
+  const x1 = 18 + (hash % 56);
+  const y1 = 12 + ((hash >>> 5) % 58);
+  const x2 = 24 + ((hash >>> 11) % 52);
+  const y2 = 28 + ((hash >>> 17) % 48);
+  const base = hsl(hash, 0, 38, 36);
+  const accent = hsl(hash, 72 + ((hash >>> 3) % 76), 52, 48);
+  const depth = hsl(hash, 196 + ((hash >>> 9) % 62), 42, 32);
+  const glow = hsl(hash, 124 + ((hash >>> 15) % 48), 58, 56);
+
+  const style: CSSProperties = {
+    backgroundColor: base,
+    backgroundImage: [
+      `radial-gradient(circle at ${x1}% ${y1}%, ${glow} 0%, transparent 38%)`,
+      `radial-gradient(circle at ${x2}% ${y2}%, ${accent} 0%, transparent 44%)`,
+      `linear-gradient(135deg, ${base} 0%, ${depth} 100%)`,
+    ].join(', '),
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: '150% 150%, 135% 135%, cover',
+  };
+
+  if (generatedPlaceholderStyles.size >= READY_CACHE_LIMIT) {
+    const oldest = generatedPlaceholderStyles.keys().next().value;
+    if (oldest) generatedPlaceholderStyles.delete(oldest);
+  }
+  generatedPlaceholderStyles.set(src, style);
+  return style;
 }
 
 function canProbeFormatCandidates(src: string) {
@@ -123,6 +174,7 @@ export function LoadableImage({
   onReady,
   placeholderSrc,
   preferredFormats = DEFAULT_FORMATS,
+  decoding = 'async',
   style,
   srcSet,
   ...props
@@ -130,6 +182,7 @@ export function LoadableImage({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const notifiedReadySrc = useRef<string | null>(null);
   const [status, setStatus] = useState<ImageStatus>(() => initialStatus(src));
+  const [placeholderFailed, setPlaceholderFailed] = useState(false);
   const [resolvedSrc, setResolvedSrc] = useState<string | undefined>(() =>
     src ? (optimizedImageSrcs.get(src) ?? src) : undefined,
   );
@@ -142,6 +195,11 @@ export function LoadableImage({
   });
   const lazyThresholdKey = thresholdKey(lazyThreshold);
   const formatKey = preferredFormats.join(',');
+  const hasUsablePlaceholderSrc = Boolean(placeholderSrc && !placeholderFailed);
+  const generatedPlaceholderStyle = useMemo(
+    () => (src && !hasUsablePlaceholderSrc ? generatedImagePlaceholderStyle(src) : undefined),
+    [hasUsablePlaceholderSrc, src],
+  );
 
   const markReady = useCallback(
     (readySrc: string) => {
@@ -154,6 +212,10 @@ export function LoadableImage({
     },
     [onReady],
   );
+
+  useEffect(() => {
+    setPlaceholderFailed(false);
+  }, [placeholderSrc, src]);
 
   useEffect(() => {
     if (!src) {
@@ -240,16 +302,30 @@ export function LoadableImage({
     return () => observer.disconnect();
   }, [lazyRootMargin, lazyThreshold, lazyThresholdKey, shouldLoad, src]);
 
-  const displaySrc = shouldLoad ? resolvedSrc : placeholderSrc;
+  const displaySrc = shouldLoad ? resolvedSrc : hasUsablePlaceholderSrc ? placeholderSrc : undefined;
+  const isDisplayingPlaceholderSrc = Boolean(
+    displaySrc && placeholderSrc && displaySrc === placeholderSrc && displaySrc !== resolvedSrc,
+  );
   const imageStyle = useMemo<CSSProperties | undefined>(() => {
-    if (status === 'loaded' || !placeholderSrc) return style;
+    if (status === 'loaded') return style;
+    if (hasUsablePlaceholderSrc && placeholderSrc) {
+      return {
+        backgroundImage: cssUrl(placeholderSrc),
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
+        ...style,
+      };
+    }
+    if (generatedPlaceholderStyle) {
+      return {
+        ...generatedPlaceholderStyle,
+        ...style,
+      };
+    }
     return {
-      backgroundImage: cssUrl(placeholderSrc),
-      backgroundPosition: 'center',
-      backgroundSize: 'cover',
       ...style,
     };
-  }, [placeholderSrc, status, style]);
+  }, [generatedPlaceholderStyle, hasUsablePlaceholderSrc, placeholderSrc, status, style]);
 
   useLayoutEffect(() => {
     if (!src) {
@@ -267,10 +343,10 @@ export function LoadableImage({
     setStatus('loading');
 
     const image = imageRef.current;
-    if (displaySrc && displaySrc !== placeholderSrc && image?.complete && image.naturalWidth > 0) {
+    if (displaySrc && !isDisplayingPlaceholderSrc && image?.complete && image.naturalWidth > 0) {
       markReady(src);
     }
-  }, [displaySrc, markReady, placeholderSrc, src]);
+  }, [displaySrc, isDisplayingPlaceholderSrc, markReady, src]);
 
   if (!src) return null;
 
@@ -278,26 +354,35 @@ export function LoadableImage({
     <img
       {...props}
       ref={imageRef}
+      decoding={decoding}
       src={displaySrc}
-      srcSet={displaySrc && displaySrc !== placeholderSrc ? srcSet : undefined}
+      srcSet={displaySrc && !isDisplayingPlaceholderSrc ? srcSet : undefined}
       style={imageStyle}
       className={cn(
         'gl-loadable-img',
         status === 'loading' && 'is-loading',
         status === 'loaded' && 'is-loaded',
         status === 'error' && 'is-error',
-        placeholderSrc && status !== 'loaded' && 'has-placeholder',
+        hasUsablePlaceholderSrc && status !== 'loaded' && 'has-placeholder',
+        !hasUsablePlaceholderSrc &&
+          generatedPlaceholderStyle &&
+          status !== 'loaded' &&
+          'has-generated-placeholder',
         props.loading === 'lazy' && !shouldLoad && 'is-lazy-pending',
         className,
       )}
       onLoad={(event) => {
-        if (displaySrc && displaySrc !== placeholderSrc) {
+        if (isDisplayingPlaceholderSrc) {
+          return;
+        }
+        if (displaySrc) {
           markReady(src);
         }
         onLoad?.(event);
       }}
       onError={(event) => {
-        if (displaySrc && displaySrc === placeholderSrc) {
+        if (isDisplayingPlaceholderSrc) {
+          setPlaceholderFailed(true);
           setStatus('loading');
           return;
         }

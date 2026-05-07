@@ -2195,17 +2195,29 @@ input:focus-visible,
   background: var(--gl-skeleton-base);
   opacity: 1;
   transition:
-    filter 0.22s ease,
-    opacity 0.22s ease,
-    transform 0.22s ease;
+    filter 0.28s ease,
+    opacity 0.2s ease,
+    transform 0.28s ease;
 }
 .gl-loadable-img.is-loading,
 .gl-loadable-img.is-lazy-pending {
-  filter: blur(12px);
-  transform: scale(1.01);
+  filter: blur(14px);
+  transform: scale(1.025);
+  will-change: filter, transform;
 }
-.gl-loadable-img.is-loading:not(.has-placeholder),
-.gl-loadable-img.is-lazy-pending:not(.has-placeholder) {
+.gl-loadable-img.has-placeholder,
+.gl-loadable-img.has-generated-placeholder {
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.gl-loadable-img.has-placeholder {
+  background-size: cover;
+}
+.gl-loadable-img.has-generated-placeholder {
+  background-size: 150% 150%, 135% 135%, cover;
+}
+.gl-loadable-img.is-loading:not(.has-placeholder):not(.has-generated-placeholder),
+.gl-loadable-img.is-lazy-pending:not(.has-placeholder):not(.has-generated-placeholder) {
   background: linear-gradient(
     110deg,
     var(--gl-skeleton-base) 0%,
@@ -2220,6 +2232,7 @@ input:focus-visible,
   filter: none;
   opacity: 1;
   transform: none;
+  will-change: auto;
   animation: none;
 }
 .gl-loadable-img.is-error {
