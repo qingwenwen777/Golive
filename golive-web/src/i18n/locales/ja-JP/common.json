@@ -39,13 +39,13 @@
     "history": "履歴",
     "watchLater": "後で見る",
     "liked": "高評価したライブルーム",
-    "studioFanGroups": "??????????",
-    "messages": "?????",
-    "messagesPrivate": "???????",
-    "messagesReplies": "??",
-    "messagesLikes": "????????",
-    "messagesSystem": "??????",
-    "messagesSettings": "???????"
+    "studioFanGroups": "ファンクラブチャット",
+    "messages": "メッセージ",
+    "messagesPrivate": "自分のメッセージ",
+    "messagesReplies": "返信",
+    "messagesLikes": "受け取ったいいね",
+    "messagesSystem": "システム通知",
+    "messagesSettings": "メッセージ設定"
   },
   "sidebar": {
     "subsHeading": "登録チャンネル",
@@ -71,7 +71,7 @@
     "light": "ライト",
     "signIn": "ログイン",
     "signOut": "ログアウト",
-    "bannedAppeal": "??????????"
+    "bannedAppeal": "制限への異議申し立て"
   },
   "badges": {
     "platformVerified": "プラットフォーム認定クリエイター"
@@ -183,12 +183,12 @@
   },
   "live": "LIVE",
   "viewersWatching": "{{count}} 人が視聴中",
-  "clear": "???",
+  "clear": "クリア",
   "searchSuggestionTypes": {
-    "creator": "??????",
-    "live": "???",
-    "replay": "????",
-    "appointment": "??",
-    "post": "??"
+    "creator": "クリエイター",
+    "live": "ライブ",
+    "replay": "リプレイ",
+    "appointment": "予約",
+    "post": "投稿"
   }
 }

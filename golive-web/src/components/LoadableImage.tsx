@@ -200,6 +200,12 @@ export function LoadableImage({
     () => (src && !hasUsablePlaceholderSrc ? generatedImagePlaceholderStyle(src) : undefined),
     [hasUsablePlaceholderSrc, src],
   );
+  const effectiveResolvedSrc = useMemo(() => {
+    if (!src) return undefined;
+    if (!resolvedSrc) return src;
+    if (resolvedSrc === src || optimizedImageSrcs.get(src) === resolvedSrc) return resolvedSrc;
+    return src;
+  }, [resolvedSrc, src]);
 
   const markReady = useCallback(
     (readySrc: string) => {
@@ -302,7 +308,11 @@ export function LoadableImage({
     return () => observer.disconnect();
   }, [lazyRootMargin, lazyThreshold, lazyThresholdKey, shouldLoad, src]);
 
-  const displaySrc = shouldLoad ? resolvedSrc : hasUsablePlaceholderSrc ? placeholderSrc : undefined;
+  const displaySrc = shouldLoad
+    ? effectiveResolvedSrc
+    : hasUsablePlaceholderSrc
+      ? placeholderSrc
+      : undefined;
   const isDisplayingPlaceholderSrc = Boolean(
     displaySrc && placeholderSrc && displaySrc === placeholderSrc && displaySrc !== resolvedSrc,
   );

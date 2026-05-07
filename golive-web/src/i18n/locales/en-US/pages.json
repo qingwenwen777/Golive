@@ -9,7 +9,7 @@
     "searchEmptySub": "Try another keyword.",
     "empty": "No live streams right now",
     "emptySub": "Check back in a bit",
-    "errorTitle": "Couldn't load streams",
+    "errorTitle": "Couldn\u0027t load streams",
     "errorSub": "Check your connection and try again",
     "retry": "Retry",
     "watching": "{{count}} watching",
@@ -98,7 +98,7 @@
     "description": "Share this GoLive page.",
     "liveKicker": "Live room",
     "channelKicker": "Channel",
-    "metaSeparator": " ? "
+    "metaSeparator": " · "
   },
   "liveRoom": {
     "title": "Live Room",
@@ -439,13 +439,13 @@
       "enterChannel": "Enter channel",
       "latest": {
         "channelTitle": "Latest",
-        "channelSubtitle": "{{name}}'s live status and recent content."
+        "channelSubtitle": "{{name}}\u0027s live status and recent content."
       },
       "appointments": {
         "title": "Appointments from subscriptions",
         "subtitle": "Browse upcoming live rooms from creators you follow.",
         "channelTitle": "Live appointments",
-        "channelSubtitle": "{{name}}'s upcoming live streams appear here.",
+        "channelSubtitle": "{{name}}\u0027s upcoming live streams appear here.",
         "empty": "No upcoming appointments from your subscriptions.",
         "channelEmpty": "This creator has no live appointments.",
         "signIn": "Sign in to browse appointment schedules."
@@ -799,7 +799,7 @@
     "permission": {
       "reviewTime": "Estimated review time: within 1 business day.",
       "notice": "Keep your channel name, avatar, and cover ready for live access review.",
-      "progress": "Progress: submitted -> manual review -> result.",
+      "progress": "Progress: submitted -\u003e manual review -\u003e result.",
       "reasonLabel": "Why do you want live access?",
       "reasonPlaceholder": "Tell admins your live content plan, schedule, and channel readiness.",
       "pending": {
@@ -1187,7 +1187,7 @@
       "unmuted": "{{name}} was unmuted.",
       "kicked": "{{name}} was removed from the group chat.",
       "rejoinApproved": "{{name}} rejoined the group chat.",
-      "rejoinRejected": "{{name}}'s rejoin request was rejected.",
+      "rejoinRejected": "{{name}}\u0027s rejoin request was rejected.",
       "rejoinRequests": "Rejoin requests",
       "waitingApproval": "Waiting approval",
       "rejectRejoin": "Reject",
@@ -2242,7 +2242,7 @@
       "loading": "Loading direct messages...",
       "emptyHint": "Follow a creator, then start a direct message from their channel.",
       "threadEmpty": "No messages yet",
-      "waitingReply": "Wait for the creator's first reply before sending again",
+      "waitingReply": "Wait for the creator\u0027s first reply before sending again",
       "muted": "Do Not Disturb is on",
       "normal": "Notifications are enabled",
       "actions": "Conversation actions",
@@ -2257,9 +2257,9 @@
       "blockedToast": "Added to blacklist",
       "loadingMessages": "Loading messages...",
       "startTitle": "Start a creator DM",
-      "startBody": "Before the creator's first reply, you can send only one message.",
+      "startBody": "Before the creator\u0027s first reply, you can send only one message.",
       "input": "Type a direct message",
-      "inputWaiting": "Wait for the creator's first reply before sending again",
+      "inputWaiting": "Wait for the creator\u0027s first reply before sending again",
       "send": "Send",
       "emptyTitle": "No direct messages",
       "emptyBody": "Open a creator channel and click the DM icon to start a conversation.",
@@ -2325,7 +2325,7 @@
       "saveFailed": "Could not save message settings."
     },
     "errors": {
-      "awaitingCreatorReply": "Before the creator's first reply, you can send only one message.",
+      "awaitingCreatorReply": "Before the creator\u0027s first reply, you can send only one message.",
       "followRequired": "Follow this creator before sending a direct message.",
       "userBlocked": "A blacklist relationship exists, so direct messages are unavailable.",
       "sendFailed": "Could not send the message."
@@ -2358,7 +2358,7 @@
       "loginRequired": "Please sign in to report.",
       "reasonRequired": "Select a report type.",
       "duplicate": "You already reported this target in the past 24 hours.",
-      "dailyLimit": "You have reached today's report limit.",
+      "dailyLimit": "You have reached today\u0027s report limit.",
       "failed": "Could not submit report."
     }
   },

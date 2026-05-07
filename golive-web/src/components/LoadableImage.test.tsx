@@ -162,4 +162,27 @@ describe('LoadableImage', () => {
     expect(image.className).toContain('has-generated-placeholder');
     expect(image.className).not.toContain('is-error');
   });
+
+  it('keeps the original image source while probing optimized formats', async () => {
+    vi.stubGlobal('navigator', { userAgent: 'Chrome' });
+    vi.stubGlobal(
+      'Image',
+      class {
+        decoding = 'async';
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        src = '';
+      },
+    );
+
+    render(<LoadableImage src="/avatar.jpg" alt="avatar" />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const image = screen.getByAltText('avatar');
+    expect(image.getAttribute('src')).toBe('/avatar.jpg');
+    expect(image.className).toContain('is-loading');
+  });
 });

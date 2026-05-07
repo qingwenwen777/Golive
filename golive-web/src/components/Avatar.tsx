@@ -60,6 +60,7 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
         <LoadableImage
           src={imageSrc}
           alt=""
+          autoFormat={false}
           className="gl-avatar-img"
           onReady={() => setLoaded(true)}
           onError={() => {
