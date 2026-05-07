@@ -84,6 +84,20 @@
       "eternal_scepter": "永恒权杖"
     }
   },
+  "shareDialog": {
+    "copyLink": "复制链接",
+    "copyTarget": "分享链接",
+    "copyManual": "链接已打开，请手动复制。",
+    "copySuccess": "链接已复制。",
+    "copyFailed": "无法复制链接。",
+    "x": "X",
+    "instagram": "Instagram",
+    "reddit": "Reddit",
+    "preview": "分享",
+    "description": "分享这个 GoLive 页面。",
+    "liveKicker": "直播分享",
+    "channelKicker": "频道分享"
+  },
   "liveRoom": {
     "title": "直播间",
     "roomId": "房间 ID：{{id}}",
@@ -2097,6 +2111,7 @@
       "saveWatchLater": "稍后观看",
       "removeWatchLater": "移出稍后观看",
       "copyLiveLink": "复制直播链接",
+      "shareLiveLink": "分享直播",
       "openChannel": "打开频道",
       "report": "举报"
     }

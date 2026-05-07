@@ -46,6 +46,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
+import { ShareDialog } from '@/components/ShareDialog';
 import { LiveCardSkeleton, Skeleton } from '@/components/Skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -60,7 +61,6 @@ import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveI
 import { PostCard } from '@/features/posts/PostCard';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
-import { copyText } from '@/lib/clipboard';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
@@ -100,6 +100,7 @@ export default function ChannelPage() {
   const [activeTab, setActiveTab] = useState<ChannelTab>('home');
   const [fanBadgeDialogOpen, setFanBadgeDialogOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const activeLiveId = useActiveCreatorLiveId(authUser?.id);
 
   const profile = useMemo(
@@ -205,17 +206,6 @@ export default function ChannelPage() {
     if (isOwner || !channelId) return;
     if (followState.data?.following) unfollow.mutate();
     else follow.mutate();
-  };
-
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      const method = await copyText(url, t('channel.copyTarget'));
-      if (method === 'manual') toast.info(t('channel.copyManual'));
-      else toast.success(t('channel.copySuccess'));
-    } catch {
-      toast.info(url);
-    }
   };
 
   const handleReportChannel = () => {
@@ -410,7 +400,7 @@ export default function ChannelPage() {
                   </button>
                 </>
               )}
-              <button className="gl-secondary-btn" type="button" onClick={handleShare}>
+              <button className="gl-secondary-btn" type="button" onClick={() => setShareOpen(true)}>
                 <Share2 size={16} />
                 {t('channel.share')}
               </button>
@@ -693,6 +683,21 @@ export default function ChannelPage() {
         onOpenChange={(open) => {
           if (!open) setReportTarget(null);
         }}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={channelName}
+        url={window.location.href}
+        description={
+          primary?.description ||
+          profile?.displayName ||
+          profile?.username ||
+          t('channel.liveChannel')
+        }
+        previewImage={channelCover || primary?.cover}
+        previewKicker={t('shareDialog.channelKicker', { defaultValue: 'Channel' })}
+        previewMeta={t('channel.subscribers', { count: subscriberCount })}
       />
     </div>
   );

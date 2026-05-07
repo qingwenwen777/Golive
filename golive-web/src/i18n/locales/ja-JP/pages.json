@@ -84,6 +84,20 @@
       "eternal_scepter": "永遠のセプター"
     }
   },
+  "shareDialog": {
+    "copyLink": "リンクをコピー",
+    "copyTarget": "共有リンク",
+    "copyManual": "リンクを手動コピー用に開きました。",
+    "copySuccess": "リンクをコピーしました。",
+    "copyFailed": "リンクをコピーできませんでした。",
+    "x": "X",
+    "instagram": "Instagram",
+    "reddit": "Reddit",
+    "preview": "共有",
+    "description": "この GoLive ページを共有します。",
+    "liveKicker": "ライブルーム",
+    "channelKicker": "チャンネル"
+  },
   "liveRoom": {
     "title": "ライブルーム",
     "roomId": "ルーム ID: {{id}}",
@@ -2096,6 +2110,7 @@
       "saveWatchLater": "後で見るに保存",
       "removeWatchLater": "後で見るから削除",
       "copyLiveLink": "ライブリンクをコピー",
+      "shareLiveLink": "ライブを共有",
       "openChannel": "チャンネルを開く",
       "report": "通報"
     }

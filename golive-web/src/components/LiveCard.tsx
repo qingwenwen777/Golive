@@ -8,6 +8,7 @@ import { Avatar } from '@/components/Avatar';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LiveBadge } from '@/components/LiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
+import { ShareDialog } from '@/components/ShareDialog';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import {
   DropdownMenu,
@@ -17,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
-import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
 import { removeFromLibrary, saveToLibrary, WATCH_LATER_KEY } from '@/lib/liveLibrary';
 import {
@@ -56,6 +56,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const saveWatchLater = useSaveUserLibraryItem(WATCH_LATER_KEY);
   const removeWatchLater = useRemoveUserLibraryItem(WATCH_LATER_KEY);
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const hoverStyle = useCoverHoverStyle(
     stream.cover,
     (hasChannelName ? channelName : title) || stream.id,
@@ -85,25 +86,6 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
       watchLaterMembership.setLocalMember(true);
     }
     toast.success(t('liveRoom.savedWatchLater', { defaultValue: 'Saved to Watch later.' }));
-  };
-
-  const copyLink = async () => {
-    const href = `${window.location.origin}/live/${stream.id}`;
-    try {
-      const method = await copyText(
-        href,
-        t('liveRoom.copyTarget', { defaultValue: 'live room link' }),
-      );
-      if (method === 'manual') {
-        toast.info(
-          t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }),
-        );
-      } else {
-        toast.success(t('liveRoom.copySuccess', { defaultValue: 'Live room link copied.' }));
-      }
-    } catch {
-      toast.error(t('liveRoom.copyFailed', { defaultValue: 'Could not copy the live room link.' }));
-    }
   };
 
   const openChannel = () => {
@@ -231,8 +213,8 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
                   ? t('liveCard.menu.removeWatchLater', { defaultValue: 'Remove from Watch later' })
                   : t('liveCard.menu.saveWatchLater', { defaultValue: 'Save to Watch later' })}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={copyLink}>
-                {t('liveCard.menu.copyLiveLink', { defaultValue: 'Copy live link' })}
+              <DropdownMenuItem onSelect={() => setShareOpen(true)}>
+                {t('liveCard.menu.shareLiveLink', { defaultValue: 'Share live' })}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={openChannel}>
@@ -252,6 +234,27 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         onOpenChange={(open) => {
           if (!open) setReportTarget(null);
         }}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={title}
+        url={`${window.location.origin}/live/${encodeURIComponent(stream.id)}`}
+        description={stream.description}
+        previewImage={stream.cover}
+        previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live room' })}
+        previewMeta={`${channelName} 路 ${
+          isLive
+            ? t('home.watching', { count: stream.viewers, defaultValue: '{{count}} watching' })
+            : hasReplay
+              ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
+              : isScheduled
+                ? t('liveRoom.appointmentWaiting', {
+                    count: stream.viewers,
+                    defaultValue: '{{count}} waiting',
+                  })
+                : t('library.status.offline', { defaultValue: 'Offline' })
+        }`}
       />
     </>
   );

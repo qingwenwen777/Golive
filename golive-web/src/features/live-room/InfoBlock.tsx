@@ -6,6 +6,7 @@ import { ThumbsUp, ThumbsDown, Share2, Bell, Gift, MoreHorizontal, Flag } from '
 import { Avatar } from '@/components/Avatar';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { Icons } from '@/components/Icons';
+import { ShareDialog } from '@/components/ShareDialog';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { useLangStore } from '@/stores/useLangStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
@@ -25,7 +26,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
-import { copyText } from '@/lib/clipboard';
 import {
   LIKED_STREAMS_KEY,
   WATCH_LATER_KEY,
@@ -65,6 +65,7 @@ export function InfoBlock({
   const [expanded, setExpanded] = useState(false);
   const [reportTarget, setReportTarget] = useState<ReportTargetDraft | null>(null);
   const [likeBurstKey, setLikeBurstKey] = useState(0);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const channelId = stream.channelId || stream.channel;
   const streamId = stream.id;
@@ -179,21 +180,6 @@ export function InfoBlock({
   const channelPath = `/channel/${encodeURIComponent(channelId || stream.ownerId || channelName)}`;
   const description = stream.description?.trim() ?? '';
 
-  const handleShare = async () => {
-    try {
-      const method = await copyText(window.location.href, t('liveRoom.copyTarget'));
-      if (method === 'manual') {
-        toast.info(
-          t('liveRoom.copyManual', { defaultValue: 'Live room link opened for manual copy.' }),
-        );
-      } else {
-        toast.success(t('liveRoom.copySuccess', { defaultValue: 'Live room link copied.' }));
-      }
-    } catch {
-      toast.error(t('liveRoom.copyFailed', { defaultValue: 'Could not copy the live room link.' }));
-    }
-  };
-
   const openReport = () => {
     const target: ReportTargetDraft = {
       targetType: 'room',
@@ -282,7 +268,11 @@ export function InfoBlock({
             <Gift size={18} />
             <span>{t('liveRoom.gift', { defaultValue: 'Gift' })}</span>
           </button>
-          <button className="gl-pg-solo" aria-label={t('liveRoom.share')} onClick={handleShare}>
+          <button
+            className="gl-pg-solo"
+            aria-label={t('liveRoom.share')}
+            onClick={() => setShareOpen(true)}
+          >
             <Share2 size={18} />
             <span>{t('liveRoom.share')}</span>
           </button>
@@ -334,6 +324,16 @@ export function InfoBlock({
         onOpenChange={(open) => {
           if (!open) setReportTarget(null);
         }}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={title}
+        url={window.location.href}
+        description={description}
+        previewImage={stream.cover}
+        previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live room' })}
+        previewMeta={`${channelName} 路 ${t('liveRoom.watching', { count: viewerCount ?? stream.viewers })}`}
       />
     </div>
   );

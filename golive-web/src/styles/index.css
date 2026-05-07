@@ -2701,6 +2701,393 @@ input:focus-visible,
   opacity: 0.55;
 }
 
+.gl-share-overlay {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+}
+.gl-share-dialog {
+  display: block;
+  width: min(864px, calc(100vw - 28px));
+  max-height: calc(100dvh - 28px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 251, 0.98)), var(--gl-bg);
+  color: #0f0f0f;
+  box-shadow:
+    0 34px 90px rgba(15, 23, 42, 0.22),
+    0 10px 30px rgba(15, 23, 42, 0.08);
+}
+.gl-share-dialog > button {
+  top: 30px;
+  right: 30px;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #0f0f0f;
+  opacity: 1;
+}
+.gl-share-dialog > button:hover {
+  background: rgba(15, 15, 15, 0.06);
+}
+.gl-share-dialog-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 22px;
+  padding: 54px 20px 42px;
+}
+.gl-share-title {
+  max-width: calc(100% - 70px);
+  min-width: 0;
+  overflow: hidden;
+  color: #0f0f0f;
+  padding-inline: 34px;
+  font-size: 42px;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.14;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-divider {
+  height: 1px;
+  background: rgba(15, 15, 15, 0.12);
+}
+.gl-share-preview {
+  position: relative;
+  display: grid;
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 15, 15, 0.1);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.09),
+    0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.gl-share-preview::before {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 61, 92, 0.1), transparent 24%),
+    radial-gradient(circle at 84% 4%, rgba(28, 98, 185, 0.1), transparent 24%);
+  content: '';
+  pointer-events: none;
+}
+.gl-share-preview-media {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  justify-self: end;
+  width: min(520px, 66%);
+  aspect-ratio: 16 / 7.6;
+  margin: 28px 26px 0;
+  overflow: hidden;
+  border-radius: 26px;
+  background: linear-gradient(135deg, rgba(15, 15, 15, 0.96), rgba(38, 38, 38, 0.96)), #161616;
+  box-shadow: 0 18px 36px rgba(15, 15, 15, 0.28);
+}
+.gl-share-preview-media .gl-loadable-img,
+.gl-share-preview-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gl-share-preview-media.has-image::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 48%, rgba(0, 0, 0, 0.22));
+  content: '';
+}
+.gl-share-preview-fallback {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+  padding: 22px;
+}
+.gl-share-preview-fallback span {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-preview-fallback strong {
+  overflow: hidden;
+  font-size: 38px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-preview-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(100%, 660px);
+  max-width: calc(100% - 220px);
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  align-self: end;
+  padding: 0 28px 34px;
+}
+.gl-share-preview-copy > span {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15, 15, 15, 0.06);
+  color: rgba(15, 15, 15, 0.62);
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-preview-copy h3 {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #0f0f0f;
+  font-size: 30px;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.gl-share-preview-copy p {
+  display: -webkit-box;
+  max-width: 620px;
+  overflow: hidden;
+  color: rgba(15, 15, 15, 0.58);
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.gl-share-preview-copy small {
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(15, 15, 15, 0.42);
+  font-size: 14px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-preview-brand {
+  position: absolute;
+  right: 28px;
+  bottom: 26px;
+  z-index: 1;
+  max-width: 168px;
+  overflow: hidden;
+  color: #0f0f0f;
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(88px, 1fr));
+  gap: 18px;
+  width: min(100%, 620px);
+  align-self: center;
+  padding-top: 20px;
+}
+.gl-share-actions button {
+  display: inline-flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: #0f0f0f;
+  font-size: 14px;
+  font-weight: 750;
+  padding: 0;
+}
+.gl-share-actions button > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-share-action-icon {
+  display: inline-flex;
+  width: 86px;
+  height: 86px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 950;
+  box-shadow: 0 14px 26px rgba(15, 15, 15, 0.18);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+.gl-share-actions button:hover .gl-share-action-icon,
+.gl-share-actions button:focus-visible .gl-share-action-icon {
+  background: #1f1f1f;
+  box-shadow: 0 18px 30px rgba(15, 15, 15, 0.24);
+  transform: translateY(-2px);
+}
+.dark .gl-share-overlay {
+  background: rgba(10, 10, 12, 0.72);
+}
+.dark .gl-share-dialog {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0.98), rgba(18, 18, 20, 0.98)), var(--gl-bg);
+  color: #f4f4f5;
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.52),
+    0 10px 30px rgba(0, 0, 0, 0.28);
+}
+.dark .gl-share-dialog > button,
+.dark .gl-share-title {
+  color: #f4f4f5;
+}
+.dark .gl-share-dialog > button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.dark .gl-share-divider {
+  background: rgba(255, 255, 255, 0.12);
+}
+.dark .gl-share-preview {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #18181b;
+}
+.dark .gl-share-preview::before {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 61, 92, 0.14), transparent 24%),
+    radial-gradient(circle at 84% 4%, rgba(96, 165, 250, 0.14), transparent 24%);
+}
+.dark .gl-share-preview-copy > span {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(244, 244, 245, 0.68);
+}
+.dark .gl-share-preview-copy h3,
+.dark .gl-share-preview-brand,
+.dark .gl-share-actions button {
+  color: #f4f4f5;
+}
+.dark .gl-share-preview-copy p {
+  color: rgba(244, 244, 245, 0.62);
+}
+.dark .gl-share-preview-copy small {
+  color: rgba(244, 244, 245, 0.46);
+}
+.dark .gl-share-action-icon {
+  background: #f4f4f5;
+  color: #0f0f0f;
+}
+.dark .gl-share-actions button:hover .gl-share-action-icon,
+.dark .gl-share-actions button:focus-visible .gl-share-action-icon {
+  background: #fff;
+}
+
+@media (max-width: 720px) {
+  .gl-share-dialog {
+    width: min(100vw - 18px, 560px);
+    border-radius: 22px;
+  }
+
+  .gl-share-dialog > button {
+    top: 20px;
+    right: 18px;
+  }
+
+  .gl-share-dialog-body {
+    gap: 18px;
+    padding: 36px 12px 28px;
+  }
+
+  .gl-share-title {
+    padding-inline: 14px 58px;
+    font-size: 28px;
+  }
+
+  .gl-share-preview {
+    min-height: 368px;
+  }
+
+  .gl-share-preview-media {
+    width: calc(100% - 28px);
+    margin: 14px;
+    border-radius: 18px;
+  }
+
+  .gl-share-preview-copy {
+    max-width: 100%;
+    padding: 0 18px 58px;
+  }
+
+  .gl-share-preview-copy h3 {
+    font-size: 24px;
+  }
+
+  .gl-share-preview-copy p {
+    font-size: 14px;
+  }
+
+  .gl-share-preview-brand {
+    right: 18px;
+    bottom: 18px;
+    font-size: 22px;
+  }
+
+  .gl-share-actions {
+    grid-template-columns: repeat(4, minmax(64px, 1fr));
+    gap: 10px;
+    padding-top: 10px;
+  }
+
+  .gl-share-action-icon {
+    width: 62px;
+    height: 62px;
+    font-size: 23px;
+  }
+
+  .gl-share-actions button {
+    gap: 9px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .gl-share-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 16px;
+  }
+
+  .gl-share-preview {
+    min-height: 340px;
+  }
+}
+
 /* ── Skeletons ──────────────────────────────────────────────────────── */
 .gl-skel-cover {
   width: 100%;

@@ -84,6 +84,20 @@
       "eternal_scepter": "Eternal Scepter"
     }
   },
+  "shareDialog": {
+    "copyLink": "Copy link",
+    "copyTarget": "share link",
+    "copyManual": "Link opened for manual copy.",
+    "copySuccess": "Link copied.",
+    "copyFailed": "Could not copy the link.",
+    "x": "X",
+    "instagram": "Instagram",
+    "reddit": "Reddit",
+    "preview": "Share",
+    "description": "Share this GoLive page.",
+    "liveKicker": "Live room",
+    "channelKicker": "Channel"
+  },
   "liveRoom": {
     "title": "Live Room",
     "roomId": "Room id: {{id}}",
@@ -2104,6 +2118,7 @@
       "saveWatchLater": "Save to Watch later",
       "removeWatchLater": "Remove from Watch later",
       "copyLiveLink": "Copy live link",
+      "shareLiveLink": "Share live",
       "openChannel": "Open channel",
       "report": "Report"
     }
