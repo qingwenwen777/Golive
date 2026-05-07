@@ -24,6 +24,9 @@ const defaultBunnyAPIBase = "https://video.bunnycdn.com"
 const defaultBunnyPlayerBase = "https://player.mediadelivery.net/embed"
 const replayRecordingStableInterval = 2 * time.Second
 const replayRecordingStableChecks = 5
+const replayRecoveryLimit = 20
+
+var errRecordingNotFound = errors.New("recording file not found")
 
 type ReplayConfig struct {
 	RecordDir       string
@@ -281,12 +284,8 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "bunny stream library or api key is not configured")
 		return
 	}
-	recordPath, err := s.findRecording(room.StreamKey)
+	recordPath, err := s.waitForUploadableRecording(ctx, room.StreamKey)
 	if err != nil {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
-		return
-	}
-	if _, err := waitForStableRecording(ctx, recordPath); err != nil {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
 		return
 	}
@@ -316,12 +315,45 @@ func (s *ReplayService) cleanupRoomRecording(room model.Room) {
 	if s.recordDir == "" {
 		return
 	}
-	recordPath, err := s.findRecording(room.StreamKey)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	recordPath, err := s.waitForUploadableRecording(ctx, room.StreamKey)
 	if err != nil {
 		return
 	}
 	if err := removeRecording(recordPath); err != nil {
 		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
+	}
+}
+
+func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
+	if s == nil || s.rooms == nil || s.recordDir == "" || s.libraryID == "" || !s.bunny.Configured() {
+		return
+	}
+	rooms, err := s.rooms.ReplayRecoverableUploads(ctx, replayRecoveryLimit)
+	if err != nil {
+		logger.L().Warn("load recoverable replay uploads", zap.Error(err))
+		return
+	}
+	for _, room := range rooms {
+		recordPath, err := s.findRecording(room.StreamKey)
+		if err != nil {
+			logger.L().Info(
+				"skip replay recovery without final recording",
+				zap.String("room_id", room.ID),
+				zap.String("stream_key", room.StreamKey),
+				zap.Error(err),
+			)
+			continue
+		}
+		logger.L().Info(
+			"recover interrupted replay upload",
+			zap.String("room_id", room.ID),
+			zap.String("stream_key", room.StreamKey),
+			zap.String("path", recordPath),
+		)
+		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
+		go s.uploadRoomReplay(room)
 	}
 }
 
@@ -341,6 +373,9 @@ func (s *ReplayService) findRecording(streamKey string) (string, error) {
 	var newest string
 	var newestMod time.Time
 	for _, match := range matches {
+		if !isFinalRecordingPath(match) {
+			continue
+		}
 		info, err := os.Stat(match)
 		if err != nil || info.IsDir() || info.Size() == 0 {
 			continue
@@ -351,9 +386,53 @@ func (s *ReplayService) findRecording(streamKey string) (string, error) {
 		}
 	}
 	if newest == "" {
-		return "", fmt.Errorf("recording file not found for stream %s", key)
+		return "", fmt.Errorf("%w for stream %s", errRecordingNotFound, key)
 	}
 	return newest, nil
+}
+
+func isFinalRecordingPath(recordPath string) bool {
+	name := strings.ToLower(filepath.Base(recordPath))
+	return strings.HasSuffix(name, ".flv") && !strings.HasSuffix(name, ".tmp")
+}
+
+func (s *ReplayService) waitForUploadableRecording(ctx context.Context, streamKey string) (string, error) {
+	return s.waitForUploadableRecordingWith(
+		ctx,
+		streamKey,
+		replayRecordingStableInterval,
+		replayRecordingStableChecks,
+	)
+}
+
+func (s *ReplayService) waitForUploadableRecordingWith(
+	ctx context.Context,
+	streamKey string,
+	interval time.Duration,
+	requiredStableChecks int,
+) (string, error) {
+	if interval <= 0 {
+		interval = time.Second
+	}
+	key := strings.TrimSpace(streamKey)
+	for {
+		recordPath, err := s.findRecording(key)
+		if err == nil {
+			if _, err := waitForStableFile(ctx, recordPath, interval, requiredStableChecks); err == nil {
+				return recordPath, nil
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return "", err
+			}
+		} else if !errors.Is(err, errRecordingNotFound) {
+			return "", err
+		}
+
+		select {
+		case <-ctx.Done():
+			return "", fmt.Errorf("recording final file not found for stream %s before timeout: %w", key, ctx.Err())
+		case <-time.After(interval):
+		}
+	}
 }
 
 func removeRecording(recordPath string) error {

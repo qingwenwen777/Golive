@@ -179,6 +179,7 @@ func main() {
 			log.Fatal("http exit", zap.Error(err))
 		}
 	}()
+	go replaySvc.RecoverInterruptedUploads(schedulerCtx)
 	go appointmentSvc.RunScheduler(schedulerCtx)
 
 	stop := make(chan os.Signal, 1)

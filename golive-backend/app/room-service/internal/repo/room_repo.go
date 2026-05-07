@@ -437,6 +437,24 @@ func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID stri
 	return rooms, err
 }
 
+func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]model.Room, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	statuses := []string{
+		model.ReplayStatusPending,
+		model.ReplayStatusUploading,
+		model.ReplayStatusFailed,
+	}
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("status = ? AND replay_upload_enabled = ? AND replay_status IN ?", model.StatusEnded, true, statuses).
+		Order("COALESCE(ended_at, updated_at) ASC").
+		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
 func (r *RoomRepo) HotReplayCandidates(ctx context.Context, since time.Time, limit int, category string) ([]model.Room, error) {
 	if limit < 1 {
 		limit = 100

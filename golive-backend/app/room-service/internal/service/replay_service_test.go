@@ -40,6 +40,42 @@ func TestWaitForStableFileWaitsThroughGrowth(t *testing.T) {
 	require.Equal(t, int64(4), info.Size())
 }
 
+func TestFindRecordingIgnoresTemporaryRecording(t *testing.T) {
+	dir := t.TempDir()
+	key := "lk_temp"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, key+".flv.tmp"), []byte("temp"), 0o644))
+
+	svc := &ReplayService{recordDir: dir}
+	_, err := svc.findRecording(key)
+	require.ErrorIs(t, err, errRecordingNotFound)
+
+	finalPath := filepath.Join(dir, key+".flv")
+	require.NoError(t, os.WriteFile(finalPath, []byte("final"), 0o644))
+	path, err := svc.findRecording(key)
+	require.NoError(t, err)
+	require.Equal(t, finalPath, path)
+}
+
+func TestWaitForUploadableRecordingWaitsForTemporaryRename(t *testing.T) {
+	dir := t.TempDir()
+	key := "lk_rename"
+	tmpPath := filepath.Join(dir, key+".flv.tmp")
+	finalPath := filepath.Join(dir, key+".flv")
+	require.NoError(t, os.WriteFile(tmpPath, []byte("recording"), 0o644))
+
+	go func() {
+		time.Sleep(15 * time.Millisecond)
+		_ = os.Rename(tmpPath, finalPath)
+	}()
+
+	svc := &ReplayService{recordDir: dir}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	path, err := svc.waitForUploadableRecordingWith(ctx, key, 5*time.Millisecond, 2)
+	require.NoError(t, err)
+	require.Equal(t, finalPath, path)
+}
+
 func TestUploadVideoUsesStableContentLengthWhenFileGrows(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "recording.flv")
 	require.NoError(t, os.WriteFile(path, []byte("abc"), 0o644))
