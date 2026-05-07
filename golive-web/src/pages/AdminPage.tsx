@@ -1891,150 +1891,327 @@ function ContentPage() {
         />
       </section>
 
-      <section className="gl-admin-panel gl-admin-content-panel">
-        <div className="gl-admin-panel-head">
-          <div>
-            <span>{t('admin.content.reports.eyebrow', { defaultValue: 'Reports' })}</span>
-            <h2>{t('admin.content.reports.title', { defaultValue: 'Report management' })}</h2>
+      <div className="gl-admin-content-workbench">
+        <section className="gl-admin-panel gl-admin-content-panel">
+          <div className="gl-admin-panel-head">
+            <div>
+              <span>{t('admin.content.reports.eyebrow', { defaultValue: 'Reports' })}</span>
+              <h2>{t('admin.content.reports.title', { defaultValue: 'Report management' })}</h2>
+            </div>
           </div>
-        </div>
-        <div className="gl-admin-content-filters">
-          <AdminFilterSelect
-            label={t('admin.content.filters.status', { defaultValue: 'Status' })}
-            value={status}
-            options={['all', 'pending', 'reviewing', 'resolved', 'dismissed'].map((value) => ({
-              value,
-              label: reportStatusLabel(value, t),
-            }))}
-            onChange={setStatus}
-          />
-          <AdminFilterSelect
-            label={t('admin.content.filters.target', { defaultValue: 'Target' })}
-            value={targetType}
-            options={['all', 'room', 'channel', 'danmu', 'post', 'post_comment', 'super_chat'].map(
-              (value) => ({
+          <div className="gl-admin-content-filters">
+            <AdminFilterSelect
+              label={t('admin.content.filters.status', { defaultValue: 'Status' })}
+              value={status}
+              options={['all', 'pending', 'reviewing', 'resolved', 'dismissed'].map((value) => ({
+                value,
+                label: reportStatusLabel(value, t),
+              }))}
+              onChange={setStatus}
+            />
+            <AdminFilterSelect
+              label={t('admin.content.filters.target', { defaultValue: 'Target' })}
+              value={targetType}
+              options={[
+                'all',
+                'room',
+                'channel',
+                'danmu',
+                'post',
+                'post_comment',
+                'super_chat',
+              ].map((value) => ({
                 value,
                 label: reportTargetLabel(value, t),
-              }),
-            )}
-            onChange={setTargetType}
-          />
-          <AdminFilterSelect
-            label={t('admin.content.filters.reason', { defaultValue: 'Reason' })}
-            value={reason}
-            options={[
-              'all',
-              'spam',
-              'harassment',
-              'sexual',
-              'violence',
-              'hate',
-              'scam',
-              'illegal',
-              'other',
-            ].map((value) => ({
-              value,
-              label: reportReasonLabel(value, t),
-            }))}
-            onChange={setReason}
-          />
-          <label className="gl-admin-content-search">
-            <span>{t('admin.content.filters.search', { defaultValue: 'Search' })}</span>
-            <div>
-              <Search size={15} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t('admin.content.filters.searchPlaceholder', {
-                  defaultValue: 'Reporter, target, text',
-                })}
-              />
-            </div>
-          </label>
-        </div>
+              }))}
+              onChange={setTargetType}
+            />
+            <AdminFilterSelect
+              label={t('admin.content.filters.reason', { defaultValue: 'Reason' })}
+              value={reason}
+              options={[
+                'all',
+                'spam',
+                'harassment',
+                'sexual',
+                'violence',
+                'hate',
+                'scam',
+                'illegal',
+                'other',
+              ].map((value) => ({
+                value,
+                label: reportReasonLabel(value, t),
+              }))}
+              onChange={setReason}
+            />
+            <label className="gl-admin-content-search">
+              <span>{t('admin.content.filters.search', { defaultValue: 'Search' })}</span>
+              <div>
+                <Search size={15} />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t('admin.content.filters.searchPlaceholder', {
+                    defaultValue: 'Reporter, target, text',
+                  })}
+                />
+              </div>
+            </label>
+          </div>
 
-        <div className="gl-admin-content-grid">
-          <div className="gl-admin-report-list" aria-busy={reports.isFetching}>
-            {reports.isLoading ? (
-              <AdminEmptyState
-                label={t('admin.content.reports.loading', { defaultValue: 'Loading reports...' })}
-              />
-            ) : items.length === 0 ? (
-              <AdminEmptyState
-                label={t('admin.content.reports.empty', {
-                  defaultValue: 'No reports in this filter.',
-                })}
-              />
-            ) : (
-              items.map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  className={
-                    item.id === selectedId
-                      ? 'gl-admin-report-card is-active'
-                      : 'gl-admin-report-card'
-                  }
-                  onClick={() => {
-                    setSelectedId(item.id);
-                    setResolutionNote(item.resolutionNote ?? '');
-                    setSelectedActions([]);
-                    setDetailOpen(true);
-                  }}
-                >
-                  <div className="gl-admin-report-card-head">
-                    <span className={`gl-admin-report-severity ${item.status}`}>
-                      {reportStatusLabel(item.status, t)}
-                    </span>
-                    <time>{formatDate(item.createdAt)}</time>
-                  </div>
-                  <strong>{reportReasonLabel(item.reason, t)}</strong>
-                  <p>
-                    {item.targetTitle || item.targetText || item.targetOwnerName || item.targetId}
-                  </p>
-                  <div className="gl-admin-report-card-meta">
-                    <span>{reportTargetLabel(item.targetType, t)}</span>
-                    <span>
-                      {t('admin.content.reports.reportCount', {
-                        count: item.reportCount ?? 1,
-                        defaultValue: '{{count}} reports',
-                      })}
-                    </span>
-                    {Boolean(item.recentCount) && (
+          <div className="gl-admin-content-grid">
+            <div className="gl-admin-report-list" aria-busy={reports.isFetching}>
+              {reports.isLoading ? (
+                <AdminEmptyState
+                  label={t('admin.content.reports.loading', { defaultValue: 'Loading reports...' })}
+                />
+              ) : items.length === 0 ? (
+                <AdminEmptyState
+                  label={t('admin.content.reports.empty', {
+                    defaultValue: 'No reports in this filter.',
+                  })}
+                />
+              ) : (
+                items.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={
+                      item.id === selectedId
+                        ? 'gl-admin-report-card is-active'
+                        : 'gl-admin-report-card'
+                    }
+                    onClick={() => {
+                      setSelectedId(item.id);
+                      setResolutionNote(item.resolutionNote ?? '');
+                      setSelectedActions([]);
+                      setDetailOpen(true);
+                    }}
+                  >
+                    <div className="gl-admin-report-card-head">
+                      <span className={`gl-admin-report-severity ${item.status}`}>
+                        {reportStatusLabel(item.status, t)}
+                      </span>
+                      <time>{formatDate(item.createdAt)}</time>
+                    </div>
+                    <strong>{reportReasonLabel(item.reason, t)}</strong>
+                    <p>
+                      {item.targetTitle || item.targetText || item.targetOwnerName || item.targetId}
+                    </p>
+                    <div className="gl-admin-report-card-meta">
+                      <span>{reportTargetLabel(item.targetType, t)}</span>
                       <span>
-                        {t('admin.content.reports.recentCount', {
-                          count: item.recentCount,
-                          defaultValue: '{{count}} in 1h',
+                        {t('admin.content.reports.reportCount', {
+                          count: item.reportCount ?? 1,
+                          defaultValue: '{{count}} reports',
                         })}
                       </span>
-                    )}
-                    {item.targetUserName && <span>{item.targetUserName}</span>}
-                    {item.status === 'reviewing' && (
-                      <span>
-                        {t('admin.content.reports.cardReviewer', {
-                          name: reportReviewerName(item, t),
-                          defaultValue: 'Reviewer: {{name}}',
-                        })}
-                      </span>
-                    )}
-                    {item.resolutionAction && !isReviewResolutionAction(item.resolutionAction) && (
-                      <span>{reportActionLabels(item.resolutionAction, t)}</span>
-                    )}
-                  </div>
-                </button>
-              ))
+                      {Boolean(item.recentCount) && (
+                        <span>
+                          {t('admin.content.reports.recentCount', {
+                            count: item.recentCount,
+                            defaultValue: '{{count}} in 1h',
+                          })}
+                        </span>
+                      )}
+                      {item.targetUserName && <span>{item.targetUserName}</span>}
+                      {item.status === 'reviewing' && (
+                        <span>
+                          {t('admin.content.reports.cardReviewer', {
+                            name: reportReviewerName(item, t),
+                            defaultValue: 'Reviewer: {{name}}',
+                          })}
+                        </span>
+                      )}
+                      {item.resolutionAction &&
+                        !isReviewResolutionAction(item.resolutionAction) && (
+                          <span>{reportActionLabels(item.resolutionAction, t)}</span>
+                        )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            {(reports.data?.total ?? 0) > (reports.data?.size ?? 20) && (
+              <AdminPager
+                page={reports.data?.page ?? reportPage}
+                pageSize={reports.data?.size ?? 20}
+                total={reports.data?.total ?? 0}
+                onPage={setReportPage}
+              />
             )}
           </div>
-          {(reports.data?.total ?? 0) > (reports.data?.size ?? 20) && (
+        </section>
+
+        <section className="gl-admin-panel gl-admin-words-panel">
+          <div className="gl-admin-panel-head">
+            <div>
+              <span>{t('admin.content.words.eyebrow', { defaultValue: 'Policy' })}</span>
+              <h2>{t('admin.content.words.title', { defaultValue: 'Blocked word management' })}</h2>
+            </div>
+          </div>
+          <div className="gl-admin-word-form">
+            <input
+              value={word}
+              maxLength={60}
+              onChange={(event) => setWord(event.target.value)}
+              placeholder={t('admin.content.words.wordPlaceholder', {
+                defaultValue: 'Blocked word',
+              })}
+            />
+            <input
+              value={wordNote}
+              maxLength={120}
+              onChange={(event) => setWordNote(event.target.value)}
+              placeholder={t('admin.content.words.notePlaceholder', {
+                defaultValue: 'Note, optional',
+              })}
+            />
+            <button type="button" onClick={submitWord} disabled={createWord.isPending}>
+              <Plus size={15} />
+              {t('admin.content.words.add', { defaultValue: 'Add' })}
+            </button>
+          </div>
+          <div className="gl-admin-word-import-row">
+            <label className="gl-admin-word-import">
+              <input
+                type="file"
+                accept=".txt,.csv,.tsv,text/plain,text/csv"
+                onChange={handleBlockedWordImport}
+                disabled={importWords.isPending}
+              />
+              <Upload size={15} />
+              {t('admin.content.words.import', { defaultValue: 'Batch import' })}
+            </label>
+            <span>
+              {t('admin.content.words.importHint', {
+                defaultValue: 'TXT/CSV/TSV, one word per line. Use word,note for remarks.',
+              })}
+            </span>
+          </div>
+          <div className="gl-admin-word-list" aria-busy={blockedWords.isFetching}>
+            {(blockedWords.data?.items ?? []).length === 0 ? (
+              <AdminEmptyState
+                label={t('admin.content.words.empty', { defaultValue: 'No blocked words yet.' })}
+              />
+            ) : (
+              (blockedWords.data?.items ?? []).map((item) => {
+                const editing = editingWord?.id === item.id;
+                const row = editingWord ?? item;
+                return (
+                  <div className="gl-admin-word-row" key={item.id}>
+                    {editing ? (
+                      <>
+                        <input
+                          value={row.word}
+                          onChange={(event) => setEditingWord({ ...row, word: event.target.value })}
+                        />
+                        <input
+                          value={row.note ?? ''}
+                          onChange={(event) => setEditingWord({ ...row, note: event.target.value })}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <strong>{item.word}</strong>
+                          <span>
+                            {item.note ||
+                              t('admin.content.words.noNote', { defaultValue: 'No note' })}
+                          </span>
+                        </div>
+                        <span
+                          className={
+                            item.enabled ? 'gl-admin-word-status is-on' : 'gl-admin-word-status'
+                          }
+                        >
+                          {item.enabled
+                            ? t('admin.content.words.enabled', { defaultValue: 'Enabled' })
+                            : t('admin.content.words.disabled', { defaultValue: 'Disabled' })}
+                        </span>
+                      </>
+                    )}
+                    <div className="gl-admin-word-actions">
+                      {editing ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={saveEditingWord}
+                            disabled={updateWord.isPending}
+                          >
+                            <Save size={15} />
+                          </button>
+                          <button type="button" onClick={() => setEditingWord(null)}>
+                            <X size={15} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateWord.mutate({
+                                id: item.id,
+                                enabled: !item.enabled,
+                              })
+                            }
+                            disabled={updateWord.isPending}
+                          >
+                            {item.enabled ? <Ban size={15} /> : <Check size={15} />}
+                          </button>
+                          <button type="button" onClick={() => setEditingWord(item)}>
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="is-danger"
+                            onClick={() => {
+                              const ok = window.confirm(
+                                t('admin.content.words.confirmDelete', {
+                                  word: item.word,
+                                  defaultValue: 'Delete blocked word {{word}}?',
+                                }),
+                              );
+                              if (!ok) return;
+                              deleteWord.mutate(item.id, {
+                                onSuccess: () =>
+                                  toast.success(
+                                    t('admin.content.words.deleted', {
+                                      defaultValue: 'Blocked word deleted.',
+                                    }),
+                                  ),
+                                onError: (err) =>
+                                  toast.error(
+                                    err.message ||
+                                      t('admin.content.words.deleteFailed', {
+                                        defaultValue: 'Could not delete blocked word.',
+                                      }),
+                                  ),
+                              });
+                            }}
+                            disabled={deleteWord.isPending}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {(blockedWords.data?.total ?? 0) > (blockedWords.data?.size ?? 20) && (
             <AdminPager
-              page={reports.data?.page ?? reportPage}
-              pageSize={reports.data?.size ?? 20}
-              total={reports.data?.total ?? 0}
-              onPage={setReportPage}
+              page={blockedWords.data?.page ?? wordPage}
+              pageSize={blockedWords.data?.size ?? 20}
+              total={blockedWords.data?.total ?? 0}
+              onPage={setWordPage}
             />
           )}
-        </div>
-      </section>
+        </section>
+      </div>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="gl-admin-report-dialog p-0 sm:max-w-[1080px]">
@@ -2317,172 +2494,6 @@ function ContentPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      <section className="gl-admin-panel gl-admin-words-panel">
-        <div className="gl-admin-panel-head">
-          <div>
-            <span>{t('admin.content.words.eyebrow', { defaultValue: 'Policy' })}</span>
-            <h2>{t('admin.content.words.title', { defaultValue: 'Blocked word management' })}</h2>
-          </div>
-        </div>
-        <div className="gl-admin-word-form">
-          <input
-            value={word}
-            maxLength={60}
-            onChange={(event) => setWord(event.target.value)}
-            placeholder={t('admin.content.words.wordPlaceholder', { defaultValue: 'Blocked word' })}
-          />
-          <input
-            value={wordNote}
-            maxLength={120}
-            onChange={(event) => setWordNote(event.target.value)}
-            placeholder={t('admin.content.words.notePlaceholder', {
-              defaultValue: 'Note, optional',
-            })}
-          />
-          <button type="button" onClick={submitWord} disabled={createWord.isPending}>
-            <Plus size={15} />
-            {t('admin.content.words.add', { defaultValue: 'Add' })}
-          </button>
-        </div>
-        <div className="gl-admin-word-import-row">
-          <label className="gl-admin-word-import">
-            <input
-              type="file"
-              accept=".txt,.csv,.tsv,text/plain,text/csv"
-              onChange={handleBlockedWordImport}
-              disabled={importWords.isPending}
-            />
-            <Upload size={15} />
-            {t('admin.content.words.import', { defaultValue: 'Batch import' })}
-          </label>
-          <span>
-            {t('admin.content.words.importHint', {
-              defaultValue: 'TXT/CSV/TSV, one word per line. Use word,note for remarks.',
-            })}
-          </span>
-        </div>
-        <div className="gl-admin-word-list" aria-busy={blockedWords.isFetching}>
-          {(blockedWords.data?.items ?? []).length === 0 ? (
-            <AdminEmptyState
-              label={t('admin.content.words.empty', { defaultValue: 'No blocked words yet.' })}
-            />
-          ) : (
-            (blockedWords.data?.items ?? []).map((item) => {
-              const editing = editingWord?.id === item.id;
-              const row = editingWord ?? item;
-              return (
-                <div className="gl-admin-word-row" key={item.id}>
-                  {editing ? (
-                    <>
-                      <input
-                        value={row.word}
-                        onChange={(event) => setEditingWord({ ...row, word: event.target.value })}
-                      />
-                      <input
-                        value={row.note ?? ''}
-                        onChange={(event) => setEditingWord({ ...row, note: event.target.value })}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <div>
-                        <strong>{item.word}</strong>
-                        <span>
-                          {item.note ||
-                            t('admin.content.words.noNote', { defaultValue: 'No note' })}
-                        </span>
-                      </div>
-                      <span
-                        className={
-                          item.enabled ? 'gl-admin-word-status is-on' : 'gl-admin-word-status'
-                        }
-                      >
-                        {item.enabled
-                          ? t('admin.content.words.enabled', { defaultValue: 'Enabled' })
-                          : t('admin.content.words.disabled', { defaultValue: 'Disabled' })}
-                      </span>
-                    </>
-                  )}
-                  <div className="gl-admin-word-actions">
-                    {editing ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={saveEditingWord}
-                          disabled={updateWord.isPending}
-                        >
-                          <Save size={15} />
-                        </button>
-                        <button type="button" onClick={() => setEditingWord(null)}>
-                          <X size={15} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateWord.mutate({
-                              id: item.id,
-                              enabled: !item.enabled,
-                            })
-                          }
-                          disabled={updateWord.isPending}
-                        >
-                          {item.enabled ? <Ban size={15} /> : <Check size={15} />}
-                        </button>
-                        <button type="button" onClick={() => setEditingWord(item)}>
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          className="is-danger"
-                          onClick={() => {
-                            const ok = window.confirm(
-                              t('admin.content.words.confirmDelete', {
-                                word: item.word,
-                                defaultValue: 'Delete blocked word {{word}}?',
-                              }),
-                            );
-                            if (!ok) return;
-                            deleteWord.mutate(item.id, {
-                              onSuccess: () =>
-                                toast.success(
-                                  t('admin.content.words.deleted', {
-                                    defaultValue: 'Blocked word deleted.',
-                                  }),
-                                ),
-                              onError: (err) =>
-                                toast.error(
-                                  err.message ||
-                                    t('admin.content.words.deleteFailed', {
-                                      defaultValue: 'Could not delete blocked word.',
-                                    }),
-                                ),
-                            });
-                          }}
-                          disabled={deleteWord.isPending}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-        {(blockedWords.data?.total ?? 0) > (blockedWords.data?.size ?? 20) && (
-          <AdminPager
-            page={blockedWords.data?.page ?? wordPage}
-            pageSize={blockedWords.data?.size ?? 20}
-            total={blockedWords.data?.total ?? 0}
-            onPage={setWordPage}
-          />
-        )}
-      </section>
     </div>
   );
 }

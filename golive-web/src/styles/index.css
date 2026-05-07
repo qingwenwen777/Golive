@@ -6643,6 +6643,16 @@ input:focus-visible,
 .gl-admin-words-panel {
   overflow: hidden;
 }
+.gl-admin-content-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.72fr);
+  gap: 16px;
+  align-items: start;
+}
+.gl-admin-content-workbench .gl-admin-content-panel,
+.gl-admin-content-workbench .gl-admin-words-panel {
+  min-width: 0;
+}
 .gl-admin-content-filters {
   display: grid;
   grid-template-columns: repeat(3, minmax(150px, 1fr)) minmax(220px, 1.4fr);
@@ -7164,12 +7174,20 @@ input:focus-visible,
   min-height: 520px;
   border-top: 1px solid var(--gl-border);
 }
+.gl-admin-content-workbench .gl-admin-content-grid {
+  min-height: 0;
+}
 .gl-admin-report-list {
   display: flex;
   flex-direction: column;
   max-height: none;
   overflow: auto;
   border-right: 0;
+}
+.gl-admin-content-workbench .gl-admin-report-list,
+.gl-admin-content-workbench .gl-admin-word-list {
+  max-height: min(70vh, 760px);
+  overflow: auto;
 }
 .gl-admin-report-card {
   display: flex;
@@ -7852,6 +7870,23 @@ html[lang='zh'] .gl-admin-action-select-head small {
 .gl-admin-word-row .gl-admin-word-status.is-on {
   background: rgba(22, 163, 74, 0.1);
   color: #15803d;
+}
+.gl-admin-content-workbench .gl-admin-content-filters {
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+}
+.gl-admin-content-workbench .gl-admin-content-search {
+  grid-column: 1 / -1;
+}
+.gl-admin-content-workbench .gl-admin-word-form,
+.gl-admin-content-workbench .gl-admin-word-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.gl-admin-content-workbench .gl-admin-word-form button {
+  width: fit-content;
+}
+.gl-admin-content-workbench .gl-admin-word-row .gl-admin-word-status,
+.gl-admin-content-workbench .gl-admin-word-actions {
+  justify-self: start;
 }
 .gl-admin-economy-panel {
   min-width: 0;
@@ -13619,7 +13654,8 @@ button.gl-fan-badge-empty {
     flex-direction: column;
   }
   .gl-admin-workspace,
-  .gl-admin-split-grid {
+  .gl-admin-split-grid,
+  .gl-admin-content-workbench {
     grid-template-columns: 1fr;
   }
   .gl-admin-nav {
