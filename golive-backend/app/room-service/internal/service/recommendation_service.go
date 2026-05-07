@@ -187,16 +187,18 @@ func (s *RoomService) RecordWatch(ctx context.Context, viewerID, roomID string) 
 	}
 	now := s.now()
 	if err := s.rooms.RecordWatchEvent(ctx, &model.RoomWatchEvent{
-		ID:            watchEventID(viewerID, room.ID),
-		UserID:        viewerID,
-		RoomID:        room.ID,
-		ChannelID:     room.ChannelID,
-		OwnerID:       room.OwnerID,
-		Category:      room.Category,
-		WatchCount:    1,
-		LastWatchedAt: now,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:              watchEventID(viewerID, room.ID),
+		UserID:          viewerID,
+		RoomID:          room.ID,
+		ChannelID:       room.ChannelID,
+		OwnerID:         room.OwnerID,
+		Category:        room.Category,
+		WatchCount:      1,
+		WatchDate:       beijingWatchDate(now),
+		DailyWatchCount: 1,
+		LastWatchedAt:   now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}); err != nil {
 		return err
 	}
@@ -292,4 +294,8 @@ func preferenceCategoryKey(category string) string {
 func watchEventID(userID, roomID string) string {
 	sum := sha256.Sum256([]byte(userID + ":" + roomID))
 	return "watch-" + hex.EncodeToString(sum[:])[:24]
+}
+
+func beijingWatchDate(now time.Time) string {
+	return now.UTC().Add(8 * time.Hour).Format("2006-01-02")
 }

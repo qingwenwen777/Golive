@@ -78,8 +78,7 @@ git push prod master
 ```text
 checkout 到 /srv/golive/app
 使用 node:20-alpine 安装依赖并构建 golive-web/dist
-启动或更新 golive-backend/deploy/docker-compose.yml
-restart Go 服务，让 go run 重新编译最新源码
+重新构建并启动 golive-backend/deploy/docker-compose.yml 中的服务镜像
 输出 docker compose ps
 ```
 
@@ -127,8 +126,7 @@ docker compose logs --tail=200 srs
 cd /srv/golive/app/golive-web
 docker run --rm -v "$PWD:/app" -w /app node:20-alpine sh -lc 'corepack enable && pnpm config set registry https://registry.npmmirror.com && pnpm install --frozen-lockfile && pnpm build'
 cd /srv/golive/app/golive-backend/deploy
-docker compose up -d --remove-orphans
-docker compose restart api-gateway user-service room-service chat-service gift-service im-gateway
+docker compose up -d --build --remove-orphans
 ```
 
 查看最近一次服务器 checkout：

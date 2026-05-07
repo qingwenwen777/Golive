@@ -137,10 +137,7 @@ func (h *BetHandler) Cancel(c *gin.Context) {
 }
 
 func optionalUserID(c *gin.Context) string {
-	if uid := UserIDFromCtx(c); uid != "" {
-		return uid
-	}
-	return strings.TrimSpace(c.GetHeader("X-User-Id"))
+	return UserIDFromCtx(c)
 }
 
 func respondBetError(c *gin.Context, err error) {

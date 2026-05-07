@@ -94,7 +94,6 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		api.Any("/notifications/*action", gin.WrapH(roomProxy))
 		api.Any("/messages", gin.WrapH(roomProxy))
 		api.Any("/messages/*action", gin.WrapH(roomProxy))
-		api.Any("/srs/*action", gin.WrapH(roomProxy))
 		api.Any("/uploads/*action", uploadProxy(userProxy, roomProxy))
 
 		// gift-service
@@ -132,8 +131,6 @@ func publicRoutes() []middleware.PublicRoute {
 		{Method: http.MethodGet, Path: "/api/bets/*action"},
 		// Chat history is public for viewers entering a live room.
 		{Method: http.MethodGet, Path: "/api/chat/*action"},
-		// SRS callbacks come server-to-server.
-		{Method: http.MethodPost, Path: "/api/srs/*action"},
 		// Uploaded live covers and avatars are public assets.
 		{Method: http.MethodGet, Path: "/api/uploads/*action"},
 		{Method: http.MethodHead, Path: "/api/uploads/*action"},

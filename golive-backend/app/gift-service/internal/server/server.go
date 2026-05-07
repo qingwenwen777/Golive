@@ -33,16 +33,23 @@ func NewRouter(d Deps) *gin.Engine {
 	obs.MountMetrics(r)
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 
-	r.GET("/gifts", d.Gift.List)
-	r.GET("/gifts/fan-clubs/:creatorID/members", d.Gift.FanClubMembers)
-	r.GET("/bets/latest", d.Bet.Latest)
-
 	var auth gin.HandlerFunc
+	var optionalAuth gin.HandlerFunc
 	if d.JWTKeys != nil {
 		auth = handler.AuthRequiredWithKeySet(d.JWTKeys)
+		optionalAuth = handler.OptionalAuthWithKeySet(d.JWTKeys)
 	} else {
 		auth = handler.AuthRequired(d.JWTSecret)
+		keys, err := jwtauth.NewKeySet(d.JWTSecret, "", nil)
+		if err != nil {
+			panic("gift-service jwt key set: " + err.Error())
+		}
+		optionalAuth = handler.OptionalAuthWithKeySet(keys)
 	}
+
+	r.GET("/gifts", d.Gift.List)
+	r.GET("/gifts/fan-clubs/:creatorID/members", d.Gift.FanClubMembers)
+	r.GET("/bets/latest", optionalAuth, d.Bet.Latest)
 	r.GET("/gifts/fan-badges/me", auth, d.Gift.FanBadges)
 	r.POST("/gifts/send", auth, d.Gift.Send)
 	r.POST("/gifts/fan-clubs/join", auth, d.Gift.JoinFanClub)

@@ -27,6 +27,17 @@ type fakeStripeAPI struct {
 	sessions    map[string]*service.StripeCheckoutSession
 }
 
+type coinWatchEvent struct {
+	ID              string    `gorm:"primaryKey;type:varchar(64)"`
+	UserID          string    `gorm:"type:varchar(36);not null"`
+	RoomID          string    `gorm:"type:varchar(64);not null"`
+	WatchDate       string    `gorm:"type:varchar(10);not null"`
+	DailyWatchCount int64     `gorm:"not null;default:1"`
+	LastWatchedAt   time.Time `gorm:"not null"`
+}
+
+func (coinWatchEvent) TableName() string { return "room_watch_events" }
+
 func newFakeStripeAPI() *fakeStripeAPI {
 	return &fakeStripeAPI{
 		sessions: make(map[string]*service.StripeCheckoutSession),
@@ -52,6 +63,11 @@ func (f *fakeStripeAPI) RetrieveCheckoutSession(_ context.Context, id string) (*
 }
 
 func newCoinsTestRouter(t *testing.T) (*gin.Engine, *repo.UserRepo, *service.AuthService) {
+	router, users, auth, _ := newCoinsTestRouterWithDB(t)
+	return router, users, auth
+}
+
+func newCoinsTestRouterWithDB(t *testing.T) (*gin.Engine, *repo.UserRepo, *service.AuthService, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -60,6 +76,7 @@ func newCoinsTestRouter(t *testing.T) (*gin.Engine, *repo.UserRepo, *service.Aut
 
 	users := repo.NewUserRepo(db)
 	require.NoError(t, users.AutoMigrate())
+	require.NoError(t, db.AutoMigrate(&coinWatchEvent{}))
 
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
@@ -82,7 +99,7 @@ func newCoinsTestRouter(t *testing.T) (*gin.Engine, *repo.UserRepo, *service.Aut
 		CoinsPerCurrencyUnit: 10,
 	}, stripeAPI)
 
-	return NewRouter(Deps{Auth: auth, Users: users, Stripe: stripeSvc}), users, auth
+	return NewRouter(Deps{Auth: auth, Users: users, Stripe: stripeSvc}), users, auth, db
 }
 
 func TestTopupCoinsReturnsUpdatedUser(t *testing.T) {
@@ -207,12 +224,12 @@ func TestWithdrawCoinsIsNotImplemented(t *testing.T) {
 	require.Equal(t, int64(0), persisted.FrozenCoins)
 }
 
-func TestClaimDailyTaskIsOncePerDay(t *testing.T) {
+func TestClaimDailyLoginTaskIsOncePerDay(t *testing.T) {
 	router, _, auth := newCoinsTestRouter(t)
 	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/watch-3-lives/claim", nil)
+	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/daily-login-lottery/claim", nil)
 	req.Header.Set("Authorization", "Bearer "+login.Token)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -227,10 +244,11 @@ func TestClaimDailyTaskIsOncePerDay(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &first))
 	require.True(t, first.Created)
 	require.False(t, first.AlreadyClaimed)
-	require.Equal(t, int64(18), first.Transaction.Amount)
-	require.Equal(t, int64(1218), first.User.CoinBalance)
+	require.GreaterOrEqual(t, first.Transaction.Amount, int64(6))
+	require.LessOrEqual(t, first.Transaction.Amount, int64(18))
+	require.Equal(t, int64(1200)+first.Transaction.Amount, first.User.CoinBalance)
 
-	req2 := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/watch-3-lives/claim", nil)
+	req2 := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/daily-login-lottery/claim", nil)
 	req2.Header.Set("Authorization", "Bearer "+login.Token)
 	rec2 := httptest.NewRecorder()
 	router.ServeHTTP(rec2, req2)
@@ -245,6 +263,46 @@ func TestClaimDailyTaskIsOncePerDay(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec2.Body.Bytes(), &second))
 	require.False(t, second.Created)
 	require.True(t, second.AlreadyClaimed)
-	require.Equal(t, int64(1218), second.User.CoinBalance)
+	require.Equal(t, first.User.CoinBalance, second.User.CoinBalance)
 	require.Equal(t, first.Transaction.ID, second.Transaction.ID)
+}
+
+func TestClaimWatchDailyTaskRequiresServerProgress(t *testing.T) {
+	router, _, auth, db := newCoinsTestRouterWithDB(t)
+	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/watch-3-lives/claim", nil)
+	req.Header.Set("Authorization", "Bearer "+login.Token)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "daily_task_incomplete")
+
+	today := time.Now().UTC().Add(8 * time.Hour).Format("2006-01-02")
+	for i := 1; i <= 3; i++ {
+		require.NoError(t, db.Create(&coinWatchEvent{
+			ID:              fmt.Sprintf("watch-%d", i),
+			UserID:          login.User.ID,
+			RoomID:          fmt.Sprintf("room-%d", i),
+			WatchDate:       today,
+			DailyWatchCount: 1,
+			LastWatchedAt:   time.Now().UTC(),
+		}).Error)
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/users/me/coins/daily-tasks/watch-3-lives/claim", nil)
+	req2.Header.Set("Authorization", "Bearer "+login.Token)
+	rec2 := httptest.NewRecorder()
+	router.ServeHTTP(rec2, req2)
+
+	require.Equal(t, http.StatusOK, rec2.Code)
+	var claimed struct {
+		Transaction model.CoinTransaction `json:"transaction"`
+		Created     bool                  `json:"created"`
+	}
+	require.NoError(t, json.Unmarshal(rec2.Body.Bytes(), &claimed))
+	require.True(t, claimed.Created)
+	require.Equal(t, int64(18), claimed.Transaction.Amount)
 }

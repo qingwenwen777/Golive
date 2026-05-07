@@ -73,6 +73,31 @@ func TestRecordWatchAddsHistoryLibraryItem(t *testing.T) {
 	require.Empty(t, rows)
 }
 
+func TestRecordWatchHeartbeatsAreRateLimitedAndDaily(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+
+	now := time.Date(2026, 5, 7, 13, 0, 0, 0, time.UTC)
+	svc := NewRoomService(rooms, "")
+	svc.now = func() time.Time { return now }
+	require.NoError(t, seedLibraryRoom(ctx, rooms, "room-heartbeat", "owner-2", model.StatusLive, now.Add(-30*time.Minute)))
+
+	require.NoError(t, svc.RecordWatch(ctx, "viewer-1", "room-heartbeat"))
+	now = now.Add(10 * time.Second)
+	require.NoError(t, svc.RecordWatch(ctx, "viewer-1", "room-heartbeat"))
+	now = now.Add(20 * time.Second)
+	require.NoError(t, svc.RecordWatch(ctx, "viewer-1", "room-heartbeat"))
+
+	var event model.RoomWatchEvent
+	require.NoError(t, db.Where("user_id = ? AND room_id = ?", "viewer-1", "room-heartbeat").Take(&event).Error)
+	require.Equal(t, int64(2), event.WatchCount)
+	require.Equal(t, int64(2), event.DailyWatchCount)
+	require.Equal(t, "2026-05-07", event.WatchDate)
+}
+
 func TestLikedLibraryStaysConsistentWithLikeState(t *testing.T) {
 	ctx := context.Background()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

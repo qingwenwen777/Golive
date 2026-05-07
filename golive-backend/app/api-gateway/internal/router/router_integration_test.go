@@ -163,6 +163,19 @@ func TestRoute_PublicChatHistoryNoAuth(t *testing.T) {
 	require.Nil(t, room.last)
 }
 
+func TestRoute_DoesNotExposeSRSCallbacks(t *testing.T) {
+	user := newUpstreamSpy(t, 200, `{}`)
+	room := newUpstreamSpy(t, 200, `{}`)
+	gift := newUpstreamSpy(t, 200, `{}`)
+
+	r := newGateway(t, baseCfg(user.srv.URL, room.srv.URL, gift.srv.URL))
+
+	w := newRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("POST", "/api/srs/on_unpublish", nil))
+	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Nil(t, room.last)
+}
+
 func TestRoute_InjectsUserIDFromJWT(t *testing.T) {
 	user := newUpstreamSpy(t, 200, `{"id":"u1"}`)
 	room := newUpstreamSpy(t, 200, `{"channelId":"c","following":true}`)

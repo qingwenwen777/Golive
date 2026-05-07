@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -554,11 +555,17 @@ func (h *UserHandler) ClaimDailyCoinTask(c *gin.Context) {
 		return
 	}
 
+	now := time.Now()
+	today := beijingDailyTaskDate(now)
+	if err := h.ensureDailyCoinTaskComplete(c.Request.Context(), uid, task.ID, today); err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+
 	reward := task.RewardMin
 	if task.RewardMax > task.RewardMin {
-		reward += time.Now().UnixNano() % (task.RewardMax - task.RewardMin + 1)
+		reward += now.UnixNano() % (task.RewardMax - task.RewardMin + 1)
 	}
-	today := beijingDailyTaskDate(time.Now())
 	sourceID := fmt.Sprintf("%s:%s", task.ID, today)
 	u, tx, created, err := h.users.ClaimDailyCoinReward(
 		c.Request.Context(),
@@ -579,4 +586,25 @@ func (h *UserHandler) ClaimDailyCoinTask(c *gin.Context) {
 		Created:        created,
 		AlreadyClaimed: !created,
 	})
+}
+
+func (h *UserHandler) ensureDailyCoinTaskComplete(ctx context.Context, userID, taskID, today string) error {
+	switch taskID {
+	case "daily-login-lottery":
+		return nil
+	case "watch-3-lives", "watch-30-minutes":
+		stats, err := h.users.DailyWatchTaskStats(ctx, userID, today)
+		if err != nil {
+			return err
+		}
+		if taskID == "watch-3-lives" && stats.Rooms >= 3 {
+			return nil
+		}
+		if taskID == "watch-30-minutes" && stats.WatchSeconds >= 30*60 {
+			return nil
+		}
+		return errcode.New(http.StatusConflict, "daily task is not complete").WithReason("daily_task_incomplete")
+	default:
+		return errcode.New(http.StatusNotFound, "daily task not found")
+	}
 }

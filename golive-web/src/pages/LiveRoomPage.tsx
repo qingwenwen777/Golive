@@ -139,7 +139,7 @@ export default function LiveRoomPage() {
   );
   const roomId = stream?.id ?? id;
   const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
-  const recordRoomWatch = useRecordRoomWatch(roomId);
+  const { mutate: recordRoomWatch } = useRecordRoomWatch(roomId);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
   const roomIsStarting = Boolean(stream?.status === 'publishing' && !roomIsLive);
   const roomIsReplay = Boolean(
@@ -383,7 +383,7 @@ export default function LiveRoomPage() {
     const key = `${currentUser.id}:${stream.id}`;
     if (recordedWatchKeyRef.current === key) return;
     recordedWatchKeyRef.current = key;
-    recordRoomWatch.mutate(undefined, {
+    recordRoomWatch(undefined, {
       onError: () => {
         recordedWatchKeyRef.current = '';
       },
@@ -394,10 +394,11 @@ export default function LiveRoomPage() {
     if (!roomIsLive || fanClubLocked || !roomId || !currentUser?.id) return;
     markDailyCoinRoomWatched(currentUser.id, roomId);
     const timer = window.setInterval(() => {
+      recordRoomWatch();
       addDailyCoinWatchSeconds(currentUser.id, 30);
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [currentUser?.id, fanClubLocked, roomId, roomIsLive]);
+  }, [currentUser?.id, fanClubLocked, recordRoomWatch, roomId, roomIsLive]);
 
   useEffect(() => {
     if (!stream) return;

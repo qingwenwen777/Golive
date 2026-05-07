@@ -1080,6 +1080,27 @@ func (r *UserRepo) CreditStripeTopupIfNeeded(
 	return &u, &coinTx, created, nil
 }
 
+type DailyWatchTaskStats struct {
+	Rooms        int64
+	WatchSeconds int64
+}
+
+func (r *UserRepo) DailyWatchTaskStats(ctx context.Context, userID, watchDate string) (DailyWatchTaskStats, error) {
+	var row struct {
+		Rooms        int64
+		WatchSeconds int64
+	}
+	err := r.db.WithContext(ctx).
+		Table("room_watch_events").
+		Select("COUNT(1) AS rooms, COALESCE(SUM(daily_watch_count), 0) * ? AS watch_seconds", 30).
+		Where("user_id = ? AND watch_date = ?", userID, watchDate).
+		Scan(&row).Error
+	if isMissingRelation(err) {
+		return DailyWatchTaskStats{}, nil
+	}
+	return DailyWatchTaskStats{Rooms: row.Rooms, WatchSeconds: row.WatchSeconds}, err
+}
+
 func (r *UserRepo) ClaimDailyCoinReward(
 	ctx context.Context,
 	id string,

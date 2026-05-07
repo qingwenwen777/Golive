@@ -18,6 +18,8 @@ import (
 
 var ErrRoomNotFound = errors.New("room not found")
 
+const watchHeartbeatInterval = 30 * time.Second
+
 type RoomRepo struct {
 	db *gorm.DB
 }
@@ -476,17 +478,44 @@ func (r *RoomRepo) RecordWatchEvent(ctx context.Context, event *model.RoomWatchE
 	if event == nil || event.ID == "" || event.UserID == "" || event.RoomID == "" {
 		return nil
 	}
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"channel_id":      event.ChannelID,
-			"owner_id":        event.OwnerID,
-			"category":        event.Category,
-			"last_watched_at": event.LastWatchedAt,
-			"watch_count":     gorm.Expr("watch_count + 1"),
-			"updated_at":      event.UpdatedAt,
-		}),
-	}).Create(event).Error
+	if event.WatchDate == "" {
+		event.WatchDate = event.LastWatchedAt.UTC().Format("2006-01-02")
+	}
+	if event.DailyWatchCount <= 0 {
+		event.DailyWatchCount = 1
+	}
+	if event.WatchCount <= 0 {
+		event.WatchCount = 1
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing model.RoomWatchEvent
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND room_id = ?", event.UserID, event.RoomID).
+			Take(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tx.Create(event).Error
+		}
+		if err != nil {
+			return err
+		}
+		if event.LastWatchedAt.Before(existing.LastWatchedAt.Add(watchHeartbeatInterval)) {
+			return nil
+		}
+		dailyWatchCount := any(gorm.Expr("daily_watch_count + 1"))
+		if existing.WatchDate != event.WatchDate {
+			dailyWatchCount = event.DailyWatchCount
+		}
+		return tx.Model(&existing).Updates(map[string]any{
+			"channel_id":        event.ChannelID,
+			"owner_id":          event.OwnerID,
+			"category":          event.Category,
+			"watch_count":       gorm.Expr("watch_count + 1"),
+			"watch_date":        event.WatchDate,
+			"daily_watch_count": dailyWatchCount,
+			"last_watched_at":   event.LastWatchedAt,
+			"updated_at":        event.UpdatedAt,
+		}).Error
+	})
 }
 
 func (r *RoomRepo) RemoveWatchEvent(ctx context.Context, userID, roomID string) error {

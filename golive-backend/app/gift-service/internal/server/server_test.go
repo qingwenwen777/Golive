@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/go-redis/redis/v9"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
@@ -54,7 +55,9 @@ func newGiftHTTPFixture(t *testing.T, viewerBalance int64) giftHTTPFixture {
 		username VARCHAR(64) NOT NULL DEFAULT '',
 		display_name VARCHAR(64) NOT NULL DEFAULT '',
 		avatar VARCHAR(500) NOT NULL DEFAULT '',
-		coin_balance INTEGER NOT NULL
+		coin_balance INTEGER NOT NULL,
+		frozen_coins INTEGER NOT NULL DEFAULT 0,
+		banned BOOLEAN NOT NULL DEFAULT false
 	)`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE rooms (
 		id VARCHAR(64) PRIMARY KEY,
@@ -104,7 +107,7 @@ func postJSON(router *gin.Engine, path, userID, body string) *httptest.ResponseR
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if userID != "" {
-		req.Header.Set("X-User-Id", userID)
+		req.Header.Set("Authorization", "Bearer "+signGiftToken(userID))
 	}
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -114,11 +117,24 @@ func postJSON(router *gin.Engine, path, userID, body string) *httptest.ResponseR
 func getJSON(router *gin.Engine, path, userID string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	if userID != "" {
-		req.Header.Set("X-User-Id", userID)
+		req.Header.Set("Authorization", "Bearer "+signGiftToken(userID))
 	}
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec
+}
+
+func signGiftToken(userID string) string {
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": userID,
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"typ": "access",
+	})
+	signed, err := tok.SignedString([]byte("test-secret"))
+	if err != nil {
+		panic(err)
+	}
+	return signed
 }
 
 func seedGift(t *testing.T, db *gorm.DB, id string, price int64) {
@@ -245,6 +261,18 @@ func TestBetHTTP_RejectsUnauthorizedAndBadOpenPayloads(t *testing.T) {
 		fmt.Sprintf(`{"roomId":"room-1","amount":100,"question":%q}`, tooLongQuestion),
 	)
 	require.Equal(t, http.StatusBadRequest, bad.Code)
+}
+
+func TestGiftHTTP_RejectsSpoofedUserHeader(t *testing.T) {
+	fx := newGiftHTTPFixture(t, 1000)
+
+	req := httptest.NewRequest(http.MethodPost, "/bets", strings.NewReader(`{"roomId":"room-1","amount":100,"question":"Will blue team win?"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-Id", "u-owner")
+	rec := httptest.NewRecorder()
+	fx.router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
 func stripVolatileGiftFields(t *testing.T, body string) string {

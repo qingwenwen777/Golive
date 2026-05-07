@@ -72,8 +72,8 @@ cd golive-backend/deploy
 docker compose up -d
 ```
 
-Compose 中的 Go 服务使用 `go run ./app/<service>/cmd -config ./deploy/configs/<service>.yaml`，
-源码以只读卷挂载，`docker compose restart <service>` 会重新编译并加载最新代码。
+Compose 中的 Go 服务由 `deploy/Dockerfile.service` 编译为镜像运行。
+代码变更后请使用 `docker compose up -d --build` 重新构建并更新服务容器。
 
 ## 测试
 

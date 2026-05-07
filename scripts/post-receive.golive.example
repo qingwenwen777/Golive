@@ -5,7 +5,8 @@ set -Eeuo pipefail
 #   /srv/git/golive.git/hooks/post-receive
 #
 # It checks out the pushed branch into WORK_TREE, builds the Vite frontend
-# with a China-friendly npm mirror, then restarts the Docker Compose stack.
+# with a China-friendly npm mirror, rebuilds service images, then updates the
+# Docker Compose stack.
 
 APP_NAME="golive"
 WORK_TREE="${WORK_TREE:-/srv/${APP_NAME}/app}"
@@ -45,23 +46,9 @@ deploy_ref() {
     node:20-alpine \
     sh -lc 'corepack enable && pnpm config set registry https://registry.npmmirror.com && pnpm install --frozen-lockfile && pnpm build'
 
-  log "starting services"
+  log "rebuilding and starting services"
   cd "${WORK_TREE}/golive-backend/deploy"
-  docker compose up -d --remove-orphans
-
-  # Go services run via `go run` with the source bind-mounted. `up -d` is a
-  # no-op for already-running containers, so without an explicit restart they
-  # would keep executing the previously-compiled binary from memory and the
-  # newly-pushed Go code would never take effect. Restart them so the in-
-  # container `go run` recompiles from the updated source tree.
-  log "restarting go services to pick up new source"
-  docker compose restart \
-    api-gateway \
-    user-service \
-    room-service \
-    chat-service \
-    gift-service \
-    im-gateway
+  docker compose up -d --build --remove-orphans
 
   log "current service status"
   docker compose ps

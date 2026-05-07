@@ -36,7 +36,7 @@
 cd deploy && docker compose up -d mysql redis
 cd ../app/room-service && go run ./cmd      # :8091
 # 另一终端
-cd .. && go run ./cmd/api-gateway           # :8080，反代 /api/rooms /api/srs
+cd .. && go run ./cmd/api-gateway           # :8080，反代 /api/rooms
 ```
 
 ## 测试
@@ -114,7 +114,7 @@ curl -i http://localhost:8080/api/rooms/luna-music/like
 
 ## SRS 集成
 
-`deploy/srs.conf` 里需要把回调指过来（下一轮配 SRS 时一并改）：
+`deploy/srs.conf` 里需要把回调指到 room-service 内网地址，不经过公网 api-gateway：
 
 ```
 vhost __defaultVhost__ {

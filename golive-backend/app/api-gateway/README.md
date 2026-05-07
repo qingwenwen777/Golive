@@ -26,9 +26,11 @@ Recovery → CORS → RequestID → RateLimit → JWT → ReverseProxy
 | `/api/auth/*`                         | user-service  | 公开   |
 | `/api/users/*`                        | user-service  | JWT    |
 | `/api/rooms`, `/api/rooms/*`          | room-service  | GET 公开 / 写操作 JWT |
-| `/api/srs/*`                          | room-service  | 公开（S2S）|
 | `/api/gifts`                          | gift-service  | 公开   |
 | `/api/gifts/*`, `/api/super-chats`    | gift-service  | JWT    |
+
+SRS HTTP hooks are intentionally not exposed through the public gateway.
+`deploy/srs.conf` calls room-service on the Compose internal network instead.
 
 ## 错误响应规则
 
