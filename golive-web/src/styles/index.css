@@ -2707,25 +2707,25 @@ input:focus-visible,
 }
 .gl-share-dialog {
   display: block;
-  width: min(864px, calc(100vw - 28px));
-  max-height: calc(100dvh - 28px);
+  width: min(580px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 28px;
+  border-radius: 26px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 251, 0.98)), var(--gl-bg);
   color: #0f0f0f;
   box-shadow:
-    0 34px 90px rgba(15, 23, 42, 0.22),
-    0 10px 30px rgba(15, 23, 42, 0.08);
+    0 30px 72px rgba(15, 23, 42, 0.2),
+    0 10px 24px rgba(15, 23, 42, 0.08);
 }
 .gl-share-dialog > button {
-  top: 30px;
-  right: 30px;
+  top: 32px;
+  right: 31px;
   display: inline-flex;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -2739,16 +2739,16 @@ input:focus-visible,
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 22px;
-  padding: 54px 20px 42px;
+  gap: 14px;
+  padding: 36px 14px 30px;
 }
 .gl-share-title {
-  max-width: calc(100% - 70px);
+  max-width: calc(100% - 56px);
   min-width: 0;
   overflow: hidden;
   color: #0f0f0f;
-  padding-inline: 34px;
-  font-size: 42px;
+  padding-inline: 22px;
+  font-size: 28px;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1.14;
@@ -2762,10 +2762,10 @@ input:focus-visible,
 .gl-share-preview {
   position: relative;
   display: grid;
-  min-height: 430px;
+  min-height: 288px;
   overflow: hidden;
   border: 1px solid rgba(15, 15, 15, 0.1);
-  border-radius: 16px;
+  border-radius: 12px;
   background: #fff;
   box-shadow:
     0 18px 44px rgba(15, 23, 42, 0.09),
@@ -2785,11 +2785,11 @@ input:focus-visible,
   z-index: 1;
   align-self: start;
   justify-self: end;
-  width: min(520px, 66%);
+  width: min(350px, 64%);
   aspect-ratio: 16 / 7.6;
-  margin: 28px 26px 0;
+  margin: 18px 16px 0;
   overflow: hidden;
-  border-radius: 26px;
+  border-radius: 22px;
   background: linear-gradient(135deg, rgba(15, 15, 15, 0.96), rgba(38, 38, 38, 0.96)), #161616;
   box-shadow: 0 18px 36px rgba(15, 15, 15, 0.28);
 }
@@ -2812,7 +2812,7 @@ input:focus-visible,
   flex-direction: column;
   justify-content: space-between;
   color: #fff;
-  padding: 22px;
+  padding: 16px;
 }
 .gl-share-preview-fallback span {
   width: fit-content;
@@ -2820,16 +2820,16 @@ input:focus-visible,
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
-  padding: 6px 10px;
+  padding: 5px 9px;
   color: rgba(255, 255, 255, 0.78);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .gl-share-preview-fallback strong {
   overflow: hidden;
-  font-size: 38px;
+  font-size: 26px;
   font-weight: 950;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -2839,13 +2839,13 @@ input:focus-visible,
   position: relative;
   z-index: 1;
   display: flex;
-  width: min(100%, 660px);
-  max-width: calc(100% - 220px);
+  width: min(100%, 390px);
+  max-width: calc(100% - 132px);
   min-width: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   align-self: end;
-  padding: 0 28px 34px;
+  padding: 0 24px 22px;
 }
 .gl-share-preview-copy > span {
   width: fit-content;
@@ -2854,8 +2854,8 @@ input:focus-visible,
   border-radius: 999px;
   background: rgba(15, 15, 15, 0.06);
   color: rgba(15, 15, 15, 0.62);
-  padding: 7px 13px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2864,7 +2864,7 @@ input:focus-visible,
   display: -webkit-box;
   overflow: hidden;
   color: #0f0f0f;
-  font-size: 30px;
+  font-size: 18px;
   font-weight: 950;
   letter-spacing: 0;
   line-height: 1.15;
@@ -2873,10 +2873,10 @@ input:focus-visible,
 }
 .gl-share-preview-copy p {
   display: -webkit-box;
-  max-width: 620px;
+  max-width: 360px;
   overflow: hidden;
   color: rgba(15, 15, 15, 0.58);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 750;
   line-height: 1.5;
   -webkit-box-orient: vertical;
@@ -2886,20 +2886,20 @@ input:focus-visible,
   max-width: 100%;
   overflow: hidden;
   color: rgba(15, 15, 15, 0.42);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .gl-share-preview-brand {
   position: absolute;
-  right: 28px;
-  bottom: 26px;
+  right: 20px;
+  bottom: 20px;
   z-index: 1;
-  max-width: 168px;
+  max-width: 118px;
   overflow: hidden;
   color: #0f0f0f;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 950;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -2907,11 +2907,11 @@ input:focus-visible,
 }
 .gl-share-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(88px, 1fr));
+  grid-template-columns: repeat(4, minmax(70px, 1fr));
   gap: 18px;
-  width: min(100%, 620px);
+  width: min(100%, 410px);
   align-self: center;
-  padding-top: 20px;
+  padding-top: 28px;
 }
 .gl-share-actions button {
   display: inline-flex;
@@ -2922,7 +2922,7 @@ input:focus-visible,
   border: 0;
   background: transparent;
   color: #0f0f0f;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 750;
   padding: 0;
 }
@@ -2934,16 +2934,16 @@ input:focus-visible,
 }
 .gl-share-action-icon {
   display: inline-flex;
-  width: 86px;
-  height: 86px;
+  width: 58px;
+  height: 58px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: #000;
   color: #fff;
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 950;
-  box-shadow: 0 14px 26px rgba(15, 15, 15, 0.18);
+  box-shadow: 0 12px 24px rgba(15, 15, 15, 0.18);
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -3011,64 +3011,64 @@ input:focus-visible,
 
 @media (max-width: 720px) {
   .gl-share-dialog {
-    width: min(100vw - 18px, 560px);
-    border-radius: 22px;
+    width: min(100vw - 18px, 540px);
+    border-radius: 24px;
   }
 
   .gl-share-dialog > button {
-    top: 20px;
-    right: 18px;
+    top: 24px;
+    right: 22px;
   }
 
   .gl-share-dialog-body {
-    gap: 18px;
-    padding: 36px 12px 28px;
+    gap: 14px;
+    padding: 30px 12px 26px;
   }
 
   .gl-share-title {
-    padding-inline: 14px 58px;
-    font-size: 28px;
+    padding-inline: 14px 50px;
+    font-size: 24px;
   }
 
   .gl-share-preview {
-    min-height: 368px;
+    min-height: 276px;
   }
 
   .gl-share-preview-media {
-    width: calc(100% - 28px);
+    width: min(330px, calc(100% - 28px));
     margin: 14px;
-    border-radius: 18px;
+    border-radius: 20px;
   }
 
   .gl-share-preview-copy {
     max-width: 100%;
-    padding: 0 18px 58px;
+    padding: 0 18px 52px;
   }
 
   .gl-share-preview-copy h3 {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .gl-share-preview-copy p {
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .gl-share-preview-brand {
     right: 18px;
     bottom: 18px;
-    font-size: 22px;
+    font-size: 21px;
   }
 
   .gl-share-actions {
     grid-template-columns: repeat(4, minmax(64px, 1fr));
     gap: 10px;
-    padding-top: 10px;
+    padding-top: 20px;
   }
 
   .gl-share-action-icon {
-    width: 62px;
-    height: 62px;
-    font-size: 23px;
+    width: 56px;
+    height: 56px;
+    font-size: 21px;
   }
 
   .gl-share-actions button {
@@ -3084,7 +3084,7 @@ input:focus-visible,
   }
 
   .gl-share-preview {
-    min-height: 340px;
+    min-height: 264px;
   }
 }
 
