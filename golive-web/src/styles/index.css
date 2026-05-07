@@ -51,7 +51,7 @@
   --gl-chip-bg-active: #0f0f0f;
   --gl-chip-text-active: #ffffff;
   --gl-red: #ff3d5c;
-  --gl-progress: #ff2448;
+  --gl-progress: #fc8209;
   --gl-progress-glow: transparent;
   --gl-skeleton-base: #e5e5e5;
   --gl-skeleton-shine: rgba(255, 255, 255, 0.64);
@@ -1075,7 +1075,7 @@
   --gl-chip-bg-active: #ffffff;
   --gl-chip-text-active: #0f0f0f;
   --gl-red: #ff3d5c;
-  --gl-progress: #ff3355;
+  --gl-progress: #fc8209;
   --gl-progress-glow: transparent;
   --gl-skeleton-base: #3f3f3f;
   --gl-skeleton-shine: rgba(255, 255, 255, 0.12);
@@ -1634,25 +1634,35 @@ input:focus-visible,
   white-space: nowrap;
 }
 .gl-brand-logo {
-  display: inline-grid;
+  display: inline-flex;
   flex: 0 0 auto;
-  place-items: center;
-  position: relative;
+  align-items: center;
+  gap: var(--gl-logo-gap, 4px);
 }
-.gl-brand-logo-image {
+.gl-brand-logo-mark {
   display: block;
-  grid-area: 1 / 1;
+  width: auto;
   height: 100%;
-  width: 100%;
+  object-fit: contain;
 }
-.gl-brand-logo-image.is-dark {
-  display: none;
+.gl-brand-logo-word {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gl-text);
+  font-family: var(--gl-font-latin), sans-serif;
+  font-size: var(--gl-logo-font-size, 14px);
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
-.dark .gl-brand-logo-image.is-light {
-  display: none;
+.gl-brand-logo-go {
+  color: #111111;
 }
-.dark .gl-brand-logo-image.is-dark {
-  display: block;
+.dark .gl-brand-logo-go {
+  color: #ffffff;
+}
+.gl-brand-logo-live {
+  color: #fdd3d0;
 }
 .gl-logo-word {
   font-weight: 700;
