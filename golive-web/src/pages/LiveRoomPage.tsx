@@ -7,12 +7,10 @@ import {
   CalendarClock,
   CheckCircle2,
   CloudOff,
-  Copy,
   MessageSquare,
   PlayCircle,
   Radio,
   ShieldCheck,
-  Square,
   ThumbsUp,
   Trophy,
   UserPlus,
@@ -34,7 +32,7 @@ import { useLiveRoomUiStore } from '@/features/live-room/useLiveRoomUiStore';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
-import { useLike, useLikeState, useRecordRoomWatch, useRoom, useStopLive } from '@/api/room';
+import { useLike, useLikeState, useRecordRoomWatch, useRoom } from '@/api/room';
 import { useLibraryMembership } from '@/api/library';
 import { useReplayMessages } from '@/api/chat';
 import { useLatestBet } from '@/api/bet';
@@ -52,7 +50,6 @@ import {
   useStartAppointment,
   useUnreserveAppointment,
 } from '@/api/room';
-import { copyText } from '@/lib/clipboard';
 import { addDailyCoinWatchSeconds, markDailyCoinRoomWatched } from '@/lib/coinActivity';
 import { localizedGiftName } from '@/lib/gift';
 import {
@@ -64,10 +61,7 @@ import {
 } from '@/lib/liveLibrary';
 import {
   clearPublisherSession,
-  loadPublisherSession,
-  publisherSessionFromStream,
   savePublisherSession,
-  type PublisherSession,
 } from '@/features/creator/publisherSession';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { LoadableImage } from '@/components/LoadableImage';
@@ -113,7 +107,6 @@ export default function LiveRoomPage() {
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const appendMessage = useRealtimeStore((s) => s.appendMessage);
   const incrementViewerContribution = useRealtimeStore((s) => s.incrementViewerContribution);
-  const stopLive = useStopLive();
   const liveEndedRef = useRef(false);
   const endTransitionTimerRef = useRef<number | null>(null);
   const recordedWatchKeyRef = useRef('');
@@ -122,9 +115,6 @@ export default function LiveRoomPage() {
     startedAt: number;
   } | null>(null);
   const betAnchorRef = useRef<HTMLDivElement | null>(null);
-  const [publisherSession, setPublisherSession] = useState<PublisherSession | null>(() =>
-    loadPublisherSession(),
-  );
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
@@ -225,7 +215,6 @@ export default function LiveRoomPage() {
       }, LIVE_END_TRANSITION_MS);
     }
     clearPublisherSession();
-    setPublisherSession(null);
 
     if (stream) {
       markStreamEndedInLibraries(stream);
@@ -309,16 +298,6 @@ export default function LiveRoomPage() {
       toast.dismiss(`live-room-connection:${roomId || 'unknown'}`);
     };
   }, [roomId]);
-
-  useEffect(() => {
-    setPublisherSession(loadPublisherSession());
-  }, [id]);
-
-  useEffect(() => {
-    if (!stream?.streamKey || !currentUser?.id || stream.ownerId !== currentUser.id) return;
-    savePublisherSession(stream);
-    setPublisherSession(publisherSessionFromStream(stream));
-  }, [currentUser?.id, stream]);
 
   useEffect(() => {
     if (!stream || fanClubLocked || (!roomIsLive && !roomIsReplay)) return;
@@ -414,11 +393,6 @@ export default function LiveRoomPage() {
   const scrollToBetPanel = () => {
     betAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
-  const effectivePublisherSession = ownsStream
-    ? (publisherSessionFromStream(displayStream) ??
-      (publisherSession?.streamId === displayStream.id ? publisherSession : null))
-    : null;
-  const canShowPublisherPanel = ownsStream && effectivePublisherSession;
   const ownerName = streamChannelName(displayStream, currentUser);
   const openSuperChat = () => {
     if (exclusiveLocked) {
@@ -514,18 +488,6 @@ export default function LiveRoomPage() {
       },
     );
   };
-  const handleStopLive = () => {
-    stopLive.mutate(undefined, {
-      onSuccess: () => {
-        clearPublisherSession();
-        markStreamEndedInLibraries(displayStream);
-        setPublisherSession(null);
-        toast.success('Live ended.');
-        navigate('/');
-      },
-      onError: () => toast.error('Could not end the live.'),
-    });
-  };
   const moderationDialog = (
     <LiveRoomModerationDialog
       roomId={roomId}
@@ -591,41 +553,13 @@ export default function LiveRoomPage() {
   }
 
   if (!liveEnding && !roomIsLive && !isScheduledRoom && !roomIsStarting) {
-    if (!canShowPublisherPanel) {
-      return (
-        <div className="gl-empty">
-          <CloudOff size={64} strokeWidth={1.5} />
-          <div className="gl-empty-title">{t('liveRoom.ended')}</div>
-          <button className="gl-retry-btn mt-4" onClick={() => navigate('/')}>
-            {t('notFound.back')}
-          </button>
-        </div>
-      );
-    }
-
     return (
-      <div className="gl-page max-w-3xl">
-        <div className="gl-owner-live-actions">
-          <div>
-            <h2>Waiting for publisher</h2>
-            <p>Add the stream key in OBS. The room becomes watchable after SRS confirms publish.</p>
-          </div>
-          <button
-            type="button"
-            className="gl-owner-end-live"
-            onClick={handleStopLive}
-            disabled={stopLive.isPending}
-          >
-            <Square size={15} />
-            <span>{stopLive.isPending ? 'Ending...' : 'End live'}</span>
-          </button>
-        </div>
-        <PublisherPanel
-          session={canShowPublisherPanel}
-          playbackUrl={displayStream.playbackUrl}
-          stopping={stopLive.isPending}
-          onStop={handleStopLive}
-        />
+      <div className="gl-empty">
+        <CloudOff size={64} strokeWidth={1.5} />
+        <div className="gl-empty-title">{t('liveRoom.ended')}</div>
+        <button className="gl-retry-btn mt-4" onClick={() => navigate('/')}>
+          {t('notFound.back')}
+        </button>
       </div>
     );
   }
@@ -1037,31 +971,6 @@ export default function LiveRoomPage() {
         <div ref={betAnchorRef}>
           <BettingPanel roomId={roomId} ownsStream={ownsStream} />
         </div>
-      )}
-      {ownsStream && (
-        <div className="gl-owner-live-actions">
-          <div>
-            <h2>Live controls</h2>
-            <p>Stop the current room when your stream is finished.</p>
-          </div>
-          <button
-            type="button"
-            className="gl-owner-end-live"
-            onClick={handleStopLive}
-            disabled={stopLive.isPending}
-          >
-            <Square size={15} />
-            <span>{stopLive.isPending ? 'Ending...' : 'End live'}</span>
-          </button>
-        </div>
-      )}
-      {canShowPublisherPanel && (
-        <PublisherPanel
-          session={canShowPublisherPanel}
-          playbackUrl={displayStream.playbackUrl}
-          stopping={stopLive.isPending}
-          onStop={handleStopLive}
-        />
       )}
       {isMobile && (
         <div className="gl-mobile-chat">
@@ -1974,92 +1883,5 @@ function MuteUserDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PublisherPanel({
-  session,
-  playbackUrl,
-  stopping,
-  onStop,
-}: {
-  session: PublisherSession;
-  playbackUrl?: string;
-  stopping: boolean;
-  onStop: () => void;
-}) {
-  const streamUrl = playbackUrl || session.playbackUrl || '';
-
-  const copy = async (value: string, label: string) => {
-    try {
-      const method = await copyText(value, label);
-      if (method === 'manual') {
-        toast.info(`${label} opened for manual copy.`);
-      } else {
-        toast.success(`${label} copied.`);
-      }
-    } catch {
-      toast.error(`Could not copy ${label.toLowerCase()}.`);
-    }
-  };
-
-  return (
-    <section className="gl-publisher-panel" aria-label="Publisher setup">
-      <div className="gl-publisher-head">
-        <div className="gl-publisher-icon" aria-hidden="true">
-          <Radio size={18} />
-        </div>
-        <div>
-          <h2>Publisher setup</h2>
-          <p>Use these values in OBS, then start streaming.</p>
-        </div>
-      </div>
-
-      <PublisherValue
-        label="OBS server"
-        value={session.rtmpServer}
-        onCopy={() => copy(session.rtmpServer, 'OBS server')}
-      />
-      <PublisherValue
-        label="Stream key"
-        value={session.streamKey}
-        secret
-        onCopy={() => copy(session.streamKey, 'Stream key')}
-      />
-      {streamUrl && (
-        <PublisherValue
-          label="Playback URL"
-          value={streamUrl}
-          onCopy={() => copy(streamUrl, 'Playback URL')}
-        />
-      )}
-
-      <button type="button" className="gl-publisher-stop" onClick={onStop} disabled={stopping}>
-        <Square size={15} />
-        <span>{stopping ? 'Ending...' : 'End live'}</span>
-      </button>
-    </section>
-  );
-}
-
-function PublisherValue({
-  label,
-  value,
-  secret,
-  onCopy,
-}: {
-  label: string;
-  value: string;
-  secret?: boolean;
-  onCopy: () => void;
-}) {
-  return (
-    <div className="gl-publisher-value">
-      <span>{label}</span>
-      <code>{secret ? value.replace(/.(?=.{6})/g, '*') : value}</code>
-      <button type="button" onClick={onCopy} aria-label={`Copy ${label}`}>
-        <Copy size={15} />
-      </button>
-    </div>
   );
 }
