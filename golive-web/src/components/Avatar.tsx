@@ -76,17 +76,24 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
 }
 
 const DEFAULT_AVATAR_BASE = 'https://api.dicebear.com/7.x/avataaars/svg?seed=';
+const DEFAULT_AVATAR_SKIN_COLOR = 'ffdbb4';
 
 function defaultAvatarSrc(name: string): string {
   const seed = name.trim() || 'golive';
-  return DEFAULT_AVATAR_BASE + encodeURIComponent(seed);
+  return `${DEFAULT_AVATAR_BASE}${encodeURIComponent(seed)}&skinColor=${DEFAULT_AVATAR_SKIN_COLOR}`;
 }
 
 function normalizeAvatarSrc(src: string | undefined): string {
   if (!src) return '';
   if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) {
-    return src;
+    return withDefaultAvatarOptions(src);
   }
   if (src.startsWith('/')) return src;
   return `/${src.replace(/^\/+/, '')}`;
+}
+
+function withDefaultAvatarOptions(src: string): string {
+  if (!/^https:\/\/api\.dicebear\.com\/7\.x\/avataaars\/svg(?:\?|$)/i.test(src)) return src;
+  if (/[?&]skinColor=/i.test(src)) return src;
+  return `${src}${src.includes('?') ? '&' : '?'}skinColor=${DEFAULT_AVATAR_SKIN_COLOR}`;
 }

@@ -13,7 +13,7 @@ describe('Avatar', () => {
 
     const avatar = screen.getByLabelText('Luna Nova');
     const image = avatar.querySelector('img');
-    expect(image?.src).toBe('https://api.dicebear.com/7.x/avataaars/svg?seed=Luna%20Nova');
+    expect(image?.src).toBe('https://api.dicebear.com/7.x/avataaars/svg?seed=Luna%20Nova&skinColor=ffdbb4');
   });
 
   it('falls back to the DiceBear default avatar when the primary avatar image fails to load', () => {
@@ -24,7 +24,15 @@ describe('Avatar', () => {
     fireEvent.error(image as HTMLImageElement);
 
     expect(screen.getByLabelText('Luna').querySelector('img')?.src).toBe(
-      'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna',
+      'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&skinColor=ffdbb4',
+    );
+  });
+
+  it('adds the default skin tone to stored DiceBear avatar URLs', () => {
+    render(<Avatar name="Luna" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Luna" />);
+
+    expect(screen.getByLabelText('Luna').querySelector('img')?.src).toBe(
+      'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&skinColor=ffdbb4',
     );
   });
 

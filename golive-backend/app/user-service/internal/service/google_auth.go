@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -301,7 +300,7 @@ func (s *AuthService) loginResponseForUser(ctx context.Context, u *model.User) (
 func newGoogleUser(username, email, displayName, hash string, profile *GoogleProfile) *model.User {
 	avatar := strings.TrimSpace(profile.Picture)
 	if avatar == "" {
-		avatar = "https://api.dicebear.com/7.x/avataaars/svg?seed=" + url.QueryEscape(displayName)
+		avatar = DefaultAvatarURL(displayName)
 	}
 	sub := profile.Subject
 	now := time.Now().UTC()

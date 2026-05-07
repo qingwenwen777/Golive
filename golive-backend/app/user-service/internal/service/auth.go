@@ -514,7 +514,7 @@ func newLocalUser(username, email, displayName, hash string) *model.User {
 		Email:                email,
 		DisplayName:          displayName,
 		PasswordHash:         hash,
-		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + urlSafeSeed(displayName),
+		Avatar:               DefaultAvatarURL(displayName),
 		CoinBalance:          1200,
 		Verified:             false,
 		Role:                 model.RoleUser,

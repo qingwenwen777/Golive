@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -653,7 +652,7 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 		Email:                strings.ToLower(username) + "@gmail.com",
 		DisplayName:          displayName,
 		PasswordHash:         hash,
-		Avatar:               "https://api.dicebear.com/7.x/avataaars/svg?seed=" + url.QueryEscape(displayName),
+		Avatar:               service.DefaultAvatarURL(displayName),
 		CoinBalance:          1200,
 		Verified:             false,
 		Role:                 model.RoleAdmin,
