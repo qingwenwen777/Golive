@@ -73,7 +73,6 @@ describe('http axios client', () => {
     useAuthModalStore.setState({ open: false, afterLogin: null });
     useAuthStore.setState({
       token: 'old-token',
-      refreshToken: 'refresh-token',
       user: {
         id: 'user-1',
         username: 'streamer',
@@ -114,7 +113,7 @@ describe('http axios client', () => {
 
   it('refreshes once and retries the original request with the new token after a 401', async () => {
     refreshAuthTokenMock.mockImplementationOnce(async () => {
-      useAuthStore.getState().setTokens('new-token', 'new-refresh');
+      useAuthStore.getState().setTokens('new-token');
       return 'new-token';
     });
     const adapter = vi.fn<AxiosAdapter>(async (config) => {
@@ -139,7 +138,6 @@ describe('http axios client', () => {
     refreshAuthTokenMock.mockRejectedValueOnce(
       new AuthRefreshError('refresh-failed', {
         kind: 'unauthorized',
-        refreshToken: 'refresh-token',
         status: 401,
       }),
     );
@@ -152,7 +150,6 @@ describe('http axios client', () => {
 
     expect(adapter).toHaveBeenCalledTimes(1);
     expect(useAuthStore.getState().token).toBeNull();
-    expect(useAuthStore.getState().refreshToken).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthModalStore.getState().open).toBe(true);
   });
@@ -161,7 +158,6 @@ describe('http axios client', () => {
     refreshAuthTokenMock.mockRejectedValueOnce(
       new AuthRefreshError('refresh-failed', {
         kind: 'transient',
-        refreshToken: 'refresh-token',
         status: 503,
       }),
     );
@@ -174,7 +170,6 @@ describe('http axios client', () => {
 
     expect(adapter).toHaveBeenCalledTimes(1);
     expect(useAuthStore.getState().token).toBe('old-token');
-    expect(useAuthStore.getState().refreshToken).toBe('refresh-token');
     expect(useAuthStore.getState().user?.id).toBe('user-1');
     expect(useAuthModalStore.getState().open).toBe(false);
   });

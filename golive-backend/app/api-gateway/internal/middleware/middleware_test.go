@@ -133,6 +133,7 @@ func TestCORS_Preflight(t *testing.T) {
 
 	require.Equal(t, http.StatusNoContent, w.Code)
 	require.Equal(t, "http://localhost:5173", w.Header().Get("Access-Control-Allow-Origin"))
+	require.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
 	require.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), "POST")
 	require.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "Authorization")
 	require.Contains(t, w.Header().Get("Access-Control-Allow-Headers"), "X-Request-Id")

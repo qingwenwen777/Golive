@@ -145,10 +145,11 @@ func NewAuthService(users UserStore, tokens TokenStore, opts Options) *AuthServi
 	}
 }
 
-// LoginResp matches src/types/user.ts LoginResp exactly.
+// LoginResp returns the public login payload. RefreshToken is transported via
+// an HttpOnly cookie by the handler rather than exposed to browser JavaScript.
 type LoginResp struct {
 	Token        string           `json:"token"`
-	RefreshToken string           `json:"refreshToken"`
+	RefreshToken string           `json:"-"`
 	User         model.PublicUser `json:"user"`
 }
 
@@ -400,7 +401,7 @@ func (s *AuthService) ResetPasswordByUsernameEmail(ctx context.Context, username
 // RefreshResp is what /api/auth/refresh returns. No `user` per contract.
 type RefreshResp struct {
 	Token        string `json:"token"`
-	RefreshToken string `json:"refreshToken"`
+	RefreshToken string `json:"-"`
 }
 
 // Refresh rotates a refresh token: old one is revoked, a new pair is issued.
@@ -457,6 +458,10 @@ func (s *AuthService) Me(ctx context.Context, accessToken string) (*model.Public
 // through Me (avoids a DB hit on every request).
 func (s *AuthService) ParseAccess(token string) (string, error) {
 	return s.parseAccess(token)
+}
+
+func (s *AuthService) RefreshTTL() time.Duration {
+	return s.refreshTTL
 }
 
 // signAccess produces an access JWT with sub=userID, exp=now+accessTTL.

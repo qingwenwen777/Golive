@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -50,8 +51,8 @@ type FilterCfg struct {
 }
 
 type RateLimitCfg struct {
-	PerUserPerSec  int           `mapstructure:"per_user_per_sec"`
-	BucketSeconds  time.Duration `mapstructure:"bucket_seconds"`
+	PerUserPerSec int           `mapstructure:"per_user_per_sec"`
+	BucketSeconds time.Duration `mapstructure:"bucket_seconds"`
 }
 
 type RoomCfg struct {
@@ -71,6 +72,9 @@ func Load(path string) (*Config, error) {
 	}
 	v.AutomaticEnv()
 	v.SetEnvPrefix("CHATSVC")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	_ = v.BindEnv("mysql.dsn")
+	_ = v.BindEnv("redis.password")
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}

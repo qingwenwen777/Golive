@@ -94,6 +94,9 @@ func Load(path string) (*Config, error) {
 	v.SetEnvPrefix("ROOMSVC")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	_ = v.BindEnv("mysql.dsn")
+	_ = v.BindEnv("redis.password")
+	_ = v.BindEnv("live.stream_key_secret")
 	_ = v.BindEnv("replay.bunny_library_id")
 	_ = v.BindEnv("replay.bunny_api_key")
 

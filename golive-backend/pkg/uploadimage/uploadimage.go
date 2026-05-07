@@ -23,9 +23,12 @@ var (
 	ErrInvalidImage    = errors.New("invalid image")
 )
 
+const defaultMaxPixels int64 = 20_000_000
+
 type Options struct {
 	MaxWidth  int
 	MaxHeight int
+	MaxPixels int64
 	Quality   int
 }
 
@@ -42,6 +45,22 @@ func SaveOptimized(file *multipart.FileHeader, dir, basename, _ string, opts Opt
 	ext, ok := detectAllowedExt(data)
 	if !ok {
 		return "", ErrUnsupportedType
+	}
+
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return "", ErrInvalidImage
+	}
+	maxPixels := opts.MaxPixels
+	if maxPixels <= 0 {
+		if opts.MaxWidth > 0 && opts.MaxHeight > 0 {
+			maxPixels = int64(opts.MaxWidth) * int64(opts.MaxHeight) * 16
+		} else {
+			maxPixels = defaultMaxPixels
+		}
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > maxPixels {
+		return "", ErrInvalidImage
 	}
 
 	img, _, err := image.Decode(bytes.NewReader(data))

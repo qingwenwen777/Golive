@@ -7,7 +7,10 @@ import { TopProgressBar } from '@/components/TopProgressBar';
 import { Toaster } from '@/components/ui/sonner';
 import { LoginModal } from '@/features/auth/LoginModal';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { http } from '@/lib/axios';
+import { refreshAuthToken } from '@/lib/authToken';
 import { useAuthHydrated, useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import type { User } from '@/types/user';
 
 export default function App() {
   const location = useLocation();
@@ -17,9 +20,18 @@ export default function App() {
   const authHydrated = useAuthHydrated();
   const isAuthed = useIsAuthed();
   const user = useAuthStore((s) => s.user);
+  const restoreAttempted = useRef(false);
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   const isBannedRoute = location.pathname === '/account-banned';
   const collapsed = isNarrow || userCollapsed;
+
+  useEffect(() => {
+    if (!authHydrated) return;
+    if (!isAuthed && !restoreAttempted.current) {
+      restoreAttempted.current = true;
+      void restoreSessionFromCookie();
+    }
+  }, [authHydrated, isAuthed]);
 
   useEffect(() => {
     if (!authHydrated) return;
@@ -44,6 +56,16 @@ export default function App() {
       <LoginModal />
     </div>
   );
+}
+
+async function restoreSessionFromCookie() {
+  try {
+    await refreshAuthToken();
+    const { data } = await http.get<User>('/users/me');
+    useAuthStore.getState().setUser(data);
+  } catch {
+    useAuthStore.getState().logout();
+  }
 }
 
 function RouteOutlet() {

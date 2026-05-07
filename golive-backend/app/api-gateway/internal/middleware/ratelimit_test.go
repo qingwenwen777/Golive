@@ -50,7 +50,7 @@ func TestClientIPPrefersForwardedHeaders(t *testing.T) {
 	c.Request.Header.Set("X-Forwarded-For", "203.0.113.10, 172.18.0.1")
 	c.Request.Header.Set("X-Real-IP", "198.51.100.5")
 
-	require.Equal(t, "203.0.113.10", clientIP(c))
+	require.Equal(t, "198.51.100.5", clientIP(c))
 }
 
 func TestAuthRateLimitOnlyLimitsAuthRoutes(t *testing.T) {

@@ -11,17 +11,17 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      MYSQL_ROOT_PASSWORD: golive_root_1718011198
+      MYSQL_ROOT_PASSWORD: ${GOLIVE_MYSQL_ROOT_PASSWORD:?set GOLIVE_MYSQL_ROOT_PASSWORD in deploy/.env}
       MYSQL_DATABASE: golive
       MYSQL_USER: golive
-      MYSQL_PASSWORD: golive_mysql_1718011198
+      MYSQL_PASSWORD: ${GOLIVE_MYSQL_PASSWORD:?set GOLIVE_MYSQL_PASSWORD in deploy/.env}
     volumes: [mysql_data:/var/lib/mysql]
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ugolive", "-pgolive_mysql_1718011198"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ugolive -p\"$${MYSQL_PASSWORD}\""]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -64,21 +64,25 @@ services:
   # ========== Go application services ==========
 
   user-service:
-    image: golang:1.22
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.service
+      args:
+        SERVICE: user-service
+    image: golive-user-service:local
     container_name: golive-user-service
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/user-service/cmd -config ./deploy/configs/user-service.yaml'
+    command: ["-config", "./deploy/configs/user-service.yaml"]
     volumes:
-      - ..:/app:ro
+      - ./configs:/app/deploy/configs:ro
+      - ./secrets:/app/deploy/secrets:ro
       - avatar_uploads:/tmp/golive/avatars
       - cover_uploads:/tmp/golive/covers
-      - go_mod_cache:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      GOPROXY: https://goproxy.cn,direct
+      USERSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
       USERSVC_GOOGLE_CLIENT_ID: ${USERSVC_GOOGLE_CLIENT_ID:-}
       USERSVC_EMAIL_SMTP_PASSWORD: ${USERSVC_EMAIL_SMTP_PASSWORD:-}
       USERSVC_EMAIL_SMTP_PORT: ${USERSVC_EMAIL_SMTP_PORT:-}
@@ -95,22 +99,27 @@ services:
         condition: service_started
 
   room-service:
-    image: golang:1.22
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.service
+      args:
+        SERVICE: room-service
+    image: golive-room-service:local
     container_name: golive-room-service
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/room-service/cmd -config ./deploy/configs/room-service.yaml'
+    command: ["-config", "./deploy/configs/room-service.yaml"]
     volumes:
-      - ..:/app:ro
+      - ./configs:/app/deploy/configs:ro
+      - ./secrets:/app/deploy/secrets:ro
       - cover_uploads:/tmp/golive/covers
       - post_uploads:/tmp/golive/posts
       - replay_records:/tmp/golive/records
-      - go_mod_cache:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      GOPROXY: https://goproxy.cn,direct
+      ROOMSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      ROOMSVC_LIVE_STREAM_KEY_SECRET: ${ROOMSVC_LIVE_STREAM_KEY_SECRET:?set ROOMSVC_LIVE_STREAM_KEY_SECRET in deploy/.env}
       ROOMSVC_REPLAY_BUNNY_LIBRARY_ID: ${BUNNY_STREAM_LIBRARY_ID:-}
       ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
     depends_on:
@@ -122,19 +131,23 @@ services:
         condition: service_started
 
   gift-service:
-    image: golang:1.22
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.service
+      args:
+        SERVICE: gift-service
+    image: golive-gift-service:local
     container_name: golive-gift-service
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/gift-service/cmd -config ./deploy/configs/gift-service.yaml'
+    command: ["-config", "./deploy/configs/gift-service.yaml"]
     volumes:
-      - ..:/app:ro
-      - go_mod_cache:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
+      - ./configs:/app/deploy/configs:ro
+      - ./secrets:/app/deploy/secrets:ro
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      GOPROXY: https://goproxy.cn,direct
+      GIFTSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -144,19 +157,23 @@ services:
         condition: service_started
 
   chat-service:
-    image: golang:1.22
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.service
+      args:
+        SERVICE: chat-service
+    image: golive-chat-service:local
     container_name: golive-chat-service
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/chat-service/cmd -config ./deploy/configs/chat-service.yaml'
+    command: ["-config", "./deploy/configs/chat-service.yaml"]
     volumes:
-      - ..:/app:ro
-      - go_mod_cache:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
+      - ./configs:/app/deploy/configs:ro
+      - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      GOPROXY: https://goproxy.cn,direct
+      CHATSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -168,19 +185,23 @@ services:
         condition: service_started
 
   api-gateway:
-    image: golang:1.22
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.service
+      args:
+        SERVICE: api-gateway
+    image: golive-api-gateway:local
     container_name: golive-api-gateway
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/api-gateway/cmd -config ./deploy/configs/api-gateway.yaml'
+    command: ["-config", "./deploy/configs/api-gateway.yaml"]
     volumes:
-      - ..:/app:ro
-      - go_mod_cache:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
+      - ./configs:/app/deploy/configs:ro
+      - ./secrets:/app/deploy/secrets:ro
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-      GOPROXY: https://goproxy.cn,direct
+      GW_CSRF_SECRET: ${GW_CSRF_SECRET:?set GW_CSRF_SECRET in deploy/.env}
     depends_on:
       user-service:
         condition: service_started
@@ -192,18 +213,20 @@ services:
         condition: service_started
 
   im-gateway:
-    image: golang:1.22
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.service
+      args:
+        SERVICE: im-gateway
+    image: golive-im-gateway:local
     container_name: golive-im-gateway
     restart: unless-stopped
     logging: *default-logging
     working_dir: /app
-    command: /bin/sh -c 'rm -rf /tmp/go-build* /tmp/go-run* && exec /usr/local/go/bin/go run ./app/im-gateway/cmd -config ./deploy/configs/im-gateway.yaml'
+    command: ["-config", "./deploy/configs/im-gateway.yaml"]
     volumes:
-      - ..:/app:ro
-      - go_mod_cache:/go/pkg/mod
-      - go_build_cache:/root/.cache/go-build
-    environment:
-      GOPROXY: https://goproxy.cn,direct
+      - ./configs:/app/deploy/configs:ro
+      - ./secrets:/app/deploy/secrets:ro
     depends_on:
       redis:
         condition: service_healthy
@@ -235,8 +258,8 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      MINIO_ROOT_USER: golive
-      MINIO_ROOT_PASSWORD: golive_minio_1718011198
+      MINIO_ROOT_USER: ${GOLIVE_MINIO_ROOT_USER:?set GOLIVE_MINIO_ROOT_USER in deploy/.env}
+      MINIO_ROOT_PASSWORD: ${GOLIVE_MINIO_ROOT_PASSWORD:?set GOLIVE_MINIO_ROOT_PASSWORD in deploy/.env}
     volumes: [minio_data:/data]
     command: server /data --console-address ":9001"
 
@@ -314,8 +337,8 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: golive_grafana_1718011198
+      GF_SECURITY_ADMIN_USER: ${GOLIVE_GRAFANA_ADMIN_USER:?set GOLIVE_GRAFANA_ADMIN_USER in deploy/.env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GOLIVE_GRAFANA_ADMIN_PASSWORD:?set GOLIVE_GRAFANA_ADMIN_PASSWORD in deploy/.env}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
@@ -335,5 +358,3 @@ volumes:
   post_uploads:
   avatar_uploads:
   replay_records:
-  go_mod_cache:
-  go_build_cache:

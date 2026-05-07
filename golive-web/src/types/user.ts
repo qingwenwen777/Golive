@@ -51,6 +51,5 @@ export function userDisplayName(
 
 export interface LoginResp {
   token: string;
-  refreshToken: string;
   user: User;
 }

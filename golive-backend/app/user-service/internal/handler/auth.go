@@ -2,13 +2,17 @@ package handler
 
 import (
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/errcode"
 )
+
+const refreshCookieName = "golive_refresh"
 
 type AuthHandler struct {
 	svc        *service.AuthService
@@ -130,6 +134,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.setRefreshCookie(c, resp.RefreshToken)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -155,6 +160,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.setRefreshCookie(c, resp.RefreshToken)
 	c.JSON(http.StatusCreated, resp)
 }
 
@@ -197,6 +203,7 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.setRefreshCookie(c, resp.RefreshToken)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -214,6 +221,7 @@ func (h *AuthHandler) GoogleRegister(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.setRefreshCookie(c, resp.RefreshToken)
 	c.JSON(http.StatusCreated, resp)
 }
 
@@ -228,6 +236,7 @@ func (h *AuthHandler) GoogleLinkExisting(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.setRefreshCookie(c, resp.RefreshToken)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -287,7 +296,16 @@ type refreshReq struct {
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshReq
-	if err := c.ShouldBindJSON(&req); err != nil || req.RefreshToken == "" {
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		errcode.Respond(c, service.ErrInvalidRefresh)
+		return
+	}
+	if req.RefreshToken == "" {
+		if cookie, err := c.Cookie(refreshCookieName); err == nil {
+			req.RefreshToken = cookie
+		}
+	}
+	if req.RefreshToken == "" {
 		errcode.Respond(c, service.ErrInvalidRefresh)
 		return
 	}
@@ -296,6 +314,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
+	h.setRefreshCookie(c, resp.RefreshToken)
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -304,7 +323,13 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req refreshReq
 	_ = c.ShouldBindJSON(&req) // body is optional
+	if req.RefreshToken == "" {
+		if cookie, err := c.Cookie(refreshCookieName); err == nil {
+			req.RefreshToken = cookie
+		}
+	}
 	_ = h.svc.Logout(c.Request.Context(), req.RefreshToken)
+	h.clearRefreshCookie(c)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -317,4 +342,39 @@ func (h *AuthHandler) verifyCaptcha(c *gin.Context, id, code string) bool {
 		return false
 	}
 	return true
+}
+
+func (h *AuthHandler) setRefreshCookie(c *gin.Context, token string) {
+	maxAge := int(h.svc.RefreshTTL().Seconds())
+	if maxAge <= 0 {
+		maxAge = 7 * 24 * 60 * 60
+	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    token,
+		Path:     "/api/auth",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   isHTTPSRequest(c),
+	})
+}
+
+func (h *AuthHandler) clearRefreshCookie(c *gin.Context) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Path:     "/api/auth",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   isHTTPSRequest(c),
+	})
+}
+
+func isHTTPSRequest(c *gin.Context) bool {
+	if c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")), "https")
 }

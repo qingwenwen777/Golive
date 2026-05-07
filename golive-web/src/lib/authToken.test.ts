@@ -43,7 +43,6 @@ describe('refreshAuthToken', () => {
     axiosGetMock.mockResolvedValue({ data: { token: 'csrf-token' } });
     useAuthStore.setState({
       token: 'old-token',
-      refreshToken: 'refresh-token',
       user: {
         id: 'user-1',
         username: 'streamer',
@@ -57,8 +56,8 @@ describe('refreshAuthToken', () => {
     });
   });
 
-  it('deduplicates concurrent refresh requests and stores the returned token pair', async () => {
-    const request = deferred<{ data: { token: string; refreshToken: string } }>();
+  it('deduplicates concurrent refresh requests and stores the returned access token', async () => {
+    const request = deferred<{ data: { token: string } }>();
     axiosPostMock.mockReturnValueOnce(request.promise);
 
     const first = refreshAuthToken();
@@ -67,18 +66,18 @@ describe('refreshAuthToken', () => {
     await vi.waitFor(() => expect(axiosPostMock).toHaveBeenCalledTimes(1));
     expect(axiosPostMock).toHaveBeenCalledWith(
       '/api/auth/refresh',
-      { refreshToken: 'refresh-token' },
+      {},
       {
         timeout: 10_000,
+        withCredentials: true,
         headers: { 'X-CSRF-Token': 'csrf-token' },
       },
     );
 
-    request.resolve({ data: { token: 'new-token', refreshToken: 'new-refresh' } });
+    request.resolve({ data: { token: 'new-token' } });
 
     await expect(Promise.all([first, second])).resolves.toEqual(['new-token', 'new-token']);
     expect(useAuthStore.getState().token).toBe('new-token');
-    expect(useAuthStore.getState().refreshToken).toBe('new-refresh');
   });
 
   it('clears the in-flight guard after failure so a later refresh can retry', async () => {
@@ -90,20 +89,11 @@ describe('refreshAuthToken', () => {
     });
 
     axiosPostMock.mockResolvedValueOnce({
-      data: { token: 'retry-token', refreshToken: 'retry-refresh' },
+      data: { token: 'retry-token' },
     });
 
     await expect(refreshAuthToken()).resolves.toBe('retry-token');
     expect(axiosPostMock).toHaveBeenCalledTimes(2);
-    expect(useAuthStore.getState().refreshToken).toBe('retry-refresh');
-  });
-
-  it('fails before calling the network when no refresh token is available', async () => {
-    useAuthStore.setState({ refreshToken: null });
-
-    await expect(refreshAuthToken()).rejects.toThrow('no-refresh-token');
-
-    expect(axiosPostMock).not.toHaveBeenCalled();
   });
 
   it('marks refresh 401 responses as unauthorized for session cleanup', async () => {
@@ -113,24 +103,7 @@ describe('refreshAuthToken', () => {
     await expect(refresh).rejects.toBeInstanceOf(AuthRefreshError);
     await expect(refresh).rejects.toMatchObject({
       kind: 'unauthorized',
-      refreshToken: 'refresh-token',
       status: 401,
     });
-  });
-
-  it('adopts a newer token pair written by another tab after stale refresh 401', async () => {
-    window.localStorage.setItem(
-      'golive-auth',
-      JSON.stringify({
-        state: { token: 'tab-token', refreshToken: 'tab-refresh' },
-        version: 0,
-      }),
-    );
-    axiosPostMock.mockRejectedValueOnce(axiosError(401));
-
-    await expect(refreshAuthToken()).resolves.toBe('tab-token');
-
-    expect(useAuthStore.getState().token).toBe('tab-token');
-    expect(useAuthStore.getState().refreshToken).toBe('tab-refresh');
   });
 });

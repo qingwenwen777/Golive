@@ -5,7 +5,7 @@ service:
   log_level: info
 
 mysql:
-  dsn: "golive:golive_mysql_1718011198@tcp(mysql:3306)/golive?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: ""
   max_open: 50
   max_idle: 10
 
@@ -22,7 +22,7 @@ jwt:
       public_key_file: "/app/deploy/secrets/jwt_public.pem"
 
 live:
-  stream_key_secret: "golive-1718011198-stream-key-0e49b7c2a65d4391bd8f"
+  stream_key_secret: ""
   stream_key_ttl: 4h
   flv_base: "https://golive.us.ci/live"
 

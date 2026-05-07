@@ -55,7 +55,6 @@ function wrapperFor(queryClient: QueryClient) {
 function seedAuthedUser() {
   useAuthStore.setState({
     token: 'access-token',
-    refreshToken: 'refresh-token',
     user: {
       id: 'u-self',
       username: 'xhb',
@@ -94,7 +93,6 @@ describe('useRoomRealtime', () => {
     useDanmuStore.setState({ on: true, opacity: 1, fontSize: 'md', density: 'med' });
     useAuthStore.setState({
       token: null,
-      refreshToken: null,
       user: null,
       hasHydrated: true,
     });

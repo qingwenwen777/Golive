@@ -12,6 +12,7 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE,
   timeout: 10_000,
+  withCredentials: true,
 });
 
 http.interceptors.request.use(async (config) => {
@@ -32,7 +33,7 @@ async function doRefresh(): Promise<string> {
 }
 
 function shouldResetSessionAfterRefreshFailure(err: unknown): boolean {
-  return isSessionInvalidAfterRefreshFailure(err, useAuthStore.getState().refreshToken);
+  return isSessionInvalidAfterRefreshFailure(err);
 }
 
 function isAuthEndpoint(url: string | undefined): boolean {

@@ -33,7 +33,7 @@ cors:
   max_age: 600
 
 csrf:
-  secret: "golive-1718011198-csrf-28df7b7c2d9f4bb98f7a92f6a0a3e811"
+  secret: ""
   token_ttl: 12h
 
 ratelimit:

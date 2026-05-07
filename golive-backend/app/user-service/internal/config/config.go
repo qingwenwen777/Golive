@@ -119,6 +119,8 @@ func Load(path string) (*Config, error) {
 	v.AutomaticEnv()
 	v.SetEnvPrefix("USERSVC")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	_ = v.BindEnv("mysql.dsn")
+	_ = v.BindEnv("redis.password")
 	_ = v.BindEnv("google.client_id")
 	_ = v.BindEnv("email.enabled")
 	_ = v.BindEnv("email.smtp_host")

@@ -22,6 +22,13 @@ function normalizeCategory(cat?: string): string {
   return cat;
 }
 
+const LIVE_LIST_REFETCH_MS = 30_000;
+
+function visibleRefetchInterval(interval: number): number | false {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
+  return interval;
+}
+
 function invalidateLiveDirectoryQueries(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['rooms'] });
   void qc.invalidateQueries({ queryKey: ['rooms-infinite'] });
@@ -42,8 +49,8 @@ export function useRooms(params: RoomsQuery = {}) {
       const { data } = await http.get<PaginatedRooms>('/rooms', { params: search, signal });
       return data;
     },
-    staleTime: 10_000,
-    refetchInterval: 10_000,
+    staleTime: 20_000,
+    refetchInterval: () => visibleRefetchInterval(LIVE_LIST_REFETCH_MS),
     placeholderData: keepPreviousData,
     retry: 1,
   });
@@ -67,8 +74,8 @@ export function useInfiniteRooms(params: RoomsQuery = {}) {
       const nextPage = lastPage.page + 1;
       return lastPage.page * lastPage.size < lastPage.total ? nextPage : undefined;
     },
-    staleTime: 10_000,
-    refetchInterval: 10_000,
+    staleTime: 20_000,
+    refetchInterval: () => visibleRefetchInterval(LIVE_LIST_REFETCH_MS),
     retry: 1,
   });
 }
@@ -88,8 +95,8 @@ export function useRecommendedRooms(params: RoomsQuery = {}) {
       });
       return data;
     },
-    staleTime: 10_000,
-    refetchInterval: 10_000,
+    staleTime: 20_000,
+    refetchInterval: () => visibleRefetchInterval(LIVE_LIST_REFETCH_MS),
     placeholderData: keepPreviousData,
     retry: 1,
   });

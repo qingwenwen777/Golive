@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -76,6 +77,8 @@ func Load(path string) (*Config, error) {
 	}
 	v.AutomaticEnv()
 	v.SetEnvPrefix("IMGW")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	_ = v.BindEnv("redis.password")
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}

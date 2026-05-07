@@ -112,6 +112,24 @@ func TestSaveOptimizedRejectsMalformedImagesWithValidMagic(t *testing.T) {
 	}
 }
 
+func TestSaveOptimizedRejectsImagesAbovePixelLimit(t *testing.T) {
+	file := multipartFileHeader(t, "cover.png", "image/png", pngBytes(t, 200, 200))
+	dir := t.TempDir()
+
+	name, err := SaveOptimized(file, dir, "cover", ".png", Options{
+		MaxWidth:  100,
+		MaxHeight: 100,
+		MaxPixels: 10_000,
+		Quality:   92,
+	})
+	if !errors.Is(err, ErrInvalidImage) {
+		t.Fatalf("SaveOptimized error = %v, want ErrInvalidImage", err)
+	}
+	if name != "" {
+		t.Fatalf("name = %q, want empty", name)
+	}
+}
+
 func TestSaveOptimizedUsesDetectedFormatInsteadOfHeader(t *testing.T) {
 	original := jpegBytes(t, 16, 16)
 	file := multipartFileHeader(t, "avatar.png", "image/png", original)

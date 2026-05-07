@@ -22,6 +22,7 @@ export async function getCsrfToken(force = false): Promise<string> {
   csrfPromise = axios
     .get<{ token: string }>(`${import.meta.env.VITE_API_BASE}/csrf-token`, {
       timeout: 10_000,
+      withCredentials: true,
     })
     .then(({ data }) => {
       csrfToken = data.token;

@@ -54,13 +54,13 @@ stripe:
 
 bootstrap:
   admin:
-    enabled: true
+    enabled: false
     username: admin
-    password: admin
+    password: ""
     display_name: GoLive Admin
   # Auto-create + seed the demo user on startup. Keep disabled for production.
   demo_user:
     enabled: false
     username: demo
-    password: demo
+    password: ""
     coin_balance: 100000

@@ -226,7 +226,7 @@ export function useRoomRealtime(
     if (refreshedTokenRef.current === authToken) return;
     refreshedTokenRef.current = authToken;
     void refreshAuthToken().catch((err: unknown) => {
-      if (isSessionInvalidAfterRefreshFailure(err, useAuthStore.getState().refreshToken)) {
+      if (isSessionInvalidAfterRefreshFailure(err)) {
         logout();
       }
     });

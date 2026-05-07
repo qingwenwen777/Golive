@@ -167,10 +167,10 @@ func (s *rateLimitStore) evictOldestLocked() {
 }
 
 func clientIP(c *gin.Context) string {
-	if ip := headerClientIP(c.GetHeader("X-Forwarded-For")); ip != "" {
+	if ip := headerClientIP(c.GetHeader("X-Real-IP")); ip != "" {
 		return ip
 	}
-	if ip := headerClientIP(c.GetHeader("X-Real-IP")); ip != "" {
+	if ip := headerClientIP(c.GetHeader("X-Forwarded-For")); ip != "" {
 		return ip
 	}
 	host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
