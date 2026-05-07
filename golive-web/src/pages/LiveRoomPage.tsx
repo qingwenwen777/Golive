@@ -12,7 +12,6 @@ import {
   Radio,
   ShieldCheck,
   ThumbsUp,
-  Trophy,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -24,7 +23,6 @@ import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { InfoBlock } from '@/features/live-room/InfoBlock';
 import { GiftPanel } from '@/features/live-room/GiftPanel';
 import { SuperChatDialog } from '@/features/live-room/SuperChatDialog';
-import { BettingPanel } from '@/features/live-room/BettingPanel';
 import { FlyingGiftOverlay } from '@/features/live-room/FlyingGiftLayer';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
@@ -35,7 +33,6 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useLike, useLikeState, useRecordRoomWatch, useRoom } from '@/api/room';
 import { useLibraryMembership } from '@/api/library';
 import { useReplayMessages } from '@/api/chat';
-import { useLatestBet } from '@/api/bet';
 import {
   useMuteRoomUser,
   useRoomModerationState,
@@ -114,7 +111,6 @@ export default function LiveRoomPage() {
     stream: Stream;
     startedAt: number;
   } | null>(null);
-  const betAnchorRef = useRef<HTMLDivElement | null>(null);
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
   const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
@@ -130,7 +126,6 @@ export default function LiveRoomPage() {
     [appointmentList.data?.items, id],
   );
   const roomId = stream?.id ?? id;
-  const latestBet = useLatestBet(roomId, Boolean(roomId) && authHydrated);
   const { mutate: recordRoomWatch } = useRecordRoomWatch(roomId);
   const roomIsLive = Boolean(stream?.isLive === true || stream?.status === 'live');
   const roomIsStarting = Boolean(stream?.status === 'publishing' && !roomIsLive);
@@ -381,18 +376,6 @@ export default function LiveRoomPage() {
   const exclusiveLocked = Boolean(
     displayStream.fanClubOnly && !displayStream.fanClubMember && !ownsStream,
   );
-  const activeBetRound =
-    !liveEnding &&
-    !exclusiveLocked &&
-    !ownsStream &&
-    latestBet.data?.round &&
-    latestBet.data.round.status !== 'settled' &&
-    latestBet.data.round.status !== 'cancelled'
-      ? latestBet.data.round
-      : null;
-  const scrollToBetPanel = () => {
-    betAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
   const ownerName = streamChannelName(displayStream, currentUser);
   const openSuperChat = () => {
     if (exclusiveLocked) {
@@ -761,11 +744,6 @@ export default function LiveRoomPage() {
               interactionsLocked={exclusiveLocked}
               lockedInteractionLabel={lockedInteractionLabel}
             />
-            {!exclusiveLocked && (
-              <div ref={betAnchorRef}>
-                <BettingPanel roomId={roomId} ownsStream={ownsStream} />
-              </div>
-            )}
             {ownsStream && (
               <div className="gl-owner-live-actions">
                 <div>
@@ -967,16 +945,8 @@ export default function LiveRoomPage() {
         interactionsLocked={exclusiveLocked}
         lockedInteractionLabel={lockedInteractionLabel}
       />
-      {!exclusiveLocked && (
-        <div ref={betAnchorRef}>
-          <BettingPanel roomId={roomId} ownsStream={ownsStream} />
-        </div>
-      )}
       {isMobile && (
         <div className="gl-mobile-chat">
-          {activeBetRound && (
-            <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
-          )}
           <Chat
             messages={visibleMessages}
             roomId={roomId}
@@ -1011,9 +981,6 @@ export default function LiveRoomPage() {
         {Left}
         {!isNarrow && (
           <div className="gl-side-rail sticky top-20 self-start">
-            {activeBetRound && (
-              <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
-            )}
             <Chat
               messages={visibleMessages}
               roomId={roomId}
@@ -1045,9 +1012,6 @@ export default function LiveRoomPage() {
               <SheetHeader className="sr-only">
                 <SheetTitle>{t('liveRoom.chat')}</SheetTitle>
               </SheetHeader>
-              {activeBetRound && (
-                <BetEntryNotice question={activeBetRound.question} onClick={scrollToBetPanel} />
-              )}
               <Chat
                 messages={visibleMessages}
                 roomId={roomId}
@@ -1681,24 +1645,6 @@ function ScheduledRoomPlayer({
         </div>
       </div>
     </section>
-  );
-}
-
-function BetEntryNotice({ question, onClick }: { question: string; onClick: () => void }) {
-  const { t } = useTranslation('pages');
-  return (
-    <button type="button" className="gl-bet-entry" onClick={onClick}>
-      <span className="gl-bet-entry-icon" aria-hidden="true">
-        <Trophy size={16} />
-      </span>
-      <span className="gl-bet-entry-copy">
-        <span>{t('betting.entryActive', { defaultValue: 'Betting is open' })}</span>
-        <strong>{question}</strong>
-      </span>
-      <span className="gl-bet-entry-action">
-        {t('betting.entryView', { defaultValue: 'View' })}
-      </span>
-    </button>
   );
 }
 
