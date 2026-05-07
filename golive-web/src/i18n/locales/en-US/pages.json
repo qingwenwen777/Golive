@@ -61,7 +61,8 @@
       "tier": "Tier {{tier}}",
       "price": "{{coins}} coins",
       "empty": "No level gifts yet."
-    }
+    },
+    "recommendedLive": "Recommended live"
   },
   "giftCatalog": {
     "names": {
@@ -96,7 +97,8 @@
     "preview": "Share",
     "description": "Share this GoLive page.",
     "liveKicker": "Live room",
-    "channelKicker": "Channel"
+    "channelKicker": "Channel",
+    "metaSeparator": " ? "
   },
   "liveRoom": {
     "title": "Live Room",
@@ -211,7 +213,9 @@
         "faces": "Faces",
         "gestures": "Gestures",
         "stream": "Stream"
-      }
+      },
+      "scrollSuperChatsLeft": "Scroll SuperChats left",
+      "scrollSuperChatsRight": "Scroll SuperChats right"
     },
     "moderation": {
       "title": "Mute user",
@@ -226,7 +230,8 @@
       "minutes": "{{count}} minutes",
       "unmuteAction": "Unmute",
       "youAreMuted": "You are muted and cannot chat yet.",
-      "chatMutedPlaceholder": "You are muted"
+      "chatMutedPlaceholder": "You are muted",
+      "muteActionShort": "Mute user"
     },
     "giftPanel": {
       "title": "Gifts",
@@ -306,7 +311,13 @@
     "streamEnded": "Live has ended.",
     "endingBadge": "Ended",
     "endingTitle": "Live ended",
-    "endingSubtitle": "Thanks for watching. Preparing the room..."
+    "endingSubtitle": "Thanks for watching. Preparing the room...",
+    "danmuFontSize": "Danmu size",
+    "danmuFontSizeOptions": {
+      "sm": "Small",
+      "md": "Medium",
+      "lg": "Large"
+    }
   },
   "channel": {
     "title": "Channel",
@@ -406,7 +417,8 @@
       "success": "Fan badge lit.",
       "insufficient": "Not enough coins to buy this fan badge.",
       "failed": "Could not purchase the fan badge."
-    }
+    },
+    "message": "Message"
   },
   "library": {
     "signIn": "Sign in",
@@ -561,6 +573,10 @@
         "preferences": {
           "label": "Preferences",
           "sub": "Appearance, language, and shortcuts"
+        },
+        "blacklist": {
+          "label": "Blacklist",
+          "sub": "Manage users and creators you no longer interact with"
         }
       },
       "auth": {
@@ -664,6 +680,15 @@
         "googleNotConfigured": "Google sign-in is not configured yet.",
         "googleNotLinked": "This account is not linked to Google.",
         "googleUnlinkPasswordRequired": "Enter your current password to unlink Google."
+      },
+      "blacklist": {
+        "unblocked": "Removed from blacklist.",
+        "title": "Blacklist management",
+        "sub": "Creators you block will not appear in direct messages. When creators block viewers, those viewers cannot watch or interact.",
+        "unblock": "Remove from blacklist",
+        "empty": "No blocked users.",
+        "creator": "Creator",
+        "user": "User"
       }
     }
   },
@@ -747,7 +772,9 @@
       "completed": "Completed",
       "expired": "Expired",
       "canceled": "Canceled"
-    }
+    },
+    "cancelAppointment": "Cancel appointment",
+    "deleteRecord": "Delete permanently"
   },
   "studio": {
     "brand": "Creator Studio",
@@ -761,7 +788,8 @@
       "replay": "Data replay",
       "liveReplays": "Live replays",
       "appointments": "Live appointments",
-      "moderators": "Room moderators"
+      "moderators": "Room moderators",
+      "fanGroups": "Group chats"
     },
     "auth": {
       "title": "Sign in to open Creator Studio",
@@ -990,7 +1018,8 @@
         "confirm": "Confirm and start live"
       },
       "fanClubOnly": "Fan club exclusive live",
-      "fanClubOnlySub": "Only fan club members can watch and chat; non-members see a join screen first."
+      "fanClubOnlySub": "Only fan club members can watch and chat; non-members see a join screen first.",
+      "startWriting": "Start writing"
     },
     "appointments": {
       "total": "Appointments",
@@ -1029,7 +1058,11 @@
       "oneHourLater": "1 hour later",
       "done": "Done",
       "fanClubOnly": "Fan club exclusive appointment",
-      "fanClubOnlySub": "Non-members see the fan club join screen before the appointment room."
+      "fanClubOnlySub": "Non-members see the fan club join screen before the appointment room.",
+      "canceled": "Appointment canceled.",
+      "deleteRecordConfirm": "Delete this appointment record permanently? It will no longer appear in your appointment list.",
+      "recordDeleted": "Appointment record deleted.",
+      "deleteRecordFailed": "Could not delete this appointment record."
     },
     "moderators": {
       "added": "{{name}} is now a room moderator.",
@@ -1061,7 +1094,8 @@
       "actionAdd": "Added moderator",
       "actionRemove": "Removed moderator",
       "actionMute": "Muted {{minutes}} minutes",
-      "actionUnmute": "Unmuted user"
+      "actionUnmute": "Unmuted user",
+      "status": "Moderator"
     },
     "publisher": {
       "title": "Publishing",
@@ -1111,7 +1145,53 @@
       "metadataSaved": "Live room info updated.",
       "metadataFailed": "Could not update live room info.",
       "metadataTitleRequired": "Title is required.",
-      "metadataClearCover": "Remove cover"
+      "metadataClearCover": "Remove cover",
+      "newerGifts": "Newer gifts",
+      "olderGifts": "Older gifts",
+      "newerSuperChats": "Newer SuperChats",
+      "olderSuperChats": "Older SuperChats"
+    },
+    "fanGroups": {
+      "synced": "Synced {{count}} fan club group chats.",
+      "syncFailed": "Could not sync group chats.",
+      "updateFailed": "Could not update the group member.",
+      "groupCount": "Group chats",
+      "groupCountSub": "Up to 200 members per group",
+      "memberCount": "Fan club members",
+      "memberCountSub": "Assigned to groups",
+      "adminCount": "Group admins",
+      "adminCountSub": "Can help manage chats",
+      "mutedCount": "Muted members",
+      "mutedCountSub": "Includes temporary mutes",
+      "label": "Fan club group chats",
+      "title": "Group chat management",
+      "syncing": "Syncing",
+      "sync": "Sync fan club",
+      "description": "Members who joined the fan club are assigned into groups of up to 200 people. New fan club group chats are created automatically when a group is full.",
+      "empty": "No fan club group chats yet. Sync fan club members first.",
+      "groupNo": "Group {{no}}",
+      "mutedState": "Muted",
+      "memberActions": "Member actions",
+      "demote": "Remove admin",
+      "promote": "Make admin",
+      "unmute": "Unmute",
+      "mute": "Mute for 60 minutes",
+      "kick": "Remove from group chat",
+      "noMembers": "This group has no members yet.",
+      "roleOwner": "Owner",
+      "roleAdmin": "Admin",
+      "roleMember": "Member",
+      "adminSet": "{{name}} is now a group admin.",
+      "adminRemoved": "{{name}} is no longer a group admin.",
+      "muted": "{{name}} was muted for 60 minutes.",
+      "unmuted": "{{name}} was unmuted.",
+      "kicked": "{{name}} was removed from the group chat.",
+      "rejoinApproved": "{{name}} rejoined the group chat.",
+      "rejoinRejected": "{{name}}'s rejoin request was rejected.",
+      "rejoinRequests": "Rejoin requests",
+      "waitingApproval": "Waiting approval",
+      "rejectRejoin": "Reject",
+      "approveRejoin": "Approve"
     }
   },
   "admin": {
@@ -1256,7 +1336,8 @@
         "availableInvites": "Available invite codes",
         "usedInvites": "Used invite codes",
         "accountDirectory": "Account directory",
-        "admins": "Admins"
+        "admins": "Admins",
+        "pendingAppeals": "Pending appeals"
       },
       "directory": {
         "eyebrow": "Directory",
@@ -1358,7 +1439,8 @@
         "appealNotePlaceholder": "Optional review note",
         "markReviewing": "Reviewing",
         "approveAppeal": "Approve",
-        "rejectAppeal": "Reject"
+        "rejectAppeal": "Reject",
+        "appealBadge": "{{count}} appeal"
       },
       "coinActions": {
         "add": "Recharge",
@@ -2184,7 +2266,9 @@
       "followRequiredTitle": "Follow the creator to send a DM",
       "followRequiredBody": "Open the creator channel and follow them first, then you can start messaging here.",
       "openChannel": "Open channel",
-      "followRequiredToast": "Follow this creator before sending a direct message."
+      "followRequiredToast": "Follow this creator before sending a direct message.",
+      "selectTitle": "Select a conversation",
+      "selectBody": "Choose a direct message or fan club group chat from the left to start reading."
     },
     "fanGroupChat": {
       "memberCount": "{{count}}/200 members",
@@ -2281,5 +2365,115 @@
   "contentPolicy": {
     "blockedWord": "Content contains blocked words and cannot be sent.",
     "userRestricted": "Your account is restricted from sending interactive content."
+  },
+  "posts": {
+    "confirmDelete": "Delete this post?",
+    "deleted": "Post deleted.",
+    "deleteFailed": "Could not delete the post.",
+    "followerComments": "Followers only",
+    "openComments": "Comments open",
+    "closedComments": "Comments closed",
+    "delete": "Delete post",
+    "visibility": {
+      "updated": "Visibility updated.",
+      "updateFailed": "Could not update visibility.",
+      "editLabel": "Visibility",
+      "public": "Public",
+      "followers": "Fans",
+      "private": "Only me",
+      "privateTitle": "Only visible to you",
+      "followersTitle": "Visible to fans only",
+      "publicTitle": "Visible to everyone"
+    },
+    "comments": {
+      "restricted": "This post limits comments.",
+      "sent": "Comment posted.",
+      "failed": "Could not post the comment.",
+      "loading": "Loading comments...",
+      "empty": "No comments yet.",
+      "replyingTo": "Replying to {{name}}",
+      "cancelReply": "Cancel",
+      "placeholder": "Write a comment...",
+      "send": "Send comment",
+      "followersOnly": "Only fans can comment.",
+      "signIn": "Sign in to join the comments.",
+      "closed": "Comments are closed.",
+      "confirmDelete": "Delete this comment?",
+      "deleted": "Comment deleted.",
+      "deleteFailed": "Could not delete the comment.",
+      "reply": "Reply",
+      "delete": "Delete",
+      "expandReplies": "Show {{count}} replies",
+      "collapseReplies": "Hide {{count}} replies"
+    },
+    "editor": {
+      "visibility": "Visibility",
+      "maxImages": "Upload up to 6 images.",
+      "imageSize": "Images must be 5MB or smaller.",
+      "empty": "Write something or add images before publishing.",
+      "published": "Post published.",
+      "failed": "Publishing failed. Try again later.",
+      "kpis": "Post summary",
+      "total": "All posts",
+      "totalSub": "Published",
+      "currentPage": "Current page",
+      "title": "Publish post",
+      "listLabel": "Post management",
+      "listTitle": "My posts",
+      "emptyList": "No posts published yet.",
+      "label": "Channel posts",
+      "content": "Content",
+      "placeholder": "Share a live announcement, behind-the-scenes note, or message to fans.",
+      "enableComments": "Enable comments",
+      "followersOnlyComments": "Fans-only comments",
+      "addImages": "Add images",
+      "removeImage": "Remove image",
+      "publishing": "Publishing...",
+      "publish": "Publish post",
+      "pagination": "Post pagination",
+      "pageCount": "{{start}}-{{end}} / {{total}}",
+      "previous": "Previous page",
+      "next": "Next page"
+    }
+  },
+  "bannedAccount": {
+    "appealReasonRequired": "Please enter at least 10 characters.",
+    "appealSubmitted": "Appeal submitted. We will review it as soon as possible.",
+    "appealFailed": "Could not submit appeal.",
+    "title": "Account restricted",
+    "subtitle": "You can still sign in to review the restriction and submit an appeal. Other GoLive features are unavailable while the account is banned.",
+    "reasonLabel": "Restriction reason",
+    "noReason": "No detailed reason was provided by the moderation team.",
+    "appealReason": "Appeal reason",
+    "appealPlaceholder": "Explain what happened and why the restriction should be reviewed.",
+    "appealSending": "Submitting...",
+    "appealSubmit": "Submit appeal",
+    "signOut": "Sign out"
+  },
+  "search": {
+    "filterAria": "Search filters",
+    "filters": {
+      "all": "All",
+      "creators": "Creators",
+      "live": "Live",
+      "replays": "Replays",
+      "appointments": "Upcoming",
+      "posts": "Posts"
+    },
+    "startTitle": "Search",
+    "emptyTitle": "No matching content",
+    "emptySub": "Try another keyword.",
+    "creators": "Creators",
+    "live": "Live now",
+    "replays": "Live replays",
+    "appointments": "Upcoming live streams",
+    "posts": "Posts",
+    "appointmentBadge": "Upcoming",
+    "noResults": "No results",
+    "subscribers": "{{count}} subscribers",
+    "liveDot": "Live now",
+    "views": "{{count}} views",
+    "reservations": "{{count}} reserved",
+    "imagePost": "Image post"
   }
 }

@@ -393,10 +393,10 @@ export default function ChannelPage() {
                     type="button"
                     disabled={!creatorId}
                     onClick={handleMessageCreator}
-                    title="私信"
+                    title={t('channel.message', { defaultValue: 'Message' })}
                   >
                     <MessageCircle size={16} />
-                    私信
+                    {t('channel.message', { defaultValue: 'Message' })}
                   </button>
                 </>
               )}

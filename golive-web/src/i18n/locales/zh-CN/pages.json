@@ -61,7 +61,8 @@
       "tier": "档位 {{tier}}",
       "price": "{{coins}} coins",
       "empty": "暂无等级礼物。"
-    }
+    },
+    "recommendedLive": "????"
   },
   "giftCatalog": {
     "names": {
@@ -96,7 +97,8 @@
     "preview": "分享",
     "description": "分享这个 GoLive 页面。",
     "liveKicker": "直播分享",
-    "channelKicker": "频道分享"
+    "channelKicker": "频道分享",
+    "metaSeparator": " ? "
   },
   "liveRoom": {
     "title": "直播间",
@@ -211,7 +213,9 @@
         "faces": "表情",
         "gestures": "手势",
         "stream": "直播"
-      }
+      },
+      "scrollSuperChatsLeft": "???? SuperChat",
+      "scrollSuperChatsRight": "???? SuperChat"
     },
     "moderation": {
       "title": "禁言用户",
@@ -226,7 +230,8 @@
       "minutes": "{{count}} 分钟",
       "unmuteAction": "解除禁言",
       "youAreMuted": "你当前已被禁言，暂时不能发言。",
-      "chatMutedPlaceholder": "你当前已被禁言"
+      "chatMutedPlaceholder": "你当前已被禁言",
+      "muteActionShort": "????"
     },
     "giftPanel": {
       "title": "礼物",
@@ -298,7 +303,7 @@
     "toggleDanmu": "切换弹幕",
     "danmuOn": "弹幕：开",
     "danmuOff": "弹幕：关",
-    "danmuFontSize": "弹幕字号",
+    "danmuFontSize": "????",
     "live": "直播中",
     "jumpLive": "回到直播",
     "liveProgress": "直播进度",
@@ -307,7 +312,12 @@
     "streamEnded": "直播已结束。",
     "endingBadge": "已结束",
     "endingTitle": "直播已结束",
-    "endingSubtitle": "正在整理直播间..."
+    "endingSubtitle": "正在整理直播间...",
+    "danmuFontSizeOptions": {
+      "sm": "?",
+      "md": "?",
+      "lg": "?"
+    }
   },
   "channel": {
     "title": "频道",
@@ -407,7 +417,8 @@
       "success": "粉丝灯牌已点亮。",
       "insufficient": "coins 不足，无法购买粉丝灯牌。",
       "failed": "粉丝灯牌购买失败。"
-    }
+    },
+    "message": "??"
   },
   "library": {
     "signIn": "登录",
@@ -562,6 +573,10 @@
         "preferences": {
           "label": "偏好",
           "sub": "外观、语言与快捷入口"
+        },
+        "blacklist": {
+          "label": "???",
+          "sub": "????????????"
         }
       },
       "auth": {
@@ -665,6 +680,15 @@
         "googleNotConfigured": "Google 登录尚未配置完成。",
         "googleNotLinked": "当前账号尚未绑定 Google。",
         "googleUnlinkPasswordRequired": "请输入当前密码来解绑 Google。"
+      },
+      "blacklist": {
+        "unblocked": "???????",
+        "title": "?????",
+        "sub": "???????????????????????????????????",
+        "unblock": "?????",
+        "empty": "????????",
+        "creator": "??",
+        "user": "??"
       }
     }
   },
@@ -748,7 +772,9 @@
       "completed": "已完成",
       "expired": "已作废",
       "canceled": "已取消"
-    }
+    },
+    "cancelAppointment": "????",
+    "deleteRecord": "????"
   },
   "studio": {
     "brand": "主播工作台",
@@ -762,7 +788,8 @@
       "replay": "数据复盘",
       "liveReplays": "直播回放",
       "appointments": "直播预约",
-      "moderators": "房间房管"
+      "moderators": "房间房管",
+      "fanGroups": "????"
     },
     "auth": {
       "title": "登录后进入主播工作台",
@@ -991,7 +1018,8 @@
         "confirm": "确认开始直播"
       },
       "fanClubOnly": "粉丝团专属直播",
-      "fanClubOnlySub": "仅粉丝团成员可观看和聊天，非成员会先看到加入入口。"
+      "fanClubOnlySub": "仅粉丝团成员可观看和聊天，非成员会先看到加入入口。",
+      "startWriting": "????"
     },
     "appointments": {
       "total": "预约",
@@ -1030,7 +1058,11 @@
       "oneHourLater": "一小时后",
       "done": "完成",
       "fanClubOnly": "粉丝团专属预约直播",
-      "fanClubOnlySub": "非成员会先看到加入粉丝团界面，加入后才能进入预约直播间。"
+      "fanClubOnlySub": "非成员会先看到加入粉丝团界面，加入后才能进入预约直播间。",
+      "canceled": "??????",
+      "deleteRecordConfirm": "?????????????????????????????????",
+      "recordDeleted": "??????????",
+      "deleteRecordFailed": "?????????????"
     },
     "moderators": {
       "added": "{{name}} 已成为房间房管。",
@@ -1062,7 +1094,8 @@
       "actionAdd": "添加房管",
       "actionRemove": "取消房管",
       "actionMute": "禁言 {{minutes}} 分钟",
-      "actionUnmute": "解除禁言"
+      "actionUnmute": "解除禁言",
+      "status": "??"
     },
     "publisher": {
       "title": "推流",
@@ -1112,7 +1145,53 @@
       "metadataSaved": "直播间信息已更新。",
       "metadataFailed": "无法更新直播间信息。",
       "metadataTitleRequired": "标题不能为空。",
-      "metadataClearCover": "移除封面"
+      "metadataClearCover": "移除封面",
+      "newerGifts": "?????",
+      "olderGifts": "?????",
+      "newerSuperChats": "??? SuperChat",
+      "olderSuperChats": "??? SuperChat"
+    },
+    "fanGroups": {
+      "synced": "??? {{count}} ???????",
+      "syncFailed": "???????",
+      "updateFailed": "????????",
+      "groupCount": "????",
+      "groupCountSub": "???? 200 ?",
+      "memberCount": "?????",
+      "memberCountSub": "?????",
+      "adminCount": "????",
+      "adminCountSub": "???????",
+      "mutedCount": "????",
+      "mutedCountSub": "?????",
+      "label": "?????",
+      "title": "????",
+      "syncing": "???",
+      "sync": "?????",
+      "description": "??????????????? 200 ????????????????????????",
+      "empty": "??????????????????",
+      "groupNo": "? {{no}} ?",
+      "mutedState": "???",
+      "memberActions": "????",
+      "demote": "?????",
+      "promote": "?????",
+      "unmute": "????",
+      "mute": "?? 60 ??",
+      "kick": "????",
+      "noMembers": "??????????",
+      "roleOwner": "??",
+      "roleAdmin": "???",
+      "roleMember": "??",
+      "adminSet": "{{name}} ????????",
+      "adminRemoved": "{{name}} ???????",
+      "muted": "{{name}} ??? 60 ???",
+      "unmuted": "{{name}} ??????",
+      "kicked": "{{name}} ??????",
+      "rejoinApproved": "{{name}} ????????",
+      "rejoinRejected": "{{name}} ???????????",
+      "rejoinRequests": "??????",
+      "waitingApproval": "????",
+      "rejectRejoin": "??",
+      "approveRejoin": "??"
     }
   },
   "admin": {
@@ -1257,7 +1336,8 @@
         "availableInvites": "可用邀请码",
         "usedInvites": "已使用邀请码",
         "accountDirectory": "账号目录",
-        "admins": "管理员"
+        "admins": "管理员",
+        "pendingAppeals": "?????"
       },
       "directory": {
         "eyebrow": "目录",
@@ -1359,7 +1439,8 @@
         "appealNotePlaceholder": "可填写复核备注",
         "markReviewing": "复核中",
         "approveAppeal": "通过",
-        "rejectAppeal": "拒绝"
+        "rejectAppeal": "拒绝",
+        "appealBadge": "{{count}} ???"
       },
       "coinActions": {
         "add": "充值",
@@ -1625,7 +1706,13 @@
         "relaxed": "宽松",
         "days": "{{count}} 天",
         "hours": "{{count}} 小时",
-        "minutes": "{{count}} 分钟"
+        "minutes": "{{count}} 分钟",
+        "days_one": "{{count}} ?",
+        "days_other": "{{count}} ?",
+        "hours_one": "{{count}} ??",
+        "hours_other": "{{count}} ??",
+        "minutes_one": "{{count}} ??",
+        "minutes_other": "{{count}} ??"
       },
       "cards": {
         "registration": {
@@ -1679,7 +1766,9 @@
         "defaultState": "当前使用默认策略",
         "contentPolicy": "内容策略等级",
         "currentTimeout": "当前锁定时长",
-        "currentMute": "当前默认禁言"
+        "currentMute": "当前默认禁言",
+        "minutes_one": "{{count}} ??",
+        "minutes_other": "{{count}} ??"
       },
       "services": {
         "loading": "正在加载服务状态...",
@@ -2177,7 +2266,9 @@
       "followRequiredTitle": "关注主播后才能私信",
       "followRequiredBody": "先进入主播频道关注 TA，然后就可以从这里发起私信。",
       "openChannel": "去主播频道",
-      "followRequiredToast": "关注该主播后才能发送私信。"
+      "followRequiredToast": "关注该主播后才能发送私信。",
+      "selectTitle": "??????",
+      "selectBody": "?????????????????????"
     },
     "fanGroupChat": {
       "memberCount": "{{count}}/200 人",
@@ -2274,5 +2365,115 @@
   "contentPolicy": {
     "blockedWord": "内容包含屏蔽词，无法发送。",
     "userRestricted": "你的账号已被限制，暂时无法发送互动内容。"
+  },
+  "posts": {
+    "confirmDelete": "??????????",
+    "deleted": "??????",
+    "deleteFailed": "???????",
+    "followerComments": "????",
+    "openComments": "???",
+    "closedComments": "????",
+    "delete": "????",
+    "visibility": {
+      "updated": "????????",
+      "updateFailed": "?????????",
+      "editLabel": "????",
+      "public": "??",
+      "followers": "??",
+      "private": "???",
+      "privateTitle": "?????",
+      "followersTitle": "?????",
+      "publicTitle": "?????"
+    },
+    "comments": {
+      "restricted": "?????????",
+      "sent": "??????",
+      "failed": "???????",
+      "loading": "?????...",
+      "empty": "??????",
+      "replyingTo": "?? {{name}}",
+      "cancelReply": "??",
+      "placeholder": "?????...",
+      "send": "????",
+      "followersOnly": "????????",
+      "signIn": "????????",
+      "closed": "???????",
+      "confirmDelete": "??????????",
+      "deleted": "??????",
+      "deleteFailed": "???????",
+      "reply": "??",
+      "delete": "??",
+      "expandReplies": "?? {{count}} ???",
+      "collapseReplies": "?? {{count}} ???"
+    },
+    "editor": {
+      "visibility": "????",
+      "maxImages": "???? 6 ????",
+      "imageSize": "??????? 5MB?",
+      "empty": "??????????????",
+      "published": "??????",
+      "failed": "???????????",
+      "kpis": "????",
+      "total": "????",
+      "totalSub": "???",
+      "currentPage": "???",
+      "title": "????",
+      "listLabel": "????",
+      "listTitle": "????",
+      "emptyList": "?????????",
+      "label": "????",
+      "content": "??",
+      "placeholder": "????????????????????",
+      "enableComments": "?????",
+      "followersOnlyComments": "?????",
+      "addImages": "????",
+      "removeImage": "????",
+      "publishing": "???...",
+      "publish": "????",
+      "pagination": "????",
+      "pageCount": "{{start}}-{{end}} / {{total}}",
+      "previous": "???",
+      "next": "???"
+    }
+  },
+  "bannedAccount": {
+    "appealReasonRequired": "????? 10 ????",
+    "appealSubmitted": "??????????????",
+    "appealFailed": "???????",
+    "title": "??????",
+    "subtitle": "?????????????????????????? GoLive ???????",
+    "reasonLabel": "????",
+    "noReason": "????????????",
+    "appealReason": "????",
+    "appealPlaceholder": "????????????????????",
+    "appealSending": "???...",
+    "appealSubmit": "????",
+    "signOut": "????"
+  },
+  "search": {
+    "filterAria": "????",
+    "filters": {
+      "all": "??",
+      "creators": "??",
+      "live": "??",
+      "replays": "??",
+      "appointments": "??",
+      "posts": "??"
+    },
+    "startTitle": "??",
+    "emptyTitle": "????????",
+    "emptySub": "????????",
+    "creators": "??",
+    "live": "????",
+    "replays": "????",
+    "appointments": "????",
+    "posts": "??",
+    "appointmentBadge": "??",
+    "noResults": "????",
+    "subscribers": "{{count}} ????",
+    "liveDot": "????",
+    "views": "{{count}} ???",
+    "reservations": "{{count}} ???",
+    "imagePost": "???"
   }
 }

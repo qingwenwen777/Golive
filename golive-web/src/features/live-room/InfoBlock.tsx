@@ -333,7 +333,10 @@ export function InfoBlock({
         description={description}
         previewImage={stream.cover}
         previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live room' })}
-        previewMeta={`${channelName} 路 ${t('liveRoom.watching', { count: viewerCount ?? stream.viewers })}`}
+        previewMeta={`${channelName}${t('shareDialog.metaSeparator', { defaultValue: ' · ' })}${t(
+          'liveRoom.watching',
+          { count: viewerCount ?? stream.viewers },
+        )}`}
       />
     </div>
   );

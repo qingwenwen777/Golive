@@ -815,7 +815,7 @@ export function Player({
               >
                 {DANMU_FONT_OPTIONS.map((option) => (
                   <DropdownMenuRadioItem key={option.value} value={option.value}>
-                    {t(`player.danmuFontSize.${option.value}`, {
+                    {t(`player.danmuFontSizeOptions.${option.value}`, {
                       defaultValue: option.label,
                     })}
                   </DropdownMenuRadioItem>

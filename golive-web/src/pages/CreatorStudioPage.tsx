@@ -186,8 +186,9 @@ export function CreatorStudioShell() {
   const apply = useSubmitCreatorApplication();
   const status = user?.livePermissionStatus ?? 'none';
   const approved = status === 'approved';
+  const restoringSession = hydrated && !isAuthed && Boolean(user);
 
-  if (!hydrated || (isAuthed && me.isPending && !user)) {
+  if (!hydrated || restoringSession || (isAuthed && me.isPending && !user)) {
     return <StudioLoading label={t('studio.loading', { defaultValue: 'Loading studio...' })} />;
   }
 
@@ -1997,7 +1998,7 @@ export function CreatorFanGroupsPage() {
         toast.success(
           t('studio.fanGroups.synced', {
             count: data.total,
-            defaultValue: `已同步 ${data.total} 个粉丝团群聊。`,
+            defaultValue: 'Synced {{count}} fan club group chats.',
           }),
         ),
       onError: (err) =>
@@ -2106,7 +2107,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { role: 'admin' },
                   'studio.fanGroups.adminSet',
-                  `${member.user.name} 已设为群管理员。`,
+                  '{{name}} is now a group admin.',
                 )
               }
               onDemote={(member) =>
@@ -2115,7 +2116,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { role: 'member' },
                   'studio.fanGroups.adminRemoved',
-                  `${member.user.name} 已取消管理员。`,
+                  '{{name}} is no longer a group admin.',
                 )
               }
               onMute={(member) =>
@@ -2124,7 +2125,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { muteMinutes: 60 },
                   'studio.fanGroups.muted',
-                  `${member.user.name} 已禁言 60 分钟。`,
+                  '{{name}} was muted for 60 minutes.',
                 )
               }
               onUnmute={(member) =>
@@ -2133,7 +2134,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { muteMinutes: 0 },
                   'studio.fanGroups.unmuted',
-                  `${member.user.name} 已解除禁言。`,
+                  '{{name}} was unmuted.',
                 )
               }
               onKick={(member) =>
@@ -2142,7 +2143,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { kick: true },
                   'studio.fanGroups.kicked',
-                  `${member.user.name} 已移出群聊。`,
+                  '{{name}} was removed from the group chat.',
                 )
               }
               onApproveRejoin={(member) =>
@@ -2151,7 +2152,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { approveRejoin: true },
                   'studio.fanGroups.rejoinApproved',
-                  `${member.user.name} 已重新加入群聊。`,
+                  '{{name}} rejoined the group chat.',
                 )
               }
               onRejectRejoin={(member) =>
@@ -2160,7 +2161,7 @@ export function CreatorFanGroupsPage() {
                   member,
                   { rejectRejoin: true },
                   'studio.fanGroups.rejoinRejected',
-                  `${member.user.name} 的重新加入申请已驳回。`,
+                  "{{name}}'s rejoin request was rejected.",
                 )
               }
             />
@@ -2213,7 +2214,7 @@ function FanGroupPanel({
           <span>
             {t('studio.fanGroups.groupNo', {
               no: group.groupNo,
-              defaultValue: `第 ${group.groupNo} 群`,
+              defaultValue: 'Group {{no}}',
             })}
           </span>
           <h2>{group.name}</h2>
@@ -2228,7 +2229,9 @@ function FanGroupPanel({
       </div>
       {pendingMembers.length > 0 && (
         <div className="gl-fan-group-requests">
-          <strong>重新加入申请</strong>
+          <strong>
+            {t('studio.fanGroups.rejoinRequests', { defaultValue: 'Rejoin requests' })}
+          </strong>
           {pendingMembers.map((member) => (
             <div key={member.user.id} className="gl-fan-group-request">
               <Avatar name={member.user.name} src={member.user.avatar} size={34} />
@@ -2237,7 +2240,7 @@ function FanGroupPanel({
                 <small>
                   {member.rejoinRequestedAt
                     ? formatFanGroupDate(member.rejoinRequestedAt, locale)
-                    : '等待审批'}
+                    : t('studio.fanGroups.waitingApproval', { defaultValue: 'Waiting approval' })}
                 </small>
               </span>
               <button
@@ -2246,7 +2249,7 @@ function FanGroupPanel({
                 disabled={pending}
                 onClick={() => onRejectRejoin(member)}
               >
-                驳回
+                {t('studio.fanGroups.rejectRejoin', { defaultValue: 'Reject' })}
               </button>
               <button
                 type="button"
@@ -2254,7 +2257,7 @@ function FanGroupPanel({
                 disabled={pending}
                 onClick={() => onApproveRejoin(member)}
               >
-                同意
+                {t('studio.fanGroups.approveRejoin', { defaultValue: 'Approve' })}
               </button>
             </div>
           ))}
@@ -2368,6 +2371,7 @@ function ModerationUserRow({
   danger?: boolean;
   onAction: () => void;
 }) {
+  const { t } = useTranslation('pages');
   return (
     <div className="gl-room-mod-user-row">
       <Avatar name={user.name} src={user.avatar} size={38} />
@@ -2375,7 +2379,11 @@ function ModerationUserRow({
         <strong>{user.name}</strong>
         <span>{user.username ? `@${user.username}` : user.id}</span>
       </div>
-      {active && <span className="gl-room-mod-status">房管</span>}
+      {active && (
+        <span className="gl-room-mod-status">
+          {t('studio.moderators.status', { defaultValue: 'Moderator' })}
+        </span>
+      )}
       <button
         type="button"
         className={danger ? 'gl-secondary-btn is-danger' : 'gl-creator-secondary'}

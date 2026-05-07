@@ -38,7 +38,14 @@
     "yourLibrary": "あなた",
     "history": "履歴",
     "watchLater": "後で見る",
-    "liked": "高評価したライブルーム"
+    "liked": "高評価したライブルーム",
+    "studioFanGroups": "??????????",
+    "messages": "?????",
+    "messagesPrivate": "???????",
+    "messagesReplies": "??",
+    "messagesLikes": "????????",
+    "messagesSystem": "??????",
+    "messagesSettings": "???????"
   },
   "sidebar": {
     "subsHeading": "登録チャンネル",
@@ -63,7 +70,8 @@
     "dark": "ダーク",
     "light": "ライト",
     "signIn": "ログイン",
-    "signOut": "ログアウト"
+    "signOut": "ログアウト",
+    "bannedAppeal": "??????????"
   },
   "badges": {
     "platformVerified": "プラットフォーム認定クリエイター"
@@ -174,5 +182,13 @@
     }
   },
   "live": "LIVE",
-  "viewersWatching": "{{count}} 人が視聴中"
+  "viewersWatching": "{{count}} 人が視聴中",
+  "clear": "???",
+  "searchSuggestionTypes": {
+    "creator": "??????",
+    "live": "???",
+    "replay": "????",
+    "appointment": "??",
+    "post": "??"
+  }
 }

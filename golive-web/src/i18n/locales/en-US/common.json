@@ -38,7 +38,14 @@
     "yourLibrary": "You",
     "history": "History",
     "watchLater": "Watch later",
-    "liked": "Liked live rooms"
+    "liked": "Liked live rooms",
+    "studioFanGroups": "Fan group chats",
+    "messages": "Messages",
+    "messagesPrivate": "My messages",
+    "messagesReplies": "Replies",
+    "messagesLikes": "Likes received",
+    "messagesSystem": "System notices",
+    "messagesSettings": "Message settings"
   },
   "sidebar": {
     "subsHeading": "Subscriptions",
@@ -63,7 +70,8 @@
     "dark": "Dark",
     "light": "Light",
     "signIn": "Sign in",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "bannedAppeal": "Restriction appeal"
   },
   "badges": {
     "platformVerified": "Platform verified creator"
@@ -174,5 +182,13 @@
     }
   },
   "live": "LIVE",
-  "viewersWatching": "{{count}} watching"
+  "viewersWatching": "{{count}} watching",
+  "clear": "Clear",
+  "searchSuggestionTypes": {
+    "creator": "Creator",
+    "live": "Live",
+    "replay": "Replay",
+    "appointment": "Appointment",
+    "post": "Post"
+  }
 }

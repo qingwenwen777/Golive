@@ -243,7 +243,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         description={stream.description}
         previewImage={stream.cover}
         previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live room' })}
-        previewMeta={`${channelName} 路 ${
+        previewMeta={`${channelName}${t('shareDialog.metaSeparator', { defaultValue: ' · ' })}${
           isLive
             ? t('home.watching', { count: stream.viewers, defaultValue: '{{count}} watching' })
             : hasReplay

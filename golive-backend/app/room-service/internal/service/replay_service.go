@@ -22,6 +22,8 @@ import (
 
 const defaultBunnyAPIBase = "https://video.bunnycdn.com"
 const defaultBunnyPlayerBase = "https://player.mediadelivery.net/embed"
+const replayRecordingStableInterval = 2 * time.Second
+const replayRecordingStableChecks = 5
 
 type ReplayConfig struct {
 	RecordDir       string
@@ -284,6 +286,10 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
 		return
 	}
+	if _, err := waitForStableRecording(ctx, recordPath); err != nil {
+		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		return
+	}
 	if err := s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusUploading, ""); err != nil {
 		return
 	}
@@ -359,6 +365,56 @@ func removeRecording(recordPath string) error {
 		return err
 	}
 	return nil
+}
+
+func waitForStableRecording(ctx context.Context, recordPath string) (os.FileInfo, error) {
+	return waitForStableFile(ctx, recordPath, replayRecordingStableInterval, replayRecordingStableChecks)
+}
+
+func waitForStableFile(
+	ctx context.Context,
+	recordPath string,
+	interval time.Duration,
+	requiredStableChecks int,
+) (os.FileInfo, error) {
+	if interval <= 0 {
+		interval = time.Second
+	}
+	if requiredStableChecks <= 0 {
+		requiredStableChecks = 1
+	}
+
+	var lastSize int64 = -1
+	var lastMod time.Time
+	stableChecks := 0
+
+	for {
+		info, err := os.Stat(recordPath)
+		if err != nil {
+			return nil, err
+		}
+		if info.IsDir() {
+			return nil, fmt.Errorf("recording path is a directory: %s", recordPath)
+		}
+		if info.Size() <= 0 {
+			stableChecks = 0
+		} else if info.Size() == lastSize && info.ModTime().Equal(lastMod) {
+			stableChecks++
+			if stableChecks >= requiredStableChecks {
+				return info, nil
+			}
+		} else {
+			stableChecks = 0
+			lastSize = info.Size()
+			lastMod = info.ModTime()
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("recording file did not become stable before timeout: %w", ctx.Err())
+		case <-time.After(interval):
+		}
+	}
 }
 
 func replayVideoTitle(room model.Room) string {
@@ -472,15 +528,24 @@ func (c *BunnyClient) UploadVideo(ctx context.Context, libraryID, videoID, fileP
 		return err
 	}
 	defer file.Close()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.videoURL(libraryID, videoID), file)
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return fmt.Errorf("video upload path is a directory: %s", filePath)
+	}
+	if info.Size() <= 0 {
+		return fmt.Errorf("video upload file is empty: %s", filePath)
+	}
+	body := io.NewSectionReader(file, 0, info.Size())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.videoURL(libraryID, videoID), body)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("AccessKey", c.apiKey)
 	req.Header.Set("Content-Type", "application/octet-stream")
-	if info, err := file.Stat(); err == nil {
-		req.ContentLength = info.Size()
-	}
+	req.ContentLength = info.Size()
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err

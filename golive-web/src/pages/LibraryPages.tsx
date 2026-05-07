@@ -1755,7 +1755,11 @@ function BlacklistSettings({
               <Avatar name={item.user.name} src={item.user.avatar} size={42} />
               <span>
                 <strong>{item.user.name}</strong>
-                <small>{item.role === 'creator' ? '主播' : '用户'}</small>
+                <small>
+                  {item.role === 'creator'
+                    ? t('library.settings.blacklist.creator', { defaultValue: 'Creator' })
+                    : t('library.settings.blacklist.user', { defaultValue: 'User' })}
+                </small>
               </span>
               <button
                 className="gl-settings-button"

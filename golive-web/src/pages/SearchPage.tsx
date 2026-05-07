@@ -27,14 +27,7 @@ import { useIsAuthed } from '@/stores/useAuthStore';
 
 type SearchFilter = 'all' | 'creators' | 'live' | 'replays' | 'appointments' | 'posts';
 
-const FILTERS: Array<{ key: SearchFilter; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'creators', label: '主播' },
-  { key: 'live', label: '直播' },
-  { key: 'replays', label: '回放' },
-  { key: 'appointments', label: '预告' },
-  { key: 'posts', label: '帖子' },
-];
+const FILTERS: SearchFilter[] = ['all', 'creators', 'live', 'replays', 'appointments', 'posts'];
 
 export default function SearchPage() {
   const { t } = useTranslation('pages');
@@ -60,16 +53,20 @@ export default function SearchPage() {
 
   return (
     <div className="gl-page gl-search-page">
-      <div className="gl-search-filterbar" role="tablist" aria-label="Search filters">
+      <div
+        className="gl-search-filterbar"
+        role="tablist"
+        aria-label={t('search.filterAria', { defaultValue: 'Search filters' })}
+      >
         {FILTERS.map((item) => (
           <button
-            key={item.key}
+            key={item}
             type="button"
-            className={filter === item.key ? 'is-active' : undefined}
-            onClick={() => setFilter(item.key)}
+            className={filter === item ? 'is-active' : undefined}
+            onClick={() => setFilter(item)}
           >
-            {item.label}
-            {counts[item.key] > 0 && <span>{counts[item.key]}</span>}
+            {t(`search.filters.${item}`)}
+            {counts[item] > 0 && <span>{counts[item]}</span>}
           </button>
         ))}
       </div>
@@ -176,11 +173,18 @@ function SearchSection({
   empty: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation('pages');
   if (!visible) return null;
   return (
     <section className="gl-search-section">
       <h2>{title}</h2>
-      {empty ? <div className="gl-search-soft-empty">暂无结果</div> : children}
+      {empty ? (
+        <div className="gl-search-soft-empty">
+          {t('search.noResults', { defaultValue: 'No results' })}
+        </div>
+      ) : (
+        children
+      )}
     </section>
   );
 }
@@ -222,8 +226,15 @@ function CreatorResultRow({ creator }: { creator: SearchCreator }) {
         </Link>
         <div className="gl-search-meta">
           {creator.username && <span>@{creator.username}</span>}
-          <span>{creator.subscriberCount.toLocaleString()} 位订阅者</span>
-          {creator.live && <span className="is-live-dot">正在直播</span>}
+          <span>
+            {t('search.subscribers', {
+              count: creator.subscriberCount,
+              defaultValue: '{{count}} subscribers',
+            })}
+          </span>
+          {creator.live && (
+            <span className="is-live-dot">{t('search.liveDot', { defaultValue: 'Live now' })}</span>
+          )}
         </div>
         {creator.lastTitle && <p>{creator.lastTitle}</p>}
       </div>
@@ -283,7 +294,7 @@ function StreamResultRow({ stream, kind }: { stream: Stream; kind: 'live' | 'rep
           <span>
             {isLive
               ? t('home.watching', { count: stream.viewers, defaultValue: '{{count}} watching' })
-              : `${stream.viewers.toLocaleString()} 次观看`}
+              : t('search.views', { count: stream.viewers, defaultValue: '{{count}} views' })}
           </span>
           <span>{category}</span>
           {!isLive && stream.endedAt && <span>{formatDate(stream.endedAt, i18n.language)}</span>}
@@ -326,7 +337,12 @@ function AppointmentResultRow({ appointment }: { appointment: AppointmentItem })
         </Link>
         <div className="gl-search-meta">
           <span>{formatDate(appointment.scheduledAt, i18n.language)}</span>
-          <span>{appointment.reservationCount.toLocaleString()} 人预约</span>
+          <span>
+            {t('search.reservations', {
+              count: appointment.reservationCount,
+              defaultValue: '{{count}} reserved',
+            })}
+          </span>
           <span>{appointment.category}</span>
         </div>
         <Link
@@ -344,7 +360,7 @@ function AppointmentResultRow({ appointment }: { appointment: AppointmentItem })
 }
 
 function PostResultRow({ post }: { post: ChannelPost }) {
-  const { i18n } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
   const channelPath = `/channel/${encodeURIComponent(post.channelId)}`;
   const image = post.images[0];
 
@@ -360,7 +376,7 @@ function PostResultRow({ post }: { post: ChannelPost }) {
           <small>{formatDate(post.createdAt, i18n.language)}</small>
         </Link>
         <Link className="gl-search-post-content" to={channelPath}>
-          {post.content || '图片帖'}
+          {post.content || t('search.imagePost', { defaultValue: 'Image post' })}
         </Link>
         <div className="gl-search-post-actions">
           <span>

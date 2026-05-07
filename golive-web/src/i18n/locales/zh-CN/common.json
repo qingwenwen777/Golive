@@ -38,7 +38,14 @@
     "yourLibrary": "我的",
     "history": "观看历史",
     "watchLater": "稍后观看",
-    "liked": "喜欢的直播间"
+    "liked": "喜欢的直播间",
+    "studioFanGroups": "????",
+    "messages": "??",
+    "messagesPrivate": "????",
+    "messagesReplies": "????",
+    "messagesLikes": "????",
+    "messagesSystem": "????",
+    "messagesSettings": "????"
   },
   "sidebar": {
     "subsHeading": "订阅",
@@ -63,7 +70,8 @@
     "dark": "深色",
     "light": "浅色",
     "signIn": "登录",
-    "signOut": "退出登录"
+    "signOut": "退出登录",
+    "bannedAppeal": "????"
   },
   "badges": {
     "platformVerified": "平台认证主播"
@@ -174,5 +182,13 @@
     }
   },
   "live": "直播中",
-  "viewersWatching": "{{count}} 人正在观看"
+  "viewersWatching": "{{count}} 人正在观看",
+  "clear": "??",
+  "searchSuggestionTypes": {
+    "creator": "??",
+    "live": "??",
+    "replay": "??",
+    "appointment": "??",
+    "post": "??"
+  }
 }

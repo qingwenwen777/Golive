@@ -215,7 +215,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                       <strong>{item.value}</strong>
                       {item.label && <small>{item.label}</small>}
                     </span>
-                    <em>{suggestionTypeLabel(item.type)}</em>
+                    <em>{suggestionTypeLabel(item.type, t)}</em>
                   </button>
                 ))
               ) : (
@@ -405,18 +405,18 @@ type NotificationMenuNotice = {
   notification?: NotificationItem;
 };
 
-function suggestionTypeLabel(type: string): string {
+function suggestionTypeLabel(type: string, t: ReturnType<typeof useTranslation>['t']): string {
   switch (type) {
     case 'creator':
-      return '主播';
+      return t('searchSuggestionTypes.creator', { defaultValue: 'Creator' });
     case 'live':
-      return '直播';
+      return t('searchSuggestionTypes.live', { defaultValue: 'Live' });
     case 'replay':
-      return '回放';
+      return t('searchSuggestionTypes.replay', { defaultValue: 'Replay' });
     case 'appointment':
-      return '预告';
+      return t('searchSuggestionTypes.appointment', { defaultValue: 'Appointment' });
     case 'post':
-      return '帖子';
+      return t('searchSuggestionTypes.post', { defaultValue: 'Post' });
     default:
       return '';
   }
