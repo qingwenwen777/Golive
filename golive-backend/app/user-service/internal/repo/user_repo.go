@@ -492,6 +492,12 @@ type InviteCodeView struct {
 	CreatedAt       time.Time  `json:"createdAt"`
 }
 
+type InviteCodeStats struct {
+	Available int64 `json:"available"`
+	Used      int64 `json:"used"`
+	Total     int64 `json:"total"`
+}
+
 func (r *UserRepo) ListInviteCodes(ctx context.Context) ([]InviteCodeView, error) {
 	rows := make([]InviteCodeView, 0)
 	err := r.db.WithContext(ctx).
@@ -509,6 +515,48 @@ func (r *UserRepo) ListInviteCodes(ctx context.Context) ([]InviteCodeView, error
 		rows[i].Used = rows[i].UsedAt != nil || rows[i].UsedBy != ""
 	}
 	return rows, nil
+}
+
+func (r *UserRepo) ListInviteCodesPage(ctx context.Context, page, size int) ([]InviteCodeView, int64, InviteCodeStats, error) {
+	page, size = normalizeAdminPage(page, size)
+	base := r.db.WithContext(ctx).
+		Table("invite_codes AS ic").
+		Joins("LEFT JOIN users ON users.id = ic.used_by")
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, InviteCodeStats{}, err
+	}
+	rows := make([]InviteCodeView, 0)
+	err := base.
+		Select(`ic.id, ic.code, ic.created_by, ic.used_by,
+			users.username AS used_username, users.display_name AS used_display_name, users.email AS used_email,
+			ic.used_at, ic.created_at`).
+		Order("ic.created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, InviteCodeStats{}, err
+	}
+	for i := range rows {
+		rows[i].Used = rows[i].UsedAt != nil || rows[i].UsedBy != ""
+	}
+	stats, err := r.InviteCodeStats(ctx)
+	if err != nil {
+		return nil, 0, InviteCodeStats{}, err
+	}
+	return rows, total, stats, nil
+}
+
+func (r *UserRepo) InviteCodeStats(ctx context.Context) (InviteCodeStats, error) {
+	var stats InviteCodeStats
+	err := r.db.WithContext(ctx).
+		Table("invite_codes").
+		Select(`COUNT(*) AS total,
+			COALESCE(SUM(CASE WHEN used_by <> '' OR used_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS used,
+			COALESCE(SUM(CASE WHEN used_by = '' AND used_at IS NULL THEN 1 ELSE 0 END), 0) AS available`).
+		Scan(&stats).Error
+	return stats, err
 }
 
 func (r *UserRepo) DeleteUnusedInviteCode(ctx context.Context, id string) (*model.InviteCode, error) {
@@ -629,6 +677,13 @@ type CreatorApplicationView struct {
 	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
+type AdminStatusStats struct {
+	Pending  int64 `json:"pending"`
+	Approved int64 `json:"approved"`
+	Rejected int64 `json:"rejected"`
+	Total    int64 `json:"total"`
+}
+
 func (r *UserRepo) ListCreatorApplications(ctx context.Context) ([]CreatorApplicationView, error) {
 	rows := make([]CreatorApplicationView, 0)
 	err := r.db.WithContext(ctx).
@@ -639,6 +694,33 @@ func (r *UserRepo) ListCreatorApplications(ctx context.Context) ([]CreatorApplic
 		Order("CASE ca.status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, ca.created_at DESC").
 		Scan(&rows).Error
 	return rows, err
+}
+
+func (r *UserRepo) ListCreatorApplicationsPage(ctx context.Context, page, size int) ([]CreatorApplicationView, int64, AdminStatusStats, error) {
+	page, size = normalizeAdminPage(page, size)
+	base := r.db.WithContext(ctx).
+		Table("creator_applications AS ca").
+		Joins("JOIN users ON users.id = ca.user_id")
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, AdminStatusStats{}, err
+	}
+	rows := make([]CreatorApplicationView, 0)
+	err := base.
+		Select(`ca.id, ca.user_id, users.username, users.display_name, users.avatar,
+			ca.reason, ca.status, ca.reviewer_id, ca.reject_reason, ca.reviewed_at, ca.created_at, ca.updated_at`).
+		Order("CASE ca.status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, ca.created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, AdminStatusStats{}, err
+	}
+	stats, err := r.applicationStatusStats(ctx, "creator_applications")
+	if err != nil {
+		return nil, 0, AdminStatusStats{}, err
+	}
+	return rows, total, stats, nil
 }
 
 func (r *UserRepo) ReviewCreatorApplication(ctx context.Context, id, reviewerID, status, rejectReason string) (*model.CreatorApplication, *model.User, error) {
@@ -805,6 +887,34 @@ func (r *UserRepo) ListPlatformApplications(ctx context.Context) ([]PlatformAppl
 	return rows, err
 }
 
+func (r *UserRepo) ListPlatformApplicationsPage(ctx context.Context, page, size int) ([]PlatformApplicationView, int64, AdminStatusStats, error) {
+	page, size = normalizeAdminPage(page, size)
+	base := r.db.WithContext(ctx).
+		Table("platform_applications AS pa").
+		Joins("JOIN users ON users.id = pa.user_id")
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, AdminStatusStats{}, err
+	}
+	rows := make([]PlatformApplicationView, 0)
+	err := base.
+		Select(`pa.id, pa.user_id, users.username, users.display_name, users.avatar,
+			users.live_permission_status,
+			pa.reason, pa.status, pa.reviewer_id, pa.reject_reason, pa.reviewed_at, pa.created_at, pa.updated_at`).
+		Order("CASE pa.status WHEN 'pending' THEN 0 WHEN 'rejected' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, pa.created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, AdminStatusStats{}, err
+	}
+	stats, err := r.applicationStatusStats(ctx, "platform_applications")
+	if err != nil {
+		return nil, 0, AdminStatusStats{}, err
+	}
+	return rows, total, stats, nil
+}
+
 func (r *UserRepo) ReviewPlatformApplication(ctx context.Context, id, reviewerID, status, rejectReason string) (*model.PlatformApplication, *model.User, error) {
 	if status != model.PlatformVerificationApproved && status != model.PlatformVerificationRejected {
 		return nil, nil, errors.New("invalid review status")
@@ -890,6 +1000,51 @@ func (r *UserRepo) ListLiveCreators(ctx context.Context) ([]LiveCreatorView, err
 		Order("updated_at DESC").
 		Scan(&rows).Error
 	return rows, err
+}
+
+func (r *UserRepo) ListLiveCreatorsPage(ctx context.Context, page, size int) ([]LiveCreatorView, int64, error) {
+	page, size = normalizeAdminPage(page, size)
+	q := r.db.WithContext(ctx).
+		Table("users").
+		Where("live_permission_status = ?", model.LivePermissionApproved)
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	rows := make([]LiveCreatorView, 0)
+	err := q.Select("id, username, display_name, avatar, live_permission_status, updated_at").
+		Order("updated_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&rows).Error
+	return rows, total, err
+}
+
+func (r *UserRepo) applicationStatusStats(ctx context.Context, table string) (AdminStatusStats, error) {
+	var rows []struct {
+		Status string
+		Total  int64
+	}
+	if err := r.db.WithContext(ctx).
+		Table(table).
+		Select("status, COUNT(*) AS total").
+		Group("status").
+		Scan(&rows).Error; err != nil {
+		return AdminStatusStats{}, err
+	}
+	var stats AdminStatusStats
+	for _, row := range rows {
+		stats.Total += row.Total
+		switch row.Status {
+		case "pending":
+			stats.Pending += row.Total
+		case "approved":
+			stats.Approved += row.Total
+		case "rejected":
+			stats.Rejected += row.Total
+		}
+	}
+	return stats, nil
 }
 
 func (r *UserRepo) SetLivePermissionStatus(ctx context.Context, userID, status string) (*model.User, error) {

@@ -226,11 +226,12 @@ export default function AdminPage() {
   const canUseAdminApis = canAccessAdmin && onAdminRoute;
   const currentModule = getModuleFromPath(location.pathname);
   const currentText = moduleText(t, currentModule ?? 'dashboard');
+  const summaryParams = useMemo(() => ({ page: 1, size: 1 }), []);
 
-  const apps = useAdminCreatorApplications(canUseAdminOnlyApis);
-  const platformApps = useAdminPlatformApplications(canUseAdminOnlyApis);
-  const creators = useAdminLiveCreators(canUseAdminOnlyApis);
-  const invites = useAdminInviteCodes(canUseAdminOnlyApis);
+  const apps = useAdminCreatorApplications(summaryParams, canUseAdminOnlyApis);
+  const platformApps = useAdminPlatformApplications(summaryParams, canUseAdminOnlyApis);
+  const creators = useAdminLiveCreators(summaryParams, canUseAdminOnlyApis);
+  const invites = useAdminInviteCodes(summaryParams, canUseAdminOnlyApis);
   const approve = useReviewCreatorApplication('approve');
   const reject = useReviewCreatorApplication('reject');
   const approvePlatform = useReviewPlatformApplication('approve');
@@ -240,24 +241,24 @@ export default function AdminPage() {
   const deleteInvite = useDeleteInviteCode();
   const overview = useAdminOverview(canUseAdminApis);
 
-  const appItems = useMemo(() => apps.data?.items ?? [], [apps.data?.items]);
-  const platformAppItems = useMemo(
-    () => platformApps.data?.items ?? [],
-    [platformApps.data?.items],
-  );
-  const creatorItems = useMemo(() => creators.data?.items ?? [], [creators.data?.items]);
-  const inviteItems = useMemo(() => invites.data?.items ?? [], [invites.data?.items]);
   const metrics = useMemo<AdminMetrics>(
     () => ({
       pendingApplications:
-        appItems.filter((item) => item.status === 'pending').length +
-        platformAppItems.filter((item) => item.status === 'pending').length,
-      approvedCreators: creatorItems.length,
-      availableInvites: inviteItems.filter((item) => !item.used).length,
-      totalApplications: appItems.length + platformAppItems.length,
-      totalInvites: inviteItems.length,
+        (apps.data?.stats?.pending ?? 0) + (platformApps.data?.stats?.pending ?? 0),
+      approvedCreators: creators.data?.total ?? 0,
+      availableInvites: invites.data?.stats?.available ?? 0,
+      totalApplications: (apps.data?.stats?.total ?? 0) + (platformApps.data?.stats?.total ?? 0),
+      totalInvites: invites.data?.stats?.total ?? 0,
     }),
-    [appItems, creatorItems, inviteItems, platformAppItems],
+    [
+      apps.data?.stats?.pending,
+      apps.data?.stats?.total,
+      creators.data?.total,
+      invites.data?.stats?.available,
+      invites.data?.stats?.total,
+      platformApps.data?.stats?.pending,
+      platformApps.data?.stats?.total,
+    ],
   );
 
   if (!onAdminRoute) {
@@ -343,9 +344,6 @@ export default function AdminPage() {
           )}
           {currentModule === 'users' && (
             <UsersPage
-              inviteItems={inviteItems}
-              invitesLoading={invites.isLoading}
-              invitesError={invites.isError}
               createBusy={createInvite.isPending}
               deleteBusy={deleteInvite.isPending}
               onCreateInvite={() => {
@@ -398,15 +396,6 @@ export default function AdminPage() {
           )}
           {currentModule === 'creators' && (
             <CreatorsPage
-              applications={appItems}
-              platformApplications={platformAppItems}
-              creators={creatorItems}
-              applicationsLoading={apps.isLoading}
-              platformApplicationsLoading={platformApps.isLoading}
-              creatorsLoading={creators.isLoading}
-              applicationsError={apps.isError}
-              platformApplicationsError={platformApps.isError}
-              creatorsError={creators.isError}
               approveBusy={approve.isPending}
               rejectBusy={reject.isPending}
               platformApproveBusy={approvePlatform.isPending}
@@ -528,7 +517,6 @@ export default function AdminPage() {
               overview={overview.data}
               overviewLoading={overview.isLoading}
               metrics={metrics}
-              inviteItems={inviteItems}
               loading={
                 apps.isLoading || platformApps.isLoading || creators.isLoading || invites.isLoading
               }
@@ -762,17 +750,11 @@ function DashboardPage({
 }
 
 function UsersPage({
-  inviteItems,
-  invitesLoading,
-  invitesError,
   createBusy,
   deleteBusy,
   onCreateInvite,
   onDeleteInvite,
 }: {
-  inviteItems: AdminInviteCode[];
-  invitesLoading: boolean;
-  invitesError: boolean;
   createBusy: boolean;
   deleteBusy: boolean;
   onCreateInvite: () => void;
@@ -783,8 +765,10 @@ function UsersPage({
   const [role, setRole] = useState<string>('all');
   const [status, setStatus] = useState<AdminUserStatus>('all');
   const [page, setPage] = useState(1);
+  const [invitePage, setInvitePage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState('');
   const pageSize = 10;
+  const invitePageSize = 10;
   const users = useAdminUsers({
     q: query.trim() || undefined,
     role,
@@ -792,7 +776,9 @@ function UsersPage({
     page,
     size: pageSize,
   });
+  const invites = useAdminInviteCodes({ page: invitePage, size: invitePageSize });
   const userItems = users.data?.items ?? [];
+  const inviteItems = invites.data?.items ?? [];
   const stats = users.data?.stats ?? {
     total: 0,
     active: 0,
@@ -959,10 +945,14 @@ function UsersPage({
 
       <InvitesPanel
         items={inviteItems}
-        loading={invitesLoading}
-        error={invitesError}
+        loading={invites.isLoading}
+        error={invites.isError}
         busy={createBusy}
         deleteBusy={deleteBusy}
+        page={invites.data?.page ?? invitePage}
+        pageSize={invites.data?.size ?? invitePageSize}
+        total={invites.data?.total ?? 0}
+        onPage={setInvitePage}
         onCreate={onCreateInvite}
         onDelete={onDeleteInvite}
       />
@@ -1499,15 +1489,6 @@ function AdminAppealRecord({
 }
 
 function CreatorsPage({
-  applications,
-  platformApplications,
-  creators,
-  applicationsLoading,
-  platformApplicationsLoading,
-  creatorsLoading,
-  applicationsError,
-  platformApplicationsError,
-  creatorsError,
   approveBusy,
   rejectBusy,
   platformApproveBusy,
@@ -1519,15 +1500,6 @@ function CreatorsPage({
   onRejectPlatform,
   onDisableCreator,
 }: {
-  applications: CreatorApplication[];
-  platformApplications: PlatformApplication[];
-  creators: LiveCreator[];
-  applicationsLoading: boolean;
-  platformApplicationsLoading: boolean;
-  creatorsLoading: boolean;
-  applicationsError: boolean;
-  platformApplicationsError: boolean;
-  creatorsError: boolean;
   approveBusy: boolean;
   rejectBusy: boolean;
   platformApproveBusy: boolean;
@@ -1540,6 +1512,21 @@ function CreatorsPage({
   onDisableCreator: (item: LiveCreator) => void;
 }) {
   const { t } = useTranslation('pages');
+  const [applicationPage, setApplicationPage] = useState(1);
+  const [platformApplicationPage, setPlatformApplicationPage] = useState(1);
+  const [creatorPage, setCreatorPage] = useState(1);
+  const applications = useAdminCreatorApplications({
+    page: applicationPage,
+    size: DETAIL_RECORD_PAGE_SIZE,
+  });
+  const platformApplications = useAdminPlatformApplications({
+    page: platformApplicationPage,
+    size: DETAIL_RECORD_PAGE_SIZE,
+  });
+  const creators = useAdminLiveCreators({ page: creatorPage, size: DETAIL_RECORD_PAGE_SIZE });
+  const applicationItems = applications.data?.items ?? [];
+  const platformApplicationItems = platformApplications.data?.items ?? [];
+  const creatorItems = creators.data?.items ?? [];
   return (
     <div className="gl-admin-section-stack">
       <section
@@ -1552,8 +1539,8 @@ function CreatorsPage({
             defaultValue: 'Pending applications',
           })}
           value={
-            applications.filter((item) => item.status === 'pending').length +
-            platformApplications.filter((item) => item.status === 'pending').length
+            (applications.data?.stats?.pending ?? 0) +
+            (platformApplications.data?.stats?.pending ?? 0)
           }
           tone="red"
         />
@@ -1562,49 +1549,61 @@ function CreatorsPage({
           label={t('admin.creators.kpis.liveCreators', {
             defaultValue: 'Creators who can go live',
           })}
-          value={creators.length}
+          value={creators.data?.total ?? 0}
         />
         <AdminKpi
           icon={Check}
           label={t('admin.creators.kpis.approvedApplications', {
             defaultValue: 'Approved applications',
           })}
-          value={platformApplications.filter((item) => item.status === 'approved').length}
+          value={platformApplications.data?.stats?.approved ?? 0}
         />
         <AdminKpi
           icon={X}
           label={t('admin.creators.kpis.rejectedApplications', {
             defaultValue: 'Rejected applications',
           })}
-          value={platformApplications.filter((item) => item.status === 'rejected').length}
+          value={platformApplications.data?.stats?.rejected ?? 0}
         />
       </section>
       <div className="gl-admin-split-grid">
         <div className="gl-admin-section-stack">
           <ApplicationsPanel
-            items={applications}
-            loading={applicationsLoading}
-            error={applicationsError}
+            items={applicationItems}
+            loading={applications.isLoading}
+            error={applications.isError}
             approveBusy={approveBusy}
             rejectBusy={rejectBusy}
+            page={applications.data?.page ?? applicationPage}
+            pageSize={applications.data?.size ?? DETAIL_RECORD_PAGE_SIZE}
+            total={applications.data?.total ?? 0}
+            onPage={setApplicationPage}
             onApprove={onApprove}
             onReject={onReject}
           />
           <PlatformApplicationsPanel
-            items={platformApplications}
-            loading={platformApplicationsLoading}
-            error={platformApplicationsError}
+            items={platformApplicationItems}
+            loading={platformApplications.isLoading}
+            error={platformApplications.isError}
             approveBusy={platformApproveBusy}
             rejectBusy={platformRejectBusy}
+            page={platformApplications.data?.page ?? platformApplicationPage}
+            pageSize={platformApplications.data?.size ?? DETAIL_RECORD_PAGE_SIZE}
+            total={platformApplications.data?.total ?? 0}
+            onPage={setPlatformApplicationPage}
             onApprove={onApprovePlatform}
             onReject={onRejectPlatform}
           />
         </div>
         <PermissionPanel
-          items={creators}
-          loading={creatorsLoading}
-          error={creatorsError}
+          items={creatorItems}
+          loading={creators.isLoading}
+          error={creators.isError}
           busy={permissionBusy}
+          page={creators.data?.page ?? creatorPage}
+          pageSize={creators.data?.size ?? DETAIL_RECORD_PAGE_SIZE}
+          total={creators.data?.total ?? 0}
+          onPage={setCreatorPage}
           onDisable={onDisableCreator}
         />
       </div>
@@ -3976,13 +3975,11 @@ function SystemPage({
   overview,
   overviewLoading,
   metrics,
-  inviteItems,
   loading,
 }: {
   overview?: AdminOverview;
   overviewLoading: boolean;
   metrics: AdminMetrics;
-  inviteItems: AdminInviteCode[];
   loading: boolean;
 }) {
   const { t } = useTranslation('pages');
@@ -4006,7 +4003,7 @@ function SystemPage({
   const healthOk = healthItems.filter((item) => item.status === 'ok').length;
   const healthDown = healthItems.filter((item) => item.status === 'down').length;
   const healthTotal = healthItems.length;
-  const availableInvites = inviteItems.filter((item) => !item.used).length;
+  const availableInvites = metrics.availableInvites;
   const reviewTimeoutNumber = Number(reviewTimeout);
   const defaultMuteNumber = Number(defaultMute);
   const dirty = Boolean(
@@ -4124,7 +4121,7 @@ function SystemPage({
                 value={registrationPolicyLabel(data?.registrationPolicy, t)}
                 meta={t('admin.system.cards.registration.meta', {
                   available: loading ? '-' : availableInvites,
-                  total: loading ? '-' : inviteItems.length,
+                  total: loading ? '-' : metrics.totalInvites,
                   defaultValue: '{{available}} 可用 / {{total}} 总邀请码',
                 })}
                 to="/admin/users"
@@ -4192,7 +4189,7 @@ function SystemPage({
                 label={t('admin.system.access.invites', { defaultValue: '邀请码池' })}
                 value={t('admin.system.access.invitesValue', {
                   available: loading ? '-' : availableInvites,
-                  total: loading ? '-' : inviteItems.length,
+                  total: loading ? '-' : metrics.totalInvites,
                   defaultValue: '{{available}} 可用 / {{total}} 总计',
                 })}
               />
@@ -4593,21 +4590,23 @@ function PermissionPanel({
   loading,
   error,
   busy,
+  page,
+  pageSize,
+  total,
+  onPage,
   onDisable,
 }: {
   items: LiveCreator[];
   loading: boolean;
   error: boolean;
   busy: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
   onDisable: (item: LiveCreator) => void;
 }) {
   const { t } = useTranslation('pages');
-  const [page, setPage] = useState(1);
-  const pageData = pagedItems(items, page, DETAIL_RECORD_PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [items.length]);
 
   return (
     <section className="gl-admin-panel">
@@ -4628,7 +4627,7 @@ function PermissionPanel({
       ) : items.length ? (
         <>
           <div className="gl-admin-list">
-            {pageData.items.map((item) => (
+            {items.map((item) => (
               <div className="gl-admin-permission-row" key={item.id}>
                 <AdminUser
                   avatar={item.avatar}
@@ -4656,13 +4655,8 @@ function PermissionPanel({
               </div>
             ))}
           </div>
-          {items.length > DETAIL_RECORD_PAGE_SIZE && (
-            <AdminPager
-              page={pageData.page}
-              pageSize={DETAIL_RECORD_PAGE_SIZE}
-              total={items.length}
-              onPage={setPage}
-            />
+          {total > pageSize && (
+            <AdminPager page={page} pageSize={pageSize} total={total} onPage={onPage} />
           )}
         </>
       ) : (
@@ -4682,6 +4676,10 @@ function ApplicationsPanel({
   error,
   approveBusy,
   rejectBusy,
+  page,
+  pageSize,
+  total,
+  onPage,
   onApprove,
   onReject,
 }: {
@@ -4690,18 +4688,16 @@ function ApplicationsPanel({
   error: boolean;
   approveBusy: boolean;
   rejectBusy: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
 }) {
   const { t } = useTranslation('pages');
   const [rejectingId, setRejectingId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
-  const [page, setPage] = useState(1);
-  const pageData = pagedItems(items, page, DETAIL_RECORD_PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [items.length]);
 
   return (
     <section className="gl-admin-panel">
@@ -4728,7 +4724,7 @@ function ApplicationsPanel({
       ) : items.length ? (
         <>
           <div className="gl-admin-review-list">
-            {pageData.items.map((app) => {
+            {items.map((app) => {
               const pending = app.status === 'pending';
               const busy = approveBusy || rejectBusy;
               const rejecting = rejectingId === app.id;
@@ -4829,13 +4825,8 @@ function ApplicationsPanel({
               );
             })}
           </div>
-          {items.length > DETAIL_RECORD_PAGE_SIZE && (
-            <AdminPager
-              page={pageData.page}
-              pageSize={DETAIL_RECORD_PAGE_SIZE}
-              total={items.length}
-              onPage={setPage}
-            />
+          {total > pageSize && (
+            <AdminPager page={page} pageSize={pageSize} total={total} onPage={onPage} />
           )}
         </>
       ) : (
@@ -4853,6 +4844,10 @@ function PlatformApplicationsPanel({
   error,
   approveBusy,
   rejectBusy,
+  page,
+  pageSize,
+  total,
+  onPage,
   onApprove,
   onReject,
 }: {
@@ -4861,18 +4856,16 @@ function PlatformApplicationsPanel({
   error: boolean;
   approveBusy: boolean;
   rejectBusy: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
 }) {
   const { t } = useTranslation('pages');
   const [rejectingId, setRejectingId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
-  const [page, setPage] = useState(1);
-  const pageData = pagedItems(items, page, DETAIL_RECORD_PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [items.length]);
 
   return (
     <section className="gl-admin-panel">
@@ -4905,7 +4898,7 @@ function PlatformApplicationsPanel({
       ) : items.length ? (
         <>
           <div className="gl-admin-review-list">
-            {pageData.items.map((app) => {
+            {items.map((app) => {
               const pending = app.status === 'pending';
               const busy = approveBusy || rejectBusy;
               const rejecting = rejectingId === app.id;
@@ -5012,13 +5005,8 @@ function PlatformApplicationsPanel({
               );
             })}
           </div>
-          {items.length > DETAIL_RECORD_PAGE_SIZE && (
-            <AdminPager
-              page={pageData.page}
-              pageSize={DETAIL_RECORD_PAGE_SIZE}
-              total={items.length}
-              onPage={setPage}
-            />
+          {total > pageSize && (
+            <AdminPager page={page} pageSize={pageSize} total={total} onPage={onPage} />
           )}
         </>
       ) : (
@@ -5038,6 +5026,10 @@ function InvitesPanel({
   error,
   busy,
   deleteBusy,
+  page,
+  pageSize,
+  total,
+  onPage,
   onCreate,
   onDelete,
 }: {
@@ -5046,6 +5038,10 @@ function InvitesPanel({
   error: boolean;
   busy: boolean;
   deleteBusy: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
   onCreate: () => void;
   onDelete: (item: AdminInviteCode) => void;
 }) {
@@ -5086,75 +5082,82 @@ function InvitesPanel({
           {t('admin.invites.error', { defaultValue: 'Could not load invite codes.' })}
         </div>
       ) : items.length ? (
-        <div className="gl-admin-invite-list">
-          {items.map((item) => (
-            <article className="gl-admin-invite-row" key={item.id}>
-              <div className="gl-admin-invite-code">
-                <Ticket size={18} />
-                <strong>{item.code}</strong>
-              </div>
-              <span className={`gl-admin-status is-${item.used ? 'approved' : 'pending'}`}>
-                {item.used
-                  ? t('admin.invites.used', { defaultValue: 'Used' })
-                  : t('admin.invites.unused', { defaultValue: 'Unused' })}
-              </span>
-              <div className="gl-admin-invite-user">
-                {item.used ? (
-                  <>
-                    <strong>{item.usedDisplayName || item.usedUsername || item.usedBy}</strong>
-                    <span>
-                      @{item.usedUsername || item.usedBy?.slice(0, 8)} / {item.usedEmail || '-'}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <strong>{t('admin.invites.noUser', { defaultValue: 'No account yet' })}</strong>
-                    <span>
-                      {t('admin.invites.available', {
-                        defaultValue: 'Available for one registration',
-                      })}
-                    </span>
-                  </>
-                )}
-              </div>
-              <span className="gl-admin-muted">
-                {item.usedAt
-                  ? t('admin.invites.usedAt', {
-                      time: formatDate(item.usedAt),
-                      defaultValue: 'Used {{time}}',
-                    })
-                  : t('admin.invites.createdAt', {
-                      time: formatDate(item.createdAt),
-                      defaultValue: 'Created {{time}}',
-                    })}
-              </span>
-              <button
-                type="button"
-                className="gl-admin-action-text"
-                onClick={() => copyCode(item.code)}
-              >
-                <Clipboard size={16} />
-                {t('admin.invites.copy', { defaultValue: 'Copy' })}
-              </button>
-              <button
-                type="button"
-                className="gl-admin-action-text reject"
-                disabled={item.used || deleteBusy}
-                title={
-                  item.used
-                    ? t('admin.invites.deleteUsedHint', {
-                        defaultValue: 'Used invite codes cannot be deleted.',
+        <>
+          <div className="gl-admin-invite-list">
+            {items.map((item) => (
+              <article className="gl-admin-invite-row" key={item.id}>
+                <div className="gl-admin-invite-code">
+                  <Ticket size={18} />
+                  <strong>{item.code}</strong>
+                </div>
+                <span className={`gl-admin-status is-${item.used ? 'approved' : 'pending'}`}>
+                  {item.used
+                    ? t('admin.invites.used', { defaultValue: 'Used' })
+                    : t('admin.invites.unused', { defaultValue: 'Unused' })}
+                </span>
+                <div className="gl-admin-invite-user">
+                  {item.used ? (
+                    <>
+                      <strong>{item.usedDisplayName || item.usedUsername || item.usedBy}</strong>
+                      <span>
+                        @{item.usedUsername || item.usedBy?.slice(0, 8)} / {item.usedEmail || '-'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>
+                        {t('admin.invites.noUser', { defaultValue: 'No account yet' })}
+                      </strong>
+                      <span>
+                        {t('admin.invites.available', {
+                          defaultValue: 'Available for one registration',
+                        })}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <span className="gl-admin-muted">
+                  {item.usedAt
+                    ? t('admin.invites.usedAt', {
+                        time: formatDate(item.usedAt),
+                        defaultValue: 'Used {{time}}',
                       })
-                    : t('admin.invites.delete', { defaultValue: 'Delete' })
-                }
-                onClick={() => onDelete(item)}
-              >
-                <X size={16} />
-                {t('admin.invites.delete', { defaultValue: 'Delete' })}
-              </button>
-            </article>
-          ))}
-        </div>
+                    : t('admin.invites.createdAt', {
+                        time: formatDate(item.createdAt),
+                        defaultValue: 'Created {{time}}',
+                      })}
+                </span>
+                <button
+                  type="button"
+                  className="gl-admin-action-text"
+                  onClick={() => copyCode(item.code)}
+                >
+                  <Clipboard size={16} />
+                  {t('admin.invites.copy', { defaultValue: 'Copy' })}
+                </button>
+                <button
+                  type="button"
+                  className="gl-admin-action-text reject"
+                  disabled={item.used || deleteBusy}
+                  title={
+                    item.used
+                      ? t('admin.invites.deleteUsedHint', {
+                          defaultValue: 'Used invite codes cannot be deleted.',
+                        })
+                      : t('admin.invites.delete', { defaultValue: 'Delete' })
+                  }
+                  onClick={() => onDelete(item)}
+                >
+                  <X size={16} />
+                  {t('admin.invites.delete', { defaultValue: 'Delete' })}
+                </button>
+              </article>
+            ))}
+          </div>
+          {total > pageSize && (
+            <AdminPager page={page} pageSize={pageSize} total={total} onPage={onPage} />
+          )}
+        </>
       ) : (
         <div className="gl-yt-shelf-empty">
           {t('admin.invites.empty', { defaultValue: 'No invite codes have been created.' })}

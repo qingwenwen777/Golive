@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { User } from '@/types/user';
@@ -86,19 +86,51 @@ export function useSubmitPlatformApplication() {
 
 export interface AdminApplicationsResp {
   items: CreatorApplication[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AdminStatusStats;
 }
 
-export function useAdminCreatorApplications(enabled = true) {
+export interface AdminListParams {
+  page?: number;
+  size?: number;
+}
+
+export interface AdminStatusStats {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+}
+
+export interface AdminInviteCodeStats {
+  available: number;
+  used: number;
+  total: number;
+}
+
+function adminListParams(params: AdminListParams = {}) {
+  return {
+    page: params.page ?? 1,
+    size: params.size ?? 20,
+  };
+}
+
+export function useAdminCreatorApplications(params: AdminListParams = {}, enabled = true) {
+  const listParams = adminListParams(params);
   return useQuery<AdminApplicationsResp, Error>({
-    queryKey: ['admin-creator-applications'],
+    queryKey: ['admin-creator-applications', listParams],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<AdminApplicationsResp>('/admin/creator-applications', {
+        params: listParams,
         signal,
       });
       return data;
     },
     staleTime: 15_000,
     enabled,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -125,15 +157,21 @@ export function useReviewCreatorApplication(action: 'approve' | 'reject') {
 
 export interface AdminPlatformApplicationsResp {
   items: PlatformApplication[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AdminStatusStats;
 }
 
-export function useAdminPlatformApplications(enabled = true) {
+export function useAdminPlatformApplications(params: AdminListParams = {}, enabled = true) {
+  const listParams = adminListParams(params);
   return useQuery<AdminPlatformApplicationsResp, Error>({
-    queryKey: ['admin-platform-applications'],
+    queryKey: ['admin-platform-applications', listParams],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<AdminPlatformApplicationsResp>(
         '/admin/platform-applications',
         {
+          params: listParams,
           signal,
         },
       );
@@ -141,6 +179,7 @@ export function useAdminPlatformApplications(enabled = true) {
     },
     staleTime: 15_000,
     enabled,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -177,19 +216,25 @@ export interface LiveCreator {
 
 export interface AdminLiveCreatorsResp {
   items: LiveCreator[];
+  total: number;
+  page: number;
+  size: number;
 }
 
-export function useAdminLiveCreators(enabled = true) {
+export function useAdminLiveCreators(params: AdminListParams = {}, enabled = true) {
+  const listParams = adminListParams(params);
   return useQuery<AdminLiveCreatorsResp, Error>({
-    queryKey: ['admin-live-creators'],
+    queryKey: ['admin-live-creators', listParams],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<AdminLiveCreatorsResp>('/admin/live-creators', {
+        params: listParams,
         signal,
       });
       return data;
     },
     staleTime: 15_000,
     enabled,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -229,19 +274,26 @@ export interface AdminInviteCode {
 
 export interface AdminInviteCodesResp {
   items: AdminInviteCode[];
+  total: number;
+  page: number;
+  size: number;
+  stats: AdminInviteCodeStats;
 }
 
-export function useAdminInviteCodes(enabled = true) {
+export function useAdminInviteCodes(params: AdminListParams = {}, enabled = true) {
+  const listParams = adminListParams(params);
   return useQuery<AdminInviteCodesResp, Error>({
-    queryKey: ['admin-invite-codes'],
+    queryKey: ['admin-invite-codes', listParams],
     queryFn: async ({ signal }) => {
       const { data } = await http.get<AdminInviteCodesResp>('/admin/invite-codes', {
+        params: listParams,
         signal,
       });
       return data;
     },
     staleTime: 15_000,
     enabled,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -2192,11 +2192,35 @@ input:focus-visible,
   }
 }
 .gl-loadable-img {
-  opacity: 0;
-  transition: opacity 0.22s ease;
+  background: var(--gl-skeleton-base);
+  opacity: 1;
+  transition:
+    filter 0.22s ease,
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+.gl-loadable-img.is-loading,
+.gl-loadable-img.is-lazy-pending {
+  filter: blur(12px);
+  transform: scale(1.01);
+}
+.gl-loadable-img.is-loading:not(.has-placeholder),
+.gl-loadable-img.is-lazy-pending:not(.has-placeholder) {
+  background: linear-gradient(
+    110deg,
+    var(--gl-skeleton-base) 0%,
+    var(--gl-skeleton-shine) 45%,
+    var(--gl-skeleton-base) 70%
+  );
+  background-size: 220% 100%;
+  animation: glImageBuffer 1.1s ease-in-out infinite;
 }
 .gl-loadable-img.is-loaded {
+  background: transparent;
+  filter: none;
   opacity: 1;
+  transform: none;
+  animation: none;
 }
 .gl-loadable-img.is-error {
   display: none;

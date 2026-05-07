@@ -160,12 +160,19 @@ func (h *AdminHandler) CreateInviteCode(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListInviteCodes(c *gin.Context) {
-	items, err := h.users.ListInviteCodes(c.Request.Context())
+	page, size := adminPageSize(c, 1, 20)
+	items, total, stats, err := h.users.ListInviteCodesPage(c.Request.Context(), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
+		"stats": stats,
+	})
 }
 
 func (h *AdminHandler) DeleteInviteCode(c *gin.Context) {
@@ -465,30 +472,50 @@ func (h *AdminHandler) AdjustUserCoins(c *gin.Context) {
 }
 
 func (h *AdminHandler) ListCreatorApplications(c *gin.Context) {
-	items, err := h.users.ListCreatorApplications(c.Request.Context())
+	page, size := adminPageSize(c, 1, 20)
+	items, total, stats, err := h.users.ListCreatorApplicationsPage(c.Request.Context(), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
+		"stats": stats,
+	})
 }
 
 func (h *AdminHandler) ListPlatformApplications(c *gin.Context) {
-	items, err := h.users.ListPlatformApplications(c.Request.Context())
+	page, size := adminPageSize(c, 1, 20)
+	items, total, stats, err := h.users.ListPlatformApplicationsPage(c.Request.Context(), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
+		"stats": stats,
+	})
 }
 
 func (h *AdminHandler) ListLiveCreators(c *gin.Context) {
-	items, err := h.users.ListLiveCreators(c.Request.Context())
+	page, size := adminPageSize(c, 1, 20)
+	items, total, err := h.users.ListLiveCreatorsPage(c.Request.Context(), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"size":  size,
+	})
 }
 
 func (h *AdminHandler) ApproveCreatorApplication(c *gin.Context) {
