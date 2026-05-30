@@ -140,6 +140,7 @@ const (
 	OutboxTopicGift      = "gift"
 	OutboxTopicSuperChat = "super_chat"
 	OutboxTopicBet       = "bet"
+	OutboxTopicLuckyBag  = "lucky_bag"
 
 	OutboxStatusPending = "pending"
 	OutboxStatusSent    = "sent"

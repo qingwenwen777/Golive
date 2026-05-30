@@ -76,6 +76,7 @@ func main() {
 	giftSvc := service.NewGiftService(giftRepo, orderRepo)
 	scSvc := service.NewSuperChatService(orderRepo, rdb)
 	betSvc := service.NewBetService(orderRepo)
+	luckyBagSvc := service.NewLuckyBagService(orderRepo, rdb)
 	adminRepo := repo.NewAdminRepo(db)
 	adminSvc := service.NewAdminService(adminRepo, orderRepo)
 
@@ -100,6 +101,7 @@ func main() {
 	giftH := handler.NewGiftHandler(giftSvc, idem)
 	scH := handler.NewSuperChatHandler(scSvc, idem)
 	betH := handler.NewBetHandler(betSvc)
+	luckyBagH := handler.NewLuckyBagHandler(luckyBagSvc)
 	adminH := handler.NewAdminHandler(adminSvc)
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {
@@ -112,6 +114,7 @@ func main() {
 		Gift:      giftH,
 		SuperChat: scH,
 		Bet:       betH,
+		LuckyBag:  luckyBagH,
 		Admin:     adminH,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
@@ -119,6 +122,7 @@ func main() {
 	outboxCtx, cancelOutbox := context.WithCancel(context.Background())
 	defer cancelOutbox()
 	go outboxSvc.Run(outboxCtx)
+	go luckyBagSvc.RunScheduler(outboxCtx)
 
 	go func() {
 		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {

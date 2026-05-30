@@ -19,6 +19,11 @@ type Broker interface {
 	Publish(ctx context.Context, channel string, payload []byte) error
 	// RecordViewerCount persists current and peak viewer counts for analytics.
 	RecordViewerCount(ctx context.Context, roomID string, count int64) error
+	// AddPresence marks an authenticated viewer as present in a room. Used by
+	// gift-service to decide lucky-bag draw eligibility (must be in the room).
+	AddPresence(ctx context.Context, roomID, userID string) error
+	// RemovePresence clears a viewer's presence when they leave the room.
+	RemovePresence(ctx context.Context, roomID, userID string) error
 }
 
 // Subscription is the receive side. Channel() yields raw payload bytes.
@@ -60,6 +65,26 @@ func (b *RedisBroker) Publish(ctx context.Context, channel string, payload []byt
 
 func (b *RedisBroker) RecordViewerCount(ctx context.Context, roomID string, count int64) error {
 	return luaRecordViewerCount.Run(ctx, b.rdb, []string{"roommetrics:" + roomID}, count, 30*24*60*60).Err()
+}
+
+func presenceKey(roomID string) string { return "room:" + roomID + ":presence" }
+
+func (b *RedisBroker) AddPresence(ctx context.Context, roomID, userID string) error {
+	if b.rdb == nil || roomID == "" || userID == "" {
+		return nil
+	}
+	pipe := b.rdb.Pipeline()
+	pipe.SAdd(ctx, presenceKey(roomID), userID)
+	pipe.Expire(ctx, presenceKey(roomID), 6*60*60)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (b *RedisBroker) RemovePresence(ctx context.Context, roomID, userID string) error {
+	if b.rdb == nil || roomID == "" || userID == "" {
+		return nil
+	}
+	return b.rdb.SRem(ctx, presenceKey(roomID), userID).Err()
 }
 
 var luaRecordViewerCount = redis.NewScript(`

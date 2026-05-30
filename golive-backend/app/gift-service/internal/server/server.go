@@ -14,6 +14,7 @@ type Deps struct {
 	Gift      *handler.GiftHandler
 	SuperChat *handler.SuperChatHandler
 	Bet       *handler.BetHandler
+	LuckyBag  *handler.LuckyBagHandler
 	Admin     *handler.AdminHandler
 }
 
@@ -58,6 +59,10 @@ func NewRouter(d Deps) *gin.Engine {
 	r.POST("/bets/:id/wagers", auth, d.Bet.Wager)
 	r.POST("/bets/:id/settle", auth, d.Bet.Settle)
 	r.POST("/bets/:id/cancel", auth, d.Bet.Cancel)
+	r.GET("/lucky-bags/latest", optionalAuth, d.LuckyBag.Latest)
+	r.POST("/lucky-bags", auth, d.LuckyBag.Open)
+	r.POST("/lucky-bags/:id/join", auth, d.LuckyBag.Join)
+	r.POST("/lucky-bags/:id/cancel", auth, d.LuckyBag.Cancel)
 	admin := r.Group("/admin/economy", auth, handler.AdminRequired(d.Admin))
 	admin.GET("/summary", d.Admin.Summary)
 	admin.GET("/gifts", d.Admin.Gifts)

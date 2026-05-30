@@ -77,6 +77,7 @@ func (r *Room) add(c Sink, profile ViewerProfile) {
 	r.mu.Unlock()
 	r.viewers.Store(n)
 	r.persistViewerCount(n)
+	r.addPresence(profile)
 	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
 }
@@ -88,13 +89,18 @@ func (r *Room) remove(connID string) bool {
 		r.mu.Unlock()
 		return false
 	}
+	gone := r.viewerProfiles[connID]
 	delete(r.conns, connID)
 	delete(r.viewerProfiles, connID)
+	stillPresent := r.userStillPresentLocked(gone.UserID)
 	n := r.uniqueViewerCountLocked()
 	empty := len(r.conns) == 0
 	r.mu.Unlock()
 	r.viewers.Store(n)
 	r.persistViewerCount(n)
+	if !stillPresent {
+		r.removePresence(gone)
+	}
 	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
 	return empty
@@ -164,6 +170,7 @@ func (r *Room) updateViewer(connID string, profile ViewerProfile) {
 	r.mu.Unlock()
 	r.viewers.Store(n)
 	r.persistViewerCount(n)
+	r.addPresence(profile)
 	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
 }
@@ -301,6 +308,44 @@ func (r *Room) uniqueViewerCountLocked() int64 {
 		seen[key] = struct{}{}
 	}
 	return int64(len(seen))
+}
+
+// userStillPresentLocked reports whether any remaining connection belongs to
+// the given userID, so presence is only cleared on the user's last connection.
+func (r *Room) userStillPresentLocked(userID string) bool {
+	if userID == "" {
+		return false
+	}
+	for _, profile := range r.viewerProfiles {
+		if profile.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// addPresence records an authenticated, non-owner viewer in the room presence
+// set (best-effort) so gift-service can resolve lucky-bag draw eligibility.
+func (r *Room) addPresence(profile ViewerProfile) {
+	if profile.IsOwner || profile.UserID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := r.hub.broker.AddPresence(ctx, r.id, profile.UserID); err != nil {
+		logger.L().Debug("add room presence", zap.String("room", r.id), zap.Error(err))
+	}
+}
+
+func (r *Room) removePresence(profile ViewerProfile) {
+	if profile.IsOwner || profile.UserID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := r.hub.broker.RemovePresence(ctx, r.id, profile.UserID); err != nil {
+		logger.L().Debug("remove room presence", zap.String("room", r.id), zap.Error(err))
+	}
 }
 
 func viewerIdentityKey(connID string, profile ViewerProfile) string {

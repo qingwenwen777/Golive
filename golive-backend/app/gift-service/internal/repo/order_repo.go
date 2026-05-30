@@ -53,6 +53,8 @@ func (r *OrderRepo) AutoMigrate() error {
 		&model.SuperChatOrder{},
 		&model.BetRound{},
 		&model.BetWager{},
+		&model.LuckyBag{},
+		&model.LuckyBagEntry{},
 		&model.LocalMessage{},
 		&model.FanBadge{},
 		&model.CoinTransaction{},

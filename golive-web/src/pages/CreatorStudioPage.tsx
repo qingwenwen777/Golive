@@ -102,6 +102,7 @@ import {
 import { Chat, type ChatModerationTarget } from '@/features/live-room/Chat';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { BettingPanel } from '@/features/live-room/BettingPanel';
+import { LuckyBagPanel } from '@/features/live-room/LuckyBagPanel';
 import { Player } from '@/features/live-room/Player';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import {
@@ -3176,6 +3177,16 @@ export function CreatorLiveConsolePage() {
               <Trophy size={22} />
             </div>
             <BettingPanel roomId={stream.id} ownsStream />
+          </section>
+          <section className="gl-creator-panel gl-live-console-activity">
+            <div className="gl-creator-panel-head">
+              <div>
+                <span>{t('studio.console.activity', { defaultValue: 'Interaction' })}</span>
+                <h2>{t('studio.console.luckyBagTitle', { defaultValue: 'Lucky bag module' })}</h2>
+              </div>
+              <Gift size={22} />
+            </div>
+            <LuckyBagPanel roomId={stream.id} ownsStream />
           </section>
         </main>
         <StudioInteractionRail

@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 import type { Stream } from '@/types/stream';
 import { betQueryKey } from '@/api/bet';
+import { luckyBagQueryKey } from '@/api/luckyBag';
 import i18n from '@/i18n';
 import {
   type BetOption,
@@ -105,6 +106,14 @@ interface ServerBet {
   option?: BetOption;
   ts?: number;
 }
+interface ServerLuckyBag {
+  type: 'lucky_bag';
+  event: 'opened' | 'joined' | 'drawn' | 'cancelled';
+  bag?: { id?: string; roomId?: string };
+  participantCount?: number;
+  winnerCount?: number;
+  ts?: number;
+}
 type ServerMessage =
   | ServerChat
   | ServerSuperChat
@@ -114,7 +123,8 @@ type ServerMessage =
   | ServerSystem
   | ServerLiveStatus
   | ServerRoomUpdated
-  | ServerBet;
+  | ServerBet
+  | ServerLuckyBag;
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -432,6 +442,41 @@ export function useRoomRealtime(
           id: genId('bet'),
           kind: 'system',
           text,
+          ts: parsed.ts ?? now,
+        });
+        break;
+      }
+      case 'lucky_bag': {
+        void queryClient.invalidateQueries({ queryKey: luckyBagQueryKey(roomId) });
+        const bagRoomId = parsed.bag?.roomId;
+        if (bagRoomId && bagRoomId !== roomId) {
+          void queryClient.invalidateQueries({ queryKey: luckyBagQueryKey(bagRoomId) });
+        }
+        if (parsed.event === 'drawn' || parsed.event === 'cancelled') {
+          void queryClient.invalidateQueries({ queryKey: ['me'] });
+        }
+        if (parsed.event === 'joined') break;
+        const bagText =
+          parsed.event === 'opened'
+            ? i18n.t('luckyBag.systemOpened', {
+                ns: 'pages',
+                defaultValue: 'A lucky bag is up for grabs!',
+              })
+            : parsed.event === 'drawn'
+              ? i18n.t('luckyBag.systemDrawn', {
+                  ns: 'pages',
+                  count: parsed.winnerCount ?? 0,
+                  formattedCount: (parsed.winnerCount ?? 0).toLocaleString(),
+                  defaultValue: 'Lucky bag drawn: {{formattedCount}} winners.',
+                })
+              : i18n.t('luckyBag.systemCancelled', {
+                  ns: 'pages',
+                  defaultValue: 'Lucky bag cancelled. Coins were refunded.',
+                });
+        appendMessage(roomId, {
+          id: genId('bag'),
+          kind: 'system',
+          text: bagText,
           ts: parsed.ts ?? now,
         });
         break;
