@@ -79,8 +79,18 @@ git push prod master
 checkout 到 /srv/golive/app
 使用 node:20-alpine 安装依赖并构建 golive-web/dist
 重新构建并启动 golive-backend/deploy/docker-compose.yml 中的服务镜像
+对 nginx / srs 等单文件挂载配置做漂移检测，必要时强制重建容器
 输出 docker compose ps
 ```
+
+> 边缘容器（nginx、srs）通过单文件 bind-mount 挂载配置（如
+> `nginx.https.conf`、`srs.conf`）。Docker 在创建容器时按 inode 绑定挂载，而
+> `git checkout -f` 会原子替换文件（生成新 inode），导致长期运行的容器仍读旧
+> 文件；`docker compose up -d` 不会因单文件内容变化而重建，`nginx -s reload`
+> 也无法解决（挂载的还是旧 inode）。因此 hook 在部署末尾比对宿主机配置与容器
+> 内实际挂载文件的内容哈希，仅在发生漂移时对相应服务执行
+> `docker compose up -d --force-recreate --no-deps <service>`，从根本上避免配置
+> 不生效的问题。注意：`srs.conf` 变更触发的 srs 重建会短暂中断直播推流。
 
 部署 hook 默认接受 `main` 和 `master`。服务器变量可覆盖：
 

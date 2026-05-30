@@ -18,6 +18,47 @@ log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
 }
 
+# reconcile_mounted_config force-recreates a Compose service when the config
+# file it bind-mounts no longer matches the freshly checked-out file on disk.
+#
+# Why this is needed: services like nginx and srs mount a SINGLE file
+# (e.g. ./nginx.https.conf:/etc/nginx/nginx.https.conf). Docker binds that
+# mount by inode at container-creation time. `git checkout -f` writes configs
+# atomically (temp file + rename), producing a NEW inode, so a long-running
+# container keeps serving the OLD file content. `docker compose up -d` will
+# not recreate the container because the Compose service definition itself did
+# not change, and `nginx -s reload` cannot help because the mounted file is
+# still the stale inode. Only recreating the container re-resolves the path to
+# the current inode. We compare content hashes so this self-heals on every
+# deploy regardless of git history.
+#
+#   $1 service   Compose service name (also the container suffix golive-<svc>)
+#   $2..$n       pairs of <host_file_relative_to_deploy_dir> <container_path>
+reconcile_mounted_config() {
+  local service="$1"; shift
+  local container="${APP_NAME}-${service}"
+  local needs_recreate=0
+
+  while (($# >= 2)); do
+    local host_file="$1" container_path="$2"; shift 2
+    [[ -f "$host_file" ]] || continue
+    local host_sum cont_sum
+    host_sum="$(sha256sum < "$host_file" | awk '{print $1}')"
+    # Hash the container's copy on the host side (only needs `cat` inside the
+    # container, which is more universally present than sha256sum). If the file
+    # is unreadable/missing in the container, treat as drift and recreate.
+    cont_sum="$(docker exec "$container" cat "$container_path" 2>/dev/null | sha256sum | awk '{print $1}')" || cont_sum=""
+    if [[ -z "$cont_sum" || "$host_sum" != "$cont_sum" ]]; then
+      log "config drift on ${service} (${container_path}); will recreate"
+      needs_recreate=1
+    fi
+  done
+
+  if ((needs_recreate)); then
+    docker compose up -d --force-recreate --no-deps "$service"
+  fi
+}
+
 deploy_ref() {
   local newrev="$1"
   local ref="$2"
@@ -49,6 +90,18 @@ deploy_ref() {
   log "rebuilding and starting services"
   cd "${WORK_TREE}/golive-backend/deploy"
   docker compose up -d --build --remove-orphans
+
+  # Heal single-file bind-mount drift for edge containers (see helper comment).
+  # nginx serves whichever config its entrypoint picked; both are mounted, so
+  # compare both. srs.conf changing forces an srs recreate (briefly interrupts
+  # the live stream, but only when srs.conf actually changed).
+  log "reconciling edge config mounts"
+  reconcile_mounted_config nginx \
+    nginx.conf /etc/nginx/nginx.http.conf \
+    nginx.https.conf /etc/nginx/nginx.https.conf \
+    security-headers.conf /etc/nginx/security-headers.conf
+  reconcile_mounted_config srs \
+    srs.conf /usr/local/srs/conf/srs.conf
 
   log "current service status"
   docker compose ps
