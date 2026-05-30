@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowDownLeft,
@@ -9,7 +9,6 @@ import {
   Coins,
   CreditCard,
   Gift,
-  History,
   MessageSquareText,
   Radio,
   Snowflake,
@@ -421,10 +420,6 @@ export default function CoinPage() {
             <ArrowUpRight size={16} />
             {t('coin.withdraw.title', { defaultValue: 'Withdraw' })}
           </button>
-          <Link className="gl-coin-wallet-link" to="/history">
-            <History size={15} />
-            {t('coin.watchHistory', { defaultValue: 'Watch history' })}
-          </Link>
         </div>
       </section>
 
@@ -446,12 +441,10 @@ export default function CoinPage() {
         />
       </section>
 
-      <section className="gl-coin-panel">
-        <div className="gl-section-title-row">
-          <div>
-            <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
-            <span>{t('coin.dailyResetHint', { defaultValue: '北京时间 0 点刷新' })}</span>
-          </div>
+      <section className="gl-coin-section">
+        <div className="gl-coin-section-head">
+          <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
+          <span>{t('coin.dailyResetHint', { defaultValue: '北京时间 0 点刷新' })}</span>
         </div>
         <div className="gl-coin-task-grid">
           {DAILY_TASKS.map((task) => {
@@ -475,8 +468,8 @@ export default function CoinPage() {
         </div>
       </section>
 
-      <section className="gl-coin-panel gl-coin-ledger-panel">
-        <div className="gl-section-title-row">
+      <section className="gl-coin-section gl-coin-ledger-section">
+        <div className="gl-coin-section-head">
           <h2>{t('coin.ledger', { defaultValue: 'Coin ledger' })}</h2>
         </div>
         <div className="gl-coin-filters" role="tablist" aria-label="Coin record filters">

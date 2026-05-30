@@ -13047,18 +13047,14 @@ button.gl-fan-badge-empty {
 }
 .gl-coin-wallet {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
-  align-items: stretch;
-  gap: 28px;
-  overflow: hidden;
-  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px;
   border: 1px solid var(--gl-border);
   border-radius: 16px;
-  background:
-    radial-gradient(120% 140% at 100% 0%, rgba(245, 164, 0, 0.12), transparent 58%),
-    var(--gl-bg-card);
+  background: var(--gl-bg-card);
   color: var(--gl-text);
-  padding: 28px 30px;
+  padding: 26px 30px;
 }
 .gl-coin-wallet-info {
   display: flex;
@@ -13078,19 +13074,22 @@ button.gl-fan-badge-empty {
 .gl-coin-wallet-amount {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin-top: 14px;
 }
 .gl-coin-wallet-coin {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffd479, #f5a400);
-  color: #5a3b00;
+  background: rgba(245, 164, 0, 0.14);
+  color: #d98a00;
+}
+.dark .gl-coin-wallet-coin {
+  color: #f5b73c;
 }
 .gl-coin-wallet-amount strong {
   color: var(--gl-text);
@@ -13110,7 +13109,7 @@ button.gl-fan-badge-empty {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .gl-coin-wallet-breakdown span {
   display: inline-flex;
@@ -13144,6 +13143,7 @@ button.gl-fan-badge-empty {
   flex-direction: column;
   justify-content: center;
   gap: 10px;
+  min-width: 188px;
 }
 .gl-coin-wallet-actions .gl-secondary-btn {
   justify-content: center;
@@ -13154,18 +13154,8 @@ button.gl-fan-badge-empty {
 .gl-coin-wallet-actions .gl-secondary-btn:hover {
   background: var(--gl-bg-hover);
 }
-.gl-coin-wallet-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  color: var(--gl-text-2);
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-}
-.gl-coin-wallet-link:hover {
-  color: var(--gl-text);
+.gl-coin-wallet-actions .gl-coin-wide {
+  margin-top: 0;
 }
 .gl-coin-primary {
   display: inline-flex;
@@ -13231,79 +13221,55 @@ button.gl-fan-badge-empty {
   font-size: 12px;
   font-weight: 700;
 }
-.gl-coin-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
-  gap: 18px;
-  align-items: start;
-}
-.gl-coin-main,
-.gl-coin-side {
-  display: flex;
+.gl-coin-section {
   min-width: 0;
-  flex-direction: column;
-  gap: 18px;
 }
-.gl-coin-side {
-  position: sticky;
-  top: 76px;
-}
-.gl-coin-panel {
-  min-width: 0;
-  border: 1px solid var(--gl-border);
-  border-radius: 12px;
-  background: var(--gl-bg-card);
-  padding: 18px;
-}
-.gl-coin-ledger-panel {
+.gl-coin-section-head {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
 }
-.gl-coin-panel h2 {
+.gl-coin-section-head h2 {
   margin: 0;
   color: var(--gl-text);
   font-size: 18px;
   font-weight: 900;
 }
-.gl-coin-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-.gl-coin-panel-head p {
-  margin: 4px 0 0;
-  color: var(--gl-text-2);
-  font-size: 12px;
-  line-height: 1.4;
-}
-.gl-coin-panel .gl-section-title-row > div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-.gl-coin-panel .gl-section-title-row span {
+.gl-coin-section-head span {
   color: var(--gl-text-2);
   font-size: 12px;
   line-height: 1.35;
 }
+.gl-coin-ledger-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 .gl-coin-task-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 .gl-coin-task {
   display: flex;
   min-width: 0;
-  min-height: 184px;
   flex-direction: column;
   gap: 10px;
   border: 1px solid var(--gl-border);
-  border-radius: 10px;
-  background: var(--gl-bg);
-  padding: 14px;
+  border-radius: 14px;
+  background: var(--gl-bg-card);
+  padding: 18px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.gl-coin-task:hover {
+  border-color: color-mix(in srgb, var(--gl-border) 50%, var(--gl-text-2));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+.dark .gl-coin-task:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
 }
 .gl-coin-task-top,
 .gl-coin-task-bottom {
@@ -13314,8 +13280,8 @@ button.gl-fan-badge-empty {
 }
 .gl-coin-task-icon {
   display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -13410,28 +13376,37 @@ button.gl-fan-badge-empty {
 .gl-coin-record-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  border: 1px solid var(--gl-border);
+  border-radius: 14px;
+  background: var(--gl-bg-card);
+  overflow: hidden;
 }
 .gl-coin-record {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(112px, auto);
+  grid-template-columns: 42px minmax(0, 1fr) minmax(112px, auto);
   gap: 16px;
   align-items: center;
-  min-height: 74px;
-  border: 1px solid var(--gl-border);
-  border-radius: 10px;
-  background: var(--gl-bg);
-  padding: 14px 16px;
+  min-height: 68px;
+  background: transparent;
+  padding: 13px 18px;
+  transition: background 0.12s ease;
+}
+.gl-coin-record + .gl-coin-record {
+  border-top: 1px solid var(--gl-border);
+}
+.gl-coin-record:not(.is-loading):hover {
+  background: var(--gl-bg-hover);
 }
 .gl-coin-record.is-loading {
+  min-height: 68px;
   background: linear-gradient(90deg, var(--gl-bg-hover), var(--gl-bg-card), var(--gl-bg-hover));
   background-size: 220% 100%;
   animation: glBreathe 1.25s ease-in-out infinite;
 }
 .gl-coin-record-icon {
   display: inline-flex;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -13730,12 +13705,6 @@ button.gl-fan-badge-empty {
     flex: 1 1 160px;
     width: auto;
   }
-  .gl-coin-layout {
-    grid-template-columns: 1fr;
-  }
-  .gl-coin-side {
-    position: static;
-  }
   .gl-yt-collection {
     grid-template-columns: 1fr;
   }
@@ -13916,9 +13885,6 @@ button.gl-fan-badge-empty {
   .gl-coin-stats,
   .gl-coin-task-grid {
     grid-template-columns: 1fr;
-  }
-  .gl-coin-panel {
-    padding: 14px;
   }
   .gl-coin-record {
     grid-template-columns: 36px minmax(0, 1fr);
