@@ -348,6 +348,38 @@ func (r *Room) removePresence(profile ViewerProfile) {
 	}
 }
 
+// refreshPresence re-asserts the presence set from the live connection list.
+// Presence is otherwise only written on join/profile and cleared on leave, so
+// a reconnect race (token refresh, network blip) could drop a viewer from the
+// set even though they are still watching. Re-asserting on the viewer pump
+// makes a missed add self-heal well within a lucky-bag countdown.
+func (r *Room) refreshPresence() {
+	r.mu.RLock()
+	userIDs := make([]string, 0, len(r.viewerProfiles))
+	seen := make(map[string]struct{}, len(r.viewerProfiles))
+	for _, profile := range r.viewerProfiles {
+		if profile.IsOwner || profile.UserID == "" {
+			continue
+		}
+		if _, ok := seen[profile.UserID]; ok {
+			continue
+		}
+		seen[profile.UserID] = struct{}{}
+		userIDs = append(userIDs, profile.UserID)
+	}
+	r.mu.RUnlock()
+	if len(userIDs) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	for _, userID := range userIDs {
+		if err := r.hub.broker.AddPresence(ctx, r.id, userID); err != nil {
+			logger.L().Debug("refresh room presence", zap.String("room", r.id), zap.Error(err))
+		}
+	}
+}
+
 func viewerIdentityKey(connID string, profile ViewerProfile) string {
 	if profile.IsOwner {
 		return ""
@@ -417,6 +449,7 @@ func (r *Room) pumpViewerCount(ctx context.Context, interval time.Duration) {
 		case <-t.C:
 			size := r.size()
 			r.persistViewerCount(size)
+			r.refreshPresence()
 			r.fanout(encodeViewerCount(size))
 			r.broadcastViewerList()
 			metrics.MessagesSent.WithLabelValues("viewer_count").Inc()

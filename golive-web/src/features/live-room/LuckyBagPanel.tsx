@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock3, Coins, Gift, PartyPopper, Sparkles, Ticket, Users, XCircle } from 'lucide-react';
+import {
+  ChevronDown,
+  Clock3,
+  Coins,
+  Gift,
+  PartyPopper,
+  Sparkles,
+  Ticket,
+  Users,
+  XCircle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useCancelLuckyBag,
@@ -10,6 +20,12 @@ import {
   type LuckyBagErrorReason,
 } from '@/api/luckyBag';
 import { useMe } from '@/api/auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import type { LuckyBagAmountMode, LuckyBagEligibility } from '@/types/luckyBag';
@@ -436,16 +452,25 @@ function OpenLuckyBagForm({
       <div className="gl-bag-fields">
         <label>
           <span>{t('luckyBag.eligibilityLabel', { defaultValue: 'Who can join' })}</span>
-          <select
-            value={eligibility}
-            onChange={(event) => onEligibilityChange(event.target.value as LuckyBagEligibility)}
-          >
-            {ELIGIBILITY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {eligibilityOptionLabel(option, t)}
-              </option>
-            ))}
-          </select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="gl-bag-select-trigger">
+                <span>{eligibilityOptionLabel(eligibility, t)}</span>
+                <ChevronDown size={16} aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={6} className="gl-bag-select-content">
+              {ELIGIBILITY_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  key={option}
+                  className={cn('gl-bag-select-item', eligibility === option && 'is-selected')}
+                  onSelect={() => onEligibilityChange(option)}
+                >
+                  {eligibilityOptionLabel(option, t)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </label>
         {eligibility === 'fans_level' ? (
           <label>

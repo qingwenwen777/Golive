@@ -5606,21 +5606,91 @@ input:focus-visible,
 }
 .gl-bag-submit {
   display: inline-flex;
-  height: 40px;
+  align-self: flex-end;
+  height: 34px;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 6px;
   border: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, #ffb02e, #f5a400);
   color: #4a2e00;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 850;
+  padding: 0 16px;
   cursor: pointer;
 }
 .gl-bag-submit:disabled {
   cursor: default;
   opacity: 0.6;
+}
+.gl-bag-select-trigger {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.gl-bag-select-trigger:hover,
+.gl-bag-select-trigger:focus-visible,
+.gl-bag-select-trigger[data-state='open'] {
+  border-color: #f5a400;
+  outline: none;
+}
+.gl-bag-select-trigger svg {
+  flex: 0 0 auto;
+  color: var(--gl-text-2);
+  transition: transform 0.15s ease;
+}
+.gl-bag-select-trigger[data-state='open'] svg {
+  transform: rotate(180deg);
+}
+.gl-bag-select-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-bag-select-content {
+  z-index: 90;
+  width: var(--radix-dropdown-menu-trigger-width);
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg-card);
+  padding: 5px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.16);
+}
+.gl-bag-select-item {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  border-radius: 7px;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.gl-bag-select-item:focus,
+.gl-bag-select-item:hover {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-bag-select-item.is-selected {
+  background: rgba(245, 164, 0, 0.16);
+  color: #c2790a;
+}
+.dark .gl-bag-select-item.is-selected {
+  color: #f5b73c;
 }
 .gl-bag-meta {
   display: flex;
@@ -5663,16 +5733,18 @@ input:focus-visible,
 }
 .gl-bag-join {
   display: inline-flex;
-  height: 44px;
+  align-self: flex-start;
+  height: 38px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
   border: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, #ffb02e, #f5a400);
   color: #4a2e00;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 850;
+  padding: 0 20px;
   cursor: pointer;
 }
 .gl-bag-join:disabled {
