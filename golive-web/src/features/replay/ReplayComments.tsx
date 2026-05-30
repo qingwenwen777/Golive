@@ -197,6 +197,9 @@ export function ReplayComments({
             className="gl-replay-comment-input"
             maxLength={MAX_COMMENT_LENGTH}
             value={draft}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             placeholder={t('replayComments.placeholder', { defaultValue: '添加评论...' })}
             onFocus={() => {
               if (!isAuthed) {
