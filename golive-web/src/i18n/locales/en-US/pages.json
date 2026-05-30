@@ -2048,6 +2048,8 @@
     "heroSub": "{{name}} coin account. Top-up rate: 10 coins = ¥1.",
     "goTopup": "Top up",
     "watchHistory": "Watch history",
+    "availableLabel": "Available",
+    "frozenLabel": "Frozen",
     "stats": {
       "balance": "Current balance",
       "monthSpend": "Spent this month",

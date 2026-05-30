@@ -2048,6 +2048,8 @@
     "heroSub": "{{name}} 的 coin 账户，充值比例为 10 coins = ¥1。",
     "goTopup": "去充值",
     "watchHistory": "观看记录",
+    "availableLabel": "可用",
+    "frozenLabel": "冻结",
     "stats": {
       "balance": "当前余额",
       "monthSpend": "本月消费",

@@ -2048,6 +2048,8 @@
     "heroSub": "{{name}} の coin アカウント。チャージ比率は 10 coins = ¥1 です。",
     "goTopup": "チャージ",
     "watchHistory": "視聴履歴",
+    "availableLabel": "利用可能",
+    "frozenLabel": "凍結",
     "stats": {
       "balance": "現在の残高",
       "monthSpend": "今月の消費",

@@ -12,6 +12,7 @@ import {
   History,
   MessageSquareText,
   Radio,
+  Snowflake,
   Sparkles,
   Trophy,
   Wallet,
@@ -24,6 +25,7 @@ import {
   type CoinTransaction,
   type CoinTransactionType,
 } from '@/api/coins';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { readDailyCoinActivity, coinTodayKey } from '@/lib/coinActivity';
 import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -104,7 +106,6 @@ const FILTERS: Array<{ id: RecordFilter; labelKey: string; labelDefault: string 
 export default function CoinPage() {
   const { t, i18n } = useTranslation('pages');
   const [searchParams] = useSearchParams();
-  const rechargeRef = useRef<HTMLDivElement | null>(null);
   const user = useAuthStore((s) => s.user);
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
@@ -118,8 +119,10 @@ export default function CoinPage() {
   const confirmTopup = useConfirmTopupCoins();
   const claimTask = useClaimDailyCoinTask();
 
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [topupText, setTopupText] = useState(String(MIN_TOPUP_COINS));
-  const [withdrawText, setWithdrawText] = useState('10000');
+  const [withdrawText, setWithdrawText] = useState('');
   const [filter, setFilter] = useState<RecordFilter>('all');
   const [recordPage, setRecordPage] = useState(1);
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
@@ -136,9 +139,7 @@ export default function CoinPage() {
 
   useEffect(() => {
     if (searchParams.get('focus') !== 'recharge') return;
-    window.setTimeout(() => {
-      rechargeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 80);
+    setTopupOpen(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -337,6 +338,22 @@ export default function CoinPage() {
     );
   };
 
+  const openTopup = () => {
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    setTopupOpen(true);
+  };
+
+  const openWithdraw = () => {
+    if (!isAuthed) {
+      openLogin();
+      return;
+    }
+    setWithdrawOpen(true);
+  };
+
   return (
     <div className="gl-page gl-coin-page">
       {!isAuthed && (
@@ -356,14 +373,33 @@ export default function CoinPage() {
         </div>
       )}
 
-      <section className="gl-coin-hero">
-        <div className="gl-coin-hero-copy">
-          <div className="gl-coin-kicker">
-            <Wallet size={16} />
+      <section className="gl-coin-wallet" aria-label="Coin wallet">
+        <div className="gl-coin-wallet-info">
+          <div className="gl-coin-wallet-kicker">
+            <Wallet size={15} />
             Coin Center
           </div>
-          <h1>{formatCoins(balance)}</h1>
-          <p>
+          <div className="gl-coin-wallet-amount">
+            <span className="gl-coin-wallet-coin" aria-hidden="true">
+              <Coins size={26} />
+            </span>
+            <strong>{balance.toLocaleString()}</strong>
+            <em>coins</em>
+          </div>
+          <div className="gl-coin-wallet-breakdown">
+            <span>
+              {t('coin.availableLabel', { defaultValue: 'Available' })}
+              <strong>{availableBalance.toLocaleString()}</strong>
+            </span>
+            {frozenBalance > 0 && (
+              <span className="gl-coin-wallet-frozen">
+                <Snowflake size={13} />
+                {t('coin.frozenLabel', { defaultValue: 'Frozen' })}
+                <strong>{frozenBalance.toLocaleString()}</strong>
+              </span>
+            )}
+          </div>
+          <p className="gl-coin-wallet-sub">
             {t('coin.heroSub', {
               name: currentUser
                 ? userDisplayName(currentUser)
@@ -372,16 +408,20 @@ export default function CoinPage() {
             })}
           </p>
         </div>
-        <div className="gl-coin-hero-actions">
-          <button
-            type="button"
-            className="gl-coin-primary"
-            onClick={() => rechargeRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          >
+        <div className="gl-coin-wallet-actions">
+          <button type="button" className="gl-coin-primary gl-coin-wide" onClick={openTopup}>
             <CreditCard size={16} />
             {t('coin.goTopup', { defaultValue: 'Top up' })}
           </button>
-          <Link className="gl-secondary-btn" to="/history">
+          <button
+            type="button"
+            className="gl-secondary-btn gl-coin-wide"
+            onClick={openWithdraw}
+          >
+            <ArrowUpRight size={16} />
+            {t('coin.withdraw.title', { defaultValue: 'Withdraw' })}
+          </button>
+          <Link className="gl-coin-wallet-link" to="/history">
             <History size={15} />
             {t('coin.watchHistory', { defaultValue: 'Watch history' })}
           </Link>
@@ -389,11 +429,6 @@ export default function CoinPage() {
       </section>
 
       <section className="gl-coin-stats" aria-label="Coin summary">
-        <StatPill
-          icon={<Coins size={18} />}
-          value={formatCoins(balance)}
-          label={t('coin.stats.balance', { defaultValue: 'Current balance' })}
-        />
         <StatPill
           icon={<ArrowUpRight size={18} />}
           value={formatCoins(monthSpend)}
@@ -411,210 +446,222 @@ export default function CoinPage() {
         />
       </section>
 
-      <div className="gl-coin-layout">
-        <div className="gl-coin-main">
-          <section className="gl-coin-panel">
-            <div className="gl-section-title-row">
-              <div>
-                <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
-                <span>{t('coin.dailyResetHint', { defaultValue: '北京时间 0 点刷新' })}</span>
-              </div>
-            </div>
-            <div className="gl-coin-task-grid">
-              {DAILY_TASKS.map((task) => {
-                const progress = taskProgress(task.kind, activity);
-                const claimed = claimedByTask.get(task.id);
-                return (
-                  <TaskCard
-                    key={task.id}
-                    title={t(task.titleKey, { defaultValue: task.titleDefault })}
-                    description={t(task.descriptionKey, { defaultValue: task.descriptionDefault })}
-                    reward={claimed ? String(claimed.amount) : task.reward}
-                    progress={progress}
-                    target={task.target}
-                    targetLabel={t(task.targetLabelKey, { defaultValue: task.targetLabelDefault })}
-                    claimed={Boolean(claimed)}
-                    pending={claimingTaskId === task.id && claimTask.isPending}
-                    onClaim={() => handleClaim(task, progress)}
-                  />
-                );
-              })}
-            </div>
-          </section>
+      <section className="gl-coin-panel">
+        <div className="gl-section-title-row">
+          <div>
+            <h2>{t('coin.dailyTasks', { defaultValue: 'Daily tasks' })}</h2>
+            <span>{t('coin.dailyResetHint', { defaultValue: '北京时间 0 点刷新' })}</span>
+          </div>
+        </div>
+        <div className="gl-coin-task-grid">
+          {DAILY_TASKS.map((task) => {
+            const progress = taskProgress(task.kind, activity);
+            const claimed = claimedByTask.get(task.id);
+            return (
+              <TaskCard
+                key={task.id}
+                title={t(task.titleKey, { defaultValue: task.titleDefault })}
+                description={t(task.descriptionKey, { defaultValue: task.descriptionDefault })}
+                reward={claimed ? String(claimed.amount) : task.reward}
+                progress={progress}
+                target={task.target}
+                targetLabel={t(task.targetLabelKey, { defaultValue: task.targetLabelDefault })}
+                claimed={Boolean(claimed)}
+                pending={claimingTaskId === task.id && claimTask.isPending}
+                onClaim={() => handleClaim(task, progress)}
+              />
+            );
+          })}
+        </div>
+      </section>
 
-          <section className="gl-coin-panel gl-coin-ledger-panel">
-            <div className="gl-section-title-row">
-              <h2>{t('coin.ledger', { defaultValue: 'Coin ledger' })}</h2>
-            </div>
-            <div className="gl-coin-filters" role="tablist" aria-label="Coin record filters">
-              {FILTERS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={cn('gl-coin-filter', filter === item.id && 'is-active')}
-                  onClick={() => setFilter(item.id)}
-                >
-                  {t(item.labelKey, { defaultValue: item.labelDefault })}
-                </button>
-              ))}
-            </div>
-
-            {transactions.isPending && isAuthed ? (
-              <div className="gl-coin-record-list" aria-busy="true">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="gl-coin-record is-loading" />
-                ))}
-              </div>
-            ) : filteredRows.length === 0 ? (
-              <div className="gl-coin-empty">
-                <Sparkles size={32} />
-                <strong>{t('coin.emptyTitle', { defaultValue: 'No coin records yet' })}</strong>
-                <span>
-                  {t('coin.emptySub', {
-                    defaultValue:
-                      'Top-ups, gifts, Super Chats, and betting activity will appear here.',
-                  })}
-                </span>
-              </div>
-            ) : (
-              <>
-                <div className="gl-coin-record-list">
-                  {visibleRows.map((item) => (
-                    <CoinRecordRow key={item.id} item={item} />
-                  ))}
-                </div>
-                {totalRecordPages > 1 && (
-                  <RecordPagination
-                    page={recordPage}
-                    totalPages={totalRecordPages}
-                    totalItems={filteredRows.length}
-                    onPageChange={setRecordPage}
-                  />
-                )}
-              </>
-            )}
-          </section>
+      <section className="gl-coin-panel gl-coin-ledger-panel">
+        <div className="gl-section-title-row">
+          <h2>{t('coin.ledger', { defaultValue: 'Coin ledger' })}</h2>
+        </div>
+        <div className="gl-coin-filters" role="tablist" aria-label="Coin record filters">
+          {FILTERS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={cn('gl-coin-filter', filter === item.id && 'is-active')}
+              onClick={() => setFilter(item.id)}
+            >
+              {t(item.labelKey, { defaultValue: item.labelDefault })}
+            </button>
+          ))}
         </div>
 
-        <aside className="gl-coin-side">
-          <section className="gl-coin-panel" ref={rechargeRef}>
-            <div className="gl-coin-panel-head">
-              <div>
-                <h2>{t('coin.topup.title', { defaultValue: 'Top up' })}</h2>
-                <p>{t('coin.topup.sub', { defaultValue: 'Minimum 10 coins. No upper limit.' })}</p>
-              </div>
-              <CreditCard size={20} />
-            </div>
-            <label className="gl-coin-input-label">
-              <span>{t('coin.topup.amount', { defaultValue: 'Top-up amount' })}</span>
-              <div className="gl-coin-input">
-                <input
-                  inputMode="numeric"
-                  value={topupText}
-                  onChange={(event) => setTopupText(cleanCoinText(event.target.value))}
-                  onBlur={() => {
-                    if (topupAmount < MIN_TOPUP_COINS) setTopupText(String(MIN_TOPUP_COINS));
-                  }}
-                  aria-label={t('coin.topup.amountAria', { defaultValue: 'Top-up coin amount' })}
-                />
-                <span>coins</span>
-              </div>
-            </label>
-            <div className="gl-coin-quick">
-              {QUICK_TOPUPS.map((amount) => (
-                <button key={amount} type="button" onClick={() => setTopupText(String(amount))}>
-                  {amount.toLocaleString()}
-                </button>
+        {transactions.isPending && isAuthed ? (
+          <div className="gl-coin-record-list" aria-busy="true">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="gl-coin-record is-loading" />
+            ))}
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="gl-coin-empty">
+            <Sparkles size={32} />
+            <strong>{t('coin.emptyTitle', { defaultValue: 'No coin records yet' })}</strong>
+            <span>
+              {t('coin.emptySub', {
+                defaultValue:
+                  'Top-ups, gifts, Super Chats, and betting activity will appear here.',
+              })}
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="gl-coin-record-list">
+              {visibleRows.map((item) => (
+                <CoinRecordRow key={item.id} item={item} />
               ))}
             </div>
-            <div className="gl-coin-exchange">
-              <span>{t('coin.topup.pay', { defaultValue: 'Pay' })}</span>
-              <strong>{formatFiat(topupAmount, i18n.language)}</strong>
-            </div>
-            <button
-              type="button"
-              className="gl-coin-primary gl-coin-wide"
-              onClick={handleTopup}
-              disabled={topup.isPending}
-            >
-              <CreditCard size={16} />
-              {topup.isPending
-                ? t('coin.topup.pending', { defaultValue: 'Opening Stripe...' })
-                : t('coin.topup.submit', { defaultValue: 'Pay with Stripe' })}
-            </button>
-          </section>
-
-          <section className="gl-coin-panel">
-            <div className="gl-coin-panel-head">
-              <div>
-                <h2>{t('coin.withdraw.title', { defaultValue: 'Withdraw' })}</h2>
-                <p>
-                  {platformCertified
-                    ? t('coin.withdraw.subCertified', {
-                        defaultValue:
-                          'Platform certified rate preview: 25% fee. Withdrawal is not implemented yet.',
-                      })
-                    : t('coin.withdraw.sub', {
-                        defaultValue: '35% fee preview. Withdrawal is not implemented yet.',
-                      })}
-                </p>
-              </div>
-              <Wallet size={20} />
-            </div>
-            <label className="gl-coin-input-label">
-              <span>{t('coin.withdraw.amount', { defaultValue: 'Withdrawal amount' })}</span>
-              <div className="gl-coin-input">
-                <input
-                  inputMode="numeric"
-                  value={withdrawText}
-                  onChange={(event) => setWithdrawText(cleanCoinText(event.target.value))}
-                  aria-label={t('coin.withdraw.amountAria', {
-                    defaultValue: 'Withdrawal coin amount',
-                  })}
-                />
-                <span>coins</span>
-              </div>
-            </label>
-            <div className="gl-coin-withdraw-lines">
-              <span>
-                {t('coin.withdraw.available', { defaultValue: 'Available' })}{' '}
-                <strong>{formatCoins(availableBalance)}</strong>
-              </span>
-              <span>
-                {t('coin.withdraw.rate', { defaultValue: 'Fee rate' })}{' '}
-                <strong>{Math.round(withdrawFeeRate * 100)}%</strong>
-              </span>
-              <span>
-                {t('coin.withdraw.fee', { defaultValue: 'Fee' })}{' '}
-                <strong>{formatCoins(withdrawFee)}</strong>
-              </span>
-              <span>
-                {t('coin.withdraw.net', { defaultValue: 'Estimated arrival' })}{' '}
-                <strong>{formatCoins(withdrawNet)}</strong>
-              </span>
-              <span>
-                {t('coin.withdraw.rmb', { defaultValue: 'Estimated value' })}{' '}
-                <strong>{formatFiat(withdrawNet, i18n.language)}</strong>
-              </span>
-            </div>
-            {platformCertified && (
-              <div className="gl-coin-certified-note">
-                <Trophy size={15} />
-                {t('coin.withdraw.certifiedNote', {
-                  defaultValue: 'Platform certification reduced this fee by 10 percentage points.',
-                })}
-              </div>
+            {totalRecordPages > 1 && (
+              <RecordPagination
+                page={recordPage}
+                totalPages={totalRecordPages}
+                totalItems={filteredRows.length}
+                onPageChange={setRecordPage}
+              />
             )}
-            <button
-              type="button"
-              className="gl-secondary-btn gl-coin-wide"
-              onClick={handleWithdraw}
-            >
-              {t('coin.withdraw.preview', { defaultValue: 'Preview withdrawal' })}
-            </button>
-          </section>
-        </aside>
-      </div>
+          </>
+        )}
+      </section>
+
+      <Dialog open={topupOpen} onOpenChange={setTopupOpen}>
+        <DialogContent className="gl-coin-modal">
+          <div className="gl-coin-modal-head">
+            <span className="gl-coin-modal-icon">
+              <CreditCard size={18} />
+            </span>
+            <div>
+              <DialogTitle className="gl-coin-modal-title">
+                {t('coin.topup.title', { defaultValue: 'Top up' })}
+              </DialogTitle>
+              <DialogDescription className="gl-coin-modal-desc">
+                {t('coin.topup.sub', { defaultValue: 'Minimum 10 coins. No upper limit.' })}
+              </DialogDescription>
+            </div>
+          </div>
+          <label className="gl-coin-input-label">
+            <span>{t('coin.topup.amount', { defaultValue: 'Top-up amount' })}</span>
+            <div className="gl-coin-input">
+              <input
+                inputMode="numeric"
+                autoComplete="off"
+                value={topupText}
+                onChange={(event) => setTopupText(cleanCoinText(event.target.value))}
+                onBlur={() => {
+                  if (topupAmount < MIN_TOPUP_COINS) setTopupText(String(MIN_TOPUP_COINS));
+                }}
+                aria-label={t('coin.topup.amountAria', { defaultValue: 'Top-up coin amount' })}
+              />
+              <span>coins</span>
+            </div>
+          </label>
+          <div className="gl-coin-quick">
+            {QUICK_TOPUPS.map((amount) => (
+              <button
+                key={amount}
+                type="button"
+                className={cn(topupAmount === amount && 'is-active')}
+                onClick={() => setTopupText(String(amount))}
+              >
+                {amount.toLocaleString()}
+              </button>
+            ))}
+          </div>
+          <div className="gl-coin-exchange">
+            <span>{t('coin.topup.pay', { defaultValue: 'Pay' })}</span>
+            <strong>{formatFiat(topupAmount, i18n.language)}</strong>
+          </div>
+          <button
+            type="button"
+            className="gl-coin-primary gl-coin-wide"
+            onClick={handleTopup}
+            disabled={topup.isPending}
+          >
+            <CreditCard size={16} />
+            {topup.isPending
+              ? t('coin.topup.pending', { defaultValue: 'Opening Stripe...' })
+              : t('coin.topup.submit', { defaultValue: 'Pay with Stripe' })}
+          </button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogContent className="gl-coin-modal">
+          <div className="gl-coin-modal-head">
+            <span className="gl-coin-modal-icon">
+              <Wallet size={18} />
+            </span>
+            <div>
+              <DialogTitle className="gl-coin-modal-title">
+                {t('coin.withdraw.title', { defaultValue: 'Withdraw' })}
+              </DialogTitle>
+              <DialogDescription className="gl-coin-modal-desc">
+                {platformCertified
+                  ? t('coin.withdraw.subCertified', {
+                      defaultValue:
+                        'Platform certified rate preview: 25% fee. Withdrawal is not implemented yet.',
+                    })
+                  : t('coin.withdraw.sub', {
+                      defaultValue: '35% fee preview. Withdrawal is not implemented yet.',
+                    })}
+              </DialogDescription>
+            </div>
+          </div>
+          <label className="gl-coin-input-label">
+            <span>{t('coin.withdraw.amount', { defaultValue: 'Withdrawal amount' })}</span>
+            <div className="gl-coin-input">
+              <input
+                inputMode="numeric"
+                autoComplete="off"
+                value={withdrawText}
+                placeholder={String(availableBalance)}
+                onChange={(event) => setWithdrawText(cleanCoinText(event.target.value))}
+                aria-label={t('coin.withdraw.amountAria', {
+                  defaultValue: 'Withdrawal coin amount',
+                })}
+              />
+              <span>coins</span>
+            </div>
+          </label>
+          <div className="gl-coin-withdraw-lines">
+            <span>
+              {t('coin.withdraw.available', { defaultValue: 'Available' })}{' '}
+              <strong>{formatCoins(availableBalance)}</strong>
+            </span>
+            <span>
+              {t('coin.withdraw.rate', { defaultValue: 'Fee rate' })}{' '}
+              <strong>{Math.round(withdrawFeeRate * 100)}%</strong>
+            </span>
+            <span>
+              {t('coin.withdraw.fee', { defaultValue: 'Fee' })}{' '}
+              <strong>{formatCoins(withdrawFee)}</strong>
+            </span>
+            <span>
+              {t('coin.withdraw.net', { defaultValue: 'Estimated arrival' })}{' '}
+              <strong>{formatCoins(withdrawNet)}</strong>
+            </span>
+            <span>
+              {t('coin.withdraw.rmb', { defaultValue: 'Estimated value' })}{' '}
+              <strong>{formatFiat(withdrawNet, i18n.language)}</strong>
+            </span>
+          </div>
+          {platformCertified && (
+            <div className="gl-coin-certified-note">
+              <Trophy size={15} />
+              {t('coin.withdraw.certifiedNote', {
+                defaultValue: 'Platform certification reduced this fee by 10 percentage points.',
+              })}
+            </div>
+          )}
+          <button type="button" className="gl-coin-primary gl-coin-wide" onClick={handleWithdraw}>
+            {t('coin.withdraw.preview', { defaultValue: 'Preview withdrawal' })}
+          </button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
