@@ -25,6 +25,7 @@ import { GiftPanel } from '@/features/live-room/GiftPanel';
 import { SuperChatDialog } from '@/features/live-room/SuperChatDialog';
 import { FlyingGiftOverlay } from '@/features/live-room/FlyingGiftLayer';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
+import { ReplayComments } from '@/features/replay/ReplayComments';
 import { useRoomRealtime } from '@/features/live-room/useRoomRealtime';
 import { useLiveRoomUiStore } from '@/features/live-room/useLiveRoomUiStore';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
@@ -1206,6 +1207,13 @@ function ReplayRoomView({
             />
           )}
           <ReplayInfoBlock stream={stream} />
+          {!locked && (
+            <ReplayComments
+              roomId={stream.id}
+              ownerId={stream.ownerId}
+              channelId={stream.channelId}
+            />
+          )}
           {isMobile && <div className="gl-mobile-chat">{chat}</div>}
         </div>
         {!isNarrow && <div className="gl-side-rail sticky top-20 self-start">{chat}</div>}

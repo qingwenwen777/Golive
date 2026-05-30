@@ -19,6 +19,7 @@ type Deps struct {
 	Posts          *service.PostService
 	Live           *service.LiveService
 	Replay         *service.ReplayService
+	ReplayComments *service.ReplayCommentService
 	Search         *service.SearchService
 	Appointments   *service.AppointmentService
 	Moderation     *service.ModerationService
@@ -43,6 +44,7 @@ func NewRouter(d Deps) *gin.Engine {
 	postH := handler.NewPostHandler(d.Posts, d.Permission, d.PostImageDir, d.PostPublicURL)
 	liveH := handler.NewLiveHandler(d.Live, d.Permission)
 	replayH := handler.NewReplayHandler(d.Replay)
+	replayCommentH := handler.NewReplayCommentHandler(d.ReplayComments)
 	searchH := handler.NewSearchHandler(d.Search)
 	appointmentH := handler.NewAppointmentHandler(d.Appointments)
 	moderationH := handler.NewModerationHandler(d.Moderation)
@@ -154,6 +156,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.DELETE("/:id/moderation/mutes/:userID", auth, moderationH.Unmute)
 		rooms.GET("/:id", optionalAuth, roomH.Get)
 		rooms.GET("/:id/follow", optionalAuth, socialH.GetFollow)
+		rooms.GET("/:id/replay/comments", optionalAuth, replayCommentH.List)
 
 		// Authenticated mutations / personalized state.
 		authed := rooms.Group("", auth)
@@ -175,6 +178,10 @@ func NewRouter(d Deps) *gin.Engine {
 		authed.POST("/live/cover", coverH.Upload)
 		authed.PATCH("/replays/:id", replayH.Update)
 		authed.DELETE("/replays/:id", replayH.Delete)
+		authed.POST("/:id/replay/comments", replayCommentH.Create)
+		authed.DELETE("/:id/replay/comments/:commentID", replayCommentH.Delete)
+		authed.POST("/:id/replay/comments/:commentID/like", replayCommentH.Like)
+		authed.DELETE("/:id/replay/comments/:commentID/like", replayCommentH.Unlike)
 	}
 
 	uploadDir := d.CoverDir

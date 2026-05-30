@@ -68,6 +68,10 @@ func main() {
 	if err := postRepo.AutoMigrate(); err != nil {
 		log.Fatal("post automigrate", zap.Error(err))
 	}
+	replayCommentRepo := repo.NewReplayCommentRepo(db)
+	if err := replayCommentRepo.AutoMigrate(); err != nil {
+		log.Fatal("replay comment automigrate", zap.Error(err))
+	}
 	messageRepo := repo.NewMessageRepo(db)
 	if err := messageRepo.AutoMigrate(); err != nil {
 		log.Fatal("message automigrate", zap.Error(err))
@@ -125,6 +129,10 @@ func main() {
 	postSvc.SetTextPolicy(moderationSvc)
 	postSvc.SetBlockChecker(messageSvc)
 	postSvc.SetNotificationWriter(messageRepo)
+	replayCommentSvc := service.NewReplayCommentService(replayCommentRepo, roomRepo, replaySvc)
+	replayCommentSvc.SetTextPolicy(moderationSvc)
+	replayCommentSvc.SetBlockChecker(messageSvc)
+	replayCommentSvc.SetNotificationWriter(messageRepo)
 	searchSvc := service.NewSearchService(roomSvc, socialSvc, postSvc, appointmentSvc)
 	if activeRooms, err := roomRepo.ActiveRooms(context.Background()); err != nil {
 		log.Warn("load active rooms for moderation cache", zap.Error(err))
@@ -153,6 +161,7 @@ func main() {
 		Posts:          postSvc,
 		Live:           liveSvc,
 		Replay:         replaySvc,
+		ReplayComments: replayCommentSvc,
 		Search:         searchSvc,
 		Appointments:   appointmentSvc,
 		Moderation:     moderationSvc,

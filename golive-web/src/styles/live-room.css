@@ -70,6 +70,375 @@
   margin-top: 16px;
 }
 
+/* ---- Replay comments (YouTube-style) ---- */
+.gl-replay-comments {
+  margin-top: 24px;
+}
+
+.gl-replay-comments-head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.gl-replay-comments-head h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gl-text);
+}
+
+.gl-replay-comments-sort {
+  position: relative;
+}
+
+.gl-replay-comments-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gl-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.gl-replay-comments-sort-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.gl-replay-comments-sort-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 31;
+  min-width: 180px;
+  padding: 8px 0;
+  background: var(--gl-bg-card);
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+
+.gl-replay-comments-sort-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 14px;
+  color: var(--gl-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.gl-replay-comments-sort-menu button:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-replay-comments-sort-menu button.is-active {
+  font-weight: 700;
+}
+
+/* Composer */
+.gl-replay-comment-composer {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.gl-replay-comment-composer-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.gl-replay-comment-reply-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--gl-text-2);
+  background: var(--gl-bg-hover);
+  border-radius: 999px;
+}
+
+.gl-replay-comment-reply-chip button {
+  background: none;
+  border: none;
+  color: var(--gl-accent, #065fd4);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gl-replay-comment-input {
+  width: 100%;
+  padding: 6px 0;
+  font-size: 14px;
+  color: var(--gl-text);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--gl-border);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.gl-replay-comment-input:focus {
+  border-bottom-color: var(--gl-text);
+  border-bottom-width: 2px;
+}
+
+.gl-replay-comment-input::placeholder {
+  color: var(--gl-text-3);
+}
+
+.gl-replay-comment-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.gl-replay-comment-btn-ghost,
+.gl-replay-comment-btn-primary {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+}
+
+.gl-replay-comment-btn-ghost {
+  background: none;
+  color: var(--gl-text);
+}
+
+.gl-replay-comment-btn-ghost:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-replay-comment-btn-primary {
+  background: var(--gl-accent, #065fd4);
+  color: #ffffff;
+}
+
+.gl-replay-comment-btn-primary:disabled {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-3);
+  cursor: not-allowed;
+}
+
+/* List */
+.gl-replay-comment-status {
+  padding: 20px 0;
+  font-size: 14px;
+  color: var(--gl-text-2);
+}
+
+.gl-replay-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gl-replay-comment {
+  display: flex;
+  gap: 16px;
+}
+
+.gl-replay-comment-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.gl-replay-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.gl-replay-comment-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gl-text);
+}
+
+.gl-replay-comment-author.is-owner {
+  padding: 1px 8px;
+  color: var(--gl-text);
+  background: var(--gl-bg-hover);
+  border-radius: 999px;
+}
+
+.gl-replay-comment-time {
+  font-size: 12px;
+  color: var(--gl-text-2);
+}
+
+.gl-replay-comment-text {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--gl-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.gl-replay-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.gl-replay-comment-like,
+.gl-replay-comment-dislike {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--gl-text-2);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.gl-replay-comment-like:hover,
+.gl-replay-comment-dislike:hover:not(:disabled) {
+  background: var(--gl-bg-hover);
+}
+
+.gl-replay-comment-like.is-active {
+  color: var(--gl-text);
+}
+
+.gl-replay-comment-dislike:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.gl-replay-comment-reply {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gl-text);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.gl-replay-comment-reply:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-replay-comment-more-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.gl-replay-comment-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.gl-replay-comment-more span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--gl-text-2);
+}
+
+.gl-replay-comment-more:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-replay-comment-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.gl-replay-comment-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 31;
+  min-width: 140px;
+  padding: 6px 0;
+  background: var(--gl-bg-card);
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+
+.gl-replay-comment-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--gl-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.gl-replay-comment-menu button:hover {
+  background: var(--gl-bg-hover);
+}
+
+.gl-replay-comment-menu button.is-danger {
+  color: #d33426;
+}
+
+.gl-replay-comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gl-accent, #065fd4);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.gl-replay-comment-toggle:hover {
+  background: color-mix(in srgb, var(--gl-accent, #065fd4) 12%, transparent);
+}
+
+.gl-replay-comment-children {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .gl-chat.is-readonly .gl-chat-tabs.is-single {
   grid-template-columns: 1fr;
 }
