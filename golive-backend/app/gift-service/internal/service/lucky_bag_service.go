@@ -50,6 +50,7 @@ type LuckyBagView struct {
 	Bag              *model.LuckyBag      `json:"bag"`
 	MyEntry          *model.LuckyBagEntry `json:"myEntry,omitempty"`
 	ParticipantCount int64                `json:"participantCount"`
+	Winners          []repo.LuckyBagWinner `json:"winners,omitempty"`
 }
 
 type OpenLuckyBagReq struct {
@@ -71,7 +72,15 @@ func (s *LuckyBagService) Latest(ctx context.Context, roomID, userID string) (*L
 	if bag == nil {
 		return nil, nil
 	}
-	return &LuckyBagView{Bag: bag, MyEntry: entry, ParticipantCount: count}, nil
+	view := &LuckyBagView{Bag: bag, MyEntry: entry, ParticipantCount: count}
+	if bag.Status == model.LuckyBagDrawn {
+		winners, err := s.orders.LuckyBagWinners(ctx, bag.ID)
+		if err != nil {
+			return nil, err
+		}
+		view.Winners = winners
+	}
+	return view, nil
 }
 
 func (s *LuckyBagService) Open(ctx context.Context, ownerID string, req OpenLuckyBagReq) (*LuckyBagView, error) {
@@ -220,9 +229,8 @@ func (s *LuckyBagService) drawDue(ctx context.Context) {
 	}
 	for i := range bags {
 		bag := bags[i]
-		present := s.presentUsers(ctx, bag.RoomID)
 		packets := splitPackets(bag.TotalCoin, bag.Count, bag.AmountMode)
-		if _, _, err := s.orders.DrawLuckyBag(ctx, bag.ID, present, packets, time.Now().UTC().UnixMilli()); err != nil {
+		if _, _, err := s.orders.DrawLuckyBag(ctx, bag.ID, packets, time.Now().UTC().UnixMilli()); err != nil {
 			if !errors.Is(err, repo.ErrLuckyBagClosed) {
 				logger.L().Warn("draw lucky bag", zap.String("bag_id", bag.ID), zap.Error(err))
 			}
@@ -230,27 +238,8 @@ func (s *LuckyBagService) drawDue(ctx context.Context) {
 	}
 }
 
-// presentUsers returns the set of userIds currently connected to the room,
-// as recorded by im-gateway in Redis.
-func (s *LuckyBagService) presentUsers(ctx context.Context, roomID string) map[string]bool {
-	out := map[string]bool{}
-	if s.rdb == nil {
-		return out
-	}
-	members, err := s.rdb.SMembers(ctx, presenceKey(roomID)).Result()
-	if err != nil && err != redis.Nil {
-		logger.L().Debug("read room presence", zap.String("room", roomID), zap.Error(err))
-		return out
-	}
-	for _, m := range members {
-		if m = strings.TrimSpace(m); m != "" {
-			out[m] = true
-		}
-	}
-	return out
-}
-
-func presenceKey(roomID string) string { return "room:" + roomID + ":presence" }
+// presentUsers / presence tracking was removed: a draw now includes every
+// joined participant regardless of room presence.
 
 func (s *LuckyBagService) checkEligibility(ctx context.Context, userID string, bag *model.LuckyBag) (bool, error) {
 	switch bag.Eligibility {

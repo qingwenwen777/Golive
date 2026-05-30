@@ -5799,6 +5799,114 @@ input:focus-visible,
   cursor: default;
   opacity: 0.55;
 }
+.gl-bag-winners-modal {
+  max-width: 380px;
+  padding: 0;
+  overflow: hidden;
+}
+.gl-bag-winners-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 22px 22px 14px;
+  background: rgba(245, 164, 0, 0.08);
+  border-bottom: 1px solid var(--gl-border);
+}
+.gl-bag-winners-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: rgba(245, 164, 0, 0.16);
+  color: #c2790a;
+}
+.dark .gl-bag-winners-icon {
+  color: #f5b73c;
+}
+.gl-bag-winners-title {
+  font-size: 16px;
+  font-weight: 850;
+  color: var(--gl-text);
+}
+.gl-bag-winners-sub {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--gl-text-2);
+}
+.gl-bag-winners-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px;
+  list-style: none;
+}
+.gl-bag-winner-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.gl-bag-winner-row:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-bag-winner-rank {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+.gl-bag-winner-row:nth-child(1) .gl-bag-winner-rank,
+.gl-bag-winner-row:nth-child(2) .gl-bag-winner-rank,
+.gl-bag-winner-row:nth-child(3) .gl-bag-winner-rank {
+  background: rgba(245, 164, 0, 0.18);
+  color: #c2790a;
+}
+.dark .gl-bag-winner-row:nth-child(1) .gl-bag-winner-rank,
+.dark .gl-bag-winner-row:nth-child(2) .gl-bag-winner-rank,
+.dark .gl-bag-winner-row:nth-child(3) .gl-bag-winner-rank {
+  color: #f5b73c;
+}
+.gl-bag-winner-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-bag-winner-payout {
+  flex: 0 0 auto;
+  color: #c2790a;
+  font-size: 14px;
+  font-weight: 850;
+}
+.dark .gl-bag-winner-payout {
+  color: #f5b73c;
+}
+.gl-bag-winners-empty {
+  padding: 28px 22px 32px;
+  text-align: center;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  font-weight: 750;
+}
 .gl-live-console-activity .gl-bag-panel {
   margin-top: 0;
   box-shadow: none;

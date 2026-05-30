@@ -32,7 +32,31 @@ var (
 // LuckyBagWinner is the per-winner result produced by a draw.
 type LuckyBagWinner struct {
 	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
 	Payout int64  `json:"payout"`
+}
+
+// LuckyBagWinners returns the winners of a drawn bag with their display name
+// and avatar, newest payout first. Used to render the winner-list popup.
+func (r *OrderRepo) LuckyBagWinners(ctx context.Context, bagID string) ([]LuckyBagWinner, error) {
+	var winners []LuckyBagWinner
+	err := r.db.WithContext(ctx).
+		Table("lucky_bag_entries AS e").
+		Select(`
+e.user_id AS user_id,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), e.user_id) AS name,
+COALESCE(u.avatar, '') AS avatar,
+e.payout AS payout
+`).
+		Joins("LEFT JOIN users AS u ON u.id = e.user_id").
+		Where("e.bag_id = ? AND e.status = ?", bagID, model.LuckyBagEntryWon).
+		Order("e.payout DESC, e.created_at ASC").
+		Scan(&winners).Error
+	if err != nil {
+		return nil, err
+	}
+	return winners, nil
 }
 
 // LatestLuckyBag returns the most recent bag in a room plus the caller's entry
@@ -224,10 +248,12 @@ func (r *OrderRepo) DueLuckyBags(ctx context.Context, limit int) ([]model.LuckyB
 	return bags, err
 }
 
-// DrawLuckyBag settles a bag: pays present winners their packet, marks the
-// rest missed, refunds the unused remainder to the owner, and emits an outbox
+// DrawLuckyBag settles a bag: pays winners their packet, marks the rest
+// missed, refunds the unused remainder to the owner, and emits an outbox
 // event. `packets` has len == bag.Count; only the first len(winners) are paid.
-func (r *OrderRepo) DrawLuckyBag(ctx context.Context, bagID string, present map[string]bool, packets []int64, ts int64) (*model.LuckyBag, []LuckyBagWinner, error) {
+// All joined participants are eligible (the room-presence requirement was
+// removed so any joiner can win).
+func (r *OrderRepo) DrawLuckyBag(ctx context.Context, bagID string, packets []int64, ts int64) (*model.LuckyBag, []LuckyBagWinner, error) {
 	var drawnBag model.LuckyBag
 	var winners []LuckyBagWinner
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -259,12 +285,7 @@ func (r *OrderRepo) DrawLuckyBag(ctx context.Context, bagID string, present map[
 			Find(&entries).Error; err != nil {
 			return err
 		}
-		eligible := make([]model.LuckyBagEntry, 0, len(entries))
-		for _, e := range entries {
-			if present[e.UserID] {
-				eligible = append(eligible, e)
-			}
-		}
+		eligible := append([]model.LuckyBagEntry(nil), entries...)
 		shuffleEntries(eligible)
 
 		winnerCount := len(packets)

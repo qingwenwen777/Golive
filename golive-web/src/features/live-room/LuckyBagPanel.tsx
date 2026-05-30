@@ -8,6 +8,7 @@ import {
   PartyPopper,
   Sparkles,
   Ticket,
+  Trophy,
   Users,
   XCircle,
 } from 'lucide-react';
@@ -20,6 +21,8 @@ import {
   type LuckyBagErrorReason,
 } from '@/api/luckyBag';
 import { useMe } from '@/api/auth';
+import { Avatar } from '@/components/Avatar';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
-import type { LuckyBagAmountMode, LuckyBagEligibility } from '@/types/luckyBag';
+import type { LuckyBagAmountMode, LuckyBagEligibility, LuckyBagWinner } from '@/types/luckyBag';
 import { cn } from '@/lib/cn';
 
 const DEFAULT_TOTAL = 1000;
@@ -59,11 +62,26 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
   const [duration, setDuration] = useState(DEFAULT_DURATION);
   const [message, setMessage] = useState('');
   const [now, setNow] = useState(() => Date.now());
+  const [winnersBagId, setWinnersBagId] = useState<string | null>(null);
+  const [winnersOpen, setWinnersOpen] = useState(false);
+  const [shownWinnersBagId, setShownWinnersBagId] = useState<string | null>(null);
 
   const bag = latest.data?.bag ?? null;
   const myEntry = latest.data?.myEntry;
   const participantCount = latest.data?.participantCount ?? 0;
+  const winners = useMemo(() => latest.data?.winners ?? [], [latest.data?.winners]);
   const balance = me.data?.coinBalance ?? 0;
+
+  // Pop the winner list once when a bag finishes drawing.
+  useEffect(() => {
+    if (!bag || bag.status !== 'drawn') return;
+    if (shownWinnersBagId === bag.id) return;
+    setShownWinnersBagId(bag.id);
+    setWinnersBagId(bag.id);
+    setWinnersOpen(true);
+  }, [bag, shownWinnersBagId]);
+
+  const popupWinners = winnersBagId === bag?.id ? winners : [];
 
   useEffect(() => {
     if (!bag || bag.status !== 'open') return;
@@ -282,7 +300,65 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
           )}
         </>
       )}
+      <LuckyBagWinnersDialog
+        open={winnersOpen}
+        winners={popupWinners}
+        onOpenChange={setWinnersOpen}
+      />
     </section>
+  );
+}
+
+function LuckyBagWinnersDialog({
+  open,
+  winners,
+  onOpenChange,
+}: {
+  open: boolean;
+  winners: LuckyBagWinner[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation('pages');
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="gl-bag-winners-modal">
+        <div className="gl-bag-winners-head">
+          <span className="gl-bag-winners-icon" aria-hidden="true">
+            <Trophy size={20} />
+          </span>
+          <DialogTitle className="gl-bag-winners-title">
+            {t('luckyBag.winnersTitle', { defaultValue: 'Lucky bag winners' })}
+          </DialogTitle>
+          <p className="gl-bag-winners-sub">
+            {t('luckyBag.winnersCount', {
+              count: winners.length,
+              formattedCount: winners.length.toLocaleString(),
+              defaultValue: '{{formattedCount}} winners',
+            })}
+          </p>
+        </div>
+        {winners.length > 0 ? (
+          <ol className="gl-bag-winners-list">
+            {winners.map((winner, index) => (
+              <li key={winner.userId} className="gl-bag-winner-row">
+                <span className="gl-bag-winner-rank">{index + 1}</span>
+                <Avatar name={winner.name} src={winner.avatar} size={32} />
+                <span className="gl-bag-winner-name" title={winner.name}>
+                  {winner.name}
+                </span>
+                <span className="gl-bag-winner-payout">
+                  +{winner.payout.toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <div className="gl-bag-winners-empty">
+            {t('luckyBag.winnersEmpty', { defaultValue: 'No one joined this lucky bag.' })}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

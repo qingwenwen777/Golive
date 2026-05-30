@@ -30,8 +30,16 @@ export interface LuckyBagEntry {
   updatedAt: string;
 }
 
+export interface LuckyBagWinner {
+  userId: string;
+  name: string;
+  avatar?: string;
+  payout: number;
+}
+
 export interface LuckyBagView {
   bag: LuckyBag | null;
   myEntry?: LuckyBagEntry;
   participantCount: number;
+  winners?: LuckyBagWinner[];
 }
