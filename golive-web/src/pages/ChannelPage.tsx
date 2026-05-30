@@ -46,6 +46,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
+import { ReplayCard } from '@/components/ReplayCard';
 import { ShareDialog } from '@/components/ShareDialog';
 import { LiveCardSkeleton, Skeleton } from '@/components/Skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -69,6 +70,7 @@ import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/type
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
 const HISTORY_PAGE_SIZE = 4;
+const REPLAY_GRID_PAGE_SIZE = 6;
 const POST_PAGE_SIZE = 4;
 const FAN_BADGE_PRICE = 1000;
 
@@ -128,17 +130,18 @@ export default function ChannelPage() {
     primary?.channelId || (profile?.id ? `ch-${profile.id}` : normalizeChannelId(channelKey));
   const isOwner = Boolean(authUser?.id && profile?.id && authUser.id === profile.id);
   const historyMode = isOwner ? 'history' : 'replay';
+  const historyRequestSize = historyMode === 'replay' ? REPLAY_GRID_PAGE_SIZE : HISTORY_PAGE_SIZE;
   const followState = useFollowState(channelId, !!channelId);
   const follow = useFollow(channelId);
   const unfollow = useUnfollow(channelId);
   const liveHistory = useChannelLiveHistory(
     channelKey,
     historyPage,
-    HISTORY_PAGE_SIZE,
+    historyRequestSize,
     historyMode,
   );
   const historyTotal = liveHistory.data?.total ?? 0;
-  const historyPageSize = liveHistory.data?.size ?? HISTORY_PAGE_SIZE;
+  const historyPageSize = liveHistory.data?.size ?? historyRequestSize;
   const historyPageCount = Math.max(1, Math.ceil(historyTotal / historyPageSize));
   const historyItems = liveHistory.data?.items ?? [];
   const channelAppointments = useChannelAppointments(channelKey, true, appointmentPage, 4);
@@ -618,23 +621,44 @@ export default function ChannelPage() {
             </h2>
           </div>
           {liveHistory.isPending ? (
-            <div className="gl-history-list" aria-busy="true">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div className="gl-history-row is-loading" key={i} />
-              ))}
-            </div>
-          ) : historyItems.length ? (
-            <>
-              <div className="gl-history-list">
-                {historyItems.map((record) => (
-                  <ChannelHistoryRow
-                    key={record.id}
-                    record={record}
-                    channelKey={channelKey}
-                    isOwner={isOwner}
-                  />
+            historyMode === 'replay' ? (
+              <div className="gl-home-replay-grid" aria-busy="true">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div className="gl-home-replay-card is-loading" key={i} />
                 ))}
               </div>
+            ) : (
+              <div className="gl-history-list" aria-busy="true">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div className="gl-history-row is-loading" key={i} />
+                ))}
+              </div>
+            )
+          ) : historyItems.length ? (
+            <>
+              {historyMode === 'replay' ? (
+                <div className="gl-home-replay-grid">
+                  {historyItems.map((record) => (
+                    <ReplayCard
+                      key={record.id}
+                      replay={record}
+                      channelName={channelName}
+                      channelAvatar={channelAvatar}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="gl-history-list">
+                  {historyItems.map((record) => (
+                    <ChannelHistoryRow
+                      key={record.id}
+                      record={record}
+                      channelKey={channelKey}
+                      isOwner={isOwner}
+                    />
+                  ))}
+                </div>
+              )}
               {historyPageCount > 1 && (
                 <HistoryPager
                   page={historyPage}

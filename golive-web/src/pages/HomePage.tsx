@@ -4,9 +4,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Bell, CloudOff, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
-import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LiveCard } from '@/components/LiveCard';
-import { LoadableImage } from '@/components/LoadableImage';
+import { ReplayCard } from '@/components/ReplayCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
 import {
   useFollow,
@@ -16,7 +15,6 @@ import {
   useRecommendedRooms,
   useUnfollow,
   useUpcomingAppointments,
-  type HotReplayItem,
   type RecommendedCreator,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
@@ -24,8 +22,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
-import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
-import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
+import { streamChannelName, type Stream } from '@/types/stream';
 
 const UPCOMING_APPOINTMENT_LIMIT = 3;
 const RECOMMENDED_LIVE_LIMIT = 12;
@@ -256,7 +253,7 @@ function HomeHotReplaysSection({ category }: { category?: string }) {
       ) : items.length > 0 ? (
         <div className="gl-home-replay-grid">
           {items.map((replay) => (
-            <HotReplayCard key={replay.id} replay={replay} />
+            <ReplayCard key={replay.id} replay={replay} />
           ))}
         </div>
       ) : (
@@ -265,55 +262,6 @@ function HomeHotReplaysSection({ category }: { category?: string }) {
         </div>
       )}
     </section>
-  );
-}
-
-function HotReplayCard({ replay }: { replay: HotReplayItem }) {
-  const { t, i18n } = useTranslation('pages');
-  const channelName = streamChannelName(replay);
-  const hasChannelName = !isPlaceholderChannelName(channelName);
-  const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
-  const category =
-    i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;
-  const hoverStyle = useCoverHoverStyle(replay.cover, channelName || title || replay.id);
-
-  return (
-    <Link
-      className="gl-home-replay-card gl-video-hover-card"
-      style={hoverStyle}
-      to={`/live/${encodeURIComponent(replay.id)}`}
-    >
-      <div className={cn('gl-home-replay-cover', replay.cover ? 'has-image' : 'is-placeholder')}>
-        {replay.cover ? <LoadableImage src={replay.cover} alt="" loading="lazy" /> : null}
-        <div className="gl-home-replay-top">
-          <div className="gl-home-replay-badge">
-            {t('liveRoom.replay.badge', { defaultValue: 'Replay' })}
-          </div>
-          {replay.fanClubOnly && (
-            <FanClubExclusiveBadge compact className="gl-home-replay-exclusive-badge" />
-          )}
-        </div>
-        <div className="gl-home-replay-duration">{replay.duration}</div>
-      </div>
-      <div className="gl-home-replay-body">
-        <Avatar name={hasChannelName ? channelName : title} src={replay.avatar} size={44} />
-        <div className="gl-home-replay-copy">
-          <div className="gl-home-replay-title" title={title}>
-            {title}
-          </div>
-          <div className="gl-home-replay-channel">
-            {hasChannelName ? (
-              channelName
-            ) : (
-              <span className="gl-card-chan-skeleton" aria-hidden="true" />
-            )}
-          </div>
-          <div className="gl-home-replay-meta">
-            {t('liveRoom.replay.badge', { defaultValue: 'Replay' })} · {category}
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
 
