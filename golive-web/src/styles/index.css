@@ -3541,6 +3541,26 @@ input:focus-visible,
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
 }
+.gl-channel-replay-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 1279px) {
+  .gl-channel-replay-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 1023px) {
+  .gl-channel-replay-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 599px) {
+  .gl-channel-replay-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .gl-home-replay-card {
   display: block;
   min-width: 0;

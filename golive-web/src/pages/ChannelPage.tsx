@@ -70,7 +70,7 @@ import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/type
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
 
 const HISTORY_PAGE_SIZE = 4;
-const REPLAY_GRID_PAGE_SIZE = 6;
+const REPLAY_GRID_PAGE_SIZE = 8;
 const POST_PAGE_SIZE = 4;
 const FAN_BADGE_PRICE = 1000;
 
@@ -622,8 +622,8 @@ export default function ChannelPage() {
           </div>
           {liveHistory.isPending ? (
             historyMode === 'replay' ? (
-              <div className="gl-home-replay-grid" aria-busy="true">
-                {Array.from({ length: 3 }).map((_, i) => (
+              <div className="gl-channel-replay-grid" aria-busy="true">
+                {Array.from({ length: 4 }).map((_, i) => (
                   <div className="gl-home-replay-card is-loading" key={i} />
                 ))}
               </div>
@@ -637,7 +637,7 @@ export default function ChannelPage() {
           ) : historyItems.length ? (
             <>
               {historyMode === 'replay' ? (
-                <div className="gl-home-replay-grid">
+                <div className="gl-channel-replay-grid">
                   {historyItems.map((record) => (
                     <ReplayCard
                       key={record.id}
