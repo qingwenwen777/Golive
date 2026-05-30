@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
-import { publishMic, micStreamName, type MicPublishHandle } from '@/lib/micRtc';
+import { publishMic, micStreamName, MicSetupError, type MicPublishHandle } from '@/lib/micRtc';
 import type { MicLinkEligibility, MicLinkGuest } from '@/types/micLink';
 import { cn } from '@/lib/cn';
 
@@ -375,19 +375,26 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
         })
         .catch((err: unknown) => {
           if (cancelled) return;
-          const denied =
-            err instanceof DOMException &&
-            (err.name === 'NotAllowedError' ||
-              err.name === 'NotFoundError' ||
-              err.name === 'SecurityError');
+          const reason = err instanceof MicSetupError ? err.reason : 'getusermedia_failed';
+          const denied = reason === 'permission_denied';
+          const noDevice = reason === 'no_device';
+          const insecure = reason === 'insecure_context';
           toast.error(
             denied
               ? t('micLink.micPermissionDenied', {
                   defaultValue: 'Microphone unavailable. Check browser permission.',
                 })
-              : t('micLink.connectFailed', {
-                  defaultValue: 'Could not connect your mic. Please try again.',
-                }),
+              : noDevice
+                ? t('micLink.micNoDevice', {
+                    defaultValue: 'No microphone found. Connect one and try again.',
+                  })
+                : insecure
+                  ? t('micLink.micInsecure', {
+                      defaultValue: 'Mic needs a secure (HTTPS) connection.',
+                    })
+                  : t('micLink.connectFailed', {
+                      defaultValue: 'Could not connect your mic. Please try again.',
+                    }),
           );
           // Roll the seat back so the roster does not show a silent guest.
           leave.mutate();

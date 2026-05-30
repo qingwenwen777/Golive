@@ -2258,6 +2258,8 @@
     "statusPending": "Waiting for approval...",
     "statusOnAir": "You are on the mic",
     "micPermissionDenied": "Microphone unavailable. Check browser permission.",
+    "micNoDevice": "No microphone found. Connect one and try again.",
+    "micInsecure": "Mic needs a secure (HTTPS) connection.",
     "connectFailed": "Could not connect your mic. Please try again.",
     "error": {
       "disabled": "Mic-link is currently off.",
