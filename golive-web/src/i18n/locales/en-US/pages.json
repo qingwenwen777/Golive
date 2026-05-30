@@ -2258,6 +2258,7 @@
     "statusPending": "Waiting for approval...",
     "statusOnAir": "You are on the mic",
     "micPermissionDenied": "Microphone unavailable. Check browser permission.",
+    "connectFailed": "Could not connect your mic. Please try again.",
     "error": {
       "disabled": "Mic-link is currently off.",
       "notEligible": "You do not meet the join requirement.",

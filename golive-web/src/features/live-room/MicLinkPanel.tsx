@@ -373,12 +373,21 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
           publishRef.current = handle;
           handle.setMuted(myMuted);
         })
-        .catch(() => {
+        .catch((err: unknown) => {
           if (cancelled) return;
+          const denied =
+            err instanceof DOMException &&
+            (err.name === 'NotAllowedError' ||
+              err.name === 'NotFoundError' ||
+              err.name === 'SecurityError');
           toast.error(
-            t('micLink.micPermissionDenied', {
-              defaultValue: 'Microphone unavailable. Check browser permission.',
-            }),
+            denied
+              ? t('micLink.micPermissionDenied', {
+                  defaultValue: 'Microphone unavailable. Check browser permission.',
+                })
+              : t('micLink.connectFailed', {
+                  defaultValue: 'Could not connect your mic. Please try again.',
+                }),
           );
           // Roll the seat back so the roster does not show a silent guest.
           leave.mutate();

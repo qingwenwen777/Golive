@@ -2258,6 +2258,7 @@
     "statusPending": "承認を待っています...",
     "statusOnAir": "あなたはマイクに参加中です",
     "micPermissionDenied": "マイクを使用できません。ブラウザの権限を確認してください。",
+    "connectFailed": "マイク接続に失敗しました。もう一度お試しください。",
     "error": {
       "disabled": "現在コラボはオフです。",
       "notEligible": "参加条件を満たしていません。",

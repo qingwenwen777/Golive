@@ -2258,6 +2258,7 @@
     "statusPending": "等待主播通过...",
     "statusOnAir": "你正在麦上",
     "micPermissionDenied": "无法使用麦克风，请检查浏览器权限。",
+    "connectFailed": "连麦连接失败，请重试。",
     "error": {
       "disabled": "当前未开启连麦。",
       "notEligible": "你不满足连麦条件。",

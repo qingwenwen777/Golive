@@ -10,11 +10,11 @@
 const WHIP_PATH = '/rtc/v1/whip/';
 const WHEP_PATH = '/rtc/v1/whep/';
 
-// streamUrl is the SRS-style URL identifying the stream, e.g.
-// `webrtc://<host>/live/<streamName>`. SRS uses it to route the session.
-function streamUrl(streamName: string): string {
-  const host = location.host;
-  return `webrtc://${host}/live/${streamName}`;
+// All mic-link streams live under SRS app "live". SRS parses app+stream from
+// the query string (proven against SRS 5.0.213).
+function signalUrl(path: string, streamName: string): string {
+  const params = new URLSearchParams({ app: 'live', stream: streamName });
+  return `${path}?${params.toString()}`;
 }
 
 async function signal(path: string, offerSdp: string): Promise<string> {
@@ -22,12 +22,12 @@ async function signal(path: string, offerSdp: string): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/sdp' },
     body: offerSdp,
-    // SRS also accepts the api/streamurl as query params for routing.
   });
+  const body = await res.text();
   if (!res.ok) {
-    throw new Error(`mic signaling failed: ${res.status}`);
+    throw new Error(`mic signaling failed: ${res.status} ${body.slice(0, 120)}`);
   }
-  return res.text();
+  return body;
 }
 
 export interface MicPublishHandle {
@@ -38,36 +38,31 @@ export interface MicPublishHandle {
 }
 
 // publishMic captures the microphone and publishes it (audio-only) to SRS via
-// WHIP under the given stream name.
+// WHIP under the given stream name. Exactly one sendonly audio m-line is
+// offered — SRS only negotiates BUNDLE, so a duplicate transceiver breaks it.
 export async function publishMic(streamName: string): Promise<MicPublishHandle> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   });
-  for (const track of stream.getAudioTracks()) {
-    pc.addTrack(track, stream);
-  }
-  // Audio uplink only.
-  pc.addTransceiver('audio', { direction: 'sendonly' });
+  const [track] = stream.getAudioTracks();
+  pc.addTransceiver(track, { direction: 'sendonly', streams: [stream] });
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  const answer = await signal(
-    `${WHIP_PATH}?streamurl=${encodeURIComponent(streamUrl(streamName))}`,
-    offer.sdp ?? '',
-  );
+  const answer = await signal(signalUrl(WHIP_PATH, streamName), offer.sdp ?? '');
   await pc.setRemoteDescription({ type: 'answer', sdp: answer });
 
   return {
     pc,
     stream,
     setMuted: (muted: boolean) => {
-      for (const track of stream.getAudioTracks()) {
-        track.enabled = !muted;
+      for (const t of stream.getAudioTracks()) {
+        t.enabled = !muted;
       }
     },
     close: () => {
-      for (const track of stream.getTracks()) track.stop();
+      for (const t of stream.getTracks()) t.stop();
       pc.close();
     },
   };
@@ -95,10 +90,7 @@ export async function playMic(streamName: string): Promise<MicPlayHandle> {
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  const answer = await signal(
-    `${WHEP_PATH}?streamurl=${encodeURIComponent(streamUrl(streamName))}`,
-    offer.sdp ?? '',
-  );
+  const answer = await signal(signalUrl(WHEP_PATH, streamName), offer.sdp ?? '');
   await pc.setRemoteDescription({ type: 'answer', sdp: answer });
 
   return {
