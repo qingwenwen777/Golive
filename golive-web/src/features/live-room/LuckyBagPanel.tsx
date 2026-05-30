@@ -252,7 +252,9 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
                     seconds: Math.ceil(remainingMs / 1000),
                     defaultValue: '{{seconds}}s left',
                   })
-                : t('luckyBag.drawing', { defaultValue: 'Drawing...' })}
+                : effectiveStatus === 'drawing'
+                  ? t('luckyBag.drawing', { defaultValue: 'Drawing...' })
+                  : statusText(effectiveStatus, t)}
             </span>
           </div>
 
