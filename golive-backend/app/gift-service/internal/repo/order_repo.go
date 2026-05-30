@@ -104,6 +104,34 @@ WHERE id = ?
 	return strings.TrimSpace(avatar), nil
 }
 
+// UserProfile returns the display name (falling back to username then userID)
+// and avatar in a single query. Used by mic-link to render the request queue
+// and on-air roster.
+func (r *OrderRepo) UserProfile(ctx context.Context, userID string) (string, string, error) {
+	var row struct {
+		Name   string
+		Avatar string
+	}
+	err := r.db.WithContext(ctx).Raw(`
+SELECT
+  COALESCE(NULLIF(display_name, ''), NULLIF(username, ''), id) AS name,
+  COALESCE(avatar, '') AS avatar
+FROM users
+WHERE id = ?
+`, userID).Row().Scan(&row.Name, &row.Avatar)
+	if errors.Is(err, sql.ErrNoRows) {
+		return userID, "", nil
+	}
+	if err != nil {
+		return "", "", err
+	}
+	name := strings.TrimSpace(row.Name)
+	if name == "" {
+		name = userID
+	}
+	return name, strings.TrimSpace(row.Avatar), nil
+}
+
 func createCoinTransaction(
 	tx *gorm.DB,
 	userID string,

@@ -77,6 +77,7 @@ func main() {
 	scSvc := service.NewSuperChatService(orderRepo, rdb)
 	betSvc := service.NewBetService(orderRepo)
 	luckyBagSvc := service.NewLuckyBagService(orderRepo, rdb)
+	micLinkSvc := service.NewMicLinkService(orderRepo, rdb)
 	adminRepo := repo.NewAdminRepo(db)
 	adminSvc := service.NewAdminService(adminRepo, orderRepo)
 
@@ -102,6 +103,7 @@ func main() {
 	scH := handler.NewSuperChatHandler(scSvc, idem)
 	betH := handler.NewBetHandler(betSvc)
 	luckyBagH := handler.NewLuckyBagHandler(luckyBagSvc)
+	micLinkH := handler.NewMicLinkHandler(micLinkSvc)
 	adminH := handler.NewAdminHandler(adminSvc)
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {
@@ -115,6 +117,7 @@ func main() {
 		SuperChat: scH,
 		Bet:       betH,
 		LuckyBag:  luckyBagH,
+		MicLink:   micLinkH,
 		Admin:     adminH,
 	})
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}

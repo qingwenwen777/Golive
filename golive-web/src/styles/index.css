@@ -5916,6 +5916,491 @@ input:focus-visible,
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Mic-link (语音连麦) ─────────────────────────────────────────────────── */
+.gl-mic-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--gl-border);
+  border-radius: 14px;
+  background: var(--gl-bg-card);
+  box-shadow: var(--gl-shadow);
+  padding: 16px;
+}
+.gl-live-console-activity .gl-mic-panel {
+  margin-top: 0;
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+}
+.gl-mic-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gl-mic-head > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.gl-mic-head h2 {
+  margin: 0;
+  color: var(--gl-text);
+  font-size: 15px;
+  font-weight: 850;
+}
+.gl-mic-head p {
+  margin: 2px 0 0;
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-mic-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+.dark .gl-mic-icon {
+  color: #6ea8ff;
+}
+.gl-mic-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  min-height: 24px;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 9px;
+}
+.gl-mic-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.gl-mic-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.gl-mic-toggle strong {
+  font-size: 14px;
+  font-weight: 850;
+}
+.gl-mic-toggle small {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.gl-mic-toggle i {
+  width: 46px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  position: relative;
+}
+.gl-mic-toggle i::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: var(--gl-shadow);
+  transition: transform 0.18s ease;
+}
+.gl-mic-toggle.is-on i {
+  background: #2563eb;
+}
+.gl-mic-toggle.is-on i::after {
+  transform: translateX(20px);
+}
+.gl-mic-toggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.gl-mic-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gl-mic-field-label {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-mic-field-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.gl-mic-field-controls:has(.gl-mic-level-input) {
+  grid-template-columns: minmax(0, 1fr) 90px;
+}
+.gl-mic-level-input {
+  height: 38px;
+  width: 100%;
+  border: 1px solid var(--gl-border);
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 10px;
+  outline: none;
+}
+.gl-mic-level-input:focus {
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+.gl-mic-stage-url {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--gl-border);
+  border-radius: 10px;
+  background: var(--gl-bg);
+  padding: 12px;
+}
+.gl-mic-stage-url > span {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-mic-stage-url small {
+  color: var(--gl-text-3);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.gl-mic-stage-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+}
+.gl-mic-stage-row code {
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-mic-stage-row button {
+  display: inline-flex;
+  width: 34px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-mic-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.gl-mic-section-title {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gl-mic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gl-mic-list-compact {
+  gap: 2px;
+}
+.gl-mic-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+.gl-mic-row:hover {
+  background: var(--gl-bg-hover);
+}
+.gl-mic-row.is-readonly:hover {
+  background: transparent;
+}
+.gl-mic-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--gl-text);
+  font-size: 14px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gl-mic-row-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.gl-mic-approve,
+.gl-mic-reject,
+.gl-mic-remove {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.gl-mic-approve {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+.gl-mic-approve:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.gl-mic-reject,
+.gl-mic-remove {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+}
+.gl-mic-reject:hover,
+.gl-mic-remove:hover {
+  color: var(--gl-red);
+}
+.gl-mic-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+.gl-mic-state.is-live {
+  background: rgba(37, 99, 235, 0.14);
+  color: #2563eb;
+}
+.gl-mic-state.is-muted {
+  background: rgba(100, 116, 139, 0.16);
+  color: #64748b;
+}
+.gl-mic-empty {
+  margin: 0;
+  border-radius: 8px;
+  background: var(--gl-bg);
+  color: var(--gl-text-2);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 11px 12px;
+}
+.gl-mic-request-btn {
+  display: inline-flex;
+  align-self: flex-start;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 850;
+  padding: 0 20px;
+  cursor: pointer;
+}
+.gl-mic-request-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.gl-mic-self {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.gl-mic-self.is-pending {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 800;
+}
+.gl-mic-self.is-pending {
+  flex-wrap: wrap;
+}
+.gl-mic-self.is-pending > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+.gl-mic-self.is-pending button {
+  border: 0;
+  border-radius: 999px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+  font-size: 12px;
+  font-weight: 850;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.gl-mic-self.is-on-air {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  background: rgba(37, 99, 235, 0.1);
+}
+.gl-mic-self-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 850;
+}
+.dark .gl-mic-self-label {
+  color: #6ea8ff;
+}
+.gl-mic-self-actions {
+  display: flex;
+  gap: 8px;
+}
+.gl-mic-mute-btn,
+.gl-mic-leave-btn {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 14px;
+  cursor: pointer;
+}
+.gl-mic-mute-btn {
+  background: var(--gl-bg-card);
+  color: var(--gl-text);
+}
+.gl-mic-mute-btn.is-muted {
+  background: rgba(100, 116, 139, 0.18);
+  color: #475569;
+}
+.gl-mic-leave-btn {
+  background: var(--gl-bg-card);
+  color: var(--gl-red);
+}
+.gl-mic-mute-btn:disabled,
+.gl-mic-leave-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.gl-mic-confirm {
+  max-width: 360px;
+}
+.gl-mic-confirm-title {
+  font-size: 16px;
+  font-weight: 850;
+  color: var(--gl-text);
+}
+.gl-mic-confirm-body {
+  margin: 8px 0 0;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.gl-mic-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.gl-mic-confirm-actions button {
+  display: inline-flex;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 850;
+  padding: 0 16px;
+  cursor: pointer;
+}
+.gl-mic-confirm-actions .is-ghost {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text);
+}
+.gl-mic-confirm-actions .is-danger {
+  background: var(--gl-red);
+  color: #fff;
+}
+.gl-mic-confirm-actions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+/* Headless OBS mic-stage page: transparent, just a tiny status badge. */
+.gl-mic-stage {
+  min-height: 100vh;
+  background: transparent;
+}
+.gl-mic-stage-badge {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 12px;
+}
+.gl-mic-stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+}
 .gl-publisher-value {
   display: grid;
   grid-template-columns: 100px minmax(0, 1fr) 34px;

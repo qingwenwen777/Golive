@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import App from '@/App';
 import NotFoundPage from '@/pages/NotFoundPage';
@@ -112,6 +112,7 @@ const LikedPage = lazy(() =>
   })),
 );
 const MessagesPage = lazy(() => import('@/pages/MessagesPage'));
+const MicStagePage = lazy(() => import('@/pages/MicStagePage'));
 const SettingsPage = lazy(() =>
   import('@/pages/LibraryPages').then((module) => ({
     default: module.SettingsPage,
@@ -166,5 +167,15 @@ export const router = createBrowserRouter([
       { path: 'login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
+  },
+  {
+    // Standalone (no app shell): headless audio stage for the streamer's OBS
+    // Browser Source. Renders only hidden <audio> elements + a tiny badge.
+    path: '/mic-stage/:roomId',
+    element: (
+      <Suspense fallback={null}>
+        <MicStagePage />
+      </Suspense>
+    ),
   },
 ]);

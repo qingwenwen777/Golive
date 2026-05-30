@@ -16,6 +16,7 @@ import { userDisplayName } from '@/types/user';
 import type { Stream } from '@/types/stream';
 import { betQueryKey } from '@/api/bet';
 import { luckyBagQueryKey } from '@/api/luckyBag';
+import { micLinkQueryKey } from '@/api/micLink';
 import i18n from '@/i18n';
 import {
   type BetOption,
@@ -114,6 +115,24 @@ interface ServerLuckyBag {
   winnerCount?: number;
   ts?: number;
 }
+interface ServerMicLink {
+  type: 'mic_link';
+  event:
+    | 'feature_enabled'
+    | 'feature_disabled'
+    | 'requested'
+    | 'approved'
+    | 'rejected'
+    | 'cancelled'
+    | 'on_air'
+    | 'left'
+    | 'removed'
+    | 'guest_muted'
+    | 'guest_unmuted';
+  roomId?: string;
+  userId?: string;
+  ts?: number;
+}
 type ServerMessage =
   | ServerChat
   | ServerSuperChat
@@ -124,7 +143,8 @@ type ServerMessage =
   | ServerLiveStatus
   | ServerRoomUpdated
   | ServerBet
-  | ServerLuckyBag;
+  | ServerLuckyBag
+  | ServerMicLink;
 
 function genId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -479,6 +499,14 @@ export function useRoomRealtime(
           text: bagText,
           ts: parsed.ts ?? now,
         });
+        break;
+      }
+      case 'mic_link': {
+        const targetRoom = parsed.roomId || roomId;
+        void queryClient.invalidateQueries({ queryKey: micLinkQueryKey(targetRoom) });
+        if (targetRoom !== roomId) {
+          void queryClient.invalidateQueries({ queryKey: micLinkQueryKey(roomId) });
+        }
         break;
       }
     }

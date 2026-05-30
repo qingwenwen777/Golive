@@ -104,6 +104,7 @@ func New(cfg *config.Config) (*gin.Engine, error) {
 		api.Any("/bets/*action", gin.WrapH(giftProxy))
 		api.Any("/lucky-bags", gin.WrapH(giftProxy))
 		api.Any("/lucky-bags/*action", gin.WrapH(giftProxy))
+		api.Any("/mic-link/*action", gin.WrapH(giftProxy))
 
 		// chat-service
 		api.Any("/chat/*action", gin.WrapH(chatProxy))
@@ -132,6 +133,8 @@ func publicRoutes() []middleware.PublicRoute {
 		{Method: http.MethodGet, Path: "/api/gifts/*action"},
 		{Method: http.MethodGet, Path: "/api/bets/*action"},
 		{Method: http.MethodGet, Path: "/api/lucky-bags/*action"},
+		// Mic-link roster/enable state is public for viewers (read-only).
+		{Method: http.MethodGet, Path: "/api/mic-link/*action"},
 		// Chat history is public for viewers entering a live room.
 		{Method: http.MethodGet, Path: "/api/chat/*action"},
 		// Uploaded live covers and avatars are public assets.

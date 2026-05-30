@@ -247,6 +247,9 @@ services:
     logging: *default-logging
     ports:
       - "1935:1935"
+      - "8000:8000/udp"
+    environment:
+      CANDIDATE: ${GOLIVE_SRS_CANDIDATE:-154.36.185.85}
     volumes:
       - ./srs.conf:/usr/local/srs/conf/srs.conf:ro
       - replay_records:/tmp/golive/records

@@ -384,10 +384,19 @@ func canonicalStreamKey(stream string) (base string, isVariant bool) {
 	return stream, false
 }
 
+// micLinkStreamPrefix marks WebRTC audio streams published by mic-link guests.
+// These are not room RTMP streams, so the publish/unpublish hooks accept them
+// without touching room state.
+const micLinkStreamPrefix = "miclink-"
+
 // OnPublish authorizes the incoming RTMP publish. Returns nil on accept.
 func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if req.Stream == "" {
 		return errors.New("missing stream key")
+	}
+	if strings.HasPrefix(req.Stream, micLinkStreamPrefix) {
+		// Mic-link guest WebRTC audio: accept without room bookkeeping.
+		return nil
 	}
 	streamKey, isVariant := canonicalStreamKey(req.Stream)
 	roomID, err := s.live.Resolve(ctx, streamKey)
@@ -434,6 +443,10 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 
 func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error {
 	if req.Stream == "" {
+		return nil
+	}
+	if strings.HasPrefix(req.Stream, micLinkStreamPrefix) {
+		// Mic-link guest WebRTC audio teardown: nothing to update.
 		return nil
 	}
 	streamKey, isVariant := canonicalStreamKey(req.Stream)

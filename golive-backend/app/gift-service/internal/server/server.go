@@ -15,6 +15,7 @@ type Deps struct {
 	SuperChat *handler.SuperChatHandler
 	Bet       *handler.BetHandler
 	LuckyBag  *handler.LuckyBagHandler
+	MicLink   *handler.MicLinkHandler
 	Admin     *handler.AdminHandler
 }
 
@@ -63,6 +64,15 @@ func NewRouter(d Deps) *gin.Engine {
 	r.POST("/lucky-bags", auth, d.LuckyBag.Open)
 	r.POST("/lucky-bags/:id/join", auth, d.LuckyBag.Join)
 	r.POST("/lucky-bags/:id/cancel", auth, d.LuckyBag.Cancel)
+	r.GET("/mic-link/latest", optionalAuth, d.MicLink.Latest)
+	r.POST("/mic-link/config", auth, d.MicLink.Config)
+	r.POST("/mic-link/request", auth, d.MicLink.Request)
+	r.POST("/mic-link/cancel", auth, d.MicLink.Cancel)
+	r.POST("/mic-link/leave", auth, d.MicLink.Leave)
+	r.POST("/mic-link/mute", auth, d.MicLink.Mute)
+	r.POST("/mic-link/approve", auth, d.MicLink.Approve)
+	r.POST("/mic-link/reject", auth, d.MicLink.Reject)
+	r.POST("/mic-link/remove", auth, d.MicLink.Remove)
 	admin := r.Group("/admin/economy", auth, handler.AdminRequired(d.Admin))
 	admin.GET("/summary", d.Admin.Summary)
 	admin.GET("/gifts", d.Admin.Gifts)
