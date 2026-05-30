@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
@@ -1380,18 +1380,24 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
       <h1 className="gl-title">{stream.title}</h1>
       <div className="gl-info-row">
         <div className="gl-info-chan">
-          <Avatar name={channelName} src={stream.avatar} size={40} />
-          <div className="gl-info-chan-text">
-            <div className="gl-info-chan-name">
-              <span className="truncate">{channelName}</span>
-              {stream.verified && <VerifiedBadge size={14} />}
+          <Link
+            className="gl-info-chan-link"
+            to={`/channel/${encodeURIComponent(stream.channelId || stream.ownerId || channelName)}`}
+            aria-label={channelName}
+          >
+            <Avatar name={channelName} src={stream.avatar} size={40} />
+            <div className="gl-info-chan-text">
+              <div className="gl-info-chan-name">
+                <span className="truncate">{channelName}</span>
+                {stream.verified && <VerifiedBadge size={14} />}
+              </div>
+              <div className="gl-info-chan-subs">
+                {endedAt
+                  ? t('liveRoom.replay.endedAt', { time: endedAt, defaultValue: 'Ended {{time}}' })
+                  : t('liveRoom.replay.ended', { defaultValue: 'Ended live replay' })}
+              </div>
             </div>
-            <div className="gl-info-chan-subs">
-              {endedAt
-                ? t('liveRoom.replay.endedAt', { time: endedAt, defaultValue: 'Ended {{time}}' })
-                : t('liveRoom.replay.ended', { defaultValue: 'Ended live replay' })}
-            </div>
-          </div>
+          </Link>
         </div>
         <div className="gl-info-actions">
           <button

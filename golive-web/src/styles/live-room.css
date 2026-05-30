@@ -188,7 +188,9 @@
   transition: border-color 0.15s ease;
 }
 
-.gl-replay-comment-input:focus {
+.gl-replay-comment-input:focus,
+.gl-replay-comment-input:focus-visible {
+  outline: none;
   border-bottom-color: var(--gl-text);
   border-bottom-width: 2px;
 }
