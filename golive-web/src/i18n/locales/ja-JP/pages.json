@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "ティア1以上でメッセージを追加できます",
       "insufficientCoins": "coins が不足しています",
       "failed": "SuperChatの送信に失敗しました",
+      "textTooLong": "このティアのメッセージ上限（最大 {{count}} 文字）を超えています。",
       "insufficientBalance": "残高不足です（あと {{coins}} 必要）。",
       "cancel": "キャンセル",
       "topUp": "チャージ",

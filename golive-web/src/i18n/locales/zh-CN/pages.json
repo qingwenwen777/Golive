@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "升级到档位 1+ 后可附带留言",
       "insufficientCoins": "coins 不足",
       "failed": "SuperChat 发送失败",
+      "textTooLong": "留言超出当前档位的字数上限（最多 {{count}} 字）。",
       "insufficientBalance": "余额不足（还差 {{coins}}）。",
       "cancel": "取消",
       "topUp": "去充值",

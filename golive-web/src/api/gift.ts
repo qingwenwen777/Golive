@@ -78,6 +78,7 @@ export interface GiftError {
     | 'blocked_word'
     | 'user_restricted'
     | 'already_fan_club_member'
+    | 'super_chat_text_too_long'
     | 'network'
     | 'unknown';
   message: string;
@@ -110,6 +111,12 @@ function toGiftError(err: unknown): GiftError {
       return {
         reason: 'already_fan_club_member',
         message: data.message ?? 'Already a fan club member',
+      };
+    }
+    if (data?.reason === 'super_chat_text_too_long') {
+      return {
+        reason: 'super_chat_text_too_long',
+        message: data.message ?? 'Text too long for this SuperChat tier',
       };
     }
     if (!err.response) return { reason: 'network', message: 'Network error' };

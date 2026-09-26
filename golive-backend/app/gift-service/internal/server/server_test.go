@@ -204,6 +204,22 @@ func TestJoinFanClubHTTP_ExistingMemberGetsConflictWithoutCharge(t *testing.T) {
 	require.EqualValues(t, 1000, coinBalance(t, fx.db, "u-owner"))
 }
 
+func TestSuperChatHTTP_RejectsTextOverTierLimit(t *testing.T) {
+	fx := newGiftHTTPFixture(t, 1000)
+
+	// 200 coins is tier 1, which allows 50 characters.
+	tooLong := postJSON(fx.router, "/super-chats", "u-demo",
+		fmt.Sprintf(`{"roomId":"room-1","amount":200,"text":%q,"requestId":"sc-long"}`, strings.Repeat("赢", 51)))
+	require.Equal(t, http.StatusBadRequest, tooLong.Code)
+	require.JSONEq(t, `{"message":"Text too long for this SuperChat tier","reason":"super_chat_text_too_long"}`, tooLong.Body.String())
+	require.EqualValues(t, 1000, coinBalance(t, fx.db, "u-demo"))
+
+	atLimit := postJSON(fx.router, "/super-chats", "u-demo",
+		fmt.Sprintf(`{"roomId":"room-1","amount":200,"text":%q,"requestId":"sc-ok"}`, strings.Repeat("赢", 50)))
+	require.Equal(t, http.StatusOK, atLimit.Code)
+	require.EqualValues(t, 800, coinBalance(t, fx.db, "u-demo"))
+}
+
 func TestBetHTTP_OpenWagerDuplicateAndLatestViewerState(t *testing.T) {
 	fx := newGiftHTTPFixture(t, 1000)
 

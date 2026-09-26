@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "Upgrade to tier 1+ to include a message",
       "insufficientCoins": "Insufficient coins",
       "failed": "Failed to send SuperChat",
+      "textTooLong": "Message is too long for this tier (max {{count}} characters).",
       "insufficientBalance": "Insufficient balance (need {{coins}} more).",
       "cancel": "Cancel",
       "topUp": "Top up",

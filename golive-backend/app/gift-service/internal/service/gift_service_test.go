@@ -3,6 +3,12 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
+	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -568,6 +574,67 @@ func TestSuperChat_TierZeroRejected(t *testing.T) {
 	})
 	require.ErrorIs(t, err, service.ErrInvalidAmount)
 	require.EqualValues(t, 1000, balanceOf(t, db, "u-demo"), "no charge on rejected SC")
+}
+
+// The per-tier text limits used to exist only in the web client, so longer
+// text reached the database (and failed there with a 500).
+func TestSuperChat_TextLimitPerTier(t *testing.T) {
+	db := newTestDB(t, 20000)
+	svc := service.NewSuperChatService(repo.NewOrderRepo(db))
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		amount   int64
+		maxRunes int
+	}{
+		{200, 50}, {1000, 100}, {2000, 150}, {5000, 200}, {10000, 200},
+	} {
+		tier := service.AmountToTier(tc.amount)
+		require.Equal(t, tc.maxRunes, service.SuperChatMaxText(tier), "tier %d", tier)
+		// Runes, not bytes ("赢" is three bytes); surrounding whitespace is trimmed.
+		atLimit := strings.Repeat("赢", tc.maxRunes)
+		order, _, err := svc.Send(ctx, service.SendSuperChatReq{
+			UserID: "u-demo", RoomID: "r", Amount: tc.amount, Text: " \n" + atLimit + " ",
+			RequestID: fmt.Sprintf("sc-ok-%d", tier),
+		})
+		require.NoError(t, err, "tier %d", tier)
+		require.Equal(t, atLimit, order.Text)
+
+		before := balanceOf(t, db, "u-demo")
+		order, _, err = svc.Send(ctx, service.SendSuperChatReq{
+			UserID: "u-demo", RoomID: "r", Amount: tc.amount, Text: atLimit + "!",
+			RequestID: fmt.Sprintf("sc-long-%d", tier),
+		})
+		require.ErrorIs(t, err, service.ErrSuperChatTextTooLong, "tier %d", tier)
+		require.Nil(t, order)
+		require.Equal(t, before, balanceOf(t, db, "u-demo"), "tier %d: no charge", tier)
+	}
+	var orders int64
+	require.NoError(t, db.Model(&model.SuperChatOrder{}).Count(&orders).Error)
+	require.EqualValues(t, 5, orders, "a rejected super chat leaves no order row")
+}
+
+// Every tier's text must fit each column that stores it (MySQL counts
+// varchar lengths in characters): the order row and the ledger description.
+func TestSuperChatMaxTextFitsStorage(t *testing.T) {
+	orderText := varcharLen(t, model.SuperChatOrder{}, "Text")
+	ledgerDescription := varcharLen(t, model.CoinTransaction{}, "Description")
+	for tier := 0; tier <= service.AmountToTier(math.MaxInt64); tier++ {
+		require.LessOrEqual(t, service.SuperChatMaxText(tier), orderText, "tier %d", tier)
+		require.LessOrEqual(t, service.SuperChatMaxText(tier), ledgerDescription, "tier %d", tier)
+	}
+}
+
+// varcharLen returns N from the field's gorm:"type:varchar(N)" tag.
+func varcharLen(t *testing.T, v any, field string) int {
+	t.Helper()
+	f, ok := reflect.TypeOf(v).FieldByName(field)
+	require.True(t, ok, field)
+	m := regexp.MustCompile(`varchar\((\d+)\)`).FindStringSubmatch(f.Tag.Get("gorm"))
+	require.NotNil(t, m, "%s has no varchar size", field)
+	n, err := strconv.Atoi(m[1])
+	require.NoError(t, err)
+	return n
 }
 
 func TestSuperChat_UsesResolvedDisplayNameInOutbox(t *testing.T) {

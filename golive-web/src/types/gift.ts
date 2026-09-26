@@ -92,6 +92,7 @@ export function amountToTier(amount: number): SuperChatTier {
   return 0;
 }
 
+// gift-service enforces the same limits (SuperChatMaxText) on the trimmed text.
 export const SC_MAX_TEXT_BY_TIER: Record<SuperChatTier, number> = {
   0: 0,
   1: 50,
@@ -100,3 +101,9 @@ export const SC_MAX_TEXT_BY_TIER: Record<SuperChatTier, number> = {
   4: 200,
   5: 200,
 };
+
+// Counts characters the way the server does: code points, so an emoji is one
+// character rather than two UTF-16 units.
+export function superChatTextLength(text: string): number {
+  return Array.from(text).length;
+}
