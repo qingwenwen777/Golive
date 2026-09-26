@@ -153,10 +153,6 @@ func headerKID(token string) (string, error) {
 	return strings.TrimSpace(kid), nil
 }
 
-func verifyAccessWithKey(token string, secret []byte) (string, error) {
-	return verifyAccessWithJWTKey(token, key{alg: jwt.SigningMethodHS256.Alg(), secret: secret})
-}
-
 func verifyAccessWithJWTKey(token string, k key) (string, error) {
 	claims := jwt.MapClaims{}
 	parsed, err := jwt.ParseWithClaims(
@@ -164,6 +160,8 @@ func verifyAccessWithJWTKey(token string, k key) (string, error) {
 		claims,
 		func(t *jwt.Token) (any, error) { return k.verificationMaterial() },
 		jwt.WithValidMethods([]string{k.alg}),
+		// SignAccess always sets exp; a token without one would never expire.
+		jwt.WithExpirationRequired(),
 	)
 	if err != nil || !parsed.Valid {
 		return "", ErrInvalidToken

@@ -35,11 +35,11 @@ func main() {
 	fmt.Printf("dialing %d connections across %d rooms, holding %s\n", *conns, *rooms, *hold)
 
 	var (
-		dialed   atomic.Int64
-		failed   atomic.Int64
-		recvd    atomic.Int64
-		hsMu     sync.Mutex
-		hsTimes  = make([]time.Duration, 0, *conns)
+		dialed  atomic.Int64
+		failed  atomic.Int64
+		recvd   atomic.Int64
+		hsMu    sync.Mutex
+		hsTimes = make([]time.Duration, 0, *conns)
 	)
 
 	sem := make(chan struct{}, *dialConcurrency)
