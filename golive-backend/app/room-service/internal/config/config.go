@@ -11,14 +11,15 @@ import (
 )
 
 type Config struct {
-	Service ServiceCfg `mapstructure:"service"`
-	MySQL   MySQLCfg   `mapstructure:"mysql"`
-	Redis   RedisCfg   `mapstructure:"redis"`
-	JWT     JWTCfg     `mapstructure:"jwt"`
-	Live    LiveCfg    `mapstructure:"live"`
-	Replay  ReplayCfg  `mapstructure:"replay"`
-	Upload  UploadCfg  `mapstructure:"upload"`
-	Users   UsersCfg   `mapstructure:"users"`
+	Service  ServiceCfg  `mapstructure:"service"`
+	MySQL    MySQLCfg    `mapstructure:"mysql"`
+	Redis    RedisCfg    `mapstructure:"redis"`
+	JWT      JWTCfg      `mapstructure:"jwt"`
+	Live     LiveCfg     `mapstructure:"live"`
+	Replay   ReplayCfg   `mapstructure:"replay"`
+	Upload   UploadCfg   `mapstructure:"upload"`
+	Users    UsersCfg    `mapstructure:"users"`
+	Internal InternalCfg `mapstructure:"internal"`
 }
 
 type ServiceCfg struct {
@@ -84,6 +85,12 @@ type UsersCfg struct {
 	GRPCAddr   string `mapstructure:"grpc_addr"`
 }
 
+// InternalCfg holds the shared secret sent on (and required by) /internal
+// service-to-service calls (ROOMSVC_INTERNAL_TOKEN).
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
+}
+
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -102,6 +109,7 @@ func Load(path string) (*Config, error) {
 	_ = v.BindEnv("live.stream_key_secret")
 	_ = v.BindEnv("replay.bunny_library_id")
 	_ = v.BindEnv("replay.bunny_api_key")
+	_ = v.BindEnv("internal.token")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

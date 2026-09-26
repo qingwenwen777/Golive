@@ -122,7 +122,7 @@ func main() {
 	appointmentSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetNotificationWriter(messageRepo)
-	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL)
+	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL, cfg.Internal.Token)
 	if err != nil {
 		log.Fatal("new user permission client", zap.Error(err))
 	}

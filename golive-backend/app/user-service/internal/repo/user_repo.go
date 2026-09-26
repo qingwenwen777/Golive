@@ -1751,7 +1751,10 @@ func (r *UserRepo) AdminUpdateRole(ctx context.Context, userID, role string) (*m
 	return &u, nil
 }
 
-func (r *UserRepo) AdminSetUserBan(ctx context.Context, userID string, banned bool, reason string) (*model.User, error) {
+// AdminSetUserBan sets or clears a ban on both users and
+// user_moderation_states and syncs the Redis ban flag. operatorID (may be
+// empty) is recorded as the state's updated_by.
+func (r *UserRepo) AdminSetUserBan(ctx context.Context, userID string, banned bool, reason, operatorID string) (*model.User, error) {
 	var u model.User
 	now := time.Now().UTC()
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1784,6 +1787,10 @@ func (r *UserRepo) AdminSetUserBan(ctx context.Context, userID string, banned bo
 			state.BanReason = cleanReason
 			stateUpdates["ban_reason"] = cleanReason
 		}
+		if operatorID = strings.TrimSpace(operatorID); operatorID != "" {
+			state.UpdatedBy = operatorID
+			stateUpdates["updated_by"] = operatorID
+		}
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "user_id"}},
 			DoUpdates: clause.Assignments(stateUpdates),
@@ -1802,6 +1809,47 @@ func (r *UserRepo) AdminSetUserBan(ctx context.Context, userID string, banned bo
 		return nil, err
 	}
 	return &u, r.syncUserBanCache(ctx, userID, banned)
+}
+
+// SetUserMute sets (mutedUntil non-nil) or clears a site-wide mute in
+// user_moderation_states and syncs the Redis mute flag.
+func (r *UserRepo) SetUserMute(ctx context.Context, userID string, mutedUntil *time.Time, reason, operatorID string) error {
+	now := time.Now().UTC()
+	cleanReason := strings.TrimSpace(reason)
+	if mutedUntil == nil {
+		cleanReason = ""
+	}
+	operatorID = strings.TrimSpace(operatorID)
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var u model.User
+		if err := tx.Select("id").Where("id = ?", userID).Take(&u).Error; err != nil {
+			return err
+		}
+		state := model.UserModerationState{
+			UserID:     userID,
+			MutedUntil: mutedUntil,
+			MuteReason: cleanReason,
+			UpdatedBy:  operatorID,
+			UpdatedAt:  now,
+			CreatedAt:  now,
+		}
+		return tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"muted_until": mutedUntil,
+				"mute_reason": cleanReason,
+				"updated_by":  operatorID,
+				"updated_at":  now,
+			}),
+		}).Create(&state).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrUserNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return r.syncUserMuteCache(ctx, userID, mutedUntil, now)
 }
 
 func (r *UserRepo) AdminAdjustCoins(ctx context.Context, userID, action string, amount int64, note, operatorID string) (*model.User, *model.CoinTransaction, error) {
@@ -2029,6 +2077,17 @@ func (r *UserRepo) syncUserBanCache(ctx context.Context, userID string, banned b
 	key := contentpolicy.RedisSiteBanPrefix + strings.TrimSpace(userID)
 	if banned {
 		return r.rdb.Set(ctx, key, "1", 0).Err()
+	}
+	return r.rdb.Del(ctx, key).Err()
+}
+
+func (r *UserRepo) syncUserMuteCache(ctx context.Context, userID string, mutedUntil *time.Time, now time.Time) error {
+	if r.rdb == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	key := contentpolicy.RedisSiteMutePrefix + strings.TrimSpace(userID)
+	if mutedUntil != nil && mutedUntil.After(now) {
+		return r.rdb.Set(ctx, key, mutedUntil.UTC().Format(time.RFC3339), mutedUntil.Sub(now)).Err()
 	}
 	return r.rdb.Del(ctx, key).Err()
 }

@@ -390,7 +390,7 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "cannot ban your own account"))
 		return
 	}
-	u, err := h.users.AdminSetUserBan(c.Request.Context(), c.Param("id"), req.Banned, req.Reason)
+	u, err := setUserBan(c.Request.Context(), h.users, h.sessions, c.Param("id"), req.Banned, req.Reason, UserIDFromCtx(c))
 	if errors.Is(err, repo.ErrUserNotFound) {
 		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
 		return
@@ -399,20 +399,29 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
-	if req.Banned && h.sessions != nil {
-		// Existing sessions must log in again, which hands the client the
-		// banned flag and routes it to the appeal page.
-		if err := h.sessions.RevokeUserSessions(c.Request.Context(), u.ID); err != nil {
-			errcode.Respond(c, err)
-			return
-		}
-	}
 	action := "user_unban"
 	if req.Banned {
 		action = "user_ban"
 	}
 	h.logAdminAudit(c, model.AdminAuditCategoryPermission, action, "user", u.ID, u.DisplayName, u.ID, u.DisplayName, strings.TrimSpace(req.Reason))
 	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
+}
+
+// setUserBan is the single ban path for the admin API and the internal API
+// other services call: it updates the ban state and, on a ban, revokes every
+// refresh token so existing sessions must log in again, which hands the
+// client the banned flag and routes it to the appeal page.
+func setUserBan(ctx context.Context, users *repo.UserRepo, sessions SessionRevoker, userID string, banned bool, reason, operatorID string) (*model.User, error) {
+	u, err := users.AdminSetUserBan(ctx, userID, banned, reason, operatorID)
+	if err != nil {
+		return nil, err
+	}
+	if banned && sessions != nil {
+		if err := sessions.RevokeUserSessions(ctx, u.ID); err != nil {
+			return nil, err
+		}
+	}
+	return u, nil
 }
 
 type adminReviewUnbanAppealReq struct {
@@ -746,12 +755,68 @@ func timeNowUTC() time.Time {
 	return time.Now().UTC()
 }
 
+// InternalHandler serves /internal/*, the service-to-service API. Routes are
+// guarded by the shared internal token (see server.NewRouter).
 type InternalHandler struct {
-	users *repo.UserRepo
+	users    *repo.UserRepo
+	sessions SessionRevoker
 }
 
-func NewInternalHandler(users *repo.UserRepo) *InternalHandler {
-	return &InternalHandler{users: users}
+func NewInternalHandler(users *repo.UserRepo, sessions SessionRevoker) *InternalHandler {
+	return &InternalHandler{users: users, sessions: sessions}
+}
+
+const (
+	RestrictionBan    = "ban"
+	RestrictionUnban  = "unban"
+	RestrictionMute   = "mute"
+	RestrictionUnmute = "unmute"
+)
+
+type internalRestrictionReq struct {
+	Action     string     `json:"action"`
+	Reason     string     `json:"reason"`
+	MutedUntil *time.Time `json:"mutedUntil"`
+	OperatorID string     `json:"operatorId"`
+}
+
+// SetRestriction serves POST /internal/users/:id/restriction. room-service's
+// report moderation calls it instead of writing users /
+// user_moderation_states itself; a ban goes through the same path as the
+// admin ban and revokes the user's refresh tokens.
+func (h *InternalHandler) SetRestriction(c *gin.Context) {
+	var req internalRestrictionReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid body"))
+		return
+	}
+	ctx := c.Request.Context()
+	userID := strings.TrimSpace(c.Param("id"))
+	var err error
+	switch req.Action {
+	case RestrictionBan, RestrictionUnban:
+		_, err = setUserBan(ctx, h.users, h.sessions, userID, req.Action == RestrictionBan, req.Reason, req.OperatorID)
+	case RestrictionMute:
+		if req.MutedUntil == nil || !req.MutedUntil.After(time.Now()) {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "mutedUntil must be in the future"))
+			return
+		}
+		err = h.users.SetUserMute(ctx, userID, req.MutedUntil, req.Reason, req.OperatorID)
+	case RestrictionUnmute:
+		err = h.users.SetUserMute(ctx, userID, nil, "", req.OperatorID)
+	default:
+		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid action"))
+		return
+	}
+	if errors.Is(err, repo.ErrUserNotFound) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
+		return
+	}
+	if err != nil {
+		errcode.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"userId": userID, "action": req.Action})
 }
 
 func (h *InternalHandler) UserPermission(c *gin.Context) {
