@@ -18,6 +18,11 @@ var ErrAppointmentNotDeletable = errors.New("appointment cannot be permanently d
 
 const appointmentWindow = time.Hour
 
+// notificationInsertBatch caps the rows per notification INSERT. A row binds
+// 13 columns, so one statement for a large audience would exceed MySQL's
+// 65,535 placeholder limit.
+const notificationInsertBatch = 500
+
 type AppointmentRepo struct {
 	db *gorm.DB
 }
@@ -273,16 +278,17 @@ func (r *AppointmentRepo) Unreserve(ctx context.Context, appointmentID, userID s
 		Delete(&model.AppointmentReservation{}).Error
 }
 
-func (r *AppointmentRepo) WatcherIDs(ctx context.Context, appointmentID string) ([]string, error) {
-	var rows []model.AppointmentReservation
-	if err := r.db.WithContext(ctx).Where("appointment_id = ?", appointmentID).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]string, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, row.UserID)
-	}
-	return out, nil
+// WatcherIDsAfter returns up to limit user ids that reserved the appointment,
+// ordered by user id and starting after afterUserID, so large audiences are
+// paged instead of loaded at once.
+func (r *AppointmentRepo) WatcherIDsAfter(ctx context.Context, appointmentID, afterUserID string, limit int) ([]string, error) {
+	var ids []string
+	err := r.db.WithContext(ctx).Model(&model.AppointmentReservation{}).
+		Where("appointment_id = ? AND user_id > ?", appointmentID, afterUserID).
+		Order("user_id ASC").
+		Limit(limit).
+		Pluck("user_id", &ids).Error
+	return ids, err
 }
 
 func (r *AppointmentRepo) Cancel(ctx context.Context, ownerID, appointmentID string, canceledAt time.Time) (*model.LiveAppointment, error) {
@@ -410,6 +416,17 @@ func (r *AppointmentRepo) MarkReminderSent(ctx context.Context, appointmentID st
 		Update("reminder_sent_at", sentAt).Error
 }
 
+// StartNotificationDue lists appointments that went live since startedSince
+// but whose start notification has not been recorded as sent.
+func (r *AppointmentRepo) StartNotificationDue(ctx context.Context, startedSince time.Time) ([]model.LiveAppointment, error) {
+	var items []model.LiveAppointment
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND start_notified_at IS NULL AND started_at >= ?", model.AppointmentLive, startedSince).
+		Order("started_at ASC").
+		Find(&items).Error
+	return items, err
+}
+
 func (r *AppointmentRepo) MarkStartNotified(ctx context.Context, appointmentID string, sentAt time.Time) error {
 	return r.db.WithContext(ctx).Model(&model.LiveAppointment{}).Where("id = ?", appointmentID).
 		Update("start_notified_at", sentAt).Error
@@ -435,7 +452,7 @@ func (r *AppointmentRepo) CreateNotifications(ctx context.Context, notifications
 	if len(notifications) == 0 {
 		return nil
 	}
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&notifications).Error
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(&notifications, notificationInsertBatch).Error
 }
 
 func (r *AppointmentRepo) ListNotifications(ctx context.Context, userID string, page, size int, includeTypes, excludeTypes []string) ([]model.Notification, int64, int64, error) {
