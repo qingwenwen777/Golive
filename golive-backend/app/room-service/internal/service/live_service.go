@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -92,22 +93,44 @@ func (s *LiveService) SetSRSAPIBase(base string) {
 	s.srs = newSRSAPI(base)
 }
 
-// disconnectPublisher kicks the SRS client publishing with streamKey, so a
-// stopped room stops streaming and recording instead of only changing state.
-// Best effort: failures are logged and never fail the stop.
-func (s *LiveService) disconnectPublisher(ctx context.Context, roomID, streamKey string) {
-	if s.srs == nil || streamKey == "" {
-		return
+// srsPublishers returns SRS's stream list, stream name -> publisher client id,
+// or nil when there is no SRS API or it cannot be asked; callers then go on
+// as they did before they asked SRS.
+func (s *LiveService) srsPublishers(ctx context.Context, roomID string) map[string]string {
+	if s.srs == nil {
+		return nil
 	}
-	clientID, err := s.live.PublishSession(ctx, streamKey)
+	publishers, err := s.srs.activePublishers(ctx)
 	if err != nil {
-		if !errors.Is(err, repo.ErrStreamKeyNotFound) {
-			logger.L().Warn("load srs publish session", zap.Error(err), zap.String("room_id", roomID))
-		}
+		logger.L().Warn("list srs streams", zap.Error(err), zap.String("room_id", roomID))
+		return nil
+	}
+	return publishers
+}
+
+// disconnectPublisher kicks the SRS clients publishing room, so a stopped
+// room stops streaming and recording instead of only changing state: the
+// publisher SRS lists for the room's play name, and the one on_publish last
+// accepted, which SRS may not list yet (or at all while its API cannot be
+// asked). Best effort: failures are logged and never fail the stop.
+func (s *LiveService) disconnectPublisher(ctx context.Context, room *model.Room) {
+	if s.srs == nil || room.StreamKey == "" {
 		return
 	}
-	if err := s.srs.kickClient(ctx, clientID); err != nil {
-		logger.L().Warn("kick srs publisher", zap.Error(err), zap.String("room_id", roomID), zap.String("client_id", clientID))
+	var clientIDs []string
+	if clientID := s.srsPublishers(ctx, room.ID)[playStreamName(room.ID, room.StreamKey)]; clientID != "" {
+		clientIDs = append(clientIDs, clientID)
+	}
+	clientID, err := s.live.PublishSession(ctx, room.StreamKey)
+	if err == nil && !slices.Contains(clientIDs, clientID) {
+		clientIDs = append(clientIDs, clientID)
+	} else if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+		logger.L().Warn("load srs publish session", zap.Error(err), zap.String("room_id", room.ID))
+	}
+	for _, clientID := range clientIDs {
+		if err := s.srs.kickClient(ctx, clientID); err != nil {
+			logger.L().Warn("kick srs publisher", zap.Error(err), zap.String("room_id", room.ID), zap.String("client_id", clientID))
+		}
 	}
 }
 
@@ -534,6 +557,15 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 			return errors.New("stream is not publishable")
 		}
 	}
+	// SRS asks on_publish before it refuses a second publisher of a stream
+	// that is on air ("stream busy"; 5.0.213 then reports the refused
+	// attempt's unpublish), so such an attempt must change nothing: the
+	// session and a pending disconnect stay those of the publisher on air.
+	if publishers := s.srsPublishers(ctx, roomID); publishers != nil {
+		if clientID, busy := publishers[streamName]; busy && clientID != req.ClientID {
+			return errors.New("stream is already being published")
+		}
+	}
 	if err := s.live.SavePublishSession(ctx, streamKey, req.ClientID, s.keyTTL); err != nil {
 		return err
 	}
@@ -667,8 +699,9 @@ func (s *LiveService) finalizeUnpublishAfterGrace(streamKey, roomID string) {
 }
 
 // finalizeUnpublish ends roomID when the disconnect recorded for it is still
-// pending: the publisher did not reconnect (which clears the record) and no
-// newer publisher took over the stream key. The room ends at the disconnect.
+// pending: the publisher did not reconnect (which clears the record), no
+// newer publisher took over the stream key, and SRS, when it can be asked,
+// lists no publisher for the stream. The room ends at the disconnect.
 func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID string) error {
 	disconnect, err := s.live.Disconnect(ctx, roomID)
 	if errors.Is(err, repo.ErrStreamKeyNotFound) {
@@ -705,6 +738,13 @@ func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID s
 		_ = s.live.DeleteDisconnect(ctx, roomID)
 		return s.live.Delete(ctx, streamKey)
 	}
+	if publishers := s.srsPublishers(ctx, roomID); publishers != nil {
+		if _, publishing := publishers[playStreamName(roomID, streamKey)]; publishing {
+			// On air after all, e.g. the unpublish was of an attempt SRS
+			// refused as busy while another publisher kept streaming.
+			return s.live.DeleteDisconnect(ctx, roomID)
+		}
+	}
 	_, err = s.stopRoom(ctx, room, disconnect.At, false)
 	return err
 }
@@ -720,7 +760,7 @@ func (s *LiveService) stopRoom(ctx context.Context, room *model.Room, endedAt ti
 		return false, err
 	}
 	if kick {
-		s.disconnectPublisher(ctx, room.ID, room.StreamKey)
+		s.disconnectPublisher(ctx, room)
 	}
 	if s.replay != nil {
 		s.replay.EnqueueUpload(ctx, *room)

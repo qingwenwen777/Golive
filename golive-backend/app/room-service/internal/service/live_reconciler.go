@@ -101,9 +101,13 @@ func (s *LiveService) reconcileRoom(ctx context.Context, room *model.Room, publi
 		if err := s.live.Save(ctx, room.StreamKey, room.ID, s.keyTTL); err != nil {
 			return nil, err
 		}
-		err := s.live.RefreshPublishSession(ctx, room.StreamKey, s.keyTTL)
-		if errors.Is(err, repo.ErrStreamKeyNotFound) && clientID != "" {
+		var err error
+		if clientID != "" {
+			// SRS's publisher is the session, also over one a publish
+			// attempt SRS then refused as busy left behind.
 			err = s.live.SavePublishSession(ctx, room.StreamKey, clientID, s.keyTTL)
+		} else {
+			err = s.live.RefreshPublishSession(ctx, room.StreamKey, s.keyTTL)
 		}
 		if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
 			return nil, err

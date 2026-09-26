@@ -20,11 +20,12 @@ import (
 
 // fakeSRS serves SRS 5's GET /api/v1/streams/ (paged by start/count, count
 // at least 10, every stream listed with its publish state) and DELETE
-// /api/v1/clients/{id}.
+// /api/v1/clients/{id}, which ends the kicked client's publish.
 type fakeSRS struct {
 	mu          sync.Mutex
 	publishers  map[string]string // stream name -> publisher client id
 	idle        []string          // streams listed without a publisher
+	kicked      []string          // client ids, in kick order
 	down        bool
 	ignoreStart bool
 	listCalls   int
@@ -52,6 +53,12 @@ func (f *fakeSRS) setDown(down bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.down = down
+}
+
+func (f *fakeSRS) kicks() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.kicked...)
 }
 
 func (f *fakeSRS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +102,13 @@ func (f *fakeSRS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": 0, "server": "vid-test", "streams": page})
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/clients/"):
+		clientID := strings.TrimPrefix(r.URL.Path, "/api/v1/clients/")
+		f.kicked = append(f.kicked, clientID)
+		for stream, publisher := range f.publishers {
+			if publisher == clientID {
+				delete(f.publishers, stream)
+			}
+		}
 		_, _ = w.Write([]byte(`{"code":0}`))
 	default:
 		http.NotFound(w, r)
