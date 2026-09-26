@@ -744,6 +744,21 @@ func (r *OrderRepo) cancelBetRound(ctx context.Context, roundID, ownerID string,
 	return &cancelledRound, refunded, nil
 }
 
+// StaleBetRounds returns up to limit rounds still awaiting a result whose
+// betting closed at or before cutoff.
+func (r *OrderRepo) StaleBetRounds(ctx context.Context, cutoff time.Time, limit int) ([]model.BetRound, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	var rounds []model.BetRound
+	err := r.db.WithContext(ctx).
+		Where("status IN ? AND close_at <= ?", []string{model.BetRoundOpen, model.BetRoundClosed}, cutoff).
+		Order("close_at ASC").
+		Limit(limit).
+		Find(&rounds).Error
+	return rounds, err
+}
+
 // RefundOrphanedBetWagers refunds up to limit wagers still `locked` on a
 // settled or cancelled round. Such wagers were never part of the payout or
 // refund (they could slip in before rounds were locked), so without this the

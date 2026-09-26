@@ -126,7 +126,7 @@ func main() {
 	defer cancelOutbox()
 	go outboxSvc.Run(outboxCtx)
 	go luckyBagSvc.RunScheduler(outboxCtx)
-	go betSvc.RunScheduler(outboxCtx)
+	go betSvc.RunScheduler(outboxCtx, cfg.Bet.SettleGrace)
 
 	go func() {
 		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {

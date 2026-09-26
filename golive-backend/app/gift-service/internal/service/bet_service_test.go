@@ -10,6 +10,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
+	"github.com/qingwenwen777/golive/app/gift-service/internal/service"
 )
 
 // newBetTestDB extends newTestDB with the bet tables and two more viewers.
@@ -67,4 +68,55 @@ func TestBetRefundOrphanedWagers(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, n)
 	require.Equal(t, int64(1000), balanceOf(t, db, "u-a"))
+}
+
+func TestBetCancelStaleRoundsRefundsAndUnblocksRoom(t *testing.T) {
+	db := newBetTestDB(t)
+	orders := repo.NewOrderRepo(db)
+	svc := service.NewBetService(orders)
+	ctx := context.Background()
+
+	view, err := svc.Open(ctx, "u-owner", "r1", 100, "Will blue win?")
+	require.NoError(t, err)
+	staleID := view.Round.ID
+	_, err = svc.Wager(ctx, "u-a", "r1", staleID, model.BetOptionWin)
+	require.NoError(t, err)
+	require.Equal(t, int64(900), balanceOf(t, db, "u-a"))
+	// The host never settled: betting closed three hours ago.
+	require.NoError(t, db.Model(&model.BetRound{}).Where("id = ?", staleID).
+		Update("close_at", time.Now().UTC().Add(-3*time.Hour)).Error)
+
+	// A round in another room that closed recently is still within the grace.
+	view, err = svc.Open(ctx, "u-owner", "r", 100, "Will red win?")
+	require.NoError(t, err)
+	freshID := view.Round.ID
+	require.NoError(t, db.Model(&model.BetRound{}).Where("id = ?", freshID).
+		Update("close_at", time.Now().UTC().Add(-time.Minute)).Error)
+
+	_, err = svc.Open(ctx, "u-owner", "r1", 100, "Next round")
+	require.ErrorIs(t, err, service.ErrBetActive)
+
+	n, err := svc.CancelStaleRounds(ctx, 2*time.Hour)
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+
+	var stale, fresh model.BetRound
+	require.NoError(t, db.Where("id = ?", staleID).Take(&stale).Error)
+	require.Equal(t, model.BetRoundCancelled, stale.Status)
+	require.NoError(t, db.Where("id = ?", freshID).Take(&fresh).Error)
+	require.Equal(t, model.BetRoundOpen, fresh.Status)
+	require.Equal(t, int64(1000), balanceOf(t, db, "u-a"))
+
+	var events int64
+	require.NoError(t, db.Model(&model.LocalMessage{}).
+		Where("biz_id = ? AND topic = ? AND payload LIKE ?", staleID, model.OutboxTopicBet, `%"event":"cancelled"%`).
+		Count(&events).Error)
+	require.Equal(t, int64(1), events)
+
+	_, err = svc.Open(ctx, "u-owner", "r1", 100, "Next round")
+	require.NoError(t, err)
+
+	n, err = svc.CancelStaleRounds(ctx, 2*time.Hour)
+	require.NoError(t, err)
+	require.Zero(t, n)
 }
