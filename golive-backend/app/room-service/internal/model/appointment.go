@@ -39,7 +39,7 @@ func (AppointmentReservation) TableName() string { return "appointment_reservati
 
 type Notification struct {
 	ID            string     `gorm:"primaryKey;type:varchar(64)"`
-	UserID        string     `gorm:"type:varchar(36);not null;index"`
+	UserID        string     `gorm:"type:varchar(36);not null;index;index:idx_notifications_user_created,priority:1"`
 	Type          string     `gorm:"type:varchar(32);not null;index"`
 	Title         string     `gorm:"type:varchar(255);not null"`
 	Body          string     `gorm:"type:varchar(1000)"`
@@ -50,7 +50,7 @@ type Notification struct {
 	ActorAvatar   string     `gorm:"type:varchar(500)"`
 	ActorVerified bool       `gorm:"not null;default:false"`
 	ReadAt        *time.Time `gorm:"index"`
-	CreatedAt     time.Time  `gorm:"not null;index"`
+	CreatedAt     time.Time  `gorm:"not null;index;index:idx_notifications_user_created,priority:2"`
 }
 
 func (Notification) TableName() string { return "notifications" }

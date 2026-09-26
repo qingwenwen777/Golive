@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -43,8 +42,7 @@ func (h *ReplayHandler) ListMine(c *gin.Context) {
 		errcode.Respond(c, errcode.ErrUnauthorized)
 		return
 	}
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
+	page, size := pageQuery(c, 1, 24)
 	resp, err := h.svc.ListMine(c.Request.Context(), uid, page, size)
 	if err != nil {
 		errcode.Respond(c, err)

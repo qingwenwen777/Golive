@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,7 +18,7 @@ func NewSearchHandler(svc *service.SearchService) *SearchHandler {
 }
 
 func (h *SearchHandler) Search(c *gin.Context) {
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "8"))
+	size := sizeQuery(c, 8, maxPageSize)
 	resp, err := h.svc.Search(c.Request.Context(), UserIDFromCtx(c), c.Query("q"), size)
 	if err != nil {
 		errcode.Respond(c, err)
@@ -29,7 +28,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 }
 
 func (h *SearchHandler) Suggest(c *gin.Context) {
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "12"))
+	size := sizeQuery(c, 12, maxPageSize)
 	resp, err := h.svc.Suggest(c.Request.Context(), UserIDFromCtx(c), c.Query("q"), size)
 	if err != nil {
 		errcode.Respond(c, err)

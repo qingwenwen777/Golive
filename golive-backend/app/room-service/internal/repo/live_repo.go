@@ -94,15 +94,45 @@ func (r *LiveRepo) ViewerMetrics(ctx context.Context, roomID string) (*ViewerMet
 	if err != nil {
 		return nil, err
 	}
-	if len(values) >= 2 && values[0] == nil && values[1] == nil {
-		return nil, nil
+	return viewerMetricsFromValues(values), nil
+}
+
+// ViewerMetricsByRooms is ViewerMetrics for many rooms in one pipeline. Rooms
+// without metrics are absent from the result.
+func (r *LiveRepo) ViewerMetricsByRooms(ctx context.Context, roomIDs []string) (map[string]ViewerMetrics, error) {
+	out := make(map[string]ViewerMetrics, len(roomIDs))
+	if len(roomIDs) == 0 {
+		return out, nil
+	}
+	pipe := r.rdb.Pipeline()
+	cmds := make(map[string]*redis.SliceCmd, len(roomIDs))
+	for _, roomID := range roomIDs {
+		if _, ok := cmds[roomID]; ok {
+			continue
+		}
+		cmds[roomID] = pipe.HMGet(ctx, "roommetrics:"+roomID, "viewers", "peak")
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, err
+	}
+	for roomID, cmd := range cmds {
+		if metrics := viewerMetricsFromValues(cmd.Val()); metrics != nil {
+			out[roomID] = *metrics
+		}
+	}
+	return out, nil
+}
+
+func viewerMetricsFromValues(values []any) *ViewerMetrics {
+	if len(values) < 2 || values[0] == nil && values[1] == nil {
+		return nil
 	}
 	viewers := parseRedisInt(values[0])
 	peak := parseRedisInt(values[1])
 	if peak < viewers {
 		peak = viewers
 	}
-	return &ViewerMetrics{Viewers: viewers, Peak: peak}, nil
+	return &ViewerMetrics{Viewers: viewers, Peak: peak}
 }
 
 func parseRedisInt(value any) int64 {

@@ -44,8 +44,8 @@ type Room struct {
 	Category             string    `gorm:"type:varchar(64);index"`
 	CategoryJa           string    `gorm:"type:varchar(64)"`
 	StartedAt            time.Time `gorm:"index;index:idx_rooms_live_list,priority:2,sort:desc"`
-	Status               string    `gorm:"type:varchar(16);not null;default:'live';index;index:idx_rooms_live_list,priority:1"`
-	OwnerID              string    `gorm:"type:varchar(36);index"`
+	Status               string    `gorm:"type:varchar(16);not null;default:'live';index;index:idx_rooms_live_list,priority:1;index:idx_rooms_owner_status,priority:2"`
+	OwnerID              string    `gorm:"type:varchar(36);index;index:idx_rooms_owner_status,priority:1"`
 	StreamKey            string    `gorm:"type:varchar(128);index"`
 	ReplayUploadEnabled  bool      `gorm:"not null;default:false"`
 	ReplayStatus         string    `gorm:"type:varchar(20);not null;default:'none';index"`

@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -79,4 +80,19 @@ func TestUserProfiles(t *testing.T) {
 	require.Equal(t, "kabun", profiles["u2"].Name)
 	require.Equal(t, 1, profiles["u2"].Level)
 	require.Equal(t, "Creator 3f2a0c1e", profiles["3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"].Name)
+}
+
+func TestAutoMigrateCreatesRoomTsIndexPerShard(t *testing.T) {
+	db := newTestDB(t)
+	r := NewDanmuRepo(db, 4)
+	require.NoError(t, r.AutoMigrate())
+	require.NoError(t, r.AutoMigrate(), "re-running the migration is a no-op")
+	for i := 0; i < r.Shards(); i++ {
+		table := fmt.Sprintf("danmus_%d", i)
+		index := fmt.Sprintf("idx_%s_room_ts", table)
+		require.True(t, db.Table(table).Migrator().HasIndex(&model.Danmu{}, index), index)
+		var columns []string
+		require.NoError(t, db.Raw("SELECT name FROM pragma_index_info(?) ORDER BY seqno", index).Scan(&columns).Error)
+		require.Equal(t, []string{"room_id", "ts"}, columns, index)
+	}
 }

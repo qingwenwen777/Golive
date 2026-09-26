@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -272,16 +271,5 @@ func requireUser(c *gin.Context) (string, bool) {
 }
 
 func pageSize(c *gin.Context, defaultPage, defaultSize int) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(defaultPage)))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", strconv.Itoa(defaultSize)))
-	if page < 1 {
-		page = defaultPage
-	}
-	if size < 1 {
-		size = defaultSize
-	}
-	if size > 100 {
-		size = 100
-	}
-	return page, size
+	return pageQuery(c, defaultPage, defaultSize)
 }

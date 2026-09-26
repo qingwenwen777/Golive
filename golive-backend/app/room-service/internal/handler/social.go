@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -53,7 +52,7 @@ func (h *SocialHandler) ListSubscriptions(c *gin.Context) {
 }
 
 func (h *SocialHandler) RecommendedCreators(c *gin.Context) {
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "8"))
+	size := sizeQuery(c, 8, maxPageSize)
 	resp, err := h.svc.RecommendedCreators(c.Request.Context(), UserIDFromCtx(c), size, c.Query("category"))
 	if err != nil {
 		errcode.Respond(c, err)
