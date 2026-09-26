@@ -12,11 +12,13 @@ import (
 )
 
 type AppointmentHandler struct {
-	svc *service.AppointmentService
+	svc        *service.AppointmentService
+	permission service.LivePermissionChecker
+	bans       service.UserBanChecker
 }
 
-func NewAppointmentHandler(svc *service.AppointmentService) *AppointmentHandler {
-	return &AppointmentHandler{svc: svc}
+func NewAppointmentHandler(svc *service.AppointmentService, permission service.LivePermissionChecker, bans service.UserBanChecker) *AppointmentHandler {
+	return &AppointmentHandler{svc: svc, permission: permission, bans: bans}
 }
 
 type appointmentReq struct {
@@ -35,6 +37,9 @@ func (h *AppointmentHandler) Create(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !requireLivePublisher(c, h.permission, h.bans, uid) {
+		return
+	}
 	payload, ok := bindAppointmentPayload(c)
 	if !ok {
 		return
@@ -50,6 +55,9 @@ func (h *AppointmentHandler) Create(c *gin.Context) {
 func (h *AppointmentHandler) Update(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {
+		return
+	}
+	if !requireLivePublisher(c, h.permission, h.bans, uid) {
 		return
 	}
 	payload, ok := bindAppointmentPayload(c)
@@ -92,6 +100,9 @@ func (h *AppointmentHandler) DeleteRecord(c *gin.Context) {
 func (h *AppointmentHandler) Start(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {
+		return
+	}
+	if !requireLivePublisher(c, h.permission, h.bans, uid) {
 		return
 	}
 	resp, err := h.svc.Start(c.Request.Context(), uid, c.Param("id"))

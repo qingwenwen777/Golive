@@ -111,6 +111,7 @@ type ReportGroupRow struct {
 	TargetUserName   string
 	TargetTitle      string
 	TargetText       string
+	TargetVerified   bool
 	Reason           string
 	Status           string
 	ReviewerID       string
@@ -548,7 +549,7 @@ func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.
 			return ErrReportDuplicate
 		}
 		if strings.TrimSpace(report.GroupID) == "" {
-			openGroup, err := r.openReportGroup(ctx, tx, report.TargetType, report.TargetID)
+			openGroup, err := r.openReportGroup(ctx, tx, report.TargetType, report.TargetID, report.RoomID)
 			if err != nil {
 				return err
 			}
@@ -577,18 +578,23 @@ func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.
 }
 
 func (r *ModerationRepo) openReportGroupID(ctx context.Context, tx *gorm.DB, targetType, targetID string) (string, error) {
-	existing, err := r.openReportGroup(ctx, tx, targetType, targetID)
+	existing, err := r.openReportGroup(ctx, tx, targetType, targetID, "")
 	if err != nil || existing == nil {
 		return "", err
 	}
 	return existing.GroupID, nil
 }
 
-func (r *ModerationRepo) openReportGroup(ctx context.Context, tx *gorm.DB, targetType, targetID string) (*model.ContentReport, error) {
+func (r *ModerationRepo) openReportGroup(ctx context.Context, tx *gorm.DB, targetType, targetID, roomID string) (*model.ContentReport, error) {
 	var existing model.ContentReport
-	err := tx.WithContext(ctx).Model(&model.ContentReport{}).
+	q := tx.WithContext(ctx).Model(&model.ContentReport{}).
 		Where("target_type = ? AND target_id = ? AND (status = ? OR status = ?)",
-			targetType, targetID, model.ReportStatusPending, model.ReportStatusReviewing).
+			targetType, targetID, model.ReportStatusPending, model.ReportStatusReviewing)
+	if targetType == model.ReportTargetDanmu && roomID != "" {
+		// Danmu ids are chosen by the sending client and only unique per room.
+		q = q.Where("room_id = ?", roomID)
+	}
+	err := q.
 		Order("CASE status WHEN 'reviewing' THEN 0 ELSE 1 END, created_at DESC").
 		Limit(1).
 		Take(&existing).Error
@@ -679,6 +685,7 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 				TargetUserName:   row.TargetUserName,
 				TargetTitle:      row.TargetTitle,
 				TargetText:       row.TargetText,
+				TargetVerified:   row.TargetVerified,
 				Reason:           row.Reason,
 				Status:           row.Status,
 				ReviewerID:       row.ReviewerID,
@@ -709,18 +716,17 @@ func (r *ModerationRepo) ListContentReportGroups(ctx context.Context, filter Rep
 			group.ReviewExpiresAt = firstNonEmptyTime(group.ReviewExpiresAt, row.ReviewExpiresAt)
 			group.ResolutionAction = firstNonEmpty(group.ResolutionAction, row.ResolutionAction)
 		}
+		// Target fields come from one row as a whole, never merged across
+		// reports, and a server-verified row always beats a legacy one.
+		if row.TargetVerified && !group.TargetVerified {
+			setReportGroupTarget(group, row)
+		}
 		if row.CreatedAt.After(group.CreatedAt) {
 			group.ID = row.ID
 			group.GroupID = firstNonEmpty(row.GroupID, group.GroupID)
-			group.TargetURL = firstNonEmpty(row.TargetURL, group.TargetURL)
-			group.RoomID = firstNonEmpty(row.RoomID, group.RoomID)
-			group.ChannelID = firstNonEmpty(row.ChannelID, group.ChannelID)
-			group.TargetOwnerID = firstNonEmpty(row.TargetOwnerID, group.TargetOwnerID)
-			group.TargetOwnerName = firstNonEmpty(row.TargetOwnerName, group.TargetOwnerName)
-			group.TargetUserID = firstNonEmpty(row.TargetUserID, group.TargetUserID)
-			group.TargetUserName = firstNonEmpty(row.TargetUserName, group.TargetUserName)
-			group.TargetTitle = firstNonEmpty(row.TargetTitle, group.TargetTitle)
-			group.TargetText = firstNonEmpty(row.TargetText, group.TargetText)
+			if row.TargetVerified || !group.TargetVerified {
+				setReportGroupTarget(group, row)
+			}
 			group.Reason = firstNonEmpty(row.Reason, group.Reason)
 			group.ReviewerID = firstNonEmpty(row.ReviewerID, group.ReviewerID)
 			group.ReviewerName = firstNonEmpty(row.ReviewerName, group.ReviewerName)
@@ -1627,9 +1633,18 @@ func compactAdminHealthError(err error) string {
 	return msg
 }
 
-func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {
-	if userID == "" {
-		return false, nil
+// Platform roles, owned by user-service. A platform moderator only reviews
+// content (reports, blocked words); everything else needs RoleAdmin.
+const (
+	RoleUser      = "user"
+	RoleAdmin     = "admin"
+	RoleModerator = "moderator"
+)
+
+// UserRole returns the user's platform role, or "" for unknown users.
+func (r *ModerationRepo) UserRole(ctx context.Context, userID string) (string, error) {
+	if strings.TrimSpace(userID) == "" {
+		return "", nil
 	}
 	var role string
 	err := r.db.WithContext(ctx).
@@ -1638,9 +1653,14 @@ func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, erro
 		Where("id = ?", userID).
 		Take(&role).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
+		return "", nil
 	}
-	return role == "admin" || role == "moderator", err
+	return role, err
+}
+
+func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {
+	role, err := r.UserRole(ctx, userID)
+	return role == RoleAdmin, err
 }
 
 func (r *ModerationRepo) UserProfile(ctx context.Context, userID string) (ModerationUser, error) {
@@ -1744,6 +1764,19 @@ func normalizeModerationPage(page, size int) (int, int) {
 		size = 100
 	}
 	return page, size
+}
+
+func setReportGroupTarget(group *ReportGroupRow, row model.ContentReport) {
+	group.TargetURL = row.TargetURL
+	group.RoomID = row.RoomID
+	group.ChannelID = row.ChannelID
+	group.TargetOwnerID = row.TargetOwnerID
+	group.TargetOwnerName = row.TargetOwnerName
+	group.TargetUserID = row.TargetUserID
+	group.TargetUserName = row.TargetUserName
+	group.TargetTitle = row.TargetTitle
+	group.TargetText = row.TargetText
+	group.TargetVerified = row.TargetVerified
 }
 
 func reportGroupKey(row model.ContentReport) string {

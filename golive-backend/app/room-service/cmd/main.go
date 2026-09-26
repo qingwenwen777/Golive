@@ -116,6 +116,7 @@ func main() {
 		PostPublicURL:       cfg.Upload.PostPublicURL,
 	})
 	liveSvc.SetTextPolicy(moderationSvc)
+	appointmentSvc.SetTextPolicy(moderationSvc)
 	roomSvc.SetBlockChecker(messageSvc)
 	appointmentSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetBlockChecker(messageSvc)

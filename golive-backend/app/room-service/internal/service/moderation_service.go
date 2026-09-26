@@ -203,6 +203,10 @@ type MuteStateResp struct {
 	MuteRemainingSeconds int64  `json:"muteRemainingSeconds,omitempty"`
 }
 
+// CreateReportReq is the body of POST /rooms/reports. Only TargetType,
+// TargetID, RoomID (used to locate danmu), Reason and Description are read;
+// the other target fields the web client sends are ignored because the
+// server resolves them from the reported content itself.
 type CreateReportReq struct {
 	TargetType      string `json:"targetType"`
 	TargetID        string `json:"targetId"`
@@ -637,6 +641,13 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID string,
 		return nil, errcode.New(http.StatusBadRequest, "report reason is required").WithReason("reason_required")
 	}
 	description := trimRunes(strings.TrimSpace(req.Description), 100)
+	target, err := s.moderation.ResolveReportTarget(ctx, targetType, trimRunes(targetID, 128), trimRunes(strings.TrimSpace(req.RoomID), 64))
+	if errors.Is(err, repo.ErrReportTargetNotFound) {
+		return nil, errcode.New(http.StatusNotFound, "report target not found").WithReason("target_not_found")
+	}
+	if err != nil {
+		return nil, err
+	}
 	reporter, err := s.moderation.UserProfile(ctx, reporterID)
 	if err != nil {
 		return nil, err
@@ -651,16 +662,17 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID string,
 		ReporterName:    reporter.Name,
 		ReporterAvatar:  reporter.Avatar,
 		TargetType:      targetType,
-		TargetID:        trimRunes(targetID, 128),
-		TargetURL:       trimRunes(strings.TrimSpace(req.TargetURL), 800),
-		RoomID:          trimRunes(strings.TrimSpace(req.RoomID), 64),
-		ChannelID:       trimRunes(strings.TrimSpace(req.ChannelID), 64),
-		TargetOwnerID:   trimRunes(strings.TrimSpace(req.TargetOwnerID), 36),
-		TargetOwnerName: trimRunes(strings.TrimSpace(req.TargetOwnerName), 128),
-		TargetUserID:    trimRunes(strings.TrimSpace(req.TargetUserID), 36),
-		TargetUserName:  trimRunes(strings.TrimSpace(req.TargetUserName), 128),
-		TargetTitle:     trimRunes(strings.TrimSpace(req.TargetTitle), 240),
-		TargetText:      trimRunes(strings.TrimSpace(req.TargetText), 1000),
+		TargetID:        trimRunes(target.TargetID, 128),
+		TargetURL:       trimRunes(target.Link, 800),
+		RoomID:          trimRunes(target.RoomID, 64),
+		ChannelID:       trimRunes(target.ChannelID, 64),
+		TargetOwnerID:   trimRunes(target.OwnerID, 36),
+		TargetOwnerName: trimRunes(strings.TrimSpace(target.OwnerName), 128),
+		TargetUserID:    trimRunes(target.UserID, 36),
+		TargetUserName:  trimRunes(strings.TrimSpace(target.UserName), 128),
+		TargetTitle:     trimRunes(strings.TrimSpace(target.Title), 240),
+		TargetText:      trimRunes(strings.TrimSpace(target.Text), 1000),
+		TargetVerified:  true,
 		Reason:          reason,
 		Description:     description,
 		Status:          model.ReportStatusPending,
@@ -682,7 +694,7 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID string,
 }
 
 func (s *ModerationService) ListReports(ctx context.Context, adminID string, filter repo.ReportListFilter) (*ContentReportListResp, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -710,7 +722,7 @@ func (s *ModerationService) ListReports(ctx context.Context, adminID string, fil
 }
 
 func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string) (*ContentReportDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -736,7 +748,8 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 }
 
 func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string, req UpdateReportReq) (*ContentReportDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	actorRole, err := s.requireContentModerator(ctx, adminID)
+	if err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -777,6 +790,18 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 			actions = []string{model.ReportActionReview}
 		} else if status == model.ReportStatusDismissed {
 			actions = []string{model.ReportActionDismiss}
+		}
+	}
+	var actionTarget *model.ContentReport
+	if hasEnforcementAction(actions) {
+		if err := ensureReportActionsFitTarget(base.TargetType, actions); err != nil {
+			return nil, err
+		}
+		if actionTarget, err = s.verifiedReportTarget(ctx, base); err != nil {
+			return nil, err
+		}
+		if err := s.ensureCanSanctionReportTarget(ctx, actorRole, actionTarget, actions); err != nil {
+			return nil, err
 		}
 	}
 	duration := policy.normalizeSanctionDuration(actions, req.DurationMinutes)
@@ -833,6 +858,12 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	}
 	if err != nil {
 		return nil, err
+	}
+	if actionTarget != nil {
+		// Keep the claimed row's id/status but act on the verified target.
+		target := *claimed
+		copyReportTarget(&target, actionTarget)
+		claimed = &target
 	}
 	if err := s.applyReportActions(ctx, adminID, claimed, actions, note, duration); err != nil {
 		return nil, err
@@ -898,6 +929,100 @@ func normalizeReportActions(req UpdateReportReq) ([]string, error) {
 	return actions, nil
 }
 
+// hasEnforcementAction reports whether actions touch content, users or rooms
+// (anything beyond claiming or dismissing the report).
+func hasEnforcementAction(actions []string) bool {
+	for _, action := range actions {
+		if action != model.ReportActionReview && action != model.ReportActionDismiss {
+			return true
+		}
+	}
+	return false
+}
+
+// ensureReportActionsFitTarget rejects room-level actions on reports about
+// other content: a danmu report must not end the room it was posted in.
+func ensureReportActionsFitTarget(targetType string, actions []string) error {
+	if targetType == model.ReportTargetRoom {
+		return nil
+	}
+	for _, action := range actions {
+		if action == model.ReportActionWarnRoom || action == model.ReportActionForceEndLive {
+			return errcode.New(http.StatusBadRequest, "action does not apply to this report target").WithReason("action_not_allowed_for_target")
+		}
+	}
+	return nil
+}
+
+// verifiedReportTarget re-resolves the reported content so enforcement acts on
+// its real author/room. When the content is gone we fall back to the stored
+// snapshot only if it was resolved server-side at report time; legacy rows
+// carry client-supplied ids and cannot drive sanctions.
+func (s *ModerationService) verifiedReportTarget(ctx context.Context, report *model.ContentReport) (*model.ContentReport, error) {
+	target, err := s.moderation.ResolveReportTarget(ctx, report.TargetType, report.TargetID, report.RoomID)
+	if err == nil {
+		out := *report
+		out.RoomID = target.RoomID
+		out.ChannelID = target.ChannelID
+		out.TargetOwnerID = target.OwnerID
+		out.TargetOwnerName = target.OwnerName
+		out.TargetUserID = target.UserID
+		out.TargetUserName = target.UserName
+		out.TargetURL = target.Link
+		out.TargetVerified = true
+		return &out, nil
+	}
+	if !errors.Is(err, repo.ErrReportTargetNotFound) {
+		return nil, err
+	}
+	if report.TargetVerified {
+		return report, nil
+	}
+	return nil, errcode.New(http.StatusConflict, "report target can no longer be verified").WithReason("target_unverified")
+}
+
+// ensureCanSanctionReportTarget stops reports from being used against staff:
+// admins are never sanctioned through reports, and only an admin may act on a
+// platform moderator.
+func (s *ModerationService) ensureCanSanctionReportTarget(ctx context.Context, actorRole string, report *model.ContentReport, actions []string) error {
+	targets := make([]string, 0, 2)
+	for _, action := range actions {
+		switch action {
+		case model.ReportActionWarnUser, model.ReportActionSiteMute, model.ReportActionBanUser:
+			targets = append(targets, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID))
+		case model.ReportActionWarnRoom, model.ReportActionForceEndLive:
+			targets = append(targets, report.TargetOwnerID)
+		}
+	}
+	for _, userID := range targets {
+		if userID == "" {
+			continue
+		}
+		role, err := s.moderation.UserRole(ctx, userID)
+		if err != nil {
+			return err
+		}
+		switch {
+		case role == repo.RoleAdmin:
+			return errcode.New(http.StatusForbidden, "admins cannot be sanctioned through reports").WithReason("target_is_admin")
+		case role == repo.RoleModerator && actorRole != repo.RoleAdmin:
+			return errcode.New(http.StatusForbidden, "only admins can sanction moderators").WithReason("target_is_moderator")
+		}
+	}
+	return nil
+}
+
+func copyReportTarget(dst, src *model.ContentReport) {
+	dst.RoomID = src.RoomID
+	dst.ChannelID = src.ChannelID
+	dst.TargetOwnerID = src.TargetOwnerID
+	dst.TargetOwnerName = src.TargetOwnerName
+	dst.TargetUserID = src.TargetUserID
+	dst.TargetUserName = src.TargetUserName
+	dst.TargetURL = src.TargetURL
+	dst.TargetVerified = src.TargetVerified
+}
+
 func (s *ModerationService) applyReportActions(ctx context.Context, adminID string, report *model.ContentReport, actions []string, note string, durationMinutes int) error {
 	for _, action := range actions {
 		if err := s.applyReportAction(ctx, adminID, report, action, note, durationMinutes); err != nil {
@@ -914,7 +1039,7 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	now := s.now()
 	targetUserID := firstNonEmptyString(report.TargetUserID, report.TargetOwnerID)
 	targetUserName := firstNonEmptyString(report.TargetUserName, report.TargetOwnerName)
-	targetLink := firstNonEmptyString(report.TargetURL, reportLink(report))
+	targetLink := firstNonEmptyString(safeReportLink(report.TargetURL), reportLink(report))
 	switch action {
 	case model.ReportActionDeleteContent:
 		if err := s.moderation.DeleteReportedContent(ctx, report.TargetType, report.TargetID, report.RoomID, now); err != nil {
@@ -944,7 +1069,10 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	case model.ReportActionBanUser:
 		if targetUserID != "" {
 			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
-			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now)
+			if err := s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now); err != nil {
+				return err
+			}
+			return s.endUserLiveRooms(ctx, targetUserID)
 		}
 	case model.ReportActionForceEndLive:
 		roomID := firstNonEmptyString(report.RoomID, report.TargetID)
@@ -960,8 +1088,26 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	return nil
 }
 
+// endUserLiveRooms force-ends every active room owned by userID so a ban also
+// takes the user off air instead of only blocking their next GoLive.
+func (s *ModerationService) endUserLiveRooms(ctx context.Context, userID string) error {
+	if s.live == nil || s.rooms == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	rooms, err := s.rooms.ActiveRoomsByOwner(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, room := range rooms {
+		if err := s.live.ForceStopRoom(ctx, room.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *ModerationService) ListBlockedWords(ctx context.Context, adminID string, page, size int) (*BlockedWordListResp, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	rows, total, err := s.moderation.ListBlockedWords(ctx, page, size)
@@ -977,7 +1123,7 @@ func (s *ModerationService) ListBlockedWords(ctx context.Context, adminID string
 }
 
 func (s *ModerationService) CreateBlockedWord(ctx context.Context, adminID string, req CreateBlockedWordReq) (*BlockedWordDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	word := trimRunes(strings.TrimSpace(req.Word), 60)
@@ -1013,7 +1159,7 @@ func (s *ModerationService) CreateBlockedWord(ctx context.Context, adminID strin
 }
 
 func (s *ModerationService) UpdateBlockedWord(ctx context.Context, adminID, id string, req UpdateBlockedWordReq) (*BlockedWordDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	updates := map[string]any{
@@ -1051,7 +1197,7 @@ func (s *ModerationService) UpdateBlockedWord(ctx context.Context, adminID, id s
 }
 
 func (s *ModerationService) DeleteBlockedWord(ctx context.Context, adminID, id string) error {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return err
 	}
 	if err := s.moderation.DeleteBlockedWord(ctx, strings.TrimSpace(id)); err != nil {
@@ -1065,7 +1211,7 @@ func (s *ModerationService) DeleteBlockedWord(ctx context.Context, adminID, id s
 }
 
 func (s *ModerationService) BulkImportBlockedWords(ctx context.Context, adminID string, req BulkImportBlockedWordsReq) (*BulkImportBlockedWordsResp, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	if len(req.Items) == 0 {
@@ -1135,6 +1281,27 @@ func (s *ModerationService) EnsureUserCanInteract(ctx context.Context, userID st
 	}
 	if restriction.Muted {
 		return errcode.New(http.StatusForbidden, "user is muted").WithReason("site_muted")
+	}
+	return nil
+}
+
+// UserBanChecker rejects banned users. *ModerationService implements it.
+type UserBanChecker interface {
+	EnsureUserNotBanned(ctx context.Context, userID string) error
+}
+
+// EnsureUserNotBanned is EnsureUserCanInteract without the site-mute check:
+// a mute only silences chat/comments, a ban also takes away going live.
+func (s *ModerationService) EnsureUserNotBanned(ctx context.Context, userID string) error {
+	if s == nil || s.moderation == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	restriction, err := s.moderation.UserRestriction(ctx, userID, s.now())
+	if err != nil {
+		return err
+	}
+	if restriction.Banned {
+		return errcode.New(http.StatusForbidden, "user is banned").WithReason("user_banned")
 	}
 	return nil
 }
@@ -1400,6 +1567,8 @@ func moderationUser(row repo.ModerationUser) ModerationUserDTO {
 	return dto
 }
 
+// requireAdmin guards platform administration (dashboard, audit logs, system
+// settings). Platform moderators are not admins.
 func (s *ModerationService) requireAdmin(ctx context.Context, userID string) error {
 	if userID == "" {
 		return errcode.ErrUnauthorized
@@ -1412,6 +1581,22 @@ func (s *ModerationService) requireAdmin(ctx context.Context, userID string) err
 		return errcode.New(http.StatusForbidden, "admin access required")
 	}
 	return nil
+}
+
+// requireContentModerator guards content review (reports, blocked words),
+// which admins and platform moderators share. Returns the caller's role.
+func (s *ModerationService) requireContentModerator(ctx context.Context, userID string) (string, error) {
+	if userID == "" {
+		return "", errcode.ErrUnauthorized
+	}
+	role, err := s.moderation.UserRole(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if role != repo.RoleAdmin && role != repo.RoleModerator {
+		return "", errcode.New(http.StatusForbidden, "content moderator access required")
+	}
+	return role, nil
 }
 
 type adminSystemPolicy struct {
@@ -1524,7 +1709,7 @@ func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
 			GroupID:          row.GroupID,
 			TargetType:       row.TargetType,
 			TargetID:         row.TargetID,
-			TargetURL:        row.TargetURL,
+			TargetURL:        safeReportLink(row.TargetURL),
 			RoomID:           row.RoomID,
 			ChannelID:        row.ChannelID,
 			TargetOwnerID:    row.TargetOwnerID,
@@ -1567,7 +1752,7 @@ func contentReportDTO(row model.ContentReport) ContentReportDTO {
 		ReporterAvatar:   row.ReporterAvatar,
 		TargetType:       row.TargetType,
 		TargetID:         row.TargetID,
-		TargetURL:        row.TargetURL,
+		TargetURL:        safeReportLink(row.TargetURL),
 		RoomID:           row.RoomID,
 		ChannelID:        row.ChannelID,
 		TargetOwnerID:    row.TargetOwnerID,
@@ -1697,6 +1882,17 @@ func recentReportCount(rows []model.ContentReport, after time.Time) int64 {
 		}
 	}
 	return count
+}
+
+// safeReportLink only lets relative in-app paths through. Legacy reports
+// stored whatever URL the reporter sent, and the value ends up in admin links
+// and official moderation notifications.
+func safeReportLink(raw string) string {
+	link := strings.TrimSpace(raw)
+	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.ContainsAny(link, "\\\r\n\t") {
+		return ""
+	}
+	return link
 }
 
 func reportLink(report *model.ContentReport) string {

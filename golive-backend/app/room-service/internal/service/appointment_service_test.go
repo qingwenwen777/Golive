@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +14,29 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/errcode"
 )
+
+// substringTextPolicy rejects any text containing word (case-insensitive).
+type substringTextPolicy struct{ word string }
+
+func (p *substringTextPolicy) EnsureTextAllowed(_ context.Context, texts ...string) error {
+	for _, text := range texts {
+		if p.word != "" && strings.Contains(strings.ToLower(text), p.word) {
+			return errcode.New(http.StatusBadRequest, "content contains blocked word").WithReason("blocked_word")
+		}
+	}
+	return nil
+}
+
+func (p *substringTextPolicy) EnsureUserCanInteract(context.Context, string) error { return nil }
+
+func requireBlockedWord(t *testing.T, err error) {
+	t.Helper()
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr), "expected blocked_word error, got %v", err)
+	require.Equal(t, "blocked_word", appErr.Reason)
+}
 
 func newAppointmentServiceTestDeps(t *testing.T) (*AppointmentService, *gorm.DB) {
 	t.Helper()
@@ -159,4 +184,45 @@ func TestNotificationsPreferCurrentProfileAvatar(t *testing.T) {
 	require.Len(t, resp.Items, 1)
 	require.Equal(t, "Creator Display", resp.Items[0].ActorName)
 	require.Equal(t, "/uploads/current.png", resp.Items[0].ActorAvatar)
+}
+
+func TestAppointmentTextPolicyAppliesToCreateUpdateAndStart(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := newAppointmentServiceTestDeps(t)
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	policy := &substringTextPolicy{word: "forbidden"}
+	svc.SetTextPolicy(policy)
+
+	payload := AppointmentPayload{
+		ScheduledAt: now.Add(10 * time.Minute),
+		Title:       "Forbidden title",
+		Description: "A scheduled live",
+		Category:    "Gaming",
+		Cover:       "/uploads/gaming.jpg",
+		ChannelName: "Creator Channel",
+	}
+	_, err := svc.Create(ctx, "owner-policy", payload)
+	requireBlockedWord(t, err)
+
+	payload.Title = "Clean title"
+	payload.Description = "forbidden description"
+	_, err = svc.Create(ctx, "owner-policy", payload)
+	requireBlockedWord(t, err)
+
+	payload.Description = "Clean description"
+	created, err := svc.Create(ctx, "owner-policy", payload)
+	require.NoError(t, err)
+
+	payload.Description = "now it is FORBIDDEN"
+	_, err = svc.Update(ctx, "owner-policy", created.ID, payload)
+	requireBlockedWord(t, err)
+
+	// A word blocked after scheduling still stops the appointment from going live.
+	policy.word = "clean"
+	_, err = svc.Start(ctx, "owner-policy", created.ID)
+	requireBlockedWord(t, err)
+	appt, err := svc.appointments.Get(ctx, created.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.AppointmentScheduled, appt.Status)
 }
