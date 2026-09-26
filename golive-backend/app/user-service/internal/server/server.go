@@ -22,6 +22,8 @@ type Deps struct {
 	AvatarPublicURL string
 	CoverDir        string
 	CoverPublicURL  string
+	// LiveRooms ends a banned user's live rooms (room-service); nil skips it.
+	LiveRooms handler.LiveEnder
 	// InternalToken guards /internal/*; empty rejects every internal call.
 	InternalToken string
 }
@@ -39,8 +41,8 @@ func NewRouter(d Deps) *gin.Engine {
 	authH := handler.NewAuthHandler(d.Auth, d.Captcha, d.EmailCodes)
 	userH := handler.NewUserHandler(d.Users, d.EmailCodes, d.Stripe)
 	creatorH := handler.NewCreatorHandler(d.Users)
-	adminH := handler.NewAdminHandler(d.Users, d.Auth)
-	internalH := handler.NewInternalHandler(d.Users, d.Auth)
+	adminH := handler.NewAdminHandler(d.Users, d.Auth, d.LiveRooms)
+	internalH := handler.NewInternalHandler(d.Users, d.Auth, d.LiveRooms)
 	avatarH := handler.NewAvatarUploadHandler(d.Users, d.AvatarDir, d.AvatarPublicURL)
 	coverH := handler.NewCoverUploadHandler(d.Users, d.CoverDir, d.CoverPublicURL)
 

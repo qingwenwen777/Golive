@@ -43,6 +43,7 @@ type staleRoom struct {
 }
 
 // Reconcile runs one pass over the active rooms:
+//   - rooms of banned owners are ended and their publisher kicked;
 //   - live rooms keep their stream key and publish session from expiring;
 //   - live rooms whose publisher is gone are ended like a normal stop once the
 //     unpublish grace period has passed, whether the on_unpublish hook was
@@ -58,6 +59,7 @@ func (s *LiveService) Reconcile(ctx context.Context) {
 		logger.L().Warn("reconcile: load active rooms", zap.Error(err))
 		return
 	}
+	rooms = s.endBannedOwnersRooms(ctx, rooms)
 	var publishers map[string]string
 	if s.srs != nil {
 		if publishers, err = s.srs.activePublishers(ctx); err != nil {
@@ -79,6 +81,41 @@ func (s *LiveService) Reconcile(ctx context.Context) {
 	if len(stale) > 0 {
 		s.endStaleRooms(ctx, stale)
 	}
+}
+
+// endBannedOwnersRooms ends the rooms whose owner is banned and returns the
+// others. A ban made in user-service ends the owner's rooms right away through
+// POST /internal/users/:id/end-live; this catches the rooms that call missed,
+// within one reconcile interval.
+func (s *LiveService) endBannedOwnersRooms(ctx context.Context, rooms []model.Room) []model.Room {
+	if s.moderation == nil || len(rooms) == 0 {
+		return rooms
+	}
+	ownerIDs := make([]string, 0, len(rooms))
+	for _, room := range rooms {
+		if room.OwnerID != "" {
+			ownerIDs = append(ownerIDs, room.OwnerID)
+		}
+	}
+	banned, err := s.moderation.BannedUserIDs(ctx, ownerIDs)
+	if err != nil {
+		logger.L().Warn("reconcile: load banned owners", zap.Error(err))
+		return rooms
+	}
+	kept := make([]model.Room, 0, len(rooms))
+	for i := range rooms {
+		room := &rooms[i]
+		if !banned[room.OwnerID] {
+			kept = append(kept, *room)
+			continue
+		}
+		logger.L().Info("reconcile: ending live room of banned owner",
+			zap.String("room_id", room.ID), zap.String("owner_id", room.OwnerID))
+		if _, err := s.stopRoom(ctx, room, s.now(), true); err != nil {
+			logger.L().Warn("reconcile: end banned owner's room", zap.Error(err), zap.String("room_id", room.ID))
+		}
+	}
+	return kept
 }
 
 // reconcileRoom handles one active room. publishers is SRS's stream list, nil

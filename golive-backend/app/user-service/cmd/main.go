@@ -126,6 +126,7 @@ func main() {
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,
 		CoverDir:        cfg.Upload.CoverDir,
 		CoverPublicURL:  cfg.Upload.CoverPublicURL,
+		LiveRooms:       service.NewRoomServiceClient(cfg.Rooms.ServiceURL, cfg.Internal.Token),
 		InternalToken:   cfg.Internal.Token,
 	})
 	if cfg.Internal.Token == "" {

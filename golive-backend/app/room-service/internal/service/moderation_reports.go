@@ -654,19 +654,11 @@ func (s *ModerationService) setUserRestriction(ctx context.Context, userID strin
 // endUserLiveRooms force-ends every active room owned by userID so a ban also
 // takes the user off air instead of only blocking their next GoLive.
 func (s *ModerationService) endUserLiveRooms(ctx context.Context, userID string) error {
-	if s.live == nil || s.rooms == nil || strings.TrimSpace(userID) == "" {
+	if s.live == nil {
 		return nil
 	}
-	rooms, err := s.rooms.ActiveRoomsByOwner(ctx, userID)
-	if err != nil {
-		return err
-	}
-	for _, room := range rooms {
-		if err := s.live.ForceStopRoom(ctx, room.ID); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := s.live.ForceStopOwnerRooms(ctx, userID)
+	return err
 }
 
 func contentReportDTOs(rows []model.ContentReport) []ContentReportDTO {

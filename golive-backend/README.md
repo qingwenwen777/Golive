@@ -32,8 +32,9 @@ api-gateway (which only forwards `/api/<prefix>/*` to `/<prefix>/*` and drops cl
 
 | Internal API | Owner | Caller |
 | ---- | ---- | ---- |
-| `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens) | user-service | room-service report moderation |
+| `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens and ends the user's live rooms) | user-service | room-service report moderation |
 | `GET /internal/users/:id/permission` | user-service | room-service (HTTP fallback to gRPC) |
+| `POST /internal/users/:id/end-live` (ends the user's active rooms and kicks their SRS publisher; idempotent) | room-service | user-service bans (admin panel and report moderation); the live reconciler also ends banned owners' rooms if the call fails |
 | `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund) | gift-service | room-service report moderation |
 | `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete) | chat-service | room-service report moderation |
 | `GET /internal/rooms/:id/fan-badges/:userId` | chat-service | im-gateway |

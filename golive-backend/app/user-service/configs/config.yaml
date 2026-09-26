@@ -67,6 +67,10 @@ bootstrap:
     password: ""
     coin_balance: 100000
 
+# A ban ends the user's live rooms through room-service.
+rooms:
+  service_url: "http://127.0.0.1:8091"
+
 # Shared secret for service-to-service /internal APIs. Every service must use
 # the same value; an empty token rejects all internal calls. Env: USERSVC_INTERNAL_TOKEN.
 internal:

@@ -1379,6 +1379,7 @@
         "roleSaved": "用户角色已更新。",
         "banned": "用户已封禁。",
         "unbanned": "用户已解封。",
+        "liveEndFailed": "该用户的直播未能立即结束，系统将在几分钟内自动结束。",
         "invalidAmount": "请输入有效金额。",
         "coinsSaved": "Coin 余额已更新。",
         "tabs": {

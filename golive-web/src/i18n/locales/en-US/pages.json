@@ -1379,6 +1379,7 @@
         "roleSaved": "Role updated.",
         "banned": "User banned.",
         "unbanned": "User unbanned.",
+        "liveEndFailed": "Their live stream could not be ended right away. It will end automatically within a few minutes.",
         "invalidAmount": "Enter a valid amount.",
         "coinsSaved": "Coin balance updated.",
         "tabs": {

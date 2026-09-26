@@ -387,6 +387,31 @@ func (s *LiveService) ForceStopRoom(ctx context.Context, roomID string) error {
 	return err
 }
 
+// ForceStopOwnerRooms ends every active room of ownerID like ForceStopRoom,
+// kicking the publisher, and returns how many rooms this call ended. Rooms
+// that already ended are left alone, so repeating it is harmless. A ban uses
+// it to take the owner off air.
+func (s *LiveService) ForceStopOwnerRooms(ctx context.Context, ownerID string) (int, error) {
+	ownerID = strings.TrimSpace(ownerID)
+	if ownerID == "" {
+		return 0, nil
+	}
+	rooms, err := s.rooms.ActiveRoomsByOwner(ctx, ownerID)
+	if err != nil {
+		return 0, err
+	}
+	ended := 0
+	var errs []error
+	for i := range rooms {
+		stopped, err := s.stopRoom(ctx, &rooms[i], s.now(), true)
+		if stopped {
+			ended++
+		}
+		errs = append(errs, err)
+	}
+	return ended, errors.Join(errs...)
+}
+
 func (s *LiveService) PublishSystemNotice(ctx context.Context, roomID, text string) error {
 	roomID = strings.TrimSpace(roomID)
 	text = strings.TrimSpace(text)

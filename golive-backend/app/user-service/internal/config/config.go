@@ -20,6 +20,7 @@ type Config struct {
 	Upload    UploadCfg    `mapstructure:"upload"`
 	Stripe    StripeCfg    `mapstructure:"stripe"`
 	Bootstrap BootstrapCfg `mapstructure:"bootstrap"`
+	Rooms     RoomsCfg     `mapstructure:"rooms"`
 	Internal  InternalCfg  `mapstructure:"internal"`
 }
 
@@ -107,6 +108,12 @@ type AdminCfg struct {
 	Username    string `mapstructure:"username"`
 	Password    string `mapstructure:"password"`
 	DisplayName string `mapstructure:"display_name"`
+}
+
+// RoomsCfg locates room-service, which a ban asks to end the user's live
+// rooms.
+type RoomsCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
 }
 
 // InternalCfg holds the shared secret other services send on /internal
