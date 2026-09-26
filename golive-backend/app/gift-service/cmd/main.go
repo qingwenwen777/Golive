@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,6 +22,7 @@ import (
 	"github.com/qingwenwen777/golive/app/gift-service/internal/seed"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/server"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -125,7 +125,7 @@ func main() {
 	if cfg.Internal.Token == "" {
 		log.Warn("internal.token is empty: /internal endpoints reject every call")
 	}
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
 
 	outboxCtx, cancelOutbox := context.WithCancel(context.Background())
 	defer cancelOutbox()
@@ -133,11 +133,7 @@ func main() {
 	go luckyBagSvc.RunScheduler(outboxCtx)
 	go betSvc.RunScheduler(outboxCtx, cfg.Bet.SettleGrace)
 
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	go func() {
 		log.Info("gift-service listening", zap.String("addr", cfg.Service.HTTPAddr))

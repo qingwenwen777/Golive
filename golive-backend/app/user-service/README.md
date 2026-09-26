@@ -6,7 +6,7 @@ Handles authentication (login / refresh / logout) and user profiles (GET /users/
 ## Ports
 
 - HTTP: `:8090`
-- pprof: `:6062`
+- pprof: `127.0.0.1:6062` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Configuration
 

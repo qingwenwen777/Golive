@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +24,7 @@ import (
 	"github.com/qingwenwen777/golive/app/chat-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -92,13 +92,8 @@ func main() {
 	if cfg.Internal.Token == "" {
 		log.Warn("internal.token is empty: /internal endpoints reject every call")
 	}
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
-
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
 	defer cancelConsumer()

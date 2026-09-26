@@ -5,7 +5,7 @@ Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endp
 Internal (service-to-service, not proxied by api-gateway): `GET /internal/rooms/:id/fan-badges/:userId` → `{"fanBadge": {"creatorId","level"} | null}`, used by im-gateway to decorate live chat.
 
 - HTTP: `:8093` (only `/rooms/:id/danmus` + `/healthz`, proxied by api-gateway)
-- pprof: `:6068`
+- pprof: `127.0.0.1:6068` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Data flow
 

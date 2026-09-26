@@ -4,7 +4,7 @@ Gateway for persistent real-time messaging connections. Handles all live-room We
 
 - HTTP/WS: `:8081`
 - /metrics + /healthz + /debug/rooms share the same port.
-- pprof: `:6066`
+- pprof: `127.0.0.1:6066` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Purpose and design rationale
 

@@ -1,7 +1,7 @@
 service:
   name: gift-service
   http_addr: ":8092"
-  pprof_addr: ":6067"
+  pprof_addr: "127.0.0.1:6067"  # loopback only; "" disables pprof
   log_level: info
 
 mysql:
