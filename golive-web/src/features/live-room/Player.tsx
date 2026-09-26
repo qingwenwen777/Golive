@@ -95,9 +95,9 @@ export interface PlayerProps {
   liveEnding?: boolean;
 }
 
-// The playback name comes only from the public playbackUrl. The owner's
-// streamKey is the OBS publish credential ("<roomId>?key=<secret>"), not a
-// playable stream name.
+// The playback name comes only from playbackUrl: the stream's play name,
+// which is not the room id. The owner's streamKey is the OBS publish
+// credential ("<playName>?key=<secret>"), not a playable stream name.
 function streamPlaybackKey(stream: Stream): string {
   const source = stream.playbackUrl || '';
   return (

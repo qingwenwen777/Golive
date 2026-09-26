@@ -55,7 +55,8 @@ the frontend `useRoomRealtime.ts` resolves it using the current page protocol to
 
 ### HTTP-FLV paths
 
-The frontend requests the room's public `playbackUrl`, `/live/<roomId>.flv`. The secret
+The frontend requests the room's `playbackUrl`, `/live/<playName>.flv`, where the play name is the
+room id plus a tag viewers cannot derive from the id (fan-club-only rooms hand it to members only). The secret
 publish key travels only in the RTMP `?key=` parameter and is never part of this path. The nginx `location /live/` forwards requests
 to `http://srs:8080/live/` in the SRS container. Keep the trailing slash on both paths
 to avoid accidentally producing `/live/live/...`.
