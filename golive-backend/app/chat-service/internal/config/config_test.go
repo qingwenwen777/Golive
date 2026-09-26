@@ -39,6 +39,13 @@ func TestLoad_RejectsInvalidRateLimit(t *testing.T) {
 	}
 }
 
+func TestLoad_InternalTokenFromEnv(t *testing.T) {
+	t.Setenv("CHATSVC_INTERNAL_TOKEN", "from-env")
+	cfg, err := Load("../../../../deploy/configs/chat-service.yaml")
+	require.NoError(t, err)
+	require.Equal(t, "from-env", cfg.Internal.Token)
+}
+
 func TestLoad_ShippedConfigsAreValid(t *testing.T) {
 	for _, path := range []string{"../../configs/config.yaml", "../../../../deploy/configs/chat-service.yaml"} {
 		cfg, err := Load(path)

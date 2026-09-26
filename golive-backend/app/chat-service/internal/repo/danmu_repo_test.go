@@ -83,6 +83,33 @@ func TestUserProfiles(t *testing.T) {
 	require.Equal(t, "Creator 3f2a0c1e", profiles["3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"].Name)
 }
 
+func TestHide_SoftDeletesFromHistory(t *testing.T) {
+	db := newTestDB(t)
+	r := NewDanmuRepo(db, 8)
+	require.NoError(t, r.AutoMigrate())
+	ctx := context.Background()
+	for _, d := range []*model.Danmu{
+		{ID: "m-1", RoomID: "live-1", UserID: "u", Text: "bad", Ts: 1},
+		{ID: "m-2", RoomID: "live-1", UserID: "u", Text: "fine", Ts: 2},
+	} {
+		require.NoError(t, r.Insert(ctx, d))
+	}
+
+	require.NoError(t, r.Hide(ctx, "live-1", "m-1"))
+	rows, err := r.History(ctx, "live-1", 0, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "m-2", rows[0].ID)
+
+	// Hiding again is a no-op; unknown ids and other rooms are not found.
+	require.NoError(t, r.Hide(ctx, "live-1", "m-1"))
+	require.ErrorIs(t, r.Hide(ctx, "live-1", "missing"), ErrDanmuNotFound)
+	require.ErrorIs(t, r.Hide(ctx, "live-2", "m-2"), ErrDanmuNotFound)
+	var stored int64
+	require.NoError(t, db.Table(r.TableFor("live-1")).Unscoped().Count(&stored).Error)
+	require.EqualValues(t, 2, stored, "hide is a soft delete")
+}
+
 // Moderated super chats keep status=success (the payment stands) but must
 // not come back in public history. The query is MySQL-only, so assert on
 // the SQL it sends.

@@ -18,7 +18,8 @@ type FanBadgeSource interface {
 
 // FanBadgeHandler serves the internal lookup im-gateway uses to decorate
 // live chat with the sender's real fan badge. It is mounted under /internal,
-// which api-gateway does not proxy (only /api/chat/* reaches chat-service).
+// which api-gateway does not proxy (only /api/chat/* reaches chat-service)
+// and which requires the internal token.
 type FanBadgeHandler struct {
 	src FanBadgeSource
 }

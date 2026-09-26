@@ -221,6 +221,15 @@ func decorateChat(item model.Public, badges map[string]*model.FanBadgePayload, p
 	return item
 }
 
+// ErrMessageNotFound is returned by HideMessage for an unknown message.
+var ErrMessageNotFound = repo.ErrDanmuNotFound
+
+// HideMessage removes a chat message from history. It backs room-service's
+// report moderation (internal endpoint).
+func (s *ChatService) HideMessage(ctx context.Context, roomID, messageID string) error {
+	return s.danmus.Hide(ctx, roomID, messageID)
+}
+
 // FanBadge returns userID's badge for roomID's owner, or nil. It backs
 // im-gateway's live chat decoration (internal endpoint).
 func (s *ChatService) FanBadge(ctx context.Context, roomID, userID string) (*model.FanBadgePayload, error) {

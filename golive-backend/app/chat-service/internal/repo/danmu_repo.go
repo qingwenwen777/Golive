@@ -13,6 +13,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"regexp"
@@ -82,6 +83,31 @@ func (r *DanmuRepo) AutoMigrate() error {
 
 func (r *DanmuRepo) Insert(ctx context.Context, d *model.Danmu) error {
 	return r.db.WithContext(ctx).Table(r.TableFor(d.RoomID)).Create(d).Error
+}
+
+// ErrDanmuNotFound means no message (hidden or not) has that id in the room.
+var ErrDanmuNotFound = errors.New("danmu not found")
+
+// Hide soft-deletes a chat message (sets deleted_at) so history no longer
+// returns it. Hiding an already hidden message is a no-op.
+func (r *DanmuRepo) Hide(ctx context.Context, roomID, id string) error {
+	table := r.TableFor(roomID)
+	res := r.db.WithContext(ctx).Table(table).
+		Where("room_id = ? AND id = ?", roomID, id).
+		Delete(&model.Danmu{})
+	if res.Error != nil || res.RowsAffected > 0 {
+		return res.Error
+	}
+	var count int64
+	if err := r.db.WithContext(ctx).Table(table).Unscoped().
+		Where("room_id = ? AND id = ?", roomID, id).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrDanmuNotFound
+	}
+	return nil
 }
 
 // History returns the most recent `limit` danmus before `before` (ms ts).

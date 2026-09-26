@@ -9,7 +9,7 @@
 //     exposes permissions, and the JWT carries nothing but the user id.
 //   - chat-service GET /internal/rooms/<room>/fan-badges/<user>: the user's
 //     fan badge for the room owner, from gift-service's fan_badges table,
-//     which chat-service can read.
+//     which chat-service can read. Sent with the shared internal token.
 //
 // Results are cached per gateway for a short TTL, so a busy room costs one
 // lookup per chatter per TTL. When a source is down the resolver serves the
@@ -32,6 +32,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -60,6 +61,7 @@ type Resolver interface {
 type Config struct {
 	UserServiceURL string        // e.g. http://user-service:8090
 	ChatServiceURL string        // e.g. http://chat-service:8093
+	InternalToken  string        // X-Internal-Token for chat-service /internal
 	TTL            time.Duration // fresh lifetime of a cached value, default 30s
 	ErrorTTL       time.Duration // back-off after a failed lookup, default 5s
 	Timeout        time.Duration // per request, default 1s
@@ -70,6 +72,7 @@ type Config struct {
 type HTTPResolver struct {
 	userURL string
 	chatURL string
+	token   string
 	client  *http.Client
 	cfg     Config
 	now     func() time.Time
@@ -94,6 +97,7 @@ func NewHTTPResolver(cfg Config) *HTTPResolver {
 	return &HTTPResolver{
 		userURL:  strings.TrimRight(strings.TrimSpace(cfg.UserServiceURL), "/"),
 		chatURL:  strings.TrimRight(strings.TrimSpace(cfg.ChatServiceURL), "/"),
+		token:    cfg.InternalToken,
 		client:   &http.Client{Timeout: cfg.Timeout},
 		cfg:      cfg,
 		now:      time.Now,
@@ -159,7 +163,7 @@ func (r *HTTPResolver) fetchProfile(ctx context.Context, userID string) (Profile
 			Level int `json:"level"`
 		} `json:"levelInfo"`
 	}
-	found, err := r.getJSON(ctx, r.userURL+"/users/profile/"+url.PathEscape(userID), &body)
+	found, err := r.getJSON(ctx, r.userURL+"/users/profile/"+url.PathEscape(userID), "", &body)
 	if err != nil {
 		return Profile{}, err
 	}
@@ -179,7 +183,7 @@ func (r *HTTPResolver) fetchBadge(ctx context.Context, roomID, userID string) (*
 	var body struct {
 		FanBadge *FanBadge `json:"fanBadge"`
 	}
-	found, err := r.getJSON(ctx, r.chatURL+"/internal/rooms/"+url.PathEscape(roomID)+"/fan-badges/"+url.PathEscape(userID), &body)
+	found, err := r.getJSON(ctx, r.chatURL+"/internal/rooms/"+url.PathEscape(roomID)+"/fan-badges/"+url.PathEscape(userID), r.token, &body)
 	if err != nil || !found || body.FanBadge == nil {
 		return nil, err
 	}
@@ -190,14 +194,16 @@ func (r *HTTPResolver) fetchBadge(ctx context.Context, roomID, userID string) (*
 	return &FanBadge{CreatorID: b.CreatorID, Level: clampLevel(b.Level)}, nil
 }
 
-// getJSON decodes a 2xx body into out. found is false on 404.
-func (r *HTTPResolver) getJSON(ctx context.Context, endpoint string, out any) (found bool, err error) {
+// getJSON decodes a 2xx body into out. found is false on 404. A non-empty
+// internalToken is sent as X-Internal-Token (only for /internal calls).
+func (r *HTTPResolver) getJSON(ctx context.Context, endpoint, internalToken string, out any) (found bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, r.cfg.Timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return false, err
 	}
+	internalauth.SetToken(req, internalToken)
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return false, err
