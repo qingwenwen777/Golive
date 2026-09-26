@@ -508,8 +508,9 @@ func trimRunes(value string, max int) string {
 // The %LIKE% fallback (non-ASCII queries, or words shorter than the
 // full-text minimum) can't use an index, so it is bounded: a query of fewer
 // than minFallbackSearchRunes characters matches nearly every row and is
-// skipped, only the first maxFallbackSearchTokens words are matched, and at
-// most maxFallbackSearchLimit candidates are read.
+// skipped (except a single Chinese, Japanese or Korean character, which is a
+// word on its own), only the first maxFallbackSearchTokens words are matched,
+// and at most maxFallbackSearchLimit candidates are read.
 const (
 	minFallbackSearchRunes  = 2
 	maxFallbackSearchTokens = 4
@@ -519,7 +520,7 @@ const (
 // boundFallbackSearch applies the fallback bounds to phrase and limit, and
 // reports false when the query is too short to search this way.
 func boundFallbackSearch(phrase SearchPhrase, limit int) (SearchPhrase, int, bool) {
-	if utf8.RuneCountInString(phrase.Compact) < minFallbackSearchRunes {
+	if utf8.RuneCountInString(phrase.Compact) < minFallbackSearchRunes && !isSingleCJKWord(phrase.Compact) {
 		return phrase, 0, false
 	}
 	if len(phrase.Tokens) > maxFallbackSearchTokens {
@@ -529,6 +530,14 @@ func boundFallbackSearch(phrase SearchPhrase, limit int) (SearchPhrase, int, boo
 		limit = maxFallbackSearchLimit
 	}
 	return phrase, limit, true
+}
+
+// isSingleCJKWord reports a query of one Han, kana or Hangul character: "猫"
+// or "歌" is a meaningful search, unlike a single Latin letter.
+func isSingleCJKWord(compact string) bool {
+	r, size := utf8.DecodeRuneInString(compact)
+	return size > 0 && size == len(compact) &&
+		unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul)
 }
 
 func normalizeSearchLimit(limit int) int {
