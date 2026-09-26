@@ -141,6 +141,7 @@
       "invalidEmail": "Enter a valid email address.",
       "invalidEmailCode": "Email verification code is incorrect or expired.",
       "emailCodeTooSoon": "Please wait before requesting another email code.",
+      "emailCodeLimit": "Too many codes were requested for this email. Please try again later.",
       "emailCodeUnavailable": "Email verification is temporarily unavailable.",
       "emailUserMismatch": "That username is not bound to this email.",
       "emailCodeRequired": "Enter the email verification code.",

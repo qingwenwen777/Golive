@@ -672,6 +672,7 @@
         "emailTaken": "该邮箱已被其他账号绑定。",
         "invalidEmailCode": "邮箱验证码错误或已过期。",
         "emailCodeTooSoon": "请稍后再请求邮箱验证码。",
+        "emailCodeLimit": "该邮箱请求验证码的次数过多，请稍后再试。",
         "emailCodeUnavailable": "邮箱验证暂时不可用。",
         "googleLoadFailed": "无法加载 Google 登录。",
         "googleEmailExists": "这个 Google 邮箱已经属于另一个 GoLive 账号。",

@@ -69,6 +69,11 @@ function authErrorMessage(
         defaultValue: 'Please wait before requesting another email code.',
       });
     }
+    if (reason === 'email_code_limit') {
+      return t('auth.errors.emailCodeLimit', {
+        defaultValue: 'Too many codes were requested for this email. Please try again later.',
+      });
+    }
     if (reason === 'email_not_configured' || reason === 'email_send_failed') {
       return t('auth.errors.emailCodeUnavailable', {
         defaultValue: 'Email verification is temporarily unavailable.',

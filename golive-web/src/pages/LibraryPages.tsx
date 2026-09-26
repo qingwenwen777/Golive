@@ -1837,6 +1837,11 @@ function settingsErrorMessage(
         defaultValue: 'Please wait before requesting another email code.',
       });
     }
+    if (data?.reason === 'email_code_limit') {
+      return t('library.settings.errors.emailCodeLimit', {
+        defaultValue: 'Too many codes were requested for this email. Please try again later.',
+      });
+    }
     if (data?.reason === 'email_not_configured' || data?.reason === 'email_send_failed') {
       return t('library.settings.errors.emailCodeUnavailable', {
         defaultValue: 'Email verification is temporarily unavailable.',

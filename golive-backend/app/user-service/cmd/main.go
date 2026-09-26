@@ -101,6 +101,7 @@ func main() {
 		}
 	}
 	emailCodes := service.NewEmailCodeService(rdb, emailMailer, cfg.Email.CodeTTL, cfg.Email.ResendInterval)
+	emailCodes.SetMaxCodesPerHour(cfg.Email.MaxCodesPerHour)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
 		JWTSecret:      cfg.JWT.Secret,
 		JWTKeys:        jwtKeys,

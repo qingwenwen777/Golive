@@ -672,6 +672,7 @@
         "emailTaken": "This email is already bound to another account.",
         "invalidEmailCode": "Email verification code is incorrect or expired.",
         "emailCodeTooSoon": "Please wait before requesting another email code.",
+        "emailCodeLimit": "Too many codes were requested for this email. Please try again later.",
         "emailCodeUnavailable": "Email verification is temporarily unavailable.",
         "googleLoadFailed": "Could not load Google sign-in.",
         "googleEmailExists": "That Google email is already used by another GoLive account.",

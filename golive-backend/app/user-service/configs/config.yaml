@@ -38,6 +38,8 @@ email:
   sender_name: "GoLive"
   code_ttl: 10m
   resend_interval: 60s
+  # Codes one address can be sent per purpose per hour; each allows 5 guesses.
+  max_codes_per_hour: 5
 
 upload:
   avatar_dir: "./uploads/avatars"

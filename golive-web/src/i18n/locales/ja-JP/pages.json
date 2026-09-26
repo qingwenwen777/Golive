@@ -672,6 +672,7 @@
         "emailTaken": "このメールは別のアカウントで使用されています。",
         "invalidEmailCode": "メール認証コードが正しくないか期限切れです。",
         "emailCodeTooSoon": "次のメール認証コードをリクエストする前に少しお待ちください。",
+        "emailCodeLimit": "このメールアドレスへの認証コードのリクエストが多すぎます。しばらくしてからもう一度お試しください。",
         "emailCodeUnavailable": "メール認証は一時的に利用できません。",
         "googleLoadFailed": "Google ログインを読み込めませんでした。",
         "googleEmailExists": "この Google メールは別の GoLive アカウントで使用されています。",

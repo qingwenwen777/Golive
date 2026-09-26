@@ -141,6 +141,7 @@
       "invalidEmail": "请输入有效的邮箱地址。",
       "invalidEmailCode": "邮箱验证码错误或已过期。",
       "emailCodeTooSoon": "请稍后再请求邮箱验证码。",
+      "emailCodeLimit": "该邮箱请求验证码的次数过多，请稍后再试。",
       "emailCodeUnavailable": "邮箱验证暂时不可用。",
       "emailUserMismatch": "该用户名未绑定此邮箱。",
       "emailCodeRequired": "请输入邮箱验证码。",
