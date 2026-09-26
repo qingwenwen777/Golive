@@ -1806,6 +1806,11 @@ function settingsErrorMessage(
       | { message?: string; reason?: string; availableAt?: string }
       | undefined;
     if (data?.reason === 'username_taken') return t('library.settings.errors.usernameTaken');
+    if (data?.reason === 'display_name_taken') {
+      return t('library.settings.errors.displayNameTaken', {
+        defaultValue: "This display name is another user's username. Choose a different one.",
+      });
+    }
     if (data?.reason === 'username_cooldown') {
       const date = parseDate(data.availableAt);
       return date

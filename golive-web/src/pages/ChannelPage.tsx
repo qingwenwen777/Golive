@@ -111,8 +111,9 @@ export default function ChannelPage() {
   );
   const streams = useMemo(() => rooms.data?.items ?? [], [rooms.data?.items]);
   const channelStreams = useMemo(
-    () => streams.filter((stream) => matchesChannel(stream, channelKey, profile)),
-    [channelKey, profile, streams],
+    () =>
+      streams.filter((stream) => matchesChannel(stream, channelKey, profile, publicUser.isPending)),
+    [channelKey, profile, publicUser.isPending, streams],
   );
   const primary = channelStreams[0];
   const resolvedChannelName = resolveChannelName(profile, primary, channelKey, t);
@@ -1176,18 +1177,34 @@ export function resolveChannelCover(profile: User | null): string {
   return profile?.cover || '';
 }
 
-function matchesChannel(stream: Stream, key: string, profile: User | null): boolean {
+// A stream's channel label is whatever its streamer sent, so it can copy
+// another user's name. Once the key names a user, only that user's streams
+// belong to the channel; labels count only for keys that name no user, and
+// not while that is still being looked up.
+export function matchesChannel(
+  stream: Stream,
+  key: string,
+  profile: User | null,
+  profilePending = false,
+): boolean {
+  if (profile) {
+    const ownerID = profile.id.toLowerCase();
+    return (
+      stream.ownerId?.toLowerCase() === ownerID ||
+      stream.channelId.toLowerCase() === `ch-${ownerID}`
+    );
+  }
   const normalized = key.toLowerCase();
-  const channelName = streamChannelName(stream).toLowerCase();
-  const ownerID = profile?.id.toLowerCase();
-  const channelID = ownerID ? `ch-${ownerID}` : '';
-  return (
+  if (
     stream.channelId.toLowerCase() === normalized ||
-    stream.channel.toLowerCase() === normalized ||
-    stream.ownerId?.toLowerCase() === normalized ||
-    channelName === normalized ||
-    (!!ownerID && stream.ownerId?.toLowerCase() === ownerID) ||
-    (!!channelID && stream.channelId.toLowerCase() === channelID)
+    stream.ownerId?.toLowerCase() === normalized
+  ) {
+    return true;
+  }
+  return (
+    !profilePending &&
+    (stream.channel.toLowerCase() === normalized ||
+      streamChannelName(stream).toLowerCase() === normalized)
   );
 }
 

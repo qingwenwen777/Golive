@@ -84,6 +84,11 @@ function authErrorMessage(
         defaultValue: 'Username and email do not match.',
       });
     }
+    if (reason === 'display_name_taken') {
+      return t('auth.errors.displayNameTaken', {
+        defaultValue: "That display name is another user's username. Choose a different one.",
+      });
+    }
     if (reason === 'invalid_invite') {
       return t('auth.errors.invalidInvite', { defaultValue: 'Invite code is invalid.' });
     }

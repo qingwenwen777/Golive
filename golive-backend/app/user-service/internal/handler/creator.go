@@ -272,6 +272,10 @@ func (h *AdminHandler) UpdateUserProfile(c *gin.Context) {
 		errcode.Respond(c, service.ErrUsernameTaken.WithReason("username_taken"))
 		return
 	}
+	if conflict := service.NameConflict(err); conflict != nil {
+		errcode.Respond(c, conflict)
+		return
+	}
 	if errors.Is(err, repo.ErrUserNotFound) {
 		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
 		return
@@ -755,6 +759,10 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 		LivePermissionStatus: model.LivePermissionApproved,
 	}
 	if err := h.users.Create(c.Request.Context(), u); err != nil {
+		if conflict := service.NameConflict(err); conflict != nil {
+			errcode.Respond(c, conflict)
+			return
+		}
 		errcode.Respond(c, err)
 		return
 	}

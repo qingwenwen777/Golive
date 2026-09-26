@@ -131,6 +131,7 @@
       "invalidCredentials": "Invalid username or password.",
       "loginCooldown": "Too many failed password attempts. Try again in 1 minute.",
       "usernameTaken": "That username is already taken.",
+      "displayNameTaken": "That display name is another user's username. Choose a different one.",
       "badFields": "Check the fields and try again.",
       "signInFailed": "Sign-in failed. Please try again.",
       "signUpFailed": "Account creation failed. Please try again.",

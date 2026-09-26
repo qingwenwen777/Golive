@@ -392,6 +392,10 @@ func (r *RoomRepo) EndActiveByOwner(ctx context.Context, ownerID string, endedAt
 	return rooms, nil
 }
 
+// ResolveOwnerID maps a channel key to the owner's id: "ch-<id>" or a UUID
+// as is, else a user's username or display name (see userIDByName), else a
+// room's channel id or owner id, else a room's channel label when only one
+// owner uses it.
 func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -402,33 +406,74 @@ func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, erro
 		return key, nil
 	}
 
-	var ownerID string
-	err := r.db.WithContext(ctx).Raw(`
-SELECT id FROM users
-WHERE username = ? OR display_name = ?
+	ownerID, err := userIDByName(ctx, r.db, key)
+	switch {
+	case err == nil:
+		return ownerID, nil
+	case errors.Is(err, errUserNameAmbiguous):
+		return "", ErrRoomNotFound
+	case !errors.Is(err, ErrRoomNotFound) && !isMissingTable(err):
+		return "", err
+	}
+
+	err = r.db.WithContext(ctx).Raw(`
+SELECT owner_id FROM rooms
+WHERE channel_id = ? OR owner_id = ?
 ORDER BY updated_at DESC
 LIMIT 1
 `, key, key).Row().Scan(&ownerID)
 	if err == nil && strings.TrimSpace(ownerID) != "" {
 		return ownerID, nil
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) && !isMissingTable(err) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-
-	err = r.db.WithContext(ctx).Raw(`
-SELECT owner_id FROM rooms
-WHERE channel_id = ? OR owner_id = ? OR channel = ?
-ORDER BY updated_at DESC
-LIMIT 1
-`, key, key, key).Row().Scan(&ownerID)
-	if errors.Is(err, sql.ErrNoRows) || strings.TrimSpace(ownerID) == "" {
+	// Whoever goes live picks the room's channel label, so a label counts
+	// only while a single owner uses it.
+	var owners []string
+	if err := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("channel = ? AND owner_id <> ?", key, "").
+		Distinct("owner_id").Limit(2).
+		Pluck("owner_id", &owners).Error; err != nil {
+		return "", err
+	}
+	if len(owners) != 1 {
 		return "", ErrRoomNotFound
 	}
-	if err != nil {
+	return owners[0], nil
+}
+
+// errUserNameAmbiguous means several users have the display name a key names.
+var errUserNameAmbiguous = errors.New("display name belongs to several users")
+
+// userIDByName resolves a channel name to a user id. A username match always
+// wins. Display names are not unique and anyone can take one, so a display
+// name resolves only when exactly one user has it (errUserNameAmbiguous
+// otherwise), never to whoever changed their profile last. ErrRoomNotFound
+// means no user has the name.
+func userIDByName(ctx context.Context, db *gorm.DB, name string) (string, error) {
+	var ids []string
+	if err := db.WithContext(ctx).Table("users").
+		Where("username = ?", name).Limit(1).
+		Pluck("id", &ids).Error; err != nil {
 		return "", err
 	}
-	return ownerID, nil
+	if len(ids) == 1 {
+		return ids[0], nil
+	}
+	if err := db.WithContext(ctx).Table("users").
+		Where("display_name = ?", name).Limit(2).
+		Pluck("id", &ids).Error; err != nil {
+		return "", err
+	}
+	switch len(ids) {
+	case 0:
+		return "", ErrRoomNotFound
+	case 1:
+		return ids[0], nil
+	default:
+		return "", errUserNameAmbiguous
+	}
 }
 
 func isMissingTable(err error) bool {

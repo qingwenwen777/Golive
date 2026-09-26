@@ -131,6 +131,7 @@
       "invalidCredentials": "用户名或密码不正确。",
       "loginCooldown": "密码连续错误次数过多，请 1 分钟后再试。",
       "usernameTaken": "这个用户名已被使用。",
+      "displayNameTaken": "这个显示名称与其他用户的用户名相同，请换一个。",
       "badFields": "请检查输入后重试。",
       "signInFailed": "登录失败，请重试。",
       "signUpFailed": "账号创建失败，请重试。",

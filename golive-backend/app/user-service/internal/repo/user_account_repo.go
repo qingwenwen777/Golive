@@ -21,6 +21,9 @@ func (r *UserRepo) RegisterWithInvite(ctx context.Context, u *model.User, invite
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		if err := checkNewNames(tx, u.ID, u.Username, u.DisplayName); err != nil {
+			return err
+		}
 
 		if u.Email != nil {
 			err = tx.Where("email = ?", *u.Email).Take(&existing).Error

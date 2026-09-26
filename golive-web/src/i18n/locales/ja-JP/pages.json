@@ -662,6 +662,7 @@
         "weakPassword": "新しいパスワードは 8 文字以上で、英字と数字の両方を含めてください。",
         "passwordMismatch": "新しいパスワードが一致しません。",
         "usernameTaken": "このユーザー名はすでに使われています。",
+        "displayNameTaken": "この表示名は他のユーザーのユーザー名と同じです。別の名前を選んでください。",
         "usernameCooldown": "ユーザー名はクールダウン中です。{{date}} 以降に再変更できます。",
         "usernameCooldownUnknown": "ユーザー名の変更はまだクールダウン中です。",
         "invalidCurrentPassword": "現在のパスワードが正しくありません。",

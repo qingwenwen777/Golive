@@ -85,7 +85,8 @@ func (s *AuthService) GoogleRegisterWithInvite(
 	}
 
 	username = cleanGoogleUsername(username, cleanEmail)
-	displayName = trimDisplayName(displayName)
+	chosenDisplayName := trimDisplayName(displayName)
+	displayName = chosenDisplayName
 	if displayName == "" {
 		displayName = trimDisplayName(profile.Name)
 	}
@@ -107,7 +108,18 @@ func (s *AuthService) GoogleRegisterWithInvite(
 	if !ok {
 		return nil, errors.New("user store cannot register with invites")
 	}
-	if err := registrar.RegisterWithInvite(ctx, u, inviteCode); err != nil {
+	err = registrar.RegisterWithInvite(ctx, u, inviteCode)
+	if errors.Is(err, repo.ErrDisplayNameTaken) && chosenDisplayName == "" && u.DisplayName != username {
+		// The Google profile name is another user's username. The user did
+		// not pick it (and cannot edit it here), so fall back to the chosen
+		// username instead of refusing the registration.
+		u.DisplayName = username
+		err = registrar.RegisterWithInvite(ctx, u, inviteCode)
+	}
+	if err != nil {
+		if conflict := NameConflict(err); conflict != nil {
+			return nil, conflict
+		}
 		switch {
 		case errors.Is(err, repo.ErrUsernameTaken):
 			return nil, ErrUsernameTaken

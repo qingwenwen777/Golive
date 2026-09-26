@@ -122,6 +122,10 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 			errcode.Respond(c, service.ErrUsernameTaken.WithReason("username_taken"))
 			return
 		}
+		if conflict := service.NameConflict(err); conflict != nil {
+			errcode.Respond(c, conflict)
+			return
+		}
 		if errors.Is(err, repo.ErrUserNotFound) {
 			errcode.Respond(c, service.ErrUnauthorized)
 			return

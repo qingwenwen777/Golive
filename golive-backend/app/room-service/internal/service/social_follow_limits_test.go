@@ -65,11 +65,13 @@ func TestListSubscriptionsMigratesLegacyFollowKeys(t *testing.T) {
 	fx := newBlockFixture(t)
 	ctx := context.Background()
 	var nameScans int
-	require.NoError(t, fx.db.Callback().Row().After("gorm:row").Register("test:name_scans", func(tx *gorm.DB) {
+	countNameScans := func(tx *gorm.DB) {
 		if strings.Contains(tx.Statement.SQL.String(), "display_name = ?") {
 			nameScans++
 		}
-	}))
+	}
+	require.NoError(t, fx.db.Callback().Row().After("gorm:row").Register("test:name_scans", countNameScans))
+	require.NoError(t, fx.db.Callback().Query().After("gorm:query").Register("test:name_scans_query", countNameScans))
 	require.NoError(t, fx.social.Follow(ctx, "fan-1", "ch-creator-2"))
 	require.NoError(t, fx.social.Follow(ctx, "fan-1", "creator_one"))
 	require.NoError(t, fx.social.Follow(ctx, "fan-1", "renamed_user"))

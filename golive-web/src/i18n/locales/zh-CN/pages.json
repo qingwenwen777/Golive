@@ -662,6 +662,7 @@
         "weakPassword": "新密码至少 8 位，且必须同时包含字母和数字。",
         "passwordMismatch": "两次输入的新密码不一致。",
         "usernameTaken": "这个用户名已被使用。",
+        "displayNameTaken": "这个昵称与其他用户的用户名相同，请换一个。",
         "usernameCooldown": "用户名冷却中，{{date}} 后可再次修改。",
         "usernameCooldownUnknown": "用户名修改仍在冷却期。",
         "invalidCurrentPassword": "当前密码不正确。",

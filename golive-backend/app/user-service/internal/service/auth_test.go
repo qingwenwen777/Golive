@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,8 +92,15 @@ func expectFindByUsernameNotFound(mock sqlmock.Sqlmock, username string) {
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 }
 
-func expectCreateUser(mock sqlmock.Sqlmock, username string) {
+func expectCreateUser(mock sqlmock.Sqlmock, username, displayName string) {
 	mock.ExpectBegin()
+	// Neither name may pass for another user's.
+	mock.ExpectQuery(`SELECT .id. FROM .users. WHERE LOWER\(display_name\) = \? AND id <> \? LIMIT \?`).
+		WithArgs(strings.ToLower(username), sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery(`SELECT .id. FROM .users. WHERE LOWER\(username\) = \? AND id <> \? LIMIT \?`).
+		WithArgs(strings.ToLower(displayName), sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectExec("INSERT INTO `users`").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
@@ -176,7 +184,7 @@ func TestLogin_FiveFailuresTriggerCooldown(t *testing.T) {
 func TestRegister_Success(t *testing.T) {
 	svc, mock, mr := newSvc(t)
 	expectFindByUsernameNotFound(mock, "kabun")
-	expectCreateUser(mock, "kabun")
+	expectCreateUser(mock, "kabun", "Kabun Live")
 
 	resp, err := svc.Register(context.Background(), " kabun ", "secret", "Kabun Live")
 	require.NoError(t, err)
