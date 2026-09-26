@@ -54,12 +54,15 @@ describe('useWebSocket', () => {
     sockets = [];
     vi.useFakeTimers();
     vi.stubGlobal('WebSocket', FakeWebSocket);
+    // No reconnect jitter unless a test asks for it.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
   });
 
   afterEach(() => {
     cleanup();
     vi.clearAllTimers();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -121,6 +124,34 @@ describe('useWebSocket', () => {
     });
     expect(result.current.retryCount).toBe(0);
     expect(result.current.readyState).toBe('open');
+  });
+
+  // Every viewer of a restarted gateway used to come back on the same
+  // 1s, 2s, 4s... schedule; a random cut of up to half of each step spreads
+  // them out.
+  it('jitters reconnect delays and caps them at 30s, however many attempts fail', () => {
+    vi.mocked(Math.random).mockReturnValue(0.5);
+    const { result } = renderHook(() =>
+      useWebSocket('ws://example.test/ws', { heartbeatMs: 0, maxRetries: Infinity }),
+    );
+
+    // A quarter off each step: 1s, 2s, 4s, 8s, 16s, then 30s for good.
+    const delays = [750, 1500, 3000, 6000, 12000, 22500, 22500, 22500, 22500, 22500, 22500, 22500];
+    delays.forEach((delay, attempt) => {
+      act(() => {
+        sockets[attempt].close(1006, 'handshake refused');
+      });
+      expect(result.current.readyState).toBe('reconnecting');
+      act(() => {
+        vi.advanceTimersByTime(delay - 1);
+      });
+      expect(sockets).toHaveLength(attempt + 1);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(sockets).toHaveLength(attempt + 2);
+    });
+    expect(result.current.retryCount).toBe(delays.length);
   });
 
   it('does not reconnect after a manual disconnect', () => {

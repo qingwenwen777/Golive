@@ -13,7 +13,7 @@ ws:
   pong_wait: 60s
   max_message_rate: 5      # client→server frames / sec / conn (all types)
   max_conns_per_user: 8    # concurrent sockets per account
-  max_conns_per_ip: 64     # per client IP (see trusted_proxies)
+  max_conns_per_ip: 1024   # per client IP (see trusted_proxies); NATs share one
   trusted_proxies:         # peers whose X-Real-IP / X-Forwarded-For is trusted
     - "127.0.0.1/32"
     - "::1/128"

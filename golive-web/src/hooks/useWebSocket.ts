@@ -28,9 +28,12 @@ export interface UseWebSocketReturn {
 const BACKOFF_STEPS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 const SERVER_SILENCE_WATCHDOG_MS = 45000;
 
+// Delays grow to 30s and stay there. Each loses a random share of up to half
+// its step, so the viewers of a restarted gateway don't all retry at once.
 function backoffFor(attempt: number): number {
   const idx = Math.min(attempt, BACKOFF_STEPS_MS.length - 1);
-  return BACKOFF_STEPS_MS[idx]!;
+  const step = BACKOFF_STEPS_MS[idx]!;
+  return Math.round(step - (Math.random() * step) / 2);
 }
 
 function appendToken(url: string, token: string | null | undefined): string {
