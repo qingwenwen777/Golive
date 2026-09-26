@@ -62,8 +62,11 @@ Test coverage: 10 goroutines using the same `requestId` concurrently → balance
 
 ```sql
 UPDATE users SET coin_balance = coin_balance - ?
- WHERE id = ? AND coin_balance >= ?
+ WHERE id = ? AND COALESCE(banned, false) = false
+   AND coin_balance - COALESCE(frozen_coins, 0) >= ?
 ```
+
+The statement lives in `pkg/wallet` (`wallet.Debit`), which also writes the `coin_transactions` row; every balance change goes through that package inside the order's transaction.
 
 `affected_rows = 0` means insufficient balance and rolls back the entire transaction. The outer layer inserts a `failed` order into `gift_orders` separately, outside the transaction. A retry with the same requestId hits the unique constraint and retrieves the failed row, **without another debit**.
 
