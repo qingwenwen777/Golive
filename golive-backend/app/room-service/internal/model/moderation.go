@@ -117,6 +117,7 @@ type ContentReport struct {
 	TargetUserName   string     `gorm:"type:varchar(128)"`
 	TargetTitle      string     `gorm:"type:varchar(240)"`
 	TargetText       string     `gorm:"type:text"`
+	TargetVerified   bool       `gorm:"not null;default:false"` // target fields resolved server-side (legacy rows: client-supplied)
 	Reason           string     `gorm:"type:varchar(32);not null;index"`
 	Description      string     `gorm:"type:varchar(300)"`
 	Status           string     `gorm:"type:varchar(24);not null;default:pending;index"`
