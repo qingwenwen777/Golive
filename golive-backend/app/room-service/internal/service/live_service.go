@@ -616,9 +616,12 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		return nil
 	}
 	if strings.HasPrefix(req.Stream, micLinkStreamPrefix) {
-		// Mic-link guest teardown: no room state, but drop any DVR file an
-		// RTMP publish under this name left behind.
-		if s.replay != nil {
+		// Mic-link guest teardown: no room state. Guests publish over
+		// WebRTC, which SRS does not record (rtc_to_rtmp off), so only an
+		// RTMP publish under this name left a DVR file to drop; its param is
+		// "?key=...", while WHIP's is the bare query (see
+		// authorizeMicLinkPublish).
+		if s.replay != nil && strings.HasPrefix(req.Param, "?") {
 			go s.replay.cleanupStreamRecording(req.Stream)
 		}
 		return nil

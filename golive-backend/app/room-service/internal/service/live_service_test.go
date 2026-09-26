@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -741,4 +743,28 @@ func TestOnPublishMicLinkRequiresIssuedToken(t *testing.T) {
 	// Revoked (guest removed) or expired tokens stop authorizing publishes.
 	require.NoError(t, rdb.Del(ctx, miclink.TokenKey(stream)).Err())
 	require.Error(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: whipParam}))
+}
+
+// Mic-link guests publish over WebRTC, which SRS does not record
+// (rtc_to_rtmp off), so their unpublish has no DVR file to look for; only an
+// RTMP publish under a mic-link name left one.
+func TestMicLinkUnpublishLooksForRecordingOnlyAfterRTMP(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	replay, _ := env.withReplay(t)
+	stream := miclink.StreamName("live-room", "guest-1")
+	// A stand-in recording, which a cleanup started for stream removes at once.
+	recordPath := filepath.Join(replay.recordDir, stream+".flv")
+	require.NoError(t, os.WriteFile(recordPath, []byte("flv"), 0o644))
+
+	whip := SRSPublishReq{App: "live", Stream: stream, Param: "app=live&stream=" + stream + "&key=tok"}
+	require.NoError(t, env.svc.OnUnpublish(ctx, whip))
+	time.Sleep(100 * time.Millisecond)
+	require.FileExists(t, recordPath, "a WebRTC guest's unpublish starts no recording cleanup")
+
+	require.NoError(t, env.svc.OnUnpublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: "?key=tok"}))
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(recordPath)
+		return os.IsNotExist(err)
+	}, 2*time.Second, 10*time.Millisecond)
 }
