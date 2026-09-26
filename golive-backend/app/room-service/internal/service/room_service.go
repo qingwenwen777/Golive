@@ -69,6 +69,9 @@ func NewRoomService(rooms *repo.RoomRepo, flvBase string, social ...*repo.Social
 
 func (s *RoomService) SetReplayService(replay *ReplayService) {
 	s.replay = replay
+	if replay != nil {
+		replay.OnReplayChanged(s.hotReplays.clear)
+	}
 }
 
 func (s *RoomService) SetLiveRepo(live *repo.LiveRepo) {

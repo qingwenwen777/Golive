@@ -107,6 +107,10 @@ type ReplayService struct {
 	// uploads holds the rooms whose upload runs in this process, by id.
 	uploadsMu sync.Mutex
 	uploads   map[string]model.Room
+
+	// changed runs after an owner changes a replay's visibility or deletes
+	// it (see OnReplayChanged).
+	changed []func()
 }
 
 type ReplayListResp struct {
@@ -228,6 +232,22 @@ func (s *ReplayService) ListMine(ctx context.Context, ownerID string, page, size
 	return &ReplayListResp{Items: items, Total: total, Page: page, Size: size}, nil
 }
 
+// OnReplayChanged registers fn to run after an owner changes a replay's
+// visibility or deletes it. The cached replay lists (hot replays, search
+// suggestions) use it to drop the replay at once instead of showing it until
+// they expire. It only reaches this process: with several room-service
+// instances, the others catch up when their caches expire (10-15s).
+// Register before serving requests.
+func (s *ReplayService) OnReplayChanged(fn func()) {
+	s.changed = append(s.changed, fn)
+}
+
+func (s *ReplayService) replayChanged() {
+	for _, fn := range s.changed {
+		fn()
+	}
+}
+
 func (s *ReplayService) UpdateReplay(ctx context.Context, ownerID, roomID string, req UpdateReplayReq) (*model.Replay, error) {
 	if ownerID == "" {
 		return nil, errcode.ErrUnauthorized
@@ -239,6 +259,7 @@ func (s *ReplayService) UpdateReplay(ctx context.Context, ownerID, roomID string
 	if err != nil {
 		return nil, err
 	}
+	s.replayChanged()
 	return s.ReplayDTO(ctx, *room, ownerID)
 }
 
@@ -258,7 +279,11 @@ func (s *ReplayService) DeleteReplay(ctx context.Context, ownerID, roomID string
 			return err
 		}
 	}
-	return s.rooms.MarkReplayDeleted(ctx, room.ID, s.now())
+	if err := s.rooms.MarkReplayDeleted(ctx, room.ID, s.now()); err != nil {
+		return err
+	}
+	s.replayChanged()
+	return nil
 }
 
 func (s *ReplayService) EnqueueUpload(ctx context.Context, room model.Room) {
