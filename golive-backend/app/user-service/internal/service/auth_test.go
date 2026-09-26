@@ -206,12 +206,25 @@ func TestRegister_InvalidDetails(t *testing.T) {
 	require.ErrorIs(t, err, service.ErrInvalidRegister)
 }
 
+// expectFindByID expects AuthService to load user u-1 by id.
+func expectFindByID(mock sqlmock.Sqlmock, banned bool) {
+	rows := sqlmock.NewRows([]string{"id", "username", "display_name", "password_hash", "avatar", "coin_balance", "banned", "verified", "created_at", "updated_at"}).
+		AddRow("u-1", "demo", "demo", "hash", "", int64(100), banned, true, time.Now(), time.Now())
+	mock.ExpectQuery(`SELECT \* FROM .users. WHERE id = \? LIMIT \?`).
+		WithArgs("u-1", 1).
+		WillReturnRows(rows)
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM .coin_transactions. WHERE user_id = \? AND type = \? AND amount > 0`).
+		WithArgs("u-1", "topup").
+		WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(int64(0)))
+}
+
 func TestRefresh_RotatesAndInvalidatesOld(t *testing.T) {
-	svc, _, mr := newSvc(t)
+	svc, mock, mr := newSvc(t)
 	// Pre-seed a refresh token directly.
 	old := "old-refresh-token"
 	require.NoError(t, mr.Set("refresh:"+old, "u-1"))
 	mr.SetTTL("refresh:"+old, 24*time.Hour)
+	expectFindByID(mock, false)
 
 	resp, err := svc.Refresh(context.Background(), old)
 	require.NoError(t, err)
@@ -231,6 +244,25 @@ func TestRefresh_InvalidToken(t *testing.T) {
 	svc, _, _ := newSvc(t)
 	_, err := svc.Refresh(context.Background(), "nope")
 	require.ErrorIs(t, err, service.ErrInvalidRefresh)
+}
+
+// A banned user must sign in again (login stays open so they can reach the
+// appeal page) instead of refreshing, and an account that no longer exists
+// gets no new access token.
+func TestRefresh_RefusesBannedAndUnknownUsers(t *testing.T) {
+	svc, mock, mr := newSvc(t)
+	require.NoError(t, mr.Set("refresh:banned-session", "u-1"))
+	expectFindByID(mock, true)
+	_, err := svc.Refresh(context.Background(), "banned-session")
+	require.ErrorIs(t, err, service.ErrUserBanned)
+
+	require.NoError(t, mr.Set("refresh:deleted-user", "u-1"))
+	mock.ExpectQuery(`SELECT \* FROM .users. WHERE id = \? LIMIT \?`).
+		WithArgs("u-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	_, err = svc.Refresh(context.Background(), "deleted-user")
+	require.ErrorIs(t, err, service.ErrInvalidRefresh)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestLogout_Revokes(t *testing.T) {

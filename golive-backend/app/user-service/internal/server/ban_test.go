@@ -11,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+
+	"github.com/qingwenwen777/golive/app/user-service/internal/service"
 )
 
 func serveJSON(router *gin.Engine, method, path, token, body string) *httptest.ResponseRecorder {
@@ -55,12 +57,16 @@ func TestAdminBanRevokesRefreshTokensAndBlocksWrites(t *testing.T) {
 	}
 
 	// Signing in again still works and reports the ban so the client can
-	// route to the appeal page; the new session can refresh and read.
+	// route to the appeal page; the new session can read, but a banned user
+	// cannot refresh and must sign in again once the access token expires.
 	relogin, err := auth.Login(ctx, "target", "secret123")
 	require.NoError(t, err)
 	require.True(t, relogin.User.Banned)
 	_, err = auth.Refresh(ctx, relogin.RefreshToken)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, service.ErrUserBanned)
+	refreshRec := serveJSON(router, http.MethodPost, "/auth/refresh", "", fmt.Sprintf(`{"refreshToken":%q}`, relogin.RefreshToken))
+	require.Equal(t, http.StatusForbidden, refreshRec.Code)
+	require.Contains(t, refreshRec.Body.String(), "user_banned")
 	meRec := serveJSON(router, http.MethodGet, "/users/me", relogin.Token, "")
 	require.Equal(t, http.StatusOK, meRec.Code)
 	txRec := serveJSON(router, http.MethodGet, "/users/me/coins/transactions", relogin.Token, "")
@@ -97,6 +103,8 @@ func TestAdminBanRevokesRefreshTokensAndBlocksWrites(t *testing.T) {
 	require.Equal(t, http.StatusOK, unbanRec.Code)
 	profileRec := serveJSON(router, http.MethodPatch, "/users/me/profile", relogin.Token, `{"displayName":"Renamed"}`)
 	require.Equal(t, http.StatusOK, profileRec.Code)
+	_, err = auth.Refresh(ctx, relogin.RefreshToken)
+	require.NoError(t, err)
 }
 
 func TestBannedAdminLosesAdminAccess(t *testing.T) {
