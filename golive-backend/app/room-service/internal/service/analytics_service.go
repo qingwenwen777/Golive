@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,6 +134,18 @@ func (s *RoomService) HistoryByChannel(ctx context.Context, channelKey, viewerID
 	return &LiveHistoryResp{Items: items, Total: total, Page: page, Size: size}, nil
 }
 
+// hotReplayPool is the viewer-independent part of HotReplays: every candidate
+// replay in the window with its engagement signals. It is cached briefly per
+// window and category and shared by all viewers, so it must not be modified;
+// visibility and blocks are applied per viewer.
+type hotReplayPool struct {
+	rooms       []model.Room
+	likes       map[string]int64 // by room id
+	comments    map[string]int64 // by room id
+	revenue     map[string]int64 // by room id
+	subscribers map[string]int64 // by channel id
+}
+
 func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory string, days, size int) (*HotReplayResp, error) {
 	if days < 1 {
 		days = 3
@@ -150,19 +163,21 @@ func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory stri
 		return &HotReplayResp{Items: []HotReplayItem{}, Total: 0, Days: days, Size: size}, nil
 	}
 
-	since := s.now().AddDate(0, 0, -days)
-	rooms, err := s.rooms.HotReplayCandidates(ctx, since, 100, NormalizeCategory(rawCategory))
+	category := NormalizeCategory(rawCategory)
+	pool, err := s.hotReplays.get(strconv.Itoa(days)+"|"+category, func() (*hotReplayPool, error) {
+		return s.loadHotReplayPool(ctx, days, category)
+	})
 	if err != nil {
 		return nil, err
 	}
-	visibleRooms := make([]model.Room, 0, len(rooms))
-	replaysByRoom := make(map[string]*model.Replay, len(rooms))
-	for _, room := range rooms {
-		blocked, err := s.blocksRoomInteraction(ctx, viewerID, room.OwnerID)
-		if err != nil {
-			return nil, err
-		}
-		if blocked {
+	blocked, err := s.blockedRoomOwners(ctx, viewerID, pool.rooms)
+	if err != nil {
+		return nil, err
+	}
+	visibleRooms := make([]model.Room, 0, len(pool.rooms))
+	replaysByRoom := make(map[string]*model.Replay, len(pool.rooms))
+	for _, room := range pool.rooms {
+		if blocked[room.OwnerID] {
 			continue
 		}
 		replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
@@ -179,35 +194,11 @@ func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory stri
 		return &HotReplayResp{Items: []HotReplayItem{}, Total: 0, Days: days, Size: size}, nil
 	}
 
-	roomIDs := make([]string, 0, len(visibleRooms))
-	for _, room := range visibleRooms {
-		roomIDs = append(roomIDs, room.ID)
-	}
-	rows, err := s.revenueRows(ctx, roomIDs)
-	if err != nil {
-		return nil, err
-	}
-	revenueByRoom := make(map[string]int64, len(roomIDs))
-	for _, row := range rows {
-		revenueByRoom[row.RoomID] += row.Amount
-	}
-	commentCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
-	if err != nil {
-		return nil, err
-	}
-	likeCounts := make(map[string]int64, len(roomIDs))
-	if s.social != nil {
-		likeCounts, err = s.social.LikeCounts(ctx, roomIDs)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	var maxLikes, maxComments, maxRevenue, maxPeak int64
 	for _, room := range visibleRooms {
-		maxLikes = maxInt64(maxLikes, likeCounts[room.ID])
-		maxComments = maxInt64(maxComments, commentCounts[room.ID])
-		maxRevenue = maxInt64(maxRevenue, revenueByRoom[room.ID])
+		maxLikes = maxInt64(maxLikes, pool.likes[room.ID])
+		maxComments = maxInt64(maxComments, pool.comments[room.ID])
+		maxRevenue = maxInt64(maxRevenue, pool.revenue[room.ID])
 		maxPeak = maxInt64(maxPeak, maxInt64(room.PeakViewers, room.Viewers))
 	}
 
@@ -216,12 +207,10 @@ func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory stri
 	for _, room := range visibleRooms {
 		st := room.ToStream(now)
 		st.Replay = replaysByRoom[room.ID]
-		if err := s.addSubscriberCount(ctx, &st); err != nil {
-			return nil, err
-		}
-		likes := likeCounts[room.ID]
-		comments := commentCounts[room.ID]
-		revenue := revenueByRoom[room.ID]
+		st.SubscriberCount = pool.subscribers[st.ChannelID]
+		likes := pool.likes[room.ID]
+		comments := pool.comments[room.ID]
+		revenue := pool.revenue[room.ID]
 		peak := maxInt64(room.PeakViewers, room.Viewers)
 		st.PeakViewers = peak
 		items = append(items, HotReplayItem{
@@ -243,6 +232,51 @@ func (s *RoomService) HotReplays(ctx context.Context, viewerID, rawCategory stri
 		items = items[:size]
 	}
 	return &HotReplayResp{Items: items, Total: total, Days: days, Size: size}, nil
+}
+
+func (s *RoomService) loadHotReplayPool(ctx context.Context, days int, category string) (*hotReplayPool, error) {
+	since := s.now().AddDate(0, 0, -days)
+	rooms, err := s.rooms.HotReplayCandidates(ctx, since, 100, category)
+	if err != nil {
+		return nil, err
+	}
+	pool := &hotReplayPool{
+		rooms:       rooms,
+		likes:       map[string]int64{},
+		comments:    map[string]int64{},
+		revenue:     map[string]int64{},
+		subscribers: map[string]int64{},
+	}
+	if len(rooms) == 0 {
+		return pool, nil
+	}
+
+	roomIDs := make([]string, 0, len(rooms))
+	for _, room := range rooms {
+		roomIDs = append(roomIDs, room.ID)
+	}
+	revenue, err := s.revenueTotals(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	for roomID, totals := range revenue {
+		pool.revenue[roomID] = totals.Total()
+	}
+	pool.comments, err = s.rooms.DanmuCountsByRooms(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	if s.social != nil {
+		pool.likes, err = s.social.LikeCounts(ctx, roomIDs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	pool.subscribers, err = s.subscriberCounts(ctx, rooms)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
 }
 
 func (s *RoomService) CreatorAnalytics(ctx context.Context, channelKey, viewerID string) (*CreatorAnalyticsResp, error) {
@@ -572,6 +606,16 @@ func (s *RoomService) revenueRows(ctx context.Context, roomIDs []string) ([]repo
 		return nil, nil
 	}
 	return rows, err
+}
+
+// revenueTotals returns successful gift and super chat income by room id,
+// treating missing order tables as no income.
+func (s *RoomService) revenueTotals(ctx context.Context, roomIDs []string) (map[string]repo.RevenueTotals, error) {
+	totals, err := s.rooms.RevenueTotalsByRooms(ctx, roomIDs)
+	if err != nil && isMissingAnalyticsTable(err) {
+		return map[string]repo.RevenueTotals{}, nil
+	}
+	return totals, err
 }
 
 func (s *RoomService) subscribersBetween(ctx context.Context, channelID string, start, end time.Time) int64 {

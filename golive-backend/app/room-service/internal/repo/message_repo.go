@@ -411,6 +411,33 @@ func (r *MessageRepo) BlocksEitherWay(ctx context.Context, userA, userB string) 
 	return count > 0, err
 }
 
+// BlockedEitherWayAmong is BlocksEitherWay for many users in one query: it
+// returns which of others block, or are blocked by, userID.
+func (r *MessageRepo) BlockedEitherWayAmong(ctx context.Context, userID string, others []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if userID == "" || len(others) == 0 {
+		return out, nil
+	}
+	var rows []model.UserBlock
+	err := r.db.WithContext(ctx).Model(&model.UserBlock{}).
+		Select("blocker_id, target_user_id").
+		Where("(blocker_id = ? AND target_user_id IN ?) OR (target_user_id = ? AND blocker_id IN ?)", userID, others, userID, others).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		other := row.TargetUserID
+		if other == userID {
+			other = row.BlockerID
+		}
+		if other != "" && other != userID {
+			out[other] = true
+		}
+	}
+	return out, nil
+}
+
 func (r *MessageRepo) ListBlocks(ctx context.Context, blockerID string, page, size int) ([]model.UserBlock, int64, error) {
 	page, size = normalizeMessagePage(page, size)
 	tx := r.db.WithContext(ctx).Model(&model.UserBlock{}).Where("blocker_id = ?", blockerID)

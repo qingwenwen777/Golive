@@ -20,6 +20,19 @@ const (
 	recommendationLookback     = 90 * 24 * time.Hour
 )
 
+// liveRecommendationPool is the viewer-independent part of RecommendedLive:
+// the candidate rooms with live metrics and owner profiles applied, and their
+// heat signals. It is cached briefly per category and shared by all viewers,
+// so it must not be modified.
+type liveRecommendationPool struct {
+	rooms       []model.Room
+	revenue     map[string]int64 // by room id
+	comments    map[string]int64 // by room id
+	subscribers map[string]int64 // by channel id
+
+	maxComments, maxRevenue, maxViewers, maxSubscribers int64
+}
+
 func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory string, size int) (*ListResp, error) {
 	if size < 1 {
 		size = defaultRecommendedLiveSize
@@ -29,59 +42,25 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 	}
 	category := NormalizeCategory(rawCategory)
 
-	rooms, _, err := s.rooms.List(ctx, repo.ListQuery{Category: category, Page: 1, Size: 200})
+	pool, err := s.liveRecommendations.get(category, func() (*liveRecommendationPool, error) {
+		return s.loadLiveRecommendationPool(ctx, category)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if len(rooms) == 0 {
+	if len(pool.rooms) == 0 {
 		return &ListResp{Items: []model.Stream{}, Total: 0, Page: 1, Size: size}, nil
 	}
 
 	now := s.now()
-	for i := range rooms {
-		s.applyLiveViewerMetrics(ctx, &rooms[i])
-	}
-	roomIDs := make([]string, 0, len(rooms))
-	for _, room := range rooms {
-		roomIDs = append(roomIDs, room.ID)
-	}
-	revenueRows, err := s.revenueRows(ctx, roomIDs)
-	if err != nil {
-		return nil, err
-	}
-	revenueByRoom := make(map[string]int64, len(roomIDs))
-	for _, row := range revenueRows {
-		revenueByRoom[row.RoomID] += row.Amount
-	}
-	commentCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	following := map[string]bool{}
-	subscriberByChannel := map[string]int64{}
-	if s.social != nil {
-		if viewerID != "" {
-			followed, err := s.social.Following(ctx, viewerID)
-			if err != nil {
-				return nil, err
-			}
-			for _, channelID := range followed {
-				following[channelID] = true
-			}
-		}
-		channelIDs := make([]string, 0, len(rooms))
-		seenChannels := map[string]bool{}
-		for _, room := range rooms {
-			if room.ChannelID == "" || seenChannels[room.ChannelID] {
-				continue
-			}
-			seenChannels[room.ChannelID] = true
-			channelIDs = append(channelIDs, room.ChannelID)
-		}
-		subscriberByChannel, err = s.social.FollowerCounts(ctx, channelIDs)
+	if s.social != nil && viewerID != "" {
+		followed, err := s.social.Following(ctx, viewerID)
 		if err != nil {
 			return nil, err
+		}
+		for _, channelID := range followed {
+			following[channelID] = true
 		}
 	}
 
@@ -94,41 +73,32 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 	if err != nil {
 		return nil, err
 	}
-
-	var maxComments, maxRevenue, maxViewers, maxSubscribers int64
-	for _, room := range rooms {
-		maxComments = maxInt64(maxComments, commentCounts[room.ID])
-		maxRevenue = maxInt64(maxRevenue, revenueByRoom[room.ID])
-		maxViewers = maxInt64(maxViewers, maxInt64(room.Viewers, room.PeakViewers))
-		maxSubscribers = maxInt64(maxSubscribers, subscriberByChannel[room.ChannelID])
+	blocked, err := s.blockedRoomOwners(ctx, viewerID, pool.rooms)
+	if err != nil {
+		return nil, err
 	}
 
 	type scoredRoom struct {
 		room  model.Room
 		score float64
 	}
-	scored := make([]scoredRoom, 0, len(rooms))
-	for _, room := range rooms {
-		blocked, err := s.blocksRoomInteraction(ctx, viewerID, room.OwnerID)
-		if err != nil {
-			return nil, err
-		}
-		if blocked {
+	scored := make([]scoredRoom, 0, len(pool.rooms))
+	for _, room := range pool.rooms {
+		if blocked[room.OwnerID] {
 			continue
 		}
-		s.applyOwnerProfile(ctx, &room)
 		categoryKey := preferenceCategoryKey(room.Category)
 		viewers := maxInt64(room.Viewers, room.PeakViewers)
-		heatScore := normalized(commentCounts[room.ID], maxComments)*0.42 +
-			normalized(revenueByRoom[room.ID], maxRevenue)*0.38 +
-			normalized(viewers, maxViewers)*0.20
+		heatScore := normalized(pool.comments[room.ID], pool.maxComments)*0.42 +
+			normalized(pool.revenue[room.ID], pool.maxRevenue)*0.38 +
+			normalized(viewers, pool.maxViewers)*0.20
 		followScore := 0.0
 		if following[room.ChannelID] {
 			followScore = 1
 		}
 		giftScore := normalized(giftPreference.score(room), maxGiftScore)
 		watchScore := normalized(watchCategoryScore[categoryKey], maxWatchScore)
-		subscriberScore := normalized(subscriberByChannel[room.ChannelID], maxSubscribers)
+		subscriberScore := normalized(pool.subscribers[room.ChannelID], pool.maxSubscribers)
 		recencyScore := liveRecencyScore(now, room.StartedAt)
 		certifiedScore := 0.0
 		if room.Verified {
@@ -155,13 +125,66 @@ func (s *RoomService) RecommendedLive(ctx context.Context, viewerID, rawCategory
 		scored = scored[:size]
 	}
 
-	items := make([]model.Stream, 0, len(scored))
+	// Pool rooms already carry live metrics and owner profiles; only
+	// fan-club membership depends on the viewer.
+	selected := make([]model.Room, 0, len(scored))
 	for _, item := range scored {
-		st := s.streamFromRoom(ctx, &item.room, now, viewerID)
-		st.SubscriberCount = subscriberByChannel[item.room.ChannelID]
+		selected = append(selected, item.room)
+	}
+	lookups := roomLookups{fanClub: s.fanClubCreators(ctx, selected, viewerID)}
+	items := make([]model.Stream, 0, len(selected))
+	for i := range selected {
+		st := s.streamWithLookups(&selected[i], now, viewerID, lookups)
+		st.SubscriberCount = pool.subscribers[selected[i].ChannelID]
 		items = append(items, st)
 	}
 	return &ListResp{Items: items, Total: int64(len(scored)), Page: 1, Size: size}, nil
+}
+
+func (s *RoomService) loadLiveRecommendationPool(ctx context.Context, category string) (*liveRecommendationPool, error) {
+	rooms, _, err := s.rooms.List(ctx, repo.ListQuery{Category: category, Page: 1, Size: 200})
+	if err != nil {
+		return nil, err
+	}
+	pool := &liveRecommendationPool{
+		rooms:       rooms,
+		revenue:     map[string]int64{},
+		comments:    map[string]int64{},
+		subscribers: map[string]int64{},
+	}
+	if len(rooms) == 0 {
+		return pool, nil
+	}
+
+	lookups := s.loadRoomLookups(ctx, rooms, "")
+	roomIDs := make([]string, 0, len(rooms))
+	for i := range rooms {
+		lookups.apply(&rooms[i])
+		roomIDs = append(roomIDs, rooms[i].ID)
+	}
+	revenue, err := s.revenueTotals(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	for roomID, totals := range revenue {
+		pool.revenue[roomID] = totals.Total()
+	}
+	pool.comments, err = s.rooms.DanmuCountsByRooms(ctx, roomIDs)
+	if err != nil {
+		return nil, err
+	}
+	pool.subscribers, err = s.subscriberCounts(ctx, rooms)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, room := range rooms {
+		pool.maxComments = maxInt64(pool.maxComments, pool.comments[room.ID])
+		pool.maxRevenue = maxInt64(pool.maxRevenue, pool.revenue[room.ID])
+		pool.maxViewers = maxInt64(pool.maxViewers, maxInt64(room.Viewers, room.PeakViewers))
+		pool.maxSubscribers = maxInt64(pool.maxSubscribers, pool.subscribers[room.ChannelID])
+	}
+	return pool, nil
 }
 
 func (s *RoomService) RecordWatch(ctx context.Context, viewerID, roomID string) error {

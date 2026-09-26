@@ -165,6 +165,31 @@ func (r *RoomRepo) OwnerProfile(ctx context.Context, ownerID string) (OwnerProfi
 	return row, err
 }
 
+// OwnerProfiles is OwnerProfile for many owners in one query, keyed by id.
+// Owners without a users row are absent from the result.
+func (r *RoomRepo) OwnerProfiles(ctx context.Context, ownerIDs []string) (map[string]OwnerProfile, error) {
+	out := make(map[string]OwnerProfile, len(ownerIDs))
+	if len(ownerIDs) == 0 {
+		return out, nil
+	}
+	var rows []OwnerProfile
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Select("id, username, display_name, avatar, verified").
+		Where("id IN ?", ownerIDs).
+		Scan(&rows).Error
+	if isMissingTable(err) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
 func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit int, category string) ([]CreatorRecommendationCandidate, error) {
 	if limit < 1 {
 		limit = 50
@@ -276,6 +301,31 @@ func (r *RoomRepo) IsFanClubMember(ctx context.Context, userID, creatorID string
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// FanClubCreators returns which of creatorIDs userID holds a fan badge for:
+// IsFanClubMember for many creators in one query.
+func (r *RoomRepo) FanClubCreators(ctx context.Context, userID string, creatorIDs []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	userID = strings.TrimSpace(userID)
+	if userID == "" || len(creatorIDs) == 0 {
+		return out, nil
+	}
+	var ids []string
+	err := r.db.WithContext(ctx).
+		Table("fan_badges").
+		Where("user_id = ? AND creator_id IN ?", userID, creatorIDs).
+		Pluck("creator_id", &ids).Error
+	if isMissingTable(err) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
 }
 
 func (r *RoomRepo) ActiveByOwner(ctx context.Context, ownerID string) (*model.Room, error) {
@@ -852,6 +902,52 @@ LEFT JOIN users u ON u.id = s.user_id
 WHERE s.status = 'success' AND s.room_id IN ?
 `, roomIDs, roomIDs).Scan(&rows).Error
 	return rows, err
+}
+
+// RevenueTotals is a room's successful gift and super chat income.
+type RevenueTotals struct {
+	Gift      int64
+	SuperChat int64
+}
+
+func (t RevenueTotals) Total() int64 { return t.Gift + t.SuperChat }
+
+// RevenueTotalsByRooms sums successful orders per room in SQL, so callers
+// that only need totals don't load every order row.
+func (r *RoomRepo) RevenueTotalsByRooms(ctx context.Context, roomIDs []string) (map[string]RevenueTotals, error) {
+	out := make(map[string]RevenueTotals, len(roomIDs))
+	if len(roomIDs) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		RoomID string
+		Kind   string
+		Amount int64
+	}
+	err := r.db.WithContext(ctx).Raw(`
+SELECT room_id, 'gift' AS kind, COALESCE(SUM(total_coin), 0) AS amount
+FROM gift_orders
+WHERE status = 'success' AND room_id IN ?
+GROUP BY room_id
+UNION ALL
+SELECT room_id, 'super_chat' AS kind, COALESCE(SUM(amount), 0) AS amount
+FROM super_chat_orders
+WHERE status = 'success' AND room_id IN ?
+GROUP BY room_id
+`, roomIDs, roomIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		totals := out[row.RoomID]
+		if row.Kind == "super_chat" {
+			totals.SuperChat += row.Amount
+		} else {
+			totals.Gift += row.Amount
+		}
+		out[row.RoomID] = totals
+	}
+	return out, nil
 }
 
 func (r *RoomRepo) FanBadgeDistribution(ctx context.Context, creatorID string) ([]FanBadgeDistributionRow, error) {

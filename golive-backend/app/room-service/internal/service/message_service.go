@@ -717,6 +717,12 @@ func (s *MessageService) BlocksInteraction(ctx context.Context, viewerID, creato
 	return s.messages.BlocksEitherWay(ctx, viewerID, creatorID)
 }
 
+// BlocksInteractionAmong is BlocksInteraction for a page of creators in one
+// query; it returns the creators blocked either way.
+func (s *MessageService) BlocksInteractionAmong(ctx context.Context, viewerID string, creatorIDs []string) (map[string]bool, error) {
+	return s.messages.BlockedEitherWayAmong(ctx, viewerID, creatorIDs)
+}
+
 func (s *MessageService) directThreadDTO(ctx context.Context, thread model.DirectThread, userID string) (DirectThreadDTO, error) {
 	peerID := peerID(thread, userID)
 	peer, err := s.messageUser(ctx, peerID)
