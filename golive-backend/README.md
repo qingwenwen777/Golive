@@ -95,7 +95,7 @@ golive-backend/
     nginx*.conf         HTTP/HTTPS entry points
     srs.conf            SRS configuration
     observability/      Prometheus, OTel, Grafana
-  pkg/                  Shared packages: JWT, idempotency, error codes, logging, uploads, content policies, etc.
+  pkg/                  Shared packages: JWT, error codes, logging, HTTP server timeouts, uploads, content policies, etc.
 ```
 
 ## Run locally
