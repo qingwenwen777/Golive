@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -49,20 +50,93 @@ func TestWaitForStableFileWaitsThroughGrowth(t *testing.T) {
 	require.Equal(t, int64(4), info.Size())
 }
 
-func TestFindRecordingIgnoresTemporaryRecording(t *testing.T) {
+func TestFindRecordingWaitsWhileASegmentIsWritten(t *testing.T) {
 	dir := t.TempDir()
-	key := "lk_temp"
-	require.NoError(t, os.WriteFile(filepath.Join(dir, key+".flv.tmp"), []byte("temp"), 0o644))
+	key := "live-u1-temp"
+	tmpPath := filepath.Join(dir, key+".1727350000000.flv.tmp")
+	require.NoError(t, os.WriteFile(tmpPath, []byte("temp"), 0o644))
 
 	svc := &ReplayService{recordDir: dir}
 	_, err := svc.findRecording(key)
-	require.ErrorIs(t, err, errRecordingNotFound)
+	require.ErrorIs(t, err, errRecordingInProgress)
 
-	finalPath := filepath.Join(dir, key+".flv")
-	require.NoError(t, os.WriteFile(finalPath, []byte("final"), 0o644))
-	path, err := svc.findRecording(key)
+	finalPath := strings.TrimSuffix(tmpPath, ".tmp")
+	require.NoError(t, os.Rename(tmpPath, finalPath))
+	paths, err := svc.findRecording(key)
 	require.NoError(t, err)
-	require.Equal(t, finalPath, path)
+	require.Equal(t, []string{finalPath}, paths)
+}
+
+// SRS died while writing a segment, so its .tmp name stays: once untouched
+// for replayAbandonedSegmentAge it is taken as it is, in its place.
+func TestFindRecordingTakesSegmentAbandonedBySRS(t *testing.T) {
+	dir := t.TempDir()
+	key := "live-u1-crash"
+	abandoned := filepath.Join(dir, key+".1727350000000.flv.tmp")
+	later := filepath.Join(dir, key+".1727350600000.flv")
+	require.NoError(t, os.WriteFile(abandoned, []byte("crashed"), 0o644))
+	require.NoError(t, os.WriteFile(later, []byte("reconnected"), 0o644))
+	untouched := time.Now().Add(-replayAbandonedSegmentAge - time.Second)
+	require.NoError(t, os.Chtimes(abandoned, untouched, untouched))
+
+	svc := &ReplayService{recordDir: dir}
+	paths, err := svc.findRecording(key)
+	require.NoError(t, err)
+	require.Equal(t, []string{abandoned, later}, paths)
+}
+
+func TestFindRecordingOrdersSessionSegments(t *testing.T) {
+	dir := t.TempDir()
+	key := "live-u1-abc"
+	segments := []string{
+		key + ".flv", // recorded before dvr_path had a timestamp
+		key + ".1727350000000.flv",
+		key + ".1727350600000.flv",
+		key + ".1727351200000.flv",
+	}
+	for _, name := range []string{
+		segments[2], segments[0], segments[3], segments[1],
+		"live-u1-abcd.1727350300000.flv",    // another room whose id starts with this one's
+		"live-u1-abc2.flv",                  // likewise, recorded before
+		key + "_q720.1727350000000.flv",     // transcoded variant
+		key + ".1727350000000.mp4",          // not a DVR file of ours
+		key + ".x1727350000000.flv",         // not a timestamp
+		"other.1727350000000.flv",           // another stream
+		key + ".1727351800000.flv.bak",      // not a recording
+		key + ".joined.flv.part",            // a joined copy
+		key + ".4029183.joined.flv.part",    // likewise
+		key + ".1727352400000.flv.tmp.part", // not SRS's
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("flv"), 0o644))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, key+".1727353000000.flv"), nil, 0o644)) // empty
+	require.NoError(t, os.Mkdir(filepath.Join(dir, key+".1727353600000.flv"), 0o755))
+
+	svc := &ReplayService{recordDir: dir}
+	paths, err := svc.findRecording(key)
+
+	require.NoError(t, err)
+	want := make([]string, len(segments))
+	for i, name := range segments {
+		want[i] = filepath.Join(dir, name)
+	}
+	require.Equal(t, want, paths)
+}
+
+// Recordings made before the deploy have one file named after the stream:
+// the room id, or for older rooms the raw stream key.
+func TestFindRecordingReadsSingleFileRecordingsFromBeforeSegments(t *testing.T) {
+	dir := t.TempDir()
+	svc := &ReplayService{recordDir: dir}
+	for _, key := range []string{"live-u1-old", "lk_0123456789abcdef0123456789abcdef"} {
+		path := filepath.Join(dir, key+".flv")
+		require.NoError(t, os.WriteFile(path, []byte("flv"), 0o644))
+		paths, err := svc.findRecording(key)
+		require.NoError(t, err, key)
+		require.Equal(t, []string{path}, paths, key)
+	}
+	_, err := svc.findRecording("live-u1-none")
+	require.ErrorIs(t, err, errRecordingNotFound)
 }
 
 func TestWaitForUploadableRecordingWaitsForTemporaryRename(t *testing.T) {
@@ -80,9 +154,47 @@ func TestWaitForUploadableRecordingWaitsForTemporaryRename(t *testing.T) {
 	svc := &ReplayService{recordDir: dir}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	path, err := svc.waitForUploadableRecordingWith(ctx, key, 5*time.Millisecond, 2)
+	paths, err := svc.waitForUploadableRecordingWith(ctx, key, 5*time.Millisecond, 2)
 	require.NoError(t, err)
-	require.Equal(t, finalPath, path)
+	require.Equal(t, []string{finalPath}, paths)
+}
+
+// After a reconnect the stream has a finished segment and one SRS still
+// writes; the recording is complete only once that one is renamed too.
+func TestWaitForUploadableRecordingWaitsForEverySegment(t *testing.T) {
+	dir := t.TempDir()
+	key := "live-u1-reconnect"
+	first := filepath.Join(dir, key+".1727350000000.flv")
+	tmpPath := filepath.Join(dir, key+".1727350600000.flv.tmp")
+	second := strings.TrimSuffix(tmpPath, ".tmp")
+	require.NoError(t, os.WriteFile(first, []byte("first"), 0o644))
+	require.NoError(t, os.WriteFile(tmpPath, []byte("second"), 0o644))
+	renamed := make(chan struct{})
+	go func() {
+		defer close(renamed)
+		time.Sleep(50 * time.Millisecond)
+		_ = os.Rename(tmpPath, second)
+	}()
+
+	svc := &ReplayService{recordDir: dir}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	paths, err := svc.waitForUploadableRecordingWith(ctx, key, 5*time.Millisecond, 2)
+
+	require.NoError(t, err)
+	require.Equal(t, []string{first, second}, paths)
+	select {
+	case <-renamed:
+	default:
+		t.Fatal("returned before the segment being written was finished")
+	}
+
+	// Still being written when time runs out: the reason says so.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, key+".1727351200000.flv.tmp"), []byte("third"), 0o644))
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	_, err = svc.waitForUploadableRecordingWith(ctx, key, 5*time.Millisecond, 2)
+	require.ErrorContains(t, err, "still being written")
 }
 
 func TestUploadVideoUsesStableContentLengthWhenFileGrows(t *testing.T) {
@@ -245,8 +357,14 @@ func newReplayUploadTest(t *testing.T) (*ReplayService, *repo.RoomRepo, *fakeBun
 func TestUploadRecordingPublishesReplay(t *testing.T) {
 	ctx := context.Background()
 	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+	var joinedCopies atomic.Int32
+	bunny.onUpload = func() error {
+		copies, err := filepath.Glob(filepath.Join(svc.recordDir, "*"+joinedRecordingSuffix))
+		joinedCopies.Store(int32(len(copies)))
+		return err
+	}
 
-	svc.uploadRecording(ctx, room, recordPath)
+	svc.uploadRecording(ctx, room, []string{recordPath})
 
 	got, err := rooms.GetByID(ctx, room.ID)
 	require.NoError(t, err)
@@ -255,8 +373,11 @@ func TestUploadRecordingPublishesReplay(t *testing.T) {
 	canView, err := svc.CanView(ctx, *got, "")
 	require.NoError(t, err)
 	require.True(t, canView)
-	require.Empty(t, bunny.deleted)
+	require.Empty(t, bunny.deletedVideos())
 	require.NoFileExists(t, recordPath)
+	// A single segment is uploaded as it is, without a joined copy.
+	require.Equal(t, [][]byte{[]byte("flv")}, bunny.uploaded())
+	require.Zero(t, joinedCopies.Load())
 }
 
 func TestUploadRecordingDoesNotPublishReplayDeletedMidUpload(t *testing.T) {
@@ -266,7 +387,7 @@ func TestUploadRecordingDoesNotPublishReplayDeletedMidUpload(t *testing.T) {
 		return svc.DeleteReplay(ctx, room.OwnerID, room.ID)
 	}
 
-	svc.uploadRecording(ctx, room, recordPath)
+	svc.uploadRecording(ctx, room, []string{recordPath})
 
 	bunny.mu.Lock()
 	defer bunny.mu.Unlock()
@@ -634,14 +755,14 @@ func TestCleanupStaleRecordingsKeepsRecordingOfDeletedReplayStillUploading(t *te
 	require.NoError(t, rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "bunny stream request failed"))
 	recordedAt := time.Now().Add(-48 * time.Hour)
 	require.NoError(t, os.Chtimes(recordPath, recordedAt, recordedAt))
-	var existedMidUpload bool
+	var existedMidUpload atomic.Bool
 	bunny.onUpload = func() error {
 		if err := svc.DeleteReplay(ctx, room.OwnerID, room.ID); err != nil {
 			return err
 		}
 		svc.CleanupStaleRecordings(ctx)
 		_, err := os.Stat(recordPath)
-		existedMidUpload = err == nil
+		existedMidUpload.Store(err == nil)
 		return nil
 	}
 
@@ -650,10 +771,164 @@ func TestCleanupStaleRecordingsKeepsRecordingOfDeletedReplayStillUploading(t *te
 	bunny.mu.Lock()
 	defer bunny.mu.Unlock()
 	require.Empty(t, bunny.errs)
-	require.True(t, existedMidUpload, "the cleanup removed the recording of an upload in progress")
+	require.True(t, existedMidUpload.Load(), "the cleanup removed the recording of an upload in progress")
 	got, err := rooms.GetByID(ctx, room.ID)
 	require.NoError(t, err)
 	require.Equal(t, model.ReplayStatusDeleted, got.ReplayStatus)
 	require.Equal(t, []string{"video-1"}, bunny.deleted)
 	require.NoFileExists(t, recordPath)
+}
+
+// A publisher that reconnected left one segment per session: the replay is
+// all of them joined, and they are removed afterwards with the joined copy.
+// Another room whose stream name starts with this one's keeps its file.
+func TestUploadRoomReplayJoinsSessionSegments(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+	fastRecordingWaits(svc)
+	require.NoError(t, os.Remove(recordPath))
+	stream := svc.recordingStreamName(room)
+	first, second := testSession(1, 1000), testSession(2, 500)
+	firstPath := filepath.Join(svc.recordDir, stream+".1727350000000.flv")
+	secondPath := filepath.Join(svc.recordDir, stream+".1727350600000.flv")
+	otherPath := filepath.Join(svc.recordDir, stream+"2.1727350300000.flv")
+	require.NoError(t, os.WriteFile(secondPath, buildTestFLV(second...), 0o644))
+	require.NoError(t, os.WriteFile(firstPath, buildTestFLV(first...), 0o644))
+	require.NoError(t, os.WriteFile(otherPath, buildTestFLV(testSession(3, 100)...), 0o644))
+	var joinedCopies atomic.Int32
+	bunny.onUpload = func() error {
+		copies, err := filepath.Glob(filepath.Join(svc.recordDir, "*"+joinedRecordingSuffix))
+		joinedCopies.Store(int32(len(copies)))
+		return err
+	}
+
+	svc.EnqueueUpload(ctx, room)
+
+	require.Eventually(t, func() bool {
+		got, err := rooms.GetByID(ctx, room.ID)
+		return err == nil && got.ReplayStatus == model.ReplayStatusReady
+	}, 2*time.Second, 10*time.Millisecond)
+	uploads := bunny.uploaded()
+	require.Len(t, uploads, 1)
+	tags := readTestFLV(t, uploads[0])
+	require.Len(t, tags, len(first)+len(second)-1)
+	require.Equal(t, second[1].data, tags[len(first)].data, "the second session's sequence header")
+	require.Equal(t, 1000+flvSegmentGap, int(tags[len(first)].ts))
+	require.EqualValues(t, 1, joinedCopies.Load(), "uploaded without joining")
+	require.NoFileExists(t, firstPath)
+	require.NoFileExists(t, secondPath)
+	require.FileExists(t, otherPath)
+	copies, err := filepath.Glob(filepath.Join(svc.recordDir, "*"+joinedRecordingSuffix))
+	require.NoError(t, err)
+	require.Empty(t, copies, "joined copy left behind")
+}
+
+// A failed upload removes its joined copy at once but keeps the segments
+// for the retry.
+func TestUploadRoomReplayRemovesJoinedCopyWhenUploadFails(t *testing.T) {
+	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+	fastRecordingWaits(svc)
+	require.NoError(t, os.Remove(recordPath))
+	stream := svc.recordingStreamName(room)
+	segments := []string{
+		filepath.Join(svc.recordDir, stream+".1727350000000.flv"),
+		filepath.Join(svc.recordDir, stream+".1727350600000.flv"),
+	}
+	for i, path := range segments {
+		require.NoError(t, os.WriteFile(path, buildTestFLV(testSession(byte(i), 100)...), 0o644))
+	}
+	bunny.failUploads = 1
+
+	svc.runUpload(room)
+
+	got, err := rooms.GetByID(context.Background(), room.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.ReplayStatusFailed, got.ReplayStatus)
+	for _, path := range segments {
+		require.FileExists(t, path)
+	}
+	copies, err := filepath.Glob(filepath.Join(svc.recordDir, "*"+joinedRecordingSuffix))
+	require.NoError(t, err)
+	require.Empty(t, copies, "joined copy left behind")
+}
+
+func TestCleanupStaleRecordingsMatchesSegmentsExactly(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _, _, _ := newReplayUploadTest(t)
+	now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	live := model.Room{ID: "room-a", Title: "live", OwnerID: "owner-room-a", Status: model.StatusLive, StartedAt: now.Add(-30 * time.Hour)}
+	require.NoError(t, rooms.Upsert(ctx, &live))
+	old := now.Add(-25 * time.Hour)
+	files := map[string]bool{
+		"room-a.1727350000000.flv":       true,  // the live room's first session, before a reconnect
+		"room-a_q720.1727350000000.flv":  true,  // its transcoded variant
+		"room-a.flv":                     true,  // recorded before segments
+		"room-ab.1727350000000.flv":      false, // another room whose id starts with room-a
+		"room-a2.flv":                    false, // likewise, recorded before segments
+		"room-a.1727350000000.flv.tmp":   true,  // left by an SRS crash while live
+		"room-ab.1727350000000.flv.tmp":  false,
+		"room-a.x.flv":                   false, // not a DVR file of room-a
+		"miclink-room-a-guest.flv":       false, // mic-link guest stream
+		"room-a.8456.joined.flv.part":    false, // joined copy a restart left behind
+		"room-ab.1234.joined.flv.part":   false,
+		"room-a.1727360000000.flv.bak":   true, // not ours to remove
+		"notes.txt":                      true,
+		"room-zz.1727360000000.flv.part": true, // not ours either
+	}
+	for name := range files {
+		path := filepath.Join(svc.recordDir, name)
+		require.NoError(t, os.WriteFile(path, []byte("flv"), 0o644))
+		require.NoError(t, os.Chtimes(path, old, old))
+	}
+	// A joined copy of an upload that may still run is kept.
+	running := filepath.Join(svc.recordDir, "room-b.2471.joined.flv.part")
+	require.NoError(t, os.WriteFile(running, []byte("flv"), 0o644))
+	recent := now.Add(-joinedRecordingMaxAge + time.Minute)
+	require.NoError(t, os.Chtimes(running, recent, recent))
+
+	svc.CleanupStaleRecordings(ctx)
+
+	for name, kept := range files {
+		if kept {
+			require.FileExists(t, filepath.Join(svc.recordDir, name), name)
+		} else {
+			require.NoFileExists(t, filepath.Join(svc.recordDir, name), name)
+		}
+	}
+	require.FileExists(t, running)
+}
+
+// SRS refuses a publish whose DVR file already exists ("DVR can't append to
+// exists path"), so every publish session, a reconnect included, must get a
+// file of its own, and findRecording must know them as the stream's.
+func TestSRSConfigRecordsEachSessionToItsOwnFile(t *testing.T) {
+	conf, err := os.ReadFile("../../../../deploy/srs.conf")
+	require.NoError(t, err)
+	var dvrPath string
+	for _, line := range strings.Split(string(conf), "\n") {
+		fields := strings.Fields(strings.TrimSuffix(strings.TrimSpace(line), ";"))
+		if len(fields) == 2 && fields[0] == "dvr_path" {
+			dvrPath = fields[1]
+		}
+	}
+	require.NotEmpty(t, dvrPath)
+	require.Equal(t, "/tmp/golive/records", filepath.Dir(dvrPath), "the record_dir room-service reads")
+	// SRS replaces [stream], and [timestamp] with the Unix time in ms
+	// (srs_path_build_stream and srs_path_build_timestamp).
+	session := func(start time.Time) string {
+		name := strings.ReplaceAll(filepath.Base(dvrPath), "[stream]", "live-u1-abc")
+		return strings.ReplaceAll(name, "[timestamp]", strconv.FormatInt(start.UnixMilli(), 10))
+	}
+	start := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	first, reconnect := session(start), session(start.Add(20*time.Second))
+	require.NotEqual(t, first, reconnect, "a reconnect reuses the first session's DVR file")
+	for i, name := range []string{first, reconnect} {
+		segment, ok := parseRecordingName(name, "live-u1-abc")
+		require.True(t, ok, name)
+		require.False(t, segment.temp, name)
+		require.Equal(t, start.Add(time.Duration(i)*20*time.Second).UnixMilli(), segment.start, name)
+		segment, ok = parseRecordingName(name+".tmp", "live-u1-abc")
+		require.True(t, ok && segment.temp, name+".tmp")
+	}
 }

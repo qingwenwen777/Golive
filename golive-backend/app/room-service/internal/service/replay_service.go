@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +52,19 @@ const defaultFailedRecordingRetention = 7 * 24 * time.Hour
 // uploads whose retry is due.
 const replayRetryCheckInterval = time.Minute
 
+// replayAbandonedSegmentAge is how long a .tmp recording must be untouched
+// before it counts as left behind by an SRS that died while writing it. SRS
+// writes a live stream's recording every few seconds.
+const replayAbandonedSegmentAge = time.Minute
+
+// joinedRecordingSuffix ends the name of the temporary file a recording of
+// several segments is joined into for its upload. No upload runs longer than
+// joinedRecordingMaxAge, so an older one was left by a room-service restart.
+const joinedRecordingSuffix = ".joined.flv.part"
+const joinedRecordingMaxAge = 2 * replayUploadDeadline
+
 var errRecordingNotFound = errors.New("recording file not found")
+var errRecordingInProgress = errors.New("recording still being written")
 
 type ReplayConfig struct {
 	RecordDir       string
@@ -408,28 +422,23 @@ func (s *ReplayService) runUpload(room model.Room) {
 		s.failUpload(ctx, room, "bunny stream library or api key is not configured")
 		return
 	}
-	recordPath, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
+	segments, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
 	if err != nil {
 		s.failUpload(ctx, room, err.Error())
 		return
 	}
-	s.uploadRecording(ctx, room, recordPath)
+	s.uploadRecording(ctx, room, segments)
 }
 
-// uploadRecording uploads a finished DVR file to Bunny and publishes it as the
-// room's replay, unless the creator deleted the replay in the meantime.
-func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, recordPath string) {
+// uploadRecording uploads a room's finished DVR files to Bunny and publishes
+// the video as the room's replay, unless the creator deleted the replay in
+// the meantime. The files are removed afterwards.
+func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, segments []string) {
 	if err := s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusUploading, ""); err != nil {
 		return
 	}
-	videoID, err := s.bunny.CreateVideo(ctx, s.libraryID, replayVideoTitle(room))
+	videoID, err := s.uploadVideo(ctx, room, segments)
 	if err != nil {
-		s.failUpload(ctx, room, err.Error())
-		return
-	}
-	if err := s.bunny.UploadVideo(ctx, s.libraryID, videoID, recordPath); err != nil {
-		// Drop the empty video, so retries don't leave one behind each.
-		s.deleteVideo(ctx, room.ID, videoID)
 		s.failUpload(ctx, room, err.Error())
 		return
 	}
@@ -445,8 +454,69 @@ func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, re
 			logger.L().Warn("delete replay video after replay was deleted", zap.Error(err), zap.String("room_id", room.ID), zap.String("video_id", videoID))
 		}
 	}
-	if err := removeRecording(recordPath); err != nil {
-		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
+	removeRecordings(room.ID, segments)
+}
+
+// uploadVideo creates room's Bunny video and uploads its recording. Several
+// segments (the publisher reconnected) are joined into one temporary FLV
+// next to them first, removed as soon as the upload is over; a single one
+// is uploaded as it is. A video whose upload failed is deleted again, so
+// retries don't leave one behind each.
+func (s *ReplayService) uploadVideo(ctx context.Context, room model.Room, segments []string) (string, error) {
+	uploadPath := segments[0]
+	if len(segments) > 1 {
+		joined, err := s.joinRecording(room, segments)
+		if err != nil {
+			return "", err
+		}
+		defer removeRecordings(room.ID, []string{joined})
+		uploadPath = joined
+	}
+	videoID, err := s.bunny.CreateVideo(ctx, s.libraryID, replayVideoTitle(room))
+	if err != nil {
+		return "", err
+	}
+	if err := s.bunny.UploadVideo(ctx, s.libraryID, videoID, uploadPath); err != nil {
+		s.deleteVideo(ctx, room.ID, videoID)
+		return "", err
+	}
+	return videoID, nil
+}
+
+// joinRecording joins room's recording segments into one FLV in the record
+// dir and returns its path. It takes as much disk space as the segments.
+func (s *ReplayService) joinRecording(room model.Room, segments []string) (string, error) {
+	file, err := os.CreateTemp(s.recordDir, room.ID+".*"+joinedRecordingSuffix)
+	if err != nil {
+		return "", fmt.Errorf("join recording segments: %w", err)
+	}
+	joined, err := joinFLV(file, segments)
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		removeRecordings(room.ID, []string{file.Name()})
+		return "", fmt.Errorf("join recording segments: %w", err)
+	}
+	for _, damage := range joined.damaged {
+		logger.L().Warn("recording segment cut short or skipped", zap.String("room_id", room.ID), zap.String("segment", damage))
+	}
+	logger.L().Info("joined recording segments for replay upload",
+		zap.String("room_id", room.ID),
+		zap.Strings("segments", segments),
+		zap.String("path", file.Name()),
+		zap.Int64("bytes", joined.size),
+		zap.Duration("duration", joined.duration),
+	)
+	return file.Name(), nil
+}
+
+// removeRecordings removes recording files, logging those it cannot.
+func removeRecordings(roomID string, paths []string) {
+	for _, path := range paths {
+		if err := removeRecording(path); err != nil {
+			logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", roomID), zap.String("path", path))
+		}
 	}
 }
 
@@ -521,16 +591,14 @@ func (s *ReplayService) cleanupRoomRecording(room model.Room) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	recordPath, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
+	segments, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
 	if err != nil {
 		return
 	}
-	if err := removeRecording(recordPath); err != nil {
-		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
-	}
+	removeRecordings(room.ID, segments)
 }
 
-// cleanupStreamRecording removes the DVR file of a stream that never becomes
+// cleanupStreamRecording removes the DVR files of a stream that never becomes
 // a replay, such as a mic-link guest stream published over RTMP.
 func (s *ReplayService) cleanupStreamRecording(stream string) {
 	if s.recordDir == "" || stream == "" || strings.ContainsAny(stream, `/\*?[`) {
@@ -539,12 +607,14 @@ func (s *ReplayService) cleanupStreamRecording(stream string) {
 	time.Sleep(s.settleDelay)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	recordPath, err := s.waitForUploadableRecording(ctx, stream)
+	segments, err := s.waitForUploadableRecording(ctx, stream)
 	if err != nil {
 		return
 	}
-	if err := removeRecording(recordPath); err != nil {
-		logger.L().Warn("remove stream recording", zap.Error(err), zap.String("stream", stream), zap.String("path", recordPath))
+	for _, recordPath := range segments {
+		if err := removeRecording(recordPath); err != nil {
+			logger.L().Warn("remove stream recording", zap.Error(err), zap.String("stream", stream), zap.String("path", recordPath))
+		}
 	}
 }
 
@@ -587,8 +657,8 @@ func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
 
 // retryFailedUploads retries the failed replay uploads that have attempts
 // left and are due by dueBy (all of them for the zero time). They run one
-// after the other, so retries of large recordings don't compete for disk and
-// bandwidth.
+// after the other, so retries of large recordings don't compete for
+// bandwidth, nor for the disk space their joined copies take.
 func (s *ReplayService) retryFailedUploads(ctx context.Context, dueBy time.Time) {
 	if s == nil || s.rooms == nil || s.recordDir == "" {
 		return
@@ -614,7 +684,7 @@ func (s *ReplayService) retryUpload(ctx context.Context, room model.Room) {
 		return
 	}
 	defer s.untrackUpload(room.ID)
-	if _, err := s.findRecording(s.recordingStreamName(room)); err != nil {
+	if _, err := s.findRecording(s.recordingStreamName(room)); err != nil && !errors.Is(err, errRecordingInProgress) {
 		if !errors.Is(err, errRecordingNotFound) {
 			logger.L().Warn("look for recording of failed replay upload", zap.Error(err), zap.String("room_id", room.ID))
 			return
@@ -650,8 +720,8 @@ func (s *ReplayService) resumeInterruptedUploads(ctx context.Context) {
 		return
 	}
 	for _, room := range rooms {
-		recordPath, err := s.findRecording(s.recordingStreamName(room))
-		if err != nil {
+		segments, err := s.findRecording(s.recordingStreamName(room))
+		if err != nil && !errors.Is(err, errRecordingInProgress) {
 			logger.L().Info(
 				"skip replay recovery without final recording",
 				zap.String("room_id", room.ID),
@@ -662,7 +732,7 @@ func (s *ReplayService) resumeInterruptedUploads(ctx context.Context) {
 		logger.L().Info(
 			"recover interrupted replay upload",
 			zap.String("room_id", room.ID),
-			zap.String("path", recordPath),
+			zap.Strings("paths", segments),
 		)
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
 		s.startUpload(room)
@@ -675,7 +745,8 @@ func (s *ReplayService) resumeInterruptedUploads(ctx context.Context) {
 // retryable replay upload, no failed upload within failedRetention of giving
 // up, and no upload running in this process (whose replay may have been
 // deleted meanwhile). These are left by uploads that gave up, mic-link
-// streams, and restarts before a room's recording cleanup ran.
+// streams, and restarts before a room's recording cleanup ran. It also
+// removes joined copies of recordings a restart left behind.
 func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 	if s == nil || s.rooms == nil || s.recordDir == "" {
 		return
@@ -689,17 +760,27 @@ func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 	}
 	now := s.now()
 	cutoff := now.Add(-s.staleRecordingAge)
-	var stale []string
+	var stale []os.FileInfo
 	for _, entry := range entries {
 		name := strings.ToLower(entry.Name())
-		if !entry.Type().IsRegular() || !(strings.HasSuffix(name, ".flv") || strings.HasSuffix(name, ".flv.tmp")) {
+		joined := strings.HasSuffix(name, joinedRecordingSuffix)
+		if !entry.Type().IsRegular() || !(joined || strings.HasSuffix(name, ".flv") || strings.HasSuffix(name, ".flv.tmp")) {
 			continue
 		}
 		info, err := entry.Info()
-		if err != nil || info.ModTime().After(cutoff) {
+		if err != nil {
 			continue
 		}
-		stale = append(stale, entry.Name())
+		if joined {
+			if info.ModTime().Before(now.Add(-joinedRecordingMaxAge)) {
+				s.removeStaleRecording(info)
+			}
+			continue
+		}
+		if info.ModTime().After(cutoff) {
+			continue
+		}
+		stale = append(stale, info)
 	}
 	if len(stale) == 0 {
 		return
@@ -717,19 +798,22 @@ func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 			keep = append(keep, room.StreamKey)
 		}
 	}
-	for _, name := range stale {
-		// Recordings are named after the stream, possibly with a suffix
-		// (transcoded variant, DVR segment), so match by prefix.
-		if slices.ContainsFunc(keep, func(stream string) bool { return strings.HasPrefix(name, stream) }) {
+	for _, info := range stale {
+		if slices.ContainsFunc(keep, func(stream string) bool { return isRecordingOf(info.Name(), stream) }) {
 			continue
 		}
-		recordPath := filepath.Join(s.recordDir, name)
-		if err := removeRecording(recordPath); err != nil {
-			logger.L().Warn("remove stale recording", zap.Error(err), zap.String("path", recordPath))
-			continue
-		}
-		logger.L().Info("removed stale recording", zap.String("path", recordPath))
+		s.removeStaleRecording(info)
 	}
+}
+
+func (s *ReplayService) removeStaleRecording(info os.FileInfo) {
+	recordPath := filepath.Join(s.recordDir, info.Name())
+	if err := removeRecording(recordPath); err != nil {
+		logger.L().Warn("remove stale recording", zap.Error(err), zap.String("path", recordPath))
+		return
+	}
+	logger.L().Info("removed stale recording", zap.String("path", recordPath), zap.Int64("bytes", info.Size()),
+		zap.Time("modified_at", info.ModTime()))
 }
 
 // recordingStreamName is the SRS stream name a room's DVR file is named after.
@@ -745,46 +829,99 @@ func (s *ReplayService) recordingStreamName(room model.Room) string {
 	return room.ID
 }
 
-func (s *ReplayService) findRecording(streamKey string) (string, error) {
+// findRecording returns the DVR files of a stream's publish sessions, oldest
+// first. It fails with errRecordingInProgress while SRS still writes one,
+// unless SRS left that .tmp file untouched for replayAbandonedSegmentAge: SRS
+// died while recording it, and it is taken as it is.
+func (s *ReplayService) findRecording(streamKey string) ([]string, error) {
 	key := strings.TrimSpace(streamKey)
 	if key == "" {
-		return "", errors.New("recording stream key is empty")
+		return nil, errors.New("recording stream key is empty")
 	}
-	exact := filepath.Join(s.recordDir, key+".flv")
-	if info, err := os.Stat(exact); err == nil && !info.IsDir() && info.Size() > 0 {
-		return exact, nil
+	entries, err := os.ReadDir(s.recordDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
-	matches, err := filepath.Glob(filepath.Join(s.recordDir, key+"*"))
+	var segments []recordingSegment
+	for _, entry := range entries {
+		segment, ok := parseRecordingName(entry.Name(), key)
+		if !ok || !entry.Type().IsRegular() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if segment.temp && time.Since(info.ModTime()) < replayAbandonedSegmentAge {
+			return nil, fmt.Errorf("%w: %s", errRecordingInProgress, entry.Name())
+		}
+		if info.Size() == 0 {
+			continue
+		}
+		segment.path = filepath.Join(s.recordDir, entry.Name())
+		segments = append(segments, segment)
+	}
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("%w for stream %s", errRecordingNotFound, key)
+	}
+	slices.SortFunc(segments, func(a, b recordingSegment) int {
+		return cmp.Or(cmp.Compare(a.start, b.start), strings.Compare(a.path, b.path))
+	})
+	paths := make([]string, len(segments))
+	for i, segment := range segments {
+		paths[i] = segment.path
+	}
+	return paths, nil
+}
+
+// recordingSegment is the DVR file of one publish session: <stream>.<start>.flv
+// (dvr_path in deploy/srs.conf), start being the Unix time in ms SRS opened
+// it, or <stream>.flv as recorded before dvr_path had a timestamp (start 0).
+// temp means it still has SRS's .tmp suffix: SRS is writing it, or died
+// while doing so.
+type recordingSegment struct {
+	path  string
+	start int64
+	temp  bool
+}
+
+// parseRecordingName reports whether name is a DVR file of stream, which
+// exact form keeps another stream whose name starts with this one apart.
+func parseRecordingName(name, stream string) (recordingSegment, bool) {
+	rest, ok := strings.CutPrefix(name, stream+".")
+	if !ok || stream == "" {
+		return recordingSegment{}, false
+	}
+	rest, temp := strings.CutSuffix(rest, ".tmp")
+	if rest == "flv" {
+		return recordingSegment{temp: temp}, true
+	}
+	digits, ok := strings.CutSuffix(rest, ".flv")
+	if !ok || digits == "" || strings.Trim(digits, "0123456789") != "" {
+		return recordingSegment{}, false
+	}
+	start, err := strconv.ParseInt(digits, 10, 64)
 	if err != nil {
-		return "", err
+		return recordingSegment{}, false
 	}
-	var newest string
-	var newestMod time.Time
-	for _, match := range matches {
-		if !isFinalRecordingPath(match) {
-			continue
-		}
-		info, err := os.Stat(match)
-		if err != nil || info.IsDir() || info.Size() == 0 {
-			continue
-		}
-		if newest == "" || info.ModTime().After(newestMod) {
-			newest = match
-			newestMod = info.ModTime()
-		}
-	}
-	if newest == "" {
-		return "", fmt.Errorf("%w for stream %s", errRecordingNotFound, key)
-	}
-	return newest, nil
+	return recordingSegment{start: start, temp: temp}, true
 }
 
-func isFinalRecordingPath(recordPath string) bool {
-	name := strings.ToLower(filepath.Base(recordPath))
-	return strings.HasSuffix(name, ".flv") && !strings.HasSuffix(name, ".tmp")
+// isRecordingOf reports whether name is a DVR file of stream or of one of
+// its transcoded variants.
+func isRecordingOf(name, stream string) bool {
+	if _, ok := parseRecordingName(name, stream); ok {
+		return true
+	}
+	for suffix := range streamVariantSuffixes {
+		if _, ok := parseRecordingName(name, stream+suffix); ok {
+			return true
+		}
+	}
+	return false
 }
 
-func (s *ReplayService) waitForUploadableRecording(ctx context.Context, streamKey string) (string, error) {
+func (s *ReplayService) waitForUploadableRecording(ctx context.Context, streamKey string) ([]string, error) {
 	return s.waitForUploadableRecordingWith(
 		ctx,
 		streamKey,
@@ -793,31 +930,41 @@ func (s *ReplayService) waitForUploadableRecording(ctx context.Context, streamKe
 	)
 }
 
+// waitForUploadableRecordingWith waits until the stream's recording is
+// complete: no segment is being written any more and the last one has
+// stopped changing. It returns the segments, oldest first.
 func (s *ReplayService) waitForUploadableRecordingWith(
 	ctx context.Context,
 	streamKey string,
 	interval time.Duration,
 	requiredStableChecks int,
-) (string, error) {
+) ([]string, error) {
 	if interval <= 0 {
 		interval = time.Second
 	}
 	key := strings.TrimSpace(streamKey)
 	for {
-		recordPath, err := s.findRecording(key)
+		segments, err := s.findRecording(key)
 		if err == nil {
-			if _, err := waitForStableFile(ctx, recordPath, interval, requiredStableChecks); err == nil {
-				return recordPath, nil
+			if _, err = waitForStableFile(ctx, segments[len(segments)-1], interval, requiredStableChecks); err == nil {
+				// Still the same segments, none started meanwhile.
+				var again []string
+				if again, err = s.findRecording(key); err == nil && slices.Equal(again, segments) {
+					return segments, nil
+				}
 			} else if !errors.Is(err, os.ErrNotExist) {
-				return "", err
+				return nil, err
 			}
-		} else if !errors.Is(err, errRecordingNotFound) {
-			return "", err
+		} else if !errors.Is(err, errRecordingNotFound) && !errors.Is(err, errRecordingInProgress) {
+			return nil, err
 		}
 
 		select {
 		case <-ctx.Done():
-			return "", fmt.Errorf("recording final file not found for stream %s before timeout: %w", key, ctx.Err())
+			if errors.Is(err, errRecordingInProgress) {
+				return nil, fmt.Errorf("recording of stream %s is still being written: %w", key, ctx.Err())
+			}
+			return nil, fmt.Errorf("recording final file not found for stream %s before timeout: %w", key, ctx.Err())
 		case <-time.After(interval):
 		}
 	}
