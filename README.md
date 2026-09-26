@@ -1,28 +1,28 @@
 # GoLive
 
-GoLive 是一个类 YouTube Live 的直播平台项目，包含 React + TypeScript 前端、
-Go 微服务后端、直播流服务和本地/生产部署配置。
+GoLive is a YouTube Live-style streaming platform with a React + TypeScript frontend,
+Go microservices, streaming services, and local and production deployment configurations.
 
-## 项目结构
+## Project structure
 
 | Path | Description |
 | ---- | ----------- |
-| `golive-web/` | Vite + React 前端，包含直播间、创作者工作台、管理后台、消息、金币和账号状态页面 |
-| `golive-backend/` | Go 后端，按 `app/<service>` 拆分 api-gateway、user、room、chat、gift、im-gateway 等服务 |
-| `golive-backend/deploy/` | Docker Compose、nginx、SRS、TLS 和观测配置 |
-| `scripts/` | 本地一键启动脚本和 git bare 部署 hook 示例 |
-| `docs/` | 部署和前后端联调文档 |
+| `golive-web/` | Vite + React frontend with live rooms, creator studio, admin console, messages, coins, and account status pages |
+| `golive-backend/` | Go backend split into api-gateway, user, room, chat, gift, im-gateway, and other services under `app/<service>` |
+| `golive-backend/deploy/` | Docker Compose, nginx, SRS, TLS, and observability configuration |
+| `scripts/` | One-command local startup scripts and an example Git bare deployment hook |
+| `docs/` | Deployment and frontend/backend integration documentation |
 
-## 环境要求
+## Prerequisites
 
 - Node.js >= 20
 - pnpm
 - Go >= 1.22
 - Docker Engine + Docker Compose plugin
 
-## 本地开发
+## Local development
 
-前端单独开发：
+Run the frontend on its own:
 
 ```sh
 cd golive-web
@@ -31,7 +31,7 @@ pnpm dev
 # http://localhost:5173
 ```
 
-完整联调：
+Run the complete integration stack:
 
 ```sh
 # Windows PowerShell
@@ -41,10 +41,10 @@ powershell -File scripts/dev.ps1
 bash scripts/dev.sh
 ```
 
-脚本会先构建 `golive-web/dist`，再启动 `golive-backend/deploy/docker-compose.yml`
-中的 nginx、SRS、MySQL、Redis、Kafka、Go 服务和观测组件。
+The scripts first build `golive-web/dist`, then start nginx, SRS, MySQL, Redis, Kafka,
+Go services, and observability components from `golive-backend/deploy/docker-compose.yml`.
 
-## 验证
+## Validation
 
 ```sh
 cd golive-web
@@ -58,8 +58,8 @@ cd golive-backend
 go test ./...
 ```
 
-## 部署
+## Deployment
 
-生产部署使用服务器上的 git bare 仓库和 `scripts/post-receive.golive.example`
-自动 checkout、构建前端并重启 Docker Compose 服务。详细流程见
-`docs/deploy-git-bare.md`，联调说明见 `docs/integration.md`。
+Production deployment uses a bare Git repository on the server and `scripts/post-receive.golive.example`
+to check out the code, build the frontend, and restart Docker Compose services automatically. See
+`docs/deploy-git-bare.md` for deployment instructions and `docs/integration.md` for integration notes.

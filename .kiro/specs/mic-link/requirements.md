@@ -1,332 +1,332 @@
 # Requirements Document
 
-观众语音连麦 (Audience Voice Mic-Link)
+Audience Voice Mic-Link
 
 ## Introduction
 
-本功能为 GoLive 直播平台新增「观众语音连麦」(Mic-Link) 能力：直播间内已登录的观众可以向主播发起**纯语音**连麦申请，主播在申请队列中逐条审批（批准 / 拒绝），通过后嘉宾的麦克风音频被推上直播间并混入主播的输出画面，房间内所有观众都能听到。直播间同一时间最多允许 **3 名嘉宾**同时在麦。主播可随时开启 / 关闭连麦总开关、限定申请资格、把已在麦的嘉宾下麦（踢出）；嘉宾本人也可随时主动挂断 / 下麦。
+This feature adds audience voice mic-link to the GoLive streaming platform. Logged-in viewers in a live room can submit **audio-only** requests to join the streamer. The streamer reviews each request in a queue (approve / reject). Once approved, the guest microphone audio is published to the room and mixed into the streamer's output so every viewer can hear it. At most **3 guests** may be on mic simultaneously in a room. The streamer can enable or disable the feature, restrict eligibility, and remove on-air guests at any time. Guests can also hang up or leave voluntarily at any time.
 
-本功能**仅做语音连麦，不含视频 / 摄像头**，这是已确认且不会改变的产品决策（目的之一是把宿主机内存开销控制在可接受范围）。
+This feature is **audio only, with no video or camera support**. This is a confirmed, final product decision, partly to keep host memory usage within an acceptable range.
 
-本文档覆盖：用户故事、EARS 格式验收标准、术语表、详细的 UI 设计期望，以及三语 i18n 要求。文档聚焦「要做什么 (WHAT)」与「为什么 (WHY)」；具体「怎么做 (HOW)」留待 design 阶段。用户已明确要求文档「什么都要有，包括 UI 怎么设计」，故本文档专门包含 UI 设计章节。
+This document covers user stories, EARS acceptance criteria, a glossary, detailed UI design expectations, and i18n requirements for three languages. It focuses on WHAT to build and WHY; implementation details (HOW) are deferred to the design phase. The user explicitly requested comprehensive documentation, including UI design, so a dedicated UI section is included.
 
-### 已确认的产品决策 (Confirmed Product Decisions)
+### Confirmed Product Decisions
 
-1. **仅语音连麦**：无视频 / 摄像头，仅上行 Opus 音频。此决策为最终决策。
-2. **并发上限 = 3**：同一直播间最多 3 名嘉宾同时在麦。
-3. **主播主控开关**：主播必须先开启「连麦」功能，观众才能申请；主播可随时关闭。
-4. **申请资格沿用福袋资格模型**：`all`（所有登录观众）/ `followers`（关注者）/ `fans`（粉丝团成员）/ `fans_level`（粉丝团且等级 ≥ 最低等级 `minFanLevel`）。未登录观众一律不能连麦。
-5. **审批 + 双向下麦**：主播逐条审批每个申请，并可随时把在麦嘉宾下麦；嘉宾本人也可主动下麦。
+1. **Audio only**: no video or camera; only an Opus audio uplink. This decision is final.
+2. **Concurrency limit = 3**: at most 3 guests may be on mic simultaneously in one room.
+3. **Streamer master toggle**: the streamer must enable mic-link before viewers can request access and can disable it at any time.
+4. **Reuse lucky bag eligibility**: `all` (all logged-in viewers) / `followers` / `fans` (fan club members) / `fans_level` (fan club members with level ≥ `minFanLevel`). Logged-out viewers cannot join mic-link.
+5. **Approval and leave controls for both sides**: the streamer reviews each request and can remove any on-air guest; guests may also leave voluntarily.
 
-### 已确认的技术方向 (Confirmed Technical Direction)
+### Confirmed Technical Direction
 
-> 以下为已被用户接受的「可落地」技术路径，作为 design 阶段的方向约束，本需求文档的验收标准均应可在此架构上实现。具体实现细节在 design.md 固化。
+> The user has accepted the following deployable approach as a constraint for the design phase. All acceptance criteria must be achievable with this architecture. Detailed implementation decisions belong in design.md.
 
-- **主播主流不变**：OBS → RTMP → SRS (ossrs/srs:5) → HTTP-FLV / HLS，普通观众的播放链路与现状完全一致，观众端**无需 WebRTC**。
-- **嘉宾上行走 WebRTC (WHIP)**：嘉宾麦克风音频（audio-only / Opus）通过 WHIP 推到 SRS 的 `rtc_server`。
-- **连麦舞台页 (Mic Stage Page)**：一个网页通过 WHEP 订阅并播放所有已批准嘉宾的音频；主播把该页作为 **OBS 浏览器源 (Browser Source)** 加入，由 OBS 把嘉宾音频混入对外 RTMP。因此**所有观众通过现有播放链路即可听到嘉宾声音**。
-- **SRS 需启用 `rtc_server`**：开放 UDP 8000 并配置公网 candidate IP（`154.36.185.85`）。coturn / TURN 为**可选回退**（服务器已有公网 IP，STUN-only 大概率足够），不作为硬性前置条件。
-- **内存预算**：启用纯音频 WebRTC 预计新增约 +30MB ~ +90MB，在该受限宿主机（无 swap）上可接受；排除视频正是为控制开销。
+- **Keep the main stream unchanged**: OBS → RTMP → SRS (ossrs/srs:5) → HTTP-FLV / HLS. Normal viewer playback remains unchanged and **does not require WebRTC**.
+- **Guest uplink uses WebRTC (WHIP)**: guest microphone audio (audio-only / Opus) is published to SRS `rtc_server` through WHIP.
+- **Mic Stage Page**: a web page subscribes to and plays all approved guests through WHEP. The streamer adds it as an **OBS Browser Source**, allowing OBS to mix guest audio into the outgoing RTMP stream. **All viewers hear guests through the existing playback path**.
+- **Enable SRS `rtc_server`**: open UDP 8000 and configure the public candidate IP (`154.36.185.85`). coturn / TURN is an **optional fallback**, not a prerequisite; the server already has a public IP and STUN-only is expected to suffice in most cases.
+- **Memory budget**: audio-only WebRTC is estimated to add +30MB to +90MB, acceptable on this resource-constrained host without swap. Video is excluded specifically to control resource usage.
 
-### 与现有架构的契合点 (Architecture Fit — 背景，非需求)
+### Architecture Fit (Background, Not Requirements)
 
-- **信令复用现有实时链路**：连麦的申请 / 批准 / 拒绝 / 上麦 / 下麦 / 移除 / 名单变化等事件，复用现有 `room:<RoomID>` Redis 频道 → `im-gateway` WebSocket 扇出 → 前端 `useRoomRealtime.ts` 的实时通道（与弹幕、礼物、福袋、竞猜一致）。
-- **新 API 前缀必须注册**：连麦的 HTTP 接口前缀必须在 `golive-backend/app/api-gateway/internal/router/router.go` 注册，否则一律 404。
-- **资格模型已存在**：福袋已实现 `all` / `followers` / `fans` / `fans_level(minFanLevel)`；关注关系存于 Redis（`user:<id>:follows`），粉丝团等级通过 `FanBadgeLevelFor` 判定。连麦沿用相同语义。
-- **前端约定**：复用 `golive-web/src/features/live-room/` 面板模式与 `gl-*` 样式（`golive-web/src/styles/index.css`）；下拉一律用自定义 `DropdownMenu`（非原生 `<select>`）；复用 `Avatar` / `Dialog` / `DropdownMenu` 等 `components/ui` 组件；不做卡中卡嵌套；除既有小型强调按钮外不用渐变；不用超大按钮。连麦面板像 `LuckyBagPanel` 一样同时挂在 `LiveRoomPage`（观众侧）与 `CreatorStudioPage`（主播侧）。
-- **三语 i18n 强制**：所有面向用户的文案必须同时提供 zh-CN / ja-JP / en-US（`golive-web/src/i18n/locales/*/pages.json`），计数键用 `_one` / `_other`，并通过既有 locale parity 测试（`pnpm test`）。
-- **鉴权**：观众可未登录浏览；发起连麦等写操作需登录（网关注入 `X-User-Id`）。
+- **Reuse the real-time signaling path**: request / approval / rejection / join / leave / removal / roster events reuse `room:<RoomID>` Redis channels → `im-gateway` WebSocket fanout → frontend `useRoomRealtime.ts`, as chat, gifts, lucky bags, and betting already do.
+- **Register the new API prefix**: mic-link HTTP prefixes must be registered in `golive-backend/app/api-gateway/internal/router/router.go`; otherwise requests return 404.
+- **Eligibility already exists**: lucky bags implement `all` / `followers` / `fans` / `fans_level(minFanLevel)`. Follow relationships live in Redis (`user:<id>:follows`); fan club levels are checked through `FanBadgeLevelFor`. Mic-link reuses these semantics.
+- **Frontend conventions**: reuse panels in `golive-web/src/features/live-room/` and `gl-*` styles from `golive-web/src/styles/index.css`. Use custom `DropdownMenu` controls instead of native `<select>` elements, and reuse `components/ui` primitives such as `Avatar`, `Dialog`, and `DropdownMenu`. Avoid nested cards, gradients except for existing small accent buttons, and oversized buttons. Mount the mic-link panel in both `LiveRoomPage` (viewers) and `CreatorStudioPage` (streamer), following `LuckyBagPanel`.
+- **Three-language i18n is mandatory**: all user-facing text must be available in zh-CN / ja-JP / en-US (`golive-web/src/i18n/locales/*/pages.json`). Count keys use `_one` / `_other` and must pass the existing locale parity tests (`pnpm test`).
+- **Authentication**: viewers may browse without signing in; writes such as mic-link requests require login (the gateway injects `X-User-Id`).
 
 ## Glossary
 
-- **Mic_Link_Service**：后端连麦领域服务，负责连麦会话、申请的状态机、资格 / 权限校验、3 人并发额度控制，并通过 Redis 发布连麦事件。可作为新微服务或并入现有 `room-service`（design 阶段确定）。
-- **IM_Gateway**：现有 `im-gateway` 服务，通过 WebSocket 向房间内客户端扇出 `room:<RoomID>` 频道事件。
-- **SRS_RTC**：SRS 的 `rtc_server` 组件，承载嘉宾的 WHIP 上行与连麦舞台页的 WHEP 下行音频（audio-only / Opus）。
-- **Mic_Link_Session**：一个直播间内进行中的连麦会话，包含房主与 0~3 名在麦嘉宾。
-- **Mic_Request**：观众发起的一次连麦申请，状态为 `pending` / `approved` / `rejected` / `cancelled` / `on_air` / `removed` 之一。
-- **Mic_Guest**：申请被批准并已上麦、其音频正在被广播的观众。
-- **Request_Queue**：主播侧展示的待处理（`pending`）连麦申请列表，按发起时间升序。
-- **On_Air_Roster**：当前在麦嘉宾名单（最多 3 人），含每名嘉宾的昵称、头像、静音 / 说话状态。
-- **Room_Owner**：直播间所属主播（房主），由 `room:owner:<RoomID>` 标识，是唯一可管理连麦的人。
-- **Viewer**：观看直播的用户，可能未登录。
-- **Mic_Link_Console**：主播侧管理连麦的 UI 面板（总开关 + 资格设置 + 申请队列 + 在麦名单 + OBS 舞台地址），挂在 `CreatorStudioPage`。
-- **Mic_Link_Panel**：观众侧申请 / 在麦的 UI 面板，挂在 `LiveRoomPage`。
-- **On_Mic_Indicator**：房间内向所有观众展示「当前谁在麦上」的指示组件。
-- **Mic_Stage_Page**：通过 WHEP 订阅并播放所有在麦嘉宾音频的网页，由主播作为 OBS 浏览器源加入，从而把嘉宾音频混入对外直播。
-- **Eligibility**：申请资格档位，取值 `all` / `followers` / `fans` / `fans_level`，与福袋一致。
-- **Concurrency_Limit**：单个直播间同时在麦嘉宾上限，固定为 **3**。
-- **RoomID**：直播间标识。
+- **Mic_Link_Service**: backend domain service managing mic-link sessions, request state machines, eligibility and permissions, the 3-guest concurrency limit, and Redis event publication. It may be a new microservice or part of the existing `room-service`, to be decided during design.
+- **IM_Gateway**: existing `im-gateway` service that fans out `room:<RoomID>` channel events to room clients over WebSocket.
+- **SRS_RTC**: SRS `rtc_server`, carrying guest WHIP uplink and Mic Stage Page WHEP downlink audio (audio-only / Opus).
+- **Mic_Link_Session**: an active mic-link session in a live room, consisting of the owner and 0–3 on-air guests.
+- **Mic_Request**: a viewer request with one of these states: `pending` / `approved` / `rejected` / `cancelled` / `on_air` / `removed`.
+- **Mic_Guest**: an approved viewer who is on mic and whose audio is being broadcast.
+- **Request_Queue**: streamer-visible list of `pending` mic-link requests, ordered by creation time ascending.
+- **On_Air_Roster**: current on-air guests (at most 3), including each guest's nickname, avatar, and mute/speaking status.
+- **Room_Owner**: the streamer owning the room, identified by `room:owner:<RoomID>`, and the only user allowed to manage mic-link.
+- **Viewer**: a person watching the stream, possibly without signing in.
+- **Mic_Link_Console**: streamer management panel in `CreatorStudioPage`, containing the master toggle, eligibility settings, request queue, on-air roster, and OBS stage URL.
+- **Mic_Link_Panel**: viewer request/on-air panel in `LiveRoomPage`.
+- **On_Mic_Indicator**: a component showing all viewers who is currently on mic.
+- **Mic_Stage_Page**: web page that subscribes to and plays all on-air guests through WHEP; the streamer adds it as an OBS browser source to mix guests into the outgoing live stream.
+- **Eligibility**: request eligibility tier, one of `all` / `followers` / `fans` / `fans_level`, matching lucky bags.
+- **Concurrency_Limit**: maximum simultaneous on-air guests per room, fixed at **3**.
+- **RoomID**: live-room identifier.
 
 ## Requirements
 
-### Requirement 1: 主播开启 / 关闭连麦功能
+### Requirement 1: Streamer Enables or Disables Mic-Link
 
-**User Story:** 作为主播，我想为本场直播开启或关闭连麦功能，以便决定本场是否接受观众语音连麦。
-
-#### Acceptance Criteria
-
-1. WHEN Room_Owner 在 Mic_Link_Console 开启连麦总开关, THE Mic_Link_Service SHALL 将该 RoomID 的连麦状态置为「已开启」并允许接收新的 Mic_Request。
-2. WHEN Room_Owner 关闭连麦总开关, THE Mic_Link_Service SHALL 将该 RoomID 的连麦状态置为「已关闭」并拒绝所有新的 Mic_Request，返回错误原因 `mic_link_disabled`。
-3. WHILE 连麦状态为「已关闭」, THE Mic_Link_Panel SHALL 向 Viewer 隐藏或禁用「申请连麦」入口并展示「主播未开启连麦」的本地化提示。
-4. WHEN Room_Owner 关闭连麦总开关且当前存在在麦的 Mic_Guest, THE Mic_Link_Service SHALL 结束所有在麦嘉宾的连麦、释放其媒体资源，并对每名嘉宾发布 `event=removed`（原因 `feature_disabled`）。
-5. IF 非 Room_Owner 的用户尝试切换连麦总开关, THEN THE Mic_Link_Service SHALL 拒绝该操作并返回错误原因 `forbidden`。
-6. WHEN 连麦总开关状态发生变化, THE Mic_Link_Service SHALL 通过 `room:<RoomID>` 频道发布连麦事件（`event=feature_enabled` 或 `event=feature_disabled`）以同步各端 UI。
-
-### Requirement 2: 主播配置连麦申请资格
-
-**User Story:** 作为主播，我想限定哪些观众可以申请连麦，以便控制连麦人群与房间秩序。
+**User Story:** As a streamer, I want to enable or disable mic-link for a broadcast so I can decide whether to accept audience voice participation.
 
 #### Acceptance Criteria
 
-1. THE Mic_Link_Service SHALL 支持申请资格档位 `all`（所有登录观众）/ `followers`（关注者）/ `fans`（粉丝团成员）/ `fans_level`（粉丝团且等级 ≥ `minFanLevel`），语义与福袋 `LuckyBagEligibility` 一致。
-2. WHEN Room_Owner 设置申请资格, THE Mic_Link_Service SHALL 记录该 RoomID 的当前 Eligibility 与（当为 `fans_level` 时的）`minFanLevel`。
-3. WHERE 申请资格为 `followers`, THE Mic_Link_Service SHALL 仅允许已关注该主播频道的 Viewer 创建 Mic_Request。
-4. WHERE 申请资格为 `fans`, THE Mic_Link_Service SHALL 仅允许该主播粉丝团成员的 Viewer 创建 Mic_Request。
-5. WHERE 申请资格为 `fans_level`, THE Mic_Link_Service SHALL 仅允许粉丝团等级大于或等于 `minFanLevel` 的 Viewer 创建 Mic_Request。
-6. IF 不满足申请资格的 Viewer 发起连麦申请, THEN THE Mic_Link_Service SHALL 拒绝该申请并返回错误原因 `mic_link_not_eligible`。
-7. WHEN Room_Owner 选择资格档位为 `fans_level`, THE Mic_Link_Console SHALL 展示一个最低等级数字输入，取值范围与福袋一致（最小 1）。
-8. IF 非 Room_Owner 的用户尝试修改申请资格, THEN THE Mic_Link_Service SHALL 拒绝该操作并返回错误原因 `forbidden`。
+1. WHEN Room_Owner enables the master toggle in Mic_Link_Console, THE Mic_Link_Service SHALL mark mic-link as enabled for that RoomID and accept new Mic_Request entries.
+2. WHEN Room_Owner disables the master toggle, THE Mic_Link_Service SHALL mark mic-link as disabled for that RoomID and reject all new Mic_Request entries with reason `mic_link_disabled`.
+3. WHILE mic-link is disabled, THE Mic_Link_Panel SHALL hide or disable the request action and show Viewer a localized "The streamer has not enabled mic-link" message.
+4. WHEN Room_Owner disables mic-link while Mic_Guest users are on air, THE Mic_Link_Service SHALL end all guest connections, release their media resources, and publish `event=removed` with reason `feature_disabled` for each guest.
+5. IF a user other than Room_Owner attempts to change the master toggle, THEN THE Mic_Link_Service SHALL reject the operation with reason `forbidden`.
+6. WHEN the master toggle changes, THE Mic_Link_Service SHALL publish a mic-link event (`event=feature_enabled` or `event=feature_disabled`) on `room:<RoomID>` to synchronize client UIs.
 
-### Requirement 3: 观众发起连麦申请
+### Requirement 2: Streamer Configures Request Eligibility
 
-**User Story:** 作为已登录且符合资格的观众，我想向主播发起语音连麦申请，以便有机会与主播实时语音互动。
+**User Story:** As a streamer, I want to restrict who can request mic-link so I can manage participants and maintain order in the room.
 
 #### Acceptance Criteria
 
-1. WHEN 已登录且符合资格的 Viewer 在 Mic_Link_Panel 点击「申请连麦」, THE Mic_Link_Service SHALL 创建一条状态为 `pending` 的 Mic_Request，记录其 RoomID、用户标识与发起时间。
-2. IF 未登录的 Viewer 点击「申请连麦」, THEN THE Mic_Link_Panel SHALL 触发登录弹窗且不创建 Mic_Request。
-3. WHEN 一条 Mic_Request 创建成功, THE Mic_Link_Service SHALL 通过 `room:<RoomID>` 频道发布连麦事件，`event` 字段为 `requested`，并携带申请者昵称与头像供主播队列展示。
-4. IF 同一 Viewer 在同一直播间已存在状态为 `pending` 或 `approved` 或 `on_air` 的 Mic_Request, THEN THE Mic_Link_Service SHALL 拒绝新的申请并返回错误原因 `mic_link_request_exists`。
-5. WHILE 一条 Mic_Request 处于 `pending` 状态, THE Mic_Link_Panel SHALL 向该 Viewer 显示「申请待处理」状态并提供「取消申请」操作。
-6. WHEN Viewer 在申请被处理前点击「取消申请」, THE Mic_Link_Service SHALL 将该 Mic_Request 状态置为 `cancelled` 并发布 `event=cancelled` 事件。
-7. IF 连麦总开关为「已关闭」时 Viewer 发起申请, THEN THE Mic_Link_Service SHALL 拒绝该申请并返回错误原因 `mic_link_disabled`。
+1. THE Mic_Link_Service SHALL support `all` (all logged-in viewers) / `followers` / `fans` (fan club members) / `fans_level` (fan club members with level ≥ `minFanLevel`), using the same semantics as `LuckyBagEligibility`.
+2. WHEN Room_Owner configures eligibility, THE Mic_Link_Service SHALL store the current Eligibility for that RoomID and `minFanLevel` when the tier is `fans_level`.
+3. WHERE eligibility is `followers`, THE Mic_Link_Service SHALL allow only Viewer users who follow the streamer's channel to create a Mic_Request.
+4. WHERE eligibility is `fans`, THE Mic_Link_Service SHALL allow only Viewer users who belong to the streamer's fan club to create a Mic_Request.
+5. WHERE eligibility is `fans_level`, THE Mic_Link_Service SHALL allow only Viewer users whose fan club level is at least `minFanLevel` to create a Mic_Request.
+6. IF an ineligible Viewer submits a mic-link request, THEN THE Mic_Link_Service SHALL reject it with reason `mic_link_not_eligible`.
+7. WHEN Room_Owner selects `fans_level`, THE Mic_Link_Console SHALL display a numeric minimum-level input using the same range as lucky bags (minimum 1).
+8. IF a user other than Room_Owner attempts to change eligibility, THEN THE Mic_Link_Service SHALL reject the operation with reason `forbidden`.
 
-### Requirement 4: 主播审批连麦申请
+### Requirement 3: Viewer Requests Mic-Link
 
-**User Story:** 作为主播，我想在申请队列里看到待处理的连麦申请并逐个批准或拒绝，以便决定让谁上麦。
-
-#### Acceptance Criteria
-
-1. WHILE 直播间存在至少一条 `pending` 的 Mic_Request, THE Mic_Link_Console SHALL 向 Room_Owner 展示 Request_Queue，每项包含申请者昵称与头像。
-2. THE Request_Queue SHALL 按 Mic_Request 的发起时间升序排列。
-3. WHEN Room_Owner 对某条申请点击「批准」, THE Mic_Link_Service SHALL 将该 Mic_Request 状态置为 `approved` 并发布 `event=approved` 事件，事件中包含被批准的用户标识。
-4. WHEN Room_Owner 对某条申请点击「拒绝」, THE Mic_Link_Service SHALL 将该 Mic_Request 状态置为 `rejected` 并发布 `event=rejected` 事件。
-5. IF Room_Owner 批准一条申请时在麦嘉宾数量已达 Concurrency_Limit（3）, THEN THE Mic_Link_Service SHALL 拒绝该批准操作并返回错误原因 `mic_link_slot_full`。
-6. IF 非 Room_Owner 的用户尝试审批 Mic_Request, THEN THE Mic_Link_Service SHALL 拒绝该操作并返回错误原因 `forbidden`。
-7. IF Room_Owner 审批一条已不存在或已非 `pending` 状态的 Mic_Request, THEN THE Mic_Link_Service SHALL 拒绝该操作并返回错误原因 `mic_link_request_not_found`。
-
-### Requirement 5: 嘉宾上麦与音频上行
-
-**User Story:** 作为被批准的观众，我想在批准后开启麦克风上麦，以便我的声音能被主播和房间内所有观众听到。
+**User Story:** As a logged-in, eligible viewer, I want to request voice participation so I can interact with the streamer in real time.
 
 #### Acceptance Criteria
 
-1. WHEN 一条 Mic_Request 被置为 `approved`, THE Mic_Link_Service SHALL 将该被批准用户纳入 On_Air_Roster 并将其状态推进为 `on_air`。
-2. WHEN 一名被批准的 Viewer 准备上麦, THE Mic_Link_Panel SHALL 请求浏览器麦克风授权。
-3. IF 麦克风授权被拒绝或不可用, THEN THE Mic_Link_Panel SHALL 展示授权失败的本地化提示并取消该用户的上麦流程，且 Mic_Link_Service SHALL 将其移出 On_Air_Roster。
-4. WHEN 嘉宾获得麦克风授权后上麦, THE SRS_RTC SHALL 通过 WHIP 接收该嘉宾的 audio-only（Opus）上行音频流。
-5. WHEN 一名 Mic_Guest 成功上麦, THE Mic_Link_Service SHALL 发布 `event=on_air` 事件，事件携带最新的 On_Air_Roster。
-6. IF 嘉宾在被批准后的连接超时（默认 15 秒）内未能建立 WHIP 音频上行, THEN THE Mic_Link_Service SHALL 将其移出 On_Air_Roster 并发布 `event=removed`（原因 `connect_timeout`）。
-7. THE Mic_Link_Service SHALL 保证 On_Air_Roster 中在麦嘉宾数量不超过 Concurrency_Limit（3）。
+1. WHEN a logged-in, eligible Viewer clicks "Request mic-link" in Mic_Link_Panel, THE Mic_Link_Service SHALL create a `pending` Mic_Request recording RoomID, user identifier, and creation time.
+2. IF a logged-out Viewer clicks "Request mic-link", THEN THE Mic_Link_Panel SHALL open the login dialog without creating a Mic_Request.
+3. WHEN a Mic_Request is created successfully, THE Mic_Link_Service SHALL publish a mic-link event on `room:<RoomID>` with `event=requested` and the requester's nickname and avatar for the streamer queue.
+4. IF the same Viewer already has a `pending`, `approved`, or `on_air` Mic_Request in the same room, THEN THE Mic_Link_Service SHALL reject the new request with reason `mic_link_request_exists`.
+5. WHILE a Mic_Request is `pending`, THE Mic_Link_Panel SHALL show that Viewer a pending status and a "Cancel request" action.
+6. WHEN Viewer clicks "Cancel request" before it is processed, THE Mic_Link_Service SHALL set the Mic_Request to `cancelled` and publish `event=cancelled`.
+7. IF Viewer submits a request while mic-link is disabled, THEN THE Mic_Link_Service SHALL reject it with reason `mic_link_disabled`.
 
-### Requirement 6: 嘉宾自助控制（静音 / 下麦）
+### Requirement 4: Streamer Reviews Requests
 
-**User Story:** 作为连麦嘉宾，我想自己控制麦克风静音并能随时主动下麦，以便掌控自己的发言与退出时机。
-
-#### Acceptance Criteria
-
-1. WHILE 自己处于 `on_air` 状态, THE Mic_Link_Panel SHALL 向 Mic_Guest 提供「静音 / 取消静音」与「下麦」操作。
-2. WHEN Mic_Guest 点击「静音」, THE Mic_Link_Panel SHALL 停止本地麦克风音频上行，且 Mic_Link_Service SHALL 发布 `event=guest_muted` 事件以更新各端的说话 / 静音指示。
-3. WHEN Mic_Guest 点击「取消静音」, THE Mic_Link_Panel SHALL 恢复本地麦克风音频上行，且 Mic_Link_Service SHALL 发布 `event=guest_unmuted` 事件。
-4. WHEN Mic_Guest 点击「下麦」, THE Mic_Link_Service SHALL 将其移出 On_Air_Roster、释放其媒体资源并发布 `event=left` 事件。
-5. WHEN 一名 Mic_Guest 下麦或被移除, THE Mic_Link_Service SHALL 将当前在麦嘉宾数量减一，使后续审批可再次通过。
-
-### Requirement 7: 主播管理在麦嘉宾
-
-**User Story:** 作为主播，我想看到当前在麦的嘉宾并能随时把任意嘉宾下麦，以便掌控直播节奏与内容安全。
+**User Story:** As a streamer, I want to see pending mic-link requests and approve or reject them individually so I can decide who joins the microphone.
 
 #### Acceptance Criteria
 
-1. WHILE 存在至少一名 Mic_Guest 在麦, THE Mic_Link_Console SHALL 向 Room_Owner 展示 On_Air_Roster，每名嘉宾一行，含头像、昵称与静音 / 说话状态。
-2. THE On_Air_Roster SHALL 最多展示 3 名在麦嘉宾，并展示当前占用数 / 上限（如「2 / 3」）。
-3. WHEN Room_Owner 对某 Mic_Guest 点击「下麦」（移除）, THE Mic_Link_Service SHALL 结束该嘉宾的连麦、释放其媒体资源并发布 `event=removed` 事件（原因 `removed_by_owner`）。
-4. IF 非 Room_Owner 的用户尝试移除某 Mic_Guest, THEN THE Mic_Link_Service SHALL 拒绝该操作并返回错误原因 `forbidden`。
-5. WHEN 一名 Mic_Guest 被 Room_Owner 移除, THE Mic_Link_Panel SHALL 向被移除的该用户展示「已被主播下麦」的本地化提示并恢复到可再次申请的初始态（若仍符合资格且连麦开启）。
+1. WHILE the room has at least one `pending` Mic_Request, THE Mic_Link_Console SHALL display Request_Queue to Room_Owner, including each requester's nickname and avatar.
+2. THE Request_Queue SHALL sort Mic_Request entries by creation time ascending.
+3. WHEN Room_Owner clicks "Approve" on a request, THE Mic_Link_Service SHALL set the Mic_Request to `approved` and publish `event=approved` with the approved user's identifier.
+4. WHEN Room_Owner clicks "Reject" on a request, THE Mic_Link_Service SHALL set the Mic_Request to `rejected` and publish `event=rejected`.
+5. IF the on-air guest count has reached Concurrency_Limit (3) when Room_Owner approves a request, THEN THE Mic_Link_Service SHALL reject the approval with reason `mic_link_slot_full`.
+6. IF a user other than Room_Owner attempts to review a Mic_Request, THEN THE Mic_Link_Service SHALL reject the operation with reason `forbidden`.
+7. IF Room_Owner reviews a Mic_Request that no longer exists or is no longer `pending`, THEN THE Mic_Link_Service SHALL reject the operation with reason `mic_link_request_not_found`.
 
-### Requirement 8: 向房间内所有观众呈现连麦音频
+### Requirement 5: Guest Joins and Publishes Audio
 
-**User Story:** 作为房间内的普通观众，我想听到正在连麦的嘉宾并看到谁在麦上，以便完整地观看互动。
-
-#### Acceptance Criteria
-
-1. WHILE 存在至少一名 Mic_Guest 在麦, THE Mic_Stage_Page SHALL 通过 WHEP 订阅并播放所有 `on_air` 嘉宾的音频。
-2. WHILE Mic_Stage_Page 作为 OBS 浏览器源被加入主播的 OBS, THE 直播输出 SHALL 通过现有 RTMP → SRS → HTTP-FLV / HLS 链路把嘉宾音频混入直播，使所有 Viewer 经现有播放链路即可听到嘉宾声音。
-3. THE 普通 Viewer 的播放端 SHALL 无需任何 WebRTC 能力即可听到连麦音频。
-4. WHILE 存在至少一名 Mic_Guest 在麦, THE On_Mic_Indicator SHALL 向房间内所有 Viewer 展示当前在麦嘉宾的头像、昵称与说话 / 静音状态。
-5. WHEN On_Air_Roster 发生变化（新增 / 移除 / 静音态变化）, THE On_Mic_Indicator SHALL 在收到对应连麦实时事件后更新展示内容。
-
-### Requirement 9: 连麦实时信令事件
-
-**User Story:** 作为系统，我需要把连麦各阶段的状态变化实时广播给相关客户端，以便各端 UI 与房间状态保持一致。
+**User Story:** As an approved viewer, I want to enable my microphone and join so the streamer and all room viewers can hear me.
 
 #### Acceptance Criteria
 
-1. THE Mic_Link_Service SHALL 通过 Redis `room:<RoomID>` 频道发布类型为 `mic_link` 的事件，其 `event` 取值集合为 `feature_enabled` / `feature_disabled` / `requested` / `approved` / `rejected` / `cancelled` / `on_air` / `left` / `removed` / `guest_muted` / `guest_unmuted`。
-2. WHEN IM_Gateway 从 `room:<RoomID>` 收到一条 `mic_link` 事件, THE IM_Gateway SHALL 将该事件扇出给该房间所有已连接的 WebSocket 客户端。
-3. WHEN 前端 `useRoomRealtime` 收到一条 `mic_link` 事件, THE 前端 SHALL 更新连麦相关本地状态或失效相关查询缓存，以刷新 Mic_Link_Panel、Mic_Link_Console 与 On_Mic_Indicator。
-4. THE `mic_link` 事件 SHALL 携带毫秒级时间戳 `ts` 字段，与现有 chat / gift / bet / lucky_bag 事件格式保持一致。
-5. WHERE 一条 `mic_link` 事件仅与特定用户相关（如对申请者的 `approved` / `rejected`）, THE 前端 SHALL 仅对匹配该用户标识的客户端更新其个人申请状态展示。
+1. WHEN a Mic_Request becomes `approved`, THE Mic_Link_Service SHALL add the approved user to On_Air_Roster and advance the state to `on_air`.
+2. WHEN an approved Viewer prepares to join, THE Mic_Link_Panel SHALL request browser microphone permission.
+3. IF microphone permission is denied or unavailable, THEN THE Mic_Link_Panel SHALL display a localized permission-failure message and cancel the joining flow, and THE Mic_Link_Service SHALL remove the user from On_Air_Roster.
+4. WHEN a guest joins after granting microphone permission, THE SRS_RTC SHALL receive the guest's audio-only (Opus) uplink through WHIP.
+5. WHEN a Mic_Guest successfully joins, THE Mic_Link_Service SHALL publish `event=on_air` with the latest On_Air_Roster.
+6. IF a guest fails to establish a WHIP audio uplink within the connection timeout after approval (default 15 seconds), THEN THE Mic_Link_Service SHALL remove the guest from On_Air_Roster and publish `event=removed` with reason `connect_timeout`.
+7. THE Mic_Link_Service SHALL ensure the number of on-air guests in On_Air_Roster never exceeds Concurrency_Limit (3).
 
-### Requirement 10: 向主播暴露 OBS 连麦舞台地址
+### Requirement 6: Guest Controls (Mute / Leave)
 
-**User Story:** 作为主播，我想拿到连麦舞台页地址并一键复制，以便把它作为 OBS 浏览器源加入，从而把嘉宾声音混进直播。
-
-#### Acceptance Criteria
-
-1. WHILE Room_Owner 处于 Mic_Link_Console, THE Mic_Link_Console SHALL 展示本直播间的 Mic_Stage_Page 地址，展示形态与既有 OBS server / Stream key / Playback URL 行（`PublisherLine`）一致。
-2. THE Mic_Stage_Page 地址行 SHALL 提供「复制」操作，复用既有 `copyText` / clipboard 机制，并在复制成功 / 手动复制时给出本地化 toast 反馈。
-3. THE Mic_Stage_Page 地址 SHALL 绑定到具体 RoomID，使该页仅订阅本直播间的在麦嘉宾音频。
-4. THE Mic_Link_Console SHALL 在 Mic_Stage_Page 地址附近提供简短的本地化使用说明（提示主播将其加为 OBS 浏览器源）。
-5. WHERE 仅 Room_Owner 可见, THE Mic_Stage_Page 地址 SHALL 不向普通 Viewer 展示。
-
-### Requirement 11: 权限、鉴权与接口接入
-
-**User Story:** 作为平台，我需要连麦写操作要求登录、且仅房主能管理本房间连麦，并使接口被网关正确路由，以便保证安全与可用。
+**User Story:** As a mic-link guest, I want to mute my microphone and leave at any time so I control when I speak and exit.
 
 #### Acceptance Criteria
 
-1. THE 连麦相关写接口 SHALL 通过 `api-gateway` 路由注册，使用统一的 `/api/mic-link` 路径前缀。
-2. IF 一个连麦写请求缺少有效的鉴权凭证, THEN THE api-gateway SHALL 拒绝该请求并返回未授权错误（HTTP 401）。
-3. THE Mic_Link_Service SHALL 仅允许该 RoomID 的 Room_Owner 执行开关切换、资格设置、审批、移除等管理操作。
-4. WHERE 某个连麦只读接口需要支持游客查看（如查询当前在麦名单与连麦开关态）, THE api-gateway SHALL 将该只读接口登记为公开路由（参照既有 `publicRoutes()` 约定）。
-5. THE Mic_Link_Service SHALL 校验所有连麦写请求中由网关注入的 `X-User-Id` 与所声明角色一致。
+1. WHILE the guest is `on_air`, THE Mic_Link_Panel SHALL provide Mic_Guest with mute/unmute and leave actions.
+2. WHEN Mic_Guest clicks "Mute", THE Mic_Link_Panel SHALL stop the local microphone audio uplink, and THE Mic_Link_Service SHALL publish `event=guest_muted` to update speaking/mute indicators across clients.
+3. WHEN Mic_Guest clicks "Unmute", THE Mic_Link_Panel SHALL resume the local microphone audio uplink, and THE Mic_Link_Service SHALL publish `event=guest_unmuted`.
+4. WHEN Mic_Guest clicks "Leave", THE Mic_Link_Service SHALL remove the guest from On_Air_Roster, release media resources, and publish `event=left`.
+5. WHEN a Mic_Guest leaves or is removed, THE Mic_Link_Service SHALL decrement the on-air guest count so subsequent approvals can succeed.
 
-### Requirement 12: 会话生命周期与边界处理
+### Requirement 7: Streamer Manages On-Air Guests
 
-**User Story:** 作为用户，我想在直播结束、断线、重复申请等异常情况下连麦行为可预期，以便不出现残留会话或错误状态。
-
-#### Acceptance Criteria
-
-1. WHEN 一个直播间的直播结束（收到 `live_ended` / 直播状态变为 `ended`）, THE Mic_Link_Service SHALL 结束该房间所有在麦的 Mic_Guest、释放其媒体资源，并对每名嘉宾发布 `event=removed`（原因 `live_ended`）。
-2. WHEN 一个直播间的直播结束, THE Mic_Link_Service SHALL 将该房间所有 `pending` 的 Mic_Request 置为 `cancelled`（原因 `live_ended`）。
-3. WHEN 一名 Mic_Guest 的 WHIP 音频上行或 WebSocket 连接断开并超过宽限时间（默认 15 秒）未恢复, THE Mic_Link_Service SHALL 将其移出 On_Air_Roster 并发布 `event=removed`（原因 `disconnected`）。
-4. IF 同一 Viewer 重复提交连麦申请（已有 `pending` / `approved` / `on_air`）, THEN THE Mic_Link_Service SHALL 拒绝并返回错误原因 `mic_link_request_exists`（见 Requirement 3.4）。
-5. IF 一名 Viewer 已在另一个直播间处于 `on_air` 状态, THEN THE Mic_Link_Service SHALL 拒绝其在新直播间上麦并返回错误原因 `mic_link_already_on_air_elsewhere`。
-6. WHEN On_Air_Roster 因任何原因变为空, THE Mic_Link_Service SHALL 保持连麦总开关状态不变（关闭功能须由 Room_Owner 显式操作）。
-
-### Requirement 13: 连麦状态一致性与重连恢复
-
-**User Story:** 作为用户，我想在刷新页面或网络抖动后看到正确的连麦状态，以便各端展示与真实会话一致。
+**User Story:** As a streamer, I want to see current guests and remove any guest at any time so I can manage the broadcast flow and content safety.
 
 #### Acceptance Criteria
 
-1. THE Mic_Link_Service SHALL 提供一个只读接口，返回某 RoomID 的连麦开关态、当前 Eligibility / `minFanLevel`、On_Air_Roster（含各嘉宾静音态），以及调用者自身的 Mic_Request 状态。
-2. WHEN 一个客户端进入直播间或 WebSocket 重连后, THE 前端 SHALL 通过该只读接口重建 Mic_Link_Panel / Mic_Link_Console 与 On_Mic_Indicator，而不依赖错过的实时事件。
-3. WHILE 某 Viewer 自身存在 `pending` / `approved` / `on_air` 的 Mic_Request, THE Mic_Link_Panel SHALL 在该 Viewer 刷新或重连后恢复对应的申请 / 在麦状态展示。
-4. THE 只读接口返回的 On_Air_Roster SHALL 与最近一次广播的 `mic_link` 事件结果最终一致。
+1. WHILE at least one Mic_Guest is on air, THE Mic_Link_Console SHALL display On_Air_Roster to Room_Owner, with one row per guest containing avatar, nickname, and mute/speaking status.
+2. THE On_Air_Roster SHALL show at most 3 on-air guests and the current occupancy / limit, such as "2 / 3".
+3. WHEN Room_Owner clicks "Remove" for a Mic_Guest, THE Mic_Link_Service SHALL end that guest's connection, release media resources, and publish `event=removed` with reason `removed_by_owner`.
+4. IF a user other than Room_Owner attempts to remove a Mic_Guest, THEN THE Mic_Link_Service SHALL reject the operation with reason `forbidden`.
+5. WHEN Room_Owner removes a Mic_Guest, THE Mic_Link_Panel SHALL show that user a localized "The streamer removed you from mic-link" message and return to the initial request state if the feature remains enabled and the user is still eligible.
 
-### Requirement 14: 错误处理与反馈
+### Requirement 8: Deliver Guest Audio to All Room Viewers
 
-**User Story:** 作为用户，我想在连麦操作失败时收到清晰的本地化原因，以便知道下一步怎么做。
-
-#### Acceptance Criteria
-
-1. WHEN 任一连麦写操作失败, THE Mic_Link_Service SHALL 返回稳定的机器可读错误原因码，集合至少包含：`mic_link_disabled` / `mic_link_not_eligible` / `mic_link_request_exists` / `mic_link_slot_full` / `mic_link_request_not_found` / `mic_link_already_on_air_elsewhere` / `connect_timeout` / `forbidden`。
-2. WHEN 前端收到一个已知连麦错误原因码, THE Mic_Link_Panel / Mic_Link_Console SHALL 通过既有 toast（`sonner`）机制展示对应的本地化提示文案。
-3. IF 前端收到一个未识别的错误原因码, THEN THE Mic_Link_Panel / Mic_Link_Console SHALL 展示一条通用的「操作失败」本地化提示。
-
-### Requirement 15: 三语国际化
-
-**User Story:** 作为多语言用户，我想用自己的语言看到连麦相关的全部文案，以便正常使用功能。
+**User Story:** As a normal viewer, I want to hear participating guests and see who is on mic so I can follow the entire interaction.
 
 #### Acceptance Criteria
 
-1. THE Mic_Link_Panel、Mic_Link_Console、On_Mic_Indicator 及所有连麦提示文案 SHALL 同时在 zh-CN、ja-JP、en-US 三个 locale 的 `pages.json` 中提供对应键值。
-2. WHERE 某条文案包含数量（如在麦人数、占用 / 上限）, THE 对应 i18n 键 SHALL 使用 `_one` / `_other` 复数形式。
-3. THE 连麦新增的 i18n 键 SHALL 通过既有的 locale parity 测试（三语键集合一致）。
+1. WHILE at least one Mic_Guest is on air, THE Mic_Stage_Page SHALL subscribe to and play all `on_air` guest audio through WHEP.
+2. WHILE Mic_Stage_Page is added to the streamer's OBS as a browser source, THE broadcast output SHALL mix guest audio into the live stream through the existing RTMP → SRS → HTTP-FLV / HLS path, allowing every Viewer to hear guests through existing playback.
+3. THE normal Viewer playback client SHALL play mic-link audio without requiring WebRTC capabilities.
+4. WHILE at least one Mic_Guest is on air, THE On_Mic_Indicator SHALL show all Viewer users the current guests' avatars, nicknames, and speaking/mute status.
+5. WHEN On_Air_Roster changes through additions, removals, or mute-state changes, THE On_Mic_Indicator SHALL update after receiving the corresponding real-time mic-link event.
 
-## 非功能性需求 (Non-Functional Requirements)
+### Requirement 9: Real-Time Mic-Link Signaling
 
-> 以下为可度量的质量目标，作为 design.md 与验收的依据。
+**User Story:** As the system, I need to broadcast mic-link state changes to relevant clients in real time so their UIs remain consistent with room state.
 
-1. **延迟**：嘉宾语音从上麦到房间内观众听到，端到端目标 < 2 秒（嘉宾 WHIP 上行 + OBS 混流 + 现有 FLV 播放叠加延迟）；嘉宾本地静音 / 取消静音应在 1 秒内反映到上行。
-2. **并发**：单直播间在麦嘉宾硬上限 3；服务端必须在并发审批 / 上麦竞态下严格不超过 3（见 Requirement 5.7、4.5）。
-3. **状态一致性**：客户端进房或重连后，应在 2 秒内通过只读接口重建出正确的连麦状态（开关态、资格、在麦名单、静音态、自身申请态）。
-4. **资源预算**：启用 audio-only SRS WebRTC 预计新增内存约 +30MB ~ +90MB，须在该无 swap 宿主机上稳定运行；不得引入视频上行。
-5. **可观测性**：连麦关键事件（开关切换、申请、批准、拒绝、上麦、下麦、移除、断线）应可被记录以便审计与排障（参照现有 outbox 模式）。
-6. **优雅降级**：嘉宾端浏览器若不支持 WebRTC / `getUserMedia`，连麦申请入口禁用，但该用户及所有其他观众的直播观看（HTTP-FLV）不受影响。
-7. **安全**：所有管理操作仅限 Room_Owner；所有写操作需登录鉴权；Mic_Stage_Page 地址仅向房主展示。
+#### Acceptance Criteria
 
-## UI/UX 设计期望 (UI Design Expectations)
+1. THE Mic_Link_Service SHALL publish `mic_link` events through Redis `room:<RoomID>`, with `event` values from `feature_enabled` / `feature_disabled` / `requested` / `approved` / `rejected` / `cancelled` / `on_air` / `left` / `removed` / `guest_muted` / `guest_unmuted`.
+2. WHEN IM_Gateway receives a `mic_link` event from `room:<RoomID>`, THE IM_Gateway SHALL fan it out to all connected WebSocket clients in that room.
+3. WHEN frontend `useRoomRealtime` receives a `mic_link` event, THE frontend SHALL update local mic-link state or invalidate relevant query caches to refresh Mic_Link_Panel, Mic_Link_Console, and On_Mic_Indicator.
+4. THE `mic_link` event SHALL include a millisecond timestamp `ts`, consistent with existing chat / gift / bet / lucky_bag events.
+5. WHERE a `mic_link` event concerns a specific user, such as `approved` / `rejected` for a requester, THE frontend SHALL update the personal request-status display only on clients matching that user identifier.
 
-> 用户明确要求文档覆盖「UI 怎么设计」。以下为 UI/UX 设计约束与布局期望，作为 design.md 的输入。所有控件复用 `golive-web/src/features/live-room/` 既有面板模式与 `gl-*` 样式（`golive-web/src/styles/index.css`），下拉一律用自定义 `DropdownMenu`（非原生 `<select>`），复用 `Avatar` / `Dialog` / `DropdownMenu` 等组件，不做卡中卡嵌套，除既有小型强调按钮外不用渐变，不用超大按钮，仅用 `--gl-*` CSS 变量。新增样式统一以 `gl-mic-*` 前缀命名，图标使用 `lucide-react`（如 Mic / MicOff / Users / Check / X / Copy / Radio）。
+### Requirement 10: Provide the Streamer with an OBS Mic Stage URL
 
-### 通用与放置
+**User Story:** As a streamer, I want a Mic Stage Page URL with one-click copying so I can add it as an OBS browser source and mix guest audio into my broadcast.
 
-- 连麦面板落位于直播间互动区，与 `LuckyBagPanel`、`BettingPanel`、`GiftPanel` 并列；观众视图（Mic_Link_Panel）挂在 `LiveRoomPage`，主播视图（Mic_Link_Console）挂在 `CreatorStudioPage` 的直播控制台，挂载方式参考 `LuckyBagPanel`。
-- 通过 `ownsStream` 区分主播视图（管理）与观众视图（申请 / 在麦），与 `LuckyBagPanel` 的 `ownsStream` 用法一致。
-- 普通观众视图**不得**出现任何主播管理控件或 Mic_Stage_Page 地址。
+#### Acceptance Criteria
 
-### 观众侧 UI（Mic_Link_Panel）
+1. WHILE Room_Owner is in Mic_Link_Console, THE Mic_Link_Console SHALL display the room's Mic_Stage_Page URL using the same format as existing OBS server / Stream key / Playback URL rows (`PublisherLine`).
+2. THE Mic_Stage_Page URL row SHALL provide a copy action using the existing `copyText` / clipboard mechanism, with localized toast feedback for successful copying or manual-copy instructions.
+3. THE Mic_Stage_Page URL SHALL be bound to a specific RoomID so it subscribes only to that room's on-air guest audio.
+4. THE Mic_Link_Console SHALL provide brief localized instructions near the Mic_Stage_Page URL telling the streamer to add it as an OBS browser source.
+5. WHERE the URL is restricted to Room_Owner, THE Mic_Stage_Page URL SHALL not be displayed to ordinary Viewer users.
 
-1. **「申请连麦」入口**：互动区内一个主操作按钮，采用与 `gl-bag-join` 同级的小型强调按钮风格（非超大按钮）。未登录点击触发登录弹窗（Requirement 3.2）。
-2. **开关关闭态**：当主播未开启连麦时，入口禁用并显示「主播未开启连麦」本地化提示（Requirement 1.3）。
-3. **资格不满足态**：当连麦已开启但当前 Viewer 不符合资格时，入口禁用并显示资格要求提示（如「仅限关注者」「仅限粉丝团 Lv.N+」），文案对齐福袋资格展示风格。
-4. **申请状态机展示**（参考 `gl-bag-result is-joined` 风格的状态条）：
-   - `pending`：显示「申请待处理」状态条 + 「取消申请」次级按钮。
-   - `approved`（准备上麦）：显示麦克风授权请求与授权状态；授权失败显示重试 / 取消。
-   - `on_air`（连麦中）：显示「连麦中」状态 + 本地「静音 / 取消静音」切换 + 「下麦」按钮。
-   - `rejected` / `cancelled` / `removed`：以非阻断 toast 告知，并恢复到可再次申请的初始态。
-5. **本地麦克风状态**：在 `on_air` 态展示当前麦克风开 / 关（Mic / MicOff 图标）与说话指示（轻量音浪或高亮）。
+### Requirement 11: Permissions, Authentication, and Routing
 
-### 主播侧 UI（Mic_Link_Console）
+**User Story:** As the platform, I need mic-link writes to require login, room management to be owner-only, and gateway routing to work correctly so the feature is secure and available.
 
-1. **连麦总开关**：面板顶部一个开 / 关切换（参考既有开关控件样式），控制 Requirement 1。
-2. **申请资格设置**：与福袋一致的自定义下拉（`gl-bag-select-*` / `gl-mic-select-*` 模式，基于 `DropdownMenu`），选项 `all` / `followers` / `fans` / `fans_level`；选 `fans_level` 时显示最低等级数字输入（取值与福袋一致，最小 1）。**禁止使用原生 `<select>`**。
-3. **Request_Queue（申请队列）**：
-   - 列表项含 `Avatar` + 昵称 + 「批准 / 拒绝」两个操作按钮。
-   - 按发起时间升序；队列为空时显示空状态文案。
-   - 当在麦数已达 3 时，「批准」按钮置灰并提示「已满 (3/3)」。
-4. **On_Air_Roster（在麦名单）**：
-   - 顶部显示占用 / 上限（如「2 / 3」）。
-   - 每名在麦嘉宾一行：`Avatar` + 昵称 + 麦克风 / 说话状态图标 + 「下麦」（移除）按钮。
-   - 名单为空时显示空状态文案。
-5. **OBS 连麦舞台地址行**：复用 `PublisherLine` 形态（label + 只读 `code` + 复制按钮），展示 Mic_Stage_Page 地址，配本地化使用说明「将此地址添加为 OBS 浏览器源」。仅房主可见（Requirement 10）。
+#### Acceptance Criteria
 
-### 房间内在麦指示（On_Mic_Indicator）
+1. THE mic-link write endpoints SHALL be registered with `api-gateway` under the shared `/api/mic-link` prefix.
+2. IF a mic-link write request lacks valid credentials, THEN THE api-gateway SHALL reject it with an unauthorized error (HTTP 401).
+3. THE Mic_Link_Service SHALL allow only the Room_Owner for that RoomID to perform management operations such as toggling, configuring eligibility, reviewing requests, and removing guests.
+4. WHERE a read-only mic-link endpoint must support guests, such as current roster and enabled-state queries, THE api-gateway SHALL register it as a public route following the existing `publicRoutes()` convention.
+5. THE Mic_Link_Service SHALL verify that the gateway-injected `X-User-Id` in every mic-link write request matches the claimed role.
 
-1. **叠层指示**：在直播画面上叠加一个轻量指示（参考 `Player.tsx` 内 `gl-player-top` 叠层风格），展示「正在连麦」+ 在麦嘉宾头像（最多 3 个）+ 昵称，对所有观众可见。
-2. **说话 / 静音态**：每个在麦头像旁展示说话音浪或静音图标（MicOff），随 `guest_muted` / `guest_unmuted` 实时事件更新。
-3. 仅音频连麦不占用主画面视频位（无视频画面）。
+### Requirement 12: Session Lifecycle and Edge Cases
 
-### 对话框与提示 (Dialogs / Toasts)
+**User Story:** As a user, I want predictable behavior when streams end, connections drop, or requests are duplicated so sessions and states do not become stale or incorrect.
 
-1. **确认类操作**：主播「下麦（移除）」某嘉宾、关闭连麦总开关且有在麦嘉宾时，使用 `Dialog` 二次确认，文案本地化。
-2. **轻量反馈**：申请被批准 / 拒绝、被主播下麦、操作失败等，统一用 `sonner` toast 本地化提示（参考 `LuckyBagPanel` 的 toast 模式）。
+#### Acceptance Criteria
 
-### 无障碍 (Accessibility)
+1. WHEN a broadcast ends (`live_ended` is received or stream status becomes `ended`), THE Mic_Link_Service SHALL end all on-air Mic_Guest connections in the room, release their media resources, and publish `event=removed` with reason `live_ended` for each guest.
+2. WHEN a broadcast ends, THE Mic_Link_Service SHALL set all `pending` Mic_Request entries in the room to `cancelled` with reason `live_ended`.
+3. WHEN a Mic_Guest WHIP uplink or WebSocket disconnects and does not recover within the grace period (default 15 seconds), THE Mic_Link_Service SHALL remove the guest from On_Air_Roster and publish `event=removed` with reason `disconnected`.
+4. IF the same Viewer submits a duplicate request while one is already `pending` / `approved` / `on_air`, THEN THE Mic_Link_Service SHALL reject it with reason `mic_link_request_exists` (see Requirement 3.4).
+5. IF a Viewer is already `on_air` in another room, THEN THE Mic_Link_Service SHALL reject joining in the new room with reason `mic_link_already_on_air_elsewhere`.
+6. WHEN On_Air_Roster becomes empty for any reason, THE Mic_Link_Service SHALL keep the master toggle unchanged; disabling the feature requires an explicit Room_Owner action.
 
-- 所有交互按钮提供 `aria-label`；状态变化区使用 `role="status"` / `aria-live`（参考 `Player.tsx` 的 buffering / ending 提示）。
-- 切换 / 下拉控件可键盘操作并有可见焦点态（复用 `gl-bag-select-trigger:focus-visible` 同类样式）。
+### Requirement 13: State Consistency and Reconnection Recovery
 
-### i18n 键期望（三语：zh-CN / ja-JP / en-US）
+**User Story:** As a user, I want to see the correct mic-link state after refreshing or a network interruption so every client reflects the actual session.
 
-> 在每个 locale 的 `pages.json` 新增 `micLink.*` 文案块，键集合三语一致并通过 locale parity 测试。计数键用 `_one` / `_other`。以下为期望覆盖的键（命名最终以 design / 实现为准）：
+#### Acceptance Criteria
 
-- `micLink.title`、`micLink.requestButton`、`micLink.cancelRequest`、`micLink.leave`
-- `micLink.muteSelf`、`micLink.unmuteSelf`
-- `micLink.statusPending`、`micLink.statusApproved`、`micLink.statusOnAir`、`micLink.statusRejected`、`micLink.statusRemoved`
-- `micLink.featureDisabledHint`（主播未开启）、`micLink.micPermissionDenied`（授权失败）
-- 主播侧：`micLink.toggleLabel`、`micLink.eligibilityLabel`、`micLink.eligibility.all`、`micLink.eligibility.followers`、`micLink.eligibility.fans`、`micLink.eligibility.fansLevel`、`micLink.minFanLevelLabel`
-- 队列 / 名单：`micLink.queueTitle`、`micLink.queueEmpty`、`micLink.approve`、`micLink.reject`、`micLink.rosterTitle`、`micLink.rosterEmpty`、`micLink.remove`
-- 计数：`micLink.onAirCount_one`、`micLink.onAirCount_other`、`micLink.slotUsage`（如 `{{used}}/{{max}}`）
-- OBS：`micLink.stageUrlLabel`、`micLink.stageUrlHint`、`micLink.stageUrlCopied`
-- 指示：`micLink.indicatorOnAir`、`micLink.indicatorMuted`
-- 错误：`micLink.error.disabled`、`micLink.error.notEligible`、`micLink.error.requestExists`、`micLink.error.slotFull`、`micLink.error.requestNotFound`、`micLink.error.alreadyOnAirElsewhere`、`micLink.error.connectTimeout`、`micLink.error.forbidden`、`micLink.error.generic`
+1. THE Mic_Link_Service SHALL provide a read-only endpoint returning a RoomID's enabled state, current Eligibility / `minFanLevel`, On_Air_Roster with guest mute states, and the caller's own Mic_Request state.
+2. WHEN a client enters a room or reconnects its WebSocket, THE frontend SHALL reconstruct Mic_Link_Panel / Mic_Link_Console and On_Mic_Indicator from that endpoint, without relying on missed real-time events.
+3. WHILE a Viewer has a `pending` / `approved` / `on_air` Mic_Request, THE Mic_Link_Panel SHALL restore the corresponding request/on-air display after refresh or reconnection.
+4. THE On_Air_Roster returned by the read-only endpoint SHALL be eventually consistent with the most recently broadcast `mic_link` event.
 
-## 范围之外 (Out of Scope)
+### Requirement 14: Error Handling and Feedback
 
-- **视频 / 摄像头连麦**：本功能仅语音，明确排除视频，以控制宿主机内存开销。
-- **观众端 WebRTC 播放**：普通观众继续走现有 HTTP-FLV / HLS，不引入观众端 WebRTC。
-- **主播主流改造**：OBS → RTMP → SRS → FLV / HLS 主链路不变。
-- **连麦历史 / 回放 / 数据分析**：本期不做面向用户的连麦历史展示（关键事件落库仅用于审计 / 排障）。
+**User Story:** As a user, I want clear localized reasons when mic-link operations fail so I know what to do next.
+
+#### Acceptance Criteria
+
+1. WHEN any mic-link write fails, THE Mic_Link_Service SHALL return a stable machine-readable reason code, including at least `mic_link_disabled` / `mic_link_not_eligible` / `mic_link_request_exists` / `mic_link_slot_full` / `mic_link_request_not_found` / `mic_link_already_on_air_elsewhere` / `connect_timeout` / `forbidden`.
+2. WHEN the frontend receives a known mic-link reason code, THE Mic_Link_Panel / Mic_Link_Console SHALL display the corresponding localized message through the existing `sonner` toast mechanism.
+3. IF the frontend receives an unknown reason code, THEN THE Mic_Link_Panel / Mic_Link_Console SHALL display a generic localized "Operation failed" message.
+
+### Requirement 15: Internationalization in Three Languages
+
+**User Story:** As a multilingual user, I want all mic-link text in my language so I can use the feature normally.
+
+#### Acceptance Criteria
+
+1. THE Mic_Link_Panel, Mic_Link_Console, On_Mic_Indicator, and all mic-link messages SHALL have corresponding keys and values in `pages.json` for zh-CN, ja-JP, and en-US.
+2. WHERE text includes counts, such as on-air guests or occupancy/limit, THE corresponding i18n keys SHALL use `_one` / `_other` plural forms.
+3. THE new mic-link i18n keys SHALL pass the existing locale parity tests, with identical key sets across the three languages.
+
+## Non-Functional Requirements
+
+> These measurable quality targets guide design.md and acceptance.
+
+1. **Latency**: target end-to-end guest audio latency below 2 seconds, including guest WHIP uplink, OBS mixing, and existing FLV playback. Local mute/unmute should affect the uplink within 1 second.
+2. **Concurrency**: a hard limit of 3 on-air guests per room; the server must enforce it under concurrent approval/join races (Requirements 5.7 and 4.5).
+3. **State consistency**: within 2 seconds of entering or reconnecting, clients should reconstruct the correct enabled state, eligibility, roster, mute states, and personal request state from the read-only endpoint.
+4. **Resource budget**: audio-only SRS WebRTC is expected to add +30MB to +90MB and must run stably on the host without swap. Video uplinks must not be introduced.
+5. **Observability**: key events (toggle changes, requests, approvals, rejections, joins, leaves, removals, disconnections) should be recordable for auditing and troubleshooting, following the existing outbox pattern.
+6. **Graceful degradation**: disable requests in guest browsers without WebRTC / `getUserMedia`, while preserving HTTP-FLV playback for that user and all other viewers.
+7. **Security**: management is restricted to Room_Owner, all writes require authentication, and the Mic_Stage_Page URL is shown only to the owner.
+
+## UI/UX Design Expectations
+
+> The user explicitly requested UI design coverage. The following constraints and layout expectations feed into design.md. Reuse existing panels in `golive-web/src/features/live-room/` and `gl-*` styles in `golive-web/src/styles/index.css`. Use custom `DropdownMenu` controls, never native `<select>`, and reuse `Avatar`, `Dialog`, and `DropdownMenu`. Avoid nested cards, gradients except for existing small accent buttons, and oversized buttons. Use only `--gl-*` CSS variables. Prefix new styles with `gl-mic-*` and use `lucide-react` icons such as Mic / MicOff / Users / Check / X / Copy / Radio.
+
+### General Layout and Placement
+
+- Place mic-link in the room interaction area alongside `LuckyBagPanel`, `BettingPanel`, and `GiftPanel`. Mount Mic_Link_Panel in `LiveRoomPage` and Mic_Link_Console in the `CreatorStudioPage` live console, following the mounting pattern of `LuckyBagPanel`.
+- Use `ownsStream` to distinguish streamer management from viewer request/on-air views, matching `LuckyBagPanel`.
+- The normal viewer view **must not** contain streamer management controls or the Mic_Stage_Page URL.
+
+### Viewer UI (Mic_Link_Panel)
+
+1. **Request action**: a primary action in the interaction area, styled as a small accent button comparable to `gl-bag-join`, not an oversized button. Logged-out users open the login dialog (Requirement 3.2).
+2. **Disabled feature**: disable the action and show a localized "The streamer has not enabled mic-link" hint (Requirement 1.3).
+3. **Ineligible viewer**: when enabled but the current Viewer is ineligible, disable the action and show requirements such as "Followers only" or "Fan club Lv.N+ only", matching lucky bag eligibility styling.
+4. **Request state display**, using a status bar similar to `gl-bag-result is-joined`:
+   - `pending`: pending status bar + secondary "Cancel request" button.
+   - `approved` (preparing to join): microphone permission request and status; provide retry/cancel after permission failure.
+   - `on_air`: connected status + local mute/unmute toggle + leave button.
+   - `rejected` / `cancelled` / `removed`: nonblocking toast, then return to the initial request state.
+5. **Local microphone status**: while `on_air`, show microphone on/off (Mic / MicOff icons) and a speaking indicator such as a subtle waveform or highlight.
+
+### Streamer UI (Mic_Link_Console)
+
+1. **Master toggle**: an on/off control at the top of the panel, following existing toggle styles, for Requirement 1.
+2. **Eligibility settings**: a custom dropdown matching lucky bags (`gl-bag-select-*` / `gl-mic-select-*`, based on `DropdownMenu`), with `all` / `followers` / `fans` / `fans_level`. Selecting `fans_level` reveals a minimum-level numeric input with the same range as lucky bags, minimum 1. **Native `<select>` is prohibited**.
+3. **Request_Queue**:
+   - Each row contains `Avatar`, nickname, and approve/reject buttons.
+   - Sort by creation time ascending; show empty-state text when the queue is empty.
+   - At 3 on-air guests, disable "Approve" and show "Full (3/3)".
+4. **On_Air_Roster**:
+   - Show occupancy / limit at the top, such as "2 / 3".
+   - One row per guest: `Avatar`, nickname, microphone/speaking icon, and remove button.
+   - Show empty-state text when no guests are on air.
+5. **OBS Mic Stage URL row**: reuse `PublisherLine` (label + read-only `code` + copy button), display the Mic_Stage_Page URL, and include localized "Add this URL as an OBS browser source" instructions. Visible only to the owner (Requirement 10).
+
+### Room On-Mic Indicator (On_Mic_Indicator)
+
+1. **Overlay**: a lightweight overlay on the live video, following `gl-player-top` in `Player.tsx`, with an active mic-link label, up to 3 guest avatars, and nicknames; visible to all viewers.
+2. **Speaking/mute state**: show a waveform or MicOff icon beside each avatar, updated through `guest_muted` / `guest_unmuted` events.
+3. Audio-only mic-link does not occupy a video tile in the main picture.
+
+### Dialogs and Toasts
+
+1. **Confirmations**: use a localized `Dialog` to confirm streamer guest removal and disabling the feature while guests are on air.
+2. **Lightweight feedback**: use localized `sonner` toasts for approval/rejection, removal by the streamer, and failures, following `LuckyBagPanel`.
+
+### Accessibility
+
+- Provide `aria-label` for interactive buttons and use `role="status"` / `aria-live` for status changes, following buffering/ending indicators in `Player.tsx`.
+- Toggles and dropdowns must support keyboard operation and visible focus states, reusing styles like `gl-bag-select-trigger:focus-visible`.
+
+### Expected i18n Keys (zh-CN / ja-JP / en-US)
+
+> Add a `micLink.*` block to each locale's `pages.json`, with matching key sets and passing locale parity tests. Use `_one` / `_other` for counts. Expected coverage follows; final names are determined in design/implementation:
+
+- `micLink.title`, `micLink.requestButton`, `micLink.cancelRequest`, `micLink.leave`
+- `micLink.muteSelf`, `micLink.unmuteSelf`
+- `micLink.statusPending`, `micLink.statusApproved`, `micLink.statusOnAir`, `micLink.statusRejected`, `micLink.statusRemoved`
+- `micLink.featureDisabledHint` (streamer has not enabled mic-link), `micLink.micPermissionDenied` (permission denied)
+- Streamer controls: `micLink.toggleLabel`, `micLink.eligibilityLabel`, `micLink.eligibility.all`, `micLink.eligibility.followers`, `micLink.eligibility.fans`, `micLink.eligibility.fansLevel`, `micLink.minFanLevelLabel`
+- Queue/roster: `micLink.queueTitle`, `micLink.queueEmpty`, `micLink.approve`, `micLink.reject`, `micLink.rosterTitle`, `micLink.rosterEmpty`, `micLink.remove`
+- Counts: `micLink.onAirCount_one`, `micLink.onAirCount_other`, `micLink.slotUsage` (for example `{{used}}/{{max}}`)
+- OBS: `micLink.stageUrlLabel`, `micLink.stageUrlHint`, `micLink.stageUrlCopied`
+- Indicators: `micLink.indicatorOnAir`, `micLink.indicatorMuted`
+- Errors: `micLink.error.disabled`, `micLink.error.notEligible`, `micLink.error.requestExists`, `micLink.error.slotFull`, `micLink.error.requestNotFound`, `micLink.error.alreadyOnAirElsewhere`, `micLink.error.connectTimeout`, `micLink.error.forbidden`, `micLink.error.generic`
+
+## Out of Scope
+
+- **Video/camera participation**: explicitly excluded from this audio-only feature to control host memory usage.
+- **Viewer WebRTC playback**: normal viewers continue using existing HTTP-FLV / HLS; no viewer-side WebRTC is introduced.
+- **Changes to the main broadcast path**: OBS → RTMP → SRS → FLV / HLS remains unchanged.
+- **Mic-link history/replay/analytics**: no user-facing mic-link history in this iteration; persisted key events are only for auditing/troubleshooting.

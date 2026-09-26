@@ -33,7 +33,7 @@ export const useLangStore = create<LangState>((set, get) => ({
   toggleLang: () => {
     const current = get().lang;
     const currentIndex = APP_LANGS.indexOf(current);
-    const next = APP_LANGS[(currentIndex + 1) % APP_LANGS.length] ?? 'zh';
+    const next = APP_LANGS[(currentIndex + 1) % APP_LANGS.length] ?? 'en';
     get().setLang(next);
   },
 }));

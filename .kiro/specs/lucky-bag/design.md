@@ -1,30 +1,30 @@
-# 福袋 (Lucky Bag) — Design
+# Lucky Bag — Design
 
 ## 1. Overview
 
-直播间互动玩法，主播用自己的 coins 包成若干红包发给观众，倒计时结束自动开奖。
-照搬竞猜 (betting) 的全栈骨架：gift-service 领域逻辑 + coins 扣减/发放 + 本地消息表
-outbox → Redis `room:<id>` fan-out → im-gateway 广播 → 前端直播间面板 + 三语 i18n。
+A live-room interaction in which the streamer uses their own coins to create prize packets for viewers, with an automatic draw when the countdown ends.
+Reuse the full-stack betting structure: gift-service domain logic + coin debits/credits + transactional
+outbox → Redis `room:<id>` fanout → im-gateway broadcast → frontend live-room panel + i18n in three languages.
 
-与竞猜的关键差异：
-- 观众**免费参与**（不花 coins）。
-- 开奖判定：**必须已参与且开奖时仍在直播间**才有中奖资格（用 Redis 房间在线集合判定）。
-- 倒计时结束**自动开奖**（gift-service 后台调度器），竞猜是主播手动结算。
-- 主播可设定**参与资格**：全部 / 关注 / 粉丝团 / 粉丝团且等级≥N。
+Key differences from betting:
+- Viewers **participate for free** (no coins required).
+- Draw eligibility: viewers **must have joined and still be in the room at draw time** (checked against the Redis room presence set).
+- The draw runs **automatically when the countdown ends** (gift-service background scheduler); betting is settled manually by the streamer.
+- The streamer can set **eligibility**: everyone / followers / fan club / fan club with level ≥ N.
 
 ## 2. Confirmed requirements
 
-1. 主播用余额 coins 包福袋；余额不足返回 402 `insufficient_coin`。
-2. 设定红包个数 N（=中奖名额）。
-3. 金额模式：固定（每份相同）/ 拼手气随机（总额随机拆 N 份，每份≥1）。
-4. 倒计时默认 60s，上限 600s（10 分钟），前端限制。
-5. 观众免费点击参与；未登录不可参与。
-6. 开奖须"已参与 + 在房间内"；不在房间者视为弃权。
-7. 参与人数 < N：实际中奖人数 = 参与且在场人数，**剩余红包退还主播**。
-8. 一个观众一次最多中一个红包。
-9. 参与资格四档：`all` / `followers` / `fans` / `fans_level`(min_fan_level)。
-10. 一个直播间同一时间只允许一个进行中的福袋。
-11. 主播可在开奖前手动取消，全额退还主播。
+1. The streamer funds a lucky bag from their coin balance; insufficient balance returns 402 `insufficient_coin`.
+2. Set the number of packets N (= number of winning slots).
+3. Amount modes: fixed (equal amount per packet) / random (split the total randomly into N packets, each ≥ 1).
+4. Countdown defaults to 60s and is capped at 600s (10 minutes) by the frontend.
+5. Viewers click to join for free; login is required.
+6. The draw requires both prior participation and presence in the room; absent viewers forfeit eligibility.
+7. If participants < N, the actual winner count is the number of participants present; **remaining packets are refunded to the streamer**.
+8. Each viewer can win at most one packet per draw.
+9. Four eligibility tiers: `all` / `followers` / `fans` / `fans_level` (min_fan_level).
+10. Only one active lucky bag is allowed per room at a time.
+11. The streamer can cancel manually before the draw and receive a full refund.
 
 ## 3. Data model (gift-service, MySQL `golive`)
 
@@ -117,7 +117,7 @@ Manual cancel: bag → `cancelled`, full refund to owner, outbox `cancelled`.
   `useJoinLuckyBag`, `useCancelLuckyBag`.
 - `src/features/live-room/LuckyBagPanel.tsx` — owner create form (count, amount mode,
   fixed/total amount, eligibility select + min level, duration) + viewer participate
-  card (countdown, 参与 button, my-entry/result state). Mirrors `BettingPanel` styling
+  card (countdown, Join button, my-entry/result state). Mirrors `BettingPanel` styling
   (`gl-bag-*` classes echoing `gl-bet-*`).
 - Mount: CreatorStudioPage live console (owner, next to Betting module) and
   LiveRoomPage (viewer-facing, in the main column under InfoBlock for live rooms).

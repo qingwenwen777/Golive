@@ -104,7 +104,7 @@ func (s *RoomService) List(ctx context.Context, viewerID, rawCategory string, pa
 		if err := s.addSubscriberCount(ctx, &st); err != nil {
 			return nil, err
 		}
-		// streamKey deliberately NOT populated here 鈥?owner-only.
+		// streamKey is deliberately not populated here; it is owner-only.
 		items = append(items, st)
 	}
 	return &ListResp{Items: items, Total: total, Page: page, Size: size}, nil

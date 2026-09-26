@@ -1,100 +1,100 @@
 # api-gateway
 
-边界网关。所有 `http://localhost:8080/api/*` 请求经此分发到下游 service。
+Edge gateway. All `http://localhost:8080/api/*` requests are routed through it to downstream services.
 
 - HTTP: `:8080`
 - pprof: `:6060`
 
-## 中间件链
+## Middleware chain
 
 ```
 Recovery → CORS → RequestID → RateLimit → JWT → ReverseProxy
 ```
 
-| 中间件     | 作用                                                                                  |
+| Middleware | Purpose |
 | ---------- | ------------------------------------------------------------------------------------- |
-| CORS       | `localhost:5173` + 占位生产域名；`OPTIONS` 预检直接 204；暴露 `Idempotent-Replayed`   |
-| RequestID  | 没带 `X-Request-Id` 自动生成 UUID，回写响应头 + 注入到 forward 请求                  |
-| RateLimit  | per-IP 令牌桶（`golang.org/x/time/rate`），默认 100 req/s, burst 200                  |
-| JWT        | 白名单外强制校验；通过后写 `X-User-Id` 到 forward 请求；剥除 client 伪造的 X-User-Id |
-| Proxy      | 去掉 `/api` 前缀；10s 超时；5xx 包装统一错误体；4xx 原样透传                         |
+| CORS | `localhost:5173` + a placeholder production domain; `OPTIONS` preflight returns 204 directly; exposes `Idempotent-Replayed` |
+| RequestID | Generates a UUID when `X-Request-Id` is missing, writes it to the response header, and injects it into the forwarded request |
+| RateLimit | Per-IP token bucket (`golang.org/x/time/rate`), default 100 req/s, burst 200 |
+| JWT | Required outside the allowlist; injects `X-User-Id` into the forwarded request after validation; strips client-forged X-User-Id |
+| Proxy | Strips `/api`; 10s timeout; wraps 5xx in the standard error body; passes 4xx through unchanged |
 
-## 路由
+## Routes
 
 | Path                                  | Upstream      | Auth   |
 | ------------------------------------- | ------------- | ------ |
-| `/api/auth/*`                         | user-service  | 公开   |
+| `/api/auth/*` | user-service | Public |
 | `/api/users/*`                        | user-service  | JWT    |
-| `/api/rooms`, `/api/rooms/*`          | room-service  | GET 公开 / 写操作 JWT |
-| `/api/gifts`                          | gift-service  | 公开   |
+| `/api/rooms`, `/api/rooms/*` | room-service | Public GET / JWT for writes |
+| `/api/gifts` | gift-service | Public |
 | `/api/gifts/*`, `/api/super-chats`    | gift-service  | JWT    |
 
 SRS HTTP hooks are intentionally not exposed through the public gateway.
 `deploy/srs.conf` calls room-service on the Compose internal network instead.
 
-## 错误响应规则
+## Error response rules
 
-- 下游 `2xx` / `3xx` / `4xx`：**原样透传**，不动 body。这条很关键 ——
-  402 `{message:"insufficient coin", reason:"insufficient_coin"}` 必须穿过网关。
-- 下游 `5xx` 且 body 已是 `{message,...}` 形状：保留原样。
-- 下游 `5xx` 且 body 不合规（HTML、空、纯文本）：包装为
-  `{"message":"Internal error","reason":"upstream_unavailable"}`。
-- 下游不可达 / 超时：`502` / `504` + 同上 body。
+- Downstream `2xx` / `3xx` / `4xx`: **pass through unchanged**, including the body. In particular,
+  402 `{message:"insufficient coin", reason:"insufficient_coin"}` must pass through the gateway.
+- Downstream `5xx` with a body already shaped as `{message,...}`: preserve it unchanged.
+- Downstream `5xx` with a nonconforming body (HTML, empty, or plain text): wrap it as
+  `{"message":"Internal error","reason":"upstream_unavailable"}`.
+- Unreachable or timed-out upstream: `502` / `504` with the same body as above.
 
-## 配置
+## Configuration
 
-`configs/config.yaml`，可 `--config` 覆盖。upstream 地址先写死，
-后续接 etcd 服务发现时改这一处即可。
+Use `configs/config.yaml`, with an optional `--config` override. Upstream addresses are initially static;
+this is the only place to change when integrating etcd service discovery later.
 
-## 启动
+## Startup
 
 ```bash
-cd deploy && docker compose up -d mysql redis     # 依赖
+cd deploy && docker compose up -d mysql redis     # Dependencies
 cd ../app/user-service && go run ./cmd            # :8090
 cd ../room-service && go run ./cmd                # :8091
-# gift-service 下一轮做；现在缺它不影响 auth/rooms
+# gift-service is planned for the next iteration; its absence does not affect auth/rooms.
 cd ../api-gateway && go run ./cmd                 # :8080
 ```
 
-## 测试
+## Tests
 
 ```bash
 cd app/api-gateway
 
-# 中间件单元
+# Middleware unit tests
 go test ./internal/middleware/...
 
-# router 集成（启 spy upstream，断言路由 + JWT 注入 + RequestId 透传 + 5xx 包装）
+# Router integration: spy upstream; verify routing, JWT injection, RequestId forwarding, and 5xx wrapping.
 go test ./internal/router/...
 ```
 
-覆盖：
+Coverage:
 
-- `RequestID` 缺失 → 生成；存在 → 透传
-- `JWT` 拒绝缺/伪 token；接受合法 token；剥除伪造的 `X-User-Id`；公开路由跳过
-- `CORS` 预检 204 + 正确响应头；非白名单 origin 不返 ACAO
-- 路由：去 `/api`；query string 保留；JWT 通过后注入 `X-User-Id`
-- 错误：4xx 透传；5xx 非 JSON 包装；5xx 已合规保留；upstream 不可达 502/504
+- `RequestID`: generate when missing; forward when supplied.
+- `JWT`: reject missing/forged tokens; accept valid tokens; strip forged `X-User-Id`; skip public routes.
+- `CORS`: preflight returns 204 and correct headers; origins outside the allowlist receive no ACAO.
+- Routing: strip `/api`; preserve query strings; inject `X-User-Id` after JWT validation.
+- Errors: pass through 4xx; wrap non-JSON 5xx; preserve conforming 5xx; return 502/504 for unreachable upstreams.
 
-## 端到端 curl
+## End-to-end curl examples
 
 ```bash
-# 登录（公开）
+# Sign in (public).
 curl -i -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"demo","password":"demo"}' | tee /tmp/login.txt
-# 注意响应头：Access-Control-Allow-Origin / X-Request-Id
+# Check response headers: Access-Control-Allow-Origin / X-Request-Id.
 
 TOKEN=$(jq -r .token < <(grep -A100 '^{' /tmp/login.txt))
 
-# 受保护：跟随频道（JWT 由 gateway 注入 X-User-Id 到 room-service）
+# Protected: follow a channel (the gateway injects X-User-Id into the room-service request after JWT validation).
 curl -i -X POST http://localhost:8080/api/rooms/luna/follow \
   -H "Authorization: Bearer $TOKEN"
 
-# 不带 token 命中受保护路由 → gateway 直接 401，请求不会到达 room-service
+# A protected route without a token returns 401 at the gateway; room-service never receives the request.
 curl -i -X POST http://localhost:8080/api/rooms/luna/follow
 
-# X-Request-Id 透传：不带就生成
+# X-Request-Id is forwarded if supplied, otherwise generated.
 curl -sD - -X POST http://localhost:8080/api/rooms/luna/follow \
   -H "Authorization: Bearer $TOKEN" -o /dev/null | grep -i X-Request-Id
 
@@ -109,14 +109,14 @@ curl -i -X OPTIONS http://localhost:8080/api/auth/login \
 # Access-Control-Expose-Headers: Idempotent-Replayed, X-Request-Id
 ```
 
-## 与前端 axios 的对接
+## Frontend axios integration
 
-`golive-web/src/lib/axios.ts` 的关键期望：
+Key expectations in `golive-web/src/lib/axios.ts`:
 
-| 期望                             | 网关行为                                              |
+| Expectation | Gateway behavior |
 | -------------------------------- | ----------------------------------------------------- |
-| 跨域请求带 `Authorization` 通过  | CORS Allow-Headers 含 `Authorization` ✅              |
-| 401 触发 `/auth/refresh`          | 网关在 token 失效时直接返 401（不到下游）✅           |
-| `/auth/login` `/auth/refresh` 自身 401 不触发 refresh（避免死循环） | 这两条是公开路由，gateway 不动；下游真正认证失败时返回的 401 也透传 ✅ |
-| 业务侧能读 `Idempotent-Replayed` | `Access-Control-Expose-Headers` 含此项 ✅             |
-| 10s 超时                         | proxy timeout = 10s，与 axios 一致 ✅                 |
+| Cross-origin requests with `Authorization` succeed | CORS Allow-Headers includes `Authorization` ✅ |
+| 401 triggers `/auth/refresh` | The gateway returns 401 directly for invalid tokens, without calling downstream ✅ |
+| A 401 from `/auth/login` or `/auth/refresh` does not trigger refresh, avoiding a loop | Both routes are public and untouched by the gateway; actual downstream authentication failures also pass through as 401 ✅ |
+| Application code can read `Idempotent-Replayed` | Included in `Access-Control-Expose-Headers` ✅ |
+| 10s timeout | Proxy timeout = 10s, matching axios ✅ |

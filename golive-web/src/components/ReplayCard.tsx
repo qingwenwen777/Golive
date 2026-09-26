@@ -36,7 +36,7 @@ export interface ReplayCardProps {
 }
 
 /**
- * A fully clickable replay card matching the home page "热门直播回放" style.
+ * A fully clickable replay card matching the home page "Popular replays" style.
  * Clicking anywhere on the card opens the replay player at `/live/:id`.
  */
 export function ReplayCard({ replay, channelName, channelAvatar, priority }: ReplayCardProps) {
@@ -45,7 +45,8 @@ export function ReplayCard({ replay, channelName, channelAvatar, priority }: Rep
     channelName ?? streamChannelName({ channel: replay.channel ?? '', ownerId: replay.ownerId });
   const hasChannelName = !isPlaceholderChannelName(resolvedChannelName);
   const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
-  const category = i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;
+  const category =
+    i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;
   const hoverStyle = useCoverHoverStyle(replay.cover, resolvedChannelName || title || replay.id);
   const avatarSrc = replay.avatar || channelAvatar;
   const replayBadge = t('liveRoom.replay.badge', { defaultValue: 'Replay' });

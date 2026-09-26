@@ -9,22 +9,22 @@ Three pillars wired:
 | **Jaeger**                  | http://localhost:16686                | Trace search by service / operation.      |
 | **OTel Collector**          | grpc :4317  http :4318                | Receives spans → forwards to Jaeger.      |
 
-## 启动
+## Startup
 
 ```bash
 cd deploy
 docker compose up -d prometheus grafana jaeger otel-collector
 ```
 
-各业务服务（go run）默认走 `OTEL_EXPORTER_OTLP_ENDPOINT=127.0.0.1:4317`；
-collector down 也不会卡启动（pkg/obs.InitTracing 自动降级为 noop）。
+Business services started with `go run` default to `OTEL_EXPORTER_OTLP_ENDPOINT=127.0.0.1:4317`.
+An unavailable collector does not block startup (`pkg/obs.InitTracing` falls back to a no-op automatically).
 
-## Prometheus 指标矩阵
+## Prometheus metrics matrix
 
-| 指标                                | 标签                       | 来源                  |
+| Metric | Labels | Source |
 | ----------------------------------- | -------------------------- | --------------------- |
-| `http_requests_total`               | service, route, method, code | 所有 Gin 服务         |
-| `http_request_duration_seconds`     | service, route, method     | 所有 Gin 服务         |
+| `http_requests_total` | service, route, method, code | All Gin services |
+| `http_request_duration_seconds` | service, route, method | All Gin services |
 | `im_connections_active`             | —                          | im-gateway            |
 | `im_rooms_active`                   | —                          | im-gateway            |
 | `im_messages_sent_total`            | type                       | im-gateway            |
@@ -40,25 +40,25 @@ collector down 也不会卡启动（pkg/obs.InitTracing 自动降级为 noop）�
 | `kafka_produced_total`              | service, topic, outcome    | gift / im / chat      |
 | `kafka_consumed_total`              | service, topic, outcome    | chat-service          |
 
-**有意不做** roomId / userId 维度的 label —— Prometheus 高基数会很快把 TSDB 撑爆。
-高基数的"Top N 房间消息速率"放在 im-gateway `/debug/rooms` JSON 里。
+roomId / userId labels are **deliberately omitted**: high cardinality can quickly overwhelm the Prometheus TSDB.
+High-cardinality data such as Top-N room message rates is exposed in im-gateway `/debug/rooms` JSON instead.
 
-## 端到端 trace
+## End-to-end tracing
 
-走一条 `用户点送礼 → 扣款 → 本地消息表 → Kafka` 的链路。Jaeger 里搜 service=`api-gateway` operation=`POST /api/gifts/*action`，能看到：
+Follow the `user sends a gift → debit → transactional outbox → Kafka` flow. In Jaeger, search for service=`api-gateway`, operation=`POST /api/gifts/*action` to see:
 
 ```
-api-gateway: POST /api/gifts/*action   ← 网关入口（HTTP 中间件起 span）
- └─ (HTTP 反代，traceparent 头透传)
+api-gateway: POST /api/gifts/*action   ← Gateway entry point (HTTP middleware starts a span)
+ └─ (HTTP reverse proxy forwards the traceparent header)
     └─ gift-service: POST /gifts/send
-        └─ gift.send                   ← service.GiftService.Send 起 span
+        └─ gift.send                   ← service.GiftService.Send starts a span
             (attributes: user.id, room.id, gift.id, gift.count, request.id,
                           idempotent.replayed, order.id, order.total_coin)
 ```
 
-**outbox worker** 是异步的，独立起 trace（`outbox.publish`），通过 attribute `biz.id` (= orderId) 与上面那条 trace 关联。Jaeger 用 "Find traces by tag" `biz.id=gift-xxx` 即可串起来。
+The **outbox worker** runs asynchronously and starts a separate trace (`outbox.publish`). Attribute `biz.id` (= orderId) links it to the trace above. In Jaeger, use "Find traces by tag" with `biz.id=gift-xxx` to find the related traces.
 
-## 添加新服务的 instrumentation
+## Instrument a new service
 
 ```go
 import "github.com/qingwenwen777/golive/pkg/obs"
@@ -72,7 +72,7 @@ r.Use(obs.HTTPMiddleware("my-service"))
 obs.MountMetrics(r)
 ```
 
-业务侧手动 span：
+Create a span manually in business logic:
 
 ```go
 ctx, span := obs.Tracer("my-service/handler").Start(ctx, "my.op")
@@ -80,11 +80,11 @@ defer span.End()
 span.SetAttributes(attribute.String("k", "v"))
 ```
 
-## 跑一遍验证
+## Verification walkthrough
 
 1. `docker compose up -d`
 2. `go run ./app/api-gateway/cmd` etc.
 3. `curl http://localhost:8080/api/auth/login -d ... -X POST`
-4. http://localhost:9090 → `http_requests_total` 应有数据
-5. http://localhost:3000 → "GoLive Overview" 自动出现
-6. http://localhost:16686 → service `api-gateway` 能搜到 traces
+4. http://localhost:9090 → `http_requests_total` should contain data.
+5. http://localhost:3000 → "GoLive Overview" appears automatically.
+6. http://localhost:16686 → traces can be found for service `api-gateway`.

@@ -5917,7 +5917,7 @@ input:focus-visible,
   }
 }
 
-/* ── Mic-link (语音连麦) ─────────────────────────────────────────────────── */
+/* ── Voice mic-link ─────────────────────────────────────────────────────── */
 .gl-mic-panel {
   display: flex;
   flex-direction: column;

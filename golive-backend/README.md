@@ -1,87 +1,87 @@
 # GoLive Backend
 
-GoLive 后端是一个 Go 微服务工程，给 `../golive-web` 提供 HTTP API、
-WebSocket、直播流回调、礼物订单、弹幕处理、上传和管理后台数据。
+The GoLive backend is a Go microservices project providing `../golive-web` with HTTP APIs,
+WebSockets, stream callbacks, gift orders, chat processing, uploads, and admin console data.
 
-## 技术栈
+## Technology stack
 
-- Go 1.22+、Gin、gorilla/websocket、gRPC + Protobuf
-- MySQL 8 + GORM、Redis 7、Kafka、etcd、MinIO
-- Viper、zap、OpenTelemetry、Jaeger、Prometheus、Grafana
-- SRS 5（RTMP → HTTP-FLV/HLS）、Docker Compose、nginx
+- Go 1.22+, Gin, gorilla/websocket, gRPC + Protobuf
+- MySQL 8 + GORM, Redis 7, Kafka, etcd, MinIO
+- Viper, zap, OpenTelemetry, Jaeger, Prometheus, Grafana
+- SRS 5(RTMP → HTTP-FLV/HLS), Docker Compose, nginx
 
-## 服务划分
+## Services
 
-| 服务 | 入口 | 说明 |
+| Service | Entry point | Description |
 | ---- | ---- | ---- |
-| api-gateway | `app/api-gateway/cmd` | 对外 HTTP 网关，鉴权、CSRF、限流、反向代理 |
-| user-service | `app/user-service/cmd` | 登录、Google 登录、用户资料、头像/封面、金币、创作者申请 |
-| room-service | `app/room-service/cmd` | 房间、开播、预约、频道动态、关注点赞、回放、审核 |
-| chat-service | `app/chat-service/cmd` | 弹幕限流、敏感词、落盘、历史弹幕 |
-| gift-service | `app/gift-service/cmd` | 礼物、SuperChat、竞猜、幂等订单、本地消息表 |
-| im-gateway | `app/im-gateway/cmd` | WebSocket 长连接、房间 fanout、Redis Pub/Sub |
+| api-gateway | `app/api-gateway/cmd` | Public HTTP gateway, authentication, CSRF, rate limiting, reverse proxy |
+| user-service | `app/user-service/cmd` | Sign-in, Google sign-in, profiles, avatars/covers, coins, creator applications |
+| room-service | `app/room-service/cmd` | Rooms, going live, appointments, channel posts, follows/likes, replays, moderation |
+| chat-service | `app/chat-service/cmd` | Chat rate limiting, sensitive-word filtering, persistence, chat history |
+| gift-service | `app/gift-service/cmd` | Gifts, SuperChat, betting, idempotent orders, transactional outbox |
+| im-gateway | `app/im-gateway/cmd` | Persistent WebSocket connections, room fanout, Redis Pub/Sub |
 
-## 端口约定
+## Port conventions
 
-| 组件 | 端口 | 说明 |
+| Component | Port | Description |
 | ---- | ---- | ---- |
-| nginx | 80 / 443 | 静态文件、`/api`、`/ws`、`/live` 入口 |
-| api-gateway | 8080 | HTTP JSON，外部路径前缀 `/api` |
-| im-gateway | 8081 | WebSocket，路径 `/ws` |
-| SRS RTMP | 1935 | OBS 推流 |
-| SRS HTTP | 容器内 8080 | nginx 反代为 `/live` |
-| MySQL / Redis / Kafka / etcd / MinIO | compose 内网 | 不应对公网开放 |
-| Grafana / Prometheus / Jaeger | 127.0.0.1 绑定 | 通过 SSH tunnel 访问 |
+| nginx | 80 / 443 | Static files and `/api`, `/ws`, `/live` entry points |
+| api-gateway | 8080 | HTTP JSON with the public `/api` path prefix |
+| im-gateway | 8081 | WebSocket at `/ws` |
+| SRS RTMP | 1935 | OBS publishing |
+| SRS HTTP | 8080 inside the container | Proxied by nginx as `/live` |
+| MySQL / Redis / Kafka / etcd / MinIO | Compose internal network | Must not be publicly exposed |
+| Grafana / Prometheus / Jaeger | Bound to 127.0.0.1 | Access through an SSH tunnel |
 
-## 目录结构
+## Directory structure
 
 ```text
 golive-backend/
   api/
-    proto/              Protobuf 定义
-    gen/go/             生成后的 Go 代码
+    proto/              Protobuf definitions
+    gen/go/             Generated Go code
   app/
     <service>/
-      cmd/              服务入口
-      configs/          本地示例配置
+      cmd/              Service entry point
+      configs/          Local example configuration
       internal/         handler/server/service/repo/model/config
-      README.md         单服务说明
+      README.md         Service documentation
   deploy/
-    docker-compose.yml  本地和服务器运行栈
-    configs/            compose 使用的服务配置
-    nginx*.conf         HTTP/HTTPS 入口
-    srs.conf            SRS 配置
-    observability/      Prometheus、OTel、Grafana
-  pkg/                  公共包：JWT、幂等、错误码、日志、上传、内容策略等
+    docker-compose.yml  Local and server runtime stack
+    configs/            Service configurations used by Compose
+    nginx*.conf         HTTP/HTTPS entry points
+    srs.conf            SRS configuration
+    observability/      Prometheus, OTel, Grafana
+  pkg/                  Shared packages: JWT, idempotency, error codes, logging, uploads, content policies, etc.
 ```
 
-## 本地启动
+## Run locally
 
-推荐从仓库根目录使用一键脚本：
+The recommended approach is to use the one-command script from the repository root:
 
 ```bash
 bash scripts/dev.sh
-# 或 Windows:
+# Or on Windows:
 powershell -File scripts/dev.ps1
 ```
 
-只启动后端栈：
+Start only the backend stack:
 
 ```bash
 cd golive-backend/deploy
 docker compose up -d
 ```
 
-Compose 中的 Go 服务由 `deploy/Dockerfile.service` 编译为镜像运行。
-代码变更后请使用 `docker compose up -d --build` 重新构建并更新服务容器。
+Compose builds the Go services into container images using `deploy/Dockerfile.service`.
+After changing code, run `docker compose up -d --build` to rebuild and update the service containers.
 
-## 测试
+## Tests
 
 ```bash
 go test ./...
 ```
 
-也可以按服务缩小范围：
+You can also limit the scope to individual services:
 
 ```bash
 go test ./app/api-gateway/...
@@ -92,16 +92,16 @@ go test ./app/gift-service/...
 go test ./app/im-gateway/...
 ```
 
-## 前端契约
+## Frontend contract
 
-- 前端默认同源访问：`VITE_API_BASE=/api`、`VITE_WS_BASE=/ws`、
-  `VITE_FLV_BASE=/live`。
-- JWT 使用 `Authorization: Bearer <token>`，不依赖 cookie。
-- 写操作需要 CSRF token；前端会从 `/api/csrf-token` 获取并自动重试一次。
-- `/api/gifts/send`、`/api/super-chats` 按 `X-Request-Id` 幂等，replay 响应头为
-  `Idempotent-Replayed: true`。
-- 余额不足返回 HTTP 402，`reason` 为 `insufficient_coin`。
-- 对观众返回的直播流信息不能暴露 `streamKey`。
-- WebSocket 握手：`/ws?roomId=<id>&token=<jwt>`。
+- The frontend uses same-origin requests by default: `VITE_API_BASE=/api`, `VITE_WS_BASE=/ws`,
+  `VITE_FLV_BASE=/live`.
+- JWT authentication uses `Authorization: Bearer <token>` and does not depend on cookies.
+- Write operations require a CSRF token; the frontend fetches it from `/api/csrf-token` and retries once automatically.
+- `/api/gifts/send` and `/api/super-chats` are idempotent by `X-Request-Id`; replay responses include
+  `Idempotent-Replayed: true`.
+- Insufficient balance returns HTTP 402 with `reason=insufficient_coin`.
+- Stream information returned to viewers must not expose `streamKey`.
+- WebSocket handshake: `/ws?roomId=<id>&token=<jwt>`.
 
-更多联调细节见 `../docs/integration.md`，部署流程见 `../docs/deploy-git-bare.md`。
+See `../docs/integration.md` for integration details and `../docs/deploy-git-bare.md` for deployment instructions.

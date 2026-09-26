@@ -13,7 +13,7 @@ import (
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
 )
 
-// Mic-link (语音连麦) lets viewers join the streamer's audio live. State is
+// Voice mic-link lets viewers join the streamer's audio live. State is
 // ephemeral and lives entirely in Redis (no durable rows): a single JSON
 // document per room, guarded by a short Redis lock on every mutation. The
 // guest microphone travels over WebRTC (WHIP) to SRS; the OBS mic-stage page

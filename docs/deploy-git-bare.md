@@ -1,26 +1,26 @@
-# GoLive Git Bare 部署说明
+# GoLive Bare Git Deployment Guide
 
-目标服务器：`root@154.36.185.85`
+Target server: `root@154.36.185.85`
 
-本项目的服务器部署方式是：本机 push 到服务器 bare 仓库，服务器
-`post-receive` hook 自动 checkout、构建前端并重启 Compose 服务。
+Deployment works by pushing from the local machine to a bare repository on the server.
+The server's `post-receive` hook checks out the code, builds the frontend, and restarts Compose services automatically.
 
-## 1. 服务器准备
+## 1. Prepare the server
 
-推荐系统：Ubuntu 22.04 LTS。
+Recommended system: Ubuntu 22.04 LTS.
 
-公网只开放必要端口：
+Expose only the required ports to the public internet:
 
 ```text
 80    Web HTTP
 443   Web HTTPS
-1935  OBS RTMP 推流
+1935  OBS RTMP publishing
 ```
 
-不要对公网开放 MySQL、Redis、Kafka、etcd、MinIO、Prometheus、Grafana、
-Jaeger 等内部端口。
+Do not expose internal ports for MySQL, Redis, Kafka, etcd, MinIO, Prometheus, Grafana,
+Jaeger, or other internal services to the public internet.
 
-安装基础组件：
+Install the base components:
 
 ```bash
 apt update
@@ -28,20 +28,20 @@ apt install -y git ca-certificates curl docker.io docker-compose-plugin
 systemctl enable --now docker
 ```
 
-如果在国内网络环境，建议配置 Docker 镜像源，配置后执行：
+For networks in mainland China, configuring a Docker registry mirror is recommended. Then run:
 
 ```bash
 systemctl restart docker
 ```
 
-## 2. 创建 bare 仓库
+## 2. Create a bare repository
 
 ```bash
 mkdir -p /srv/git /srv/golive/app
 git init --bare /srv/git/golive.git
 ```
 
-安装部署 hook：
+Install the deployment hook:
 
 ```bash
 scp scripts/post-receive.golive.example root@154.36.185.85:/tmp/post-receive
@@ -50,49 +50,49 @@ cp /tmp/post-receive /srv/git/golive.git/hooks/post-receive
 chmod +x /srv/git/golive.git/hooks/post-receive
 ```
 
-如果 hook 脚本后续有更新，可以在服务器工作目录存在后执行：
+To update the hook later, run the following once the server working directory exists:
 
 ```bash
 cp /srv/golive/app/scripts/post-receive.golive.example /srv/git/golive.git/hooks/post-receive
 chmod +x /srv/git/golive.git/hooks/post-receive
 ```
 
-## 3. 本机添加远端并部署
+## 3. Add the remote locally and deploy
 
-当前本地分支是 `master`，推荐远端名为 `prod`：
+The current local branch is `master`; the recommended remote name is `prod`:
 
 ```bash
 git remote add prod ssh://root@154.36.185.85/srv/git/golive.git
 git push prod master
 ```
 
-如果远端已经存在：
+If the remote already exists:
 
 ```bash
 git remote set-url prod ssh://root@154.36.185.85/srv/git/golive.git
 git push prod master
 ```
 
-`post-receive` 会自动完成：
+`post-receive` automatically performs these steps:
 
 ```text
-checkout 到 /srv/golive/app
-使用 node:20-alpine 安装依赖并构建 golive-web/dist
-重新构建并启动 golive-backend/deploy/docker-compose.yml 中的服务镜像
-对 nginx / srs 等单文件挂载配置做漂移检测，必要时强制重建容器
-输出 docker compose ps
+Check out the code into /srv/golive/app
+Install dependencies and build golive-web/dist using node:20-alpine
+Rebuild and start service images in golive-backend/deploy/docker-compose.yml
+Check single-file configuration mounts for drift in nginx / srs and force-recreate containers when needed
+Print docker compose ps
 ```
 
-> 边缘容器（nginx、srs）通过单文件 bind-mount 挂载配置（如
-> `nginx.https.conf`、`srs.conf`）。Docker 在创建容器时按 inode 绑定挂载，而
-> `git checkout -f` 会原子替换文件（生成新 inode），导致长期运行的容器仍读旧
-> 文件；`docker compose up -d` 不会因单文件内容变化而重建，`nginx -s reload`
-> 也无法解决（挂载的还是旧 inode）。因此 hook 在部署末尾比对宿主机配置与容器
-> 内实际挂载文件的内容哈希，仅在发生漂移时对相应服务执行
-> `docker compose up -d --force-recreate --no-deps <service>`，从根本上避免配置
-> 不生效的问题。注意：`srs.conf` 变更触发的 srs 重建会短暂中断直播推流。
+> Edge containers (nginx, srs) mount configuration files such as
+> `nginx.https.conf` and `srs.conf` using single-file bind mounts. Docker binds each mount to an inode at container creation.
+> `git checkout -f` replaces files atomically, creating new inodes, so long-running containers may keep reading old
+> files. `docker compose up -d` does not recreate containers when only a mounted file's content changes, and `nginx -s reload`
+> cannot fix this because the mount still references the old inode. At the end of deployment, the hook therefore compares
+> content hashes of host configuration files with the files actually mounted inside containers. Only when drift is detected does it run
+> `docker compose up -d --force-recreate --no-deps <service>` for the affected service, ensuring configuration updates take effect.
+> Note: recreating srs after a change to `srs.conf` briefly interrupts live stream publishing.
 
-部署 hook 默认接受 `main` 和 `master`。服务器变量可覆盖：
+The deployment hook accepts `main` and `master` by default. Override these server variables as needed:
 
 ```bash
 DEPLOY_BRANCH=main
@@ -101,23 +101,23 @@ WORK_TREE=/srv/golive/app
 GIT_DIR=/srv/git/golive.git
 ```
 
-## 4. 访问地址
+## 4. Access URLs
 
-Web：
+Web:
 
 ```text
 http://154.36.185.85
 ```
 
-OBS 推流服务器：
+OBS publishing server:
 
 ```text
 rtmp://154.36.185.85/live
 ```
 
-如果域名 `golive.us.ci` 已解析并安装证书，nginx 会自动使用 HTTPS 配置。
+If `golive.us.ci` resolves to the server and a certificate is installed, nginx automatically uses the HTTPS configuration.
 
-## 5. 常用排查命令
+## 5. Common troubleshooting commands
 
 ```bash
 ssh root@154.36.185.85
@@ -130,7 +130,7 @@ docker compose logs --tail=200 im-gateway
 docker compose logs --tail=200 srs
 ```
 
-手动重新构建前端：
+Rebuild the frontend manually:
 
 ```bash
 cd /srv/golive/app/golive-web
@@ -139,7 +139,7 @@ cd /srv/golive/app/golive-backend/deploy
 docker compose up -d --build --remove-orphans
 ```
 
-查看最近一次服务器 checkout：
+Inspect the latest server checkout:
 
 ```bash
 cd /srv/golive/app

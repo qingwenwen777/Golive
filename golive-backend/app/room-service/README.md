@@ -1,82 +1,82 @@
 # room-service
 
-直播间列表 / 详情 / 关注 / 点赞-踩 / 主播开播 + SRS 推流鉴权。
+Live-room lists / details / follows / likes and dislikes / creator go-live flow + SRS publishing authentication.
 
-- HTTP: `:8091`（裸路径，无 `/api` 前缀，由 api-gateway 反代附加）
+- HTTP: `:8091` (unprefixed routes; api-gateway exposes them under `/api` through its reverse proxy)
 - pprof: `:6063`
 
-## 端点
+## Endpoints
 
-| 方法 | 路径                          | 鉴权 | 说明                          |
+| Method | Path | Auth | Description |
 | ---- | ----------------------------- | ---- | ----------------------------- |
-| GET  | `/rooms?category&page&size`   | 否   | 列表，剥 streamKey            |
-| GET  | `/rooms/:id`                  | 否   | 详情，剥 streamKey；404       |
+| GET | `/rooms?category&page&size` | No | List; strip streamKey |
+| GET | `/rooms/:id` | No | Details; strip streamKey; 404 if missing |
 | GET  | `/rooms/:id/follow`           | JWT  | `{channelId, following}`      |
 | POST | `/rooms/:id/follow`           | JWT  | `following:true`              |
 | DEL  | `/rooms/:id/follow`           | JWT  | `following:false`             |
 | GET  | `/rooms/:id/like`             | JWT  | `{streamId, liked, disliked, likes}` |
-| POST | `/rooms/:id/like`             | JWT  | like，互斥 dislike            |
-| DEL  | `/rooms/:id/like`             | JWT  | unlike，likes--               |
-| POST | `/rooms/:id/dislike`          | JWT  | dislike，互斥 like            |
+| POST | `/rooms/:id/like` | JWT | Like; mutually exclusive with dislike |
+| DEL  | `/rooms/:id/like`             | JWT  | unlike, likes--               |
+| POST | `/rooms/:id/dislike` | JWT | Dislike; mutually exclusive with like |
 | DEL  | `/rooms/:id/dislike`          | JWT  | undislike                     |
-| POST | `/rooms/live`                 | JWT  | 主播开播，返回含 streamKey    |
-| POST | `/srs/on_publish`             | 无   | SRS callback                  |
-| POST | `/srs/on_unpublish`           | 无   | SRS callback                  |
+| POST | `/rooms/live` | JWT | Creator goes live; response includes streamKey |
+| POST | `/srs/on_publish` | No | SRS callback |
+| POST | `/srs/on_unpublish` | No | SRS callback |
 
-## 数据层
+## Data layer
 
-- **MySQL `rooms`**：GORM AutoMigrate；启动 seed 20 行（前 12 与 `streams.ts` 一致，后 8 补分类覆盖）。
-- **关注**：Redis ZSet，正向 `user:<uid>:follows`、反向 `channel:<cid>:followers`，score=ms timestamp。
-- **点赞**：Redis Hash `like:<sid>:<uid>` 存 `liked/disliked`；计数器 `like:<sid>:count`。互斥切换走 4 段 Lua（保证 INCR/DECR 与 Hash 状态原子）。
-- **streamKey**：Redis `streamkey:<key> → roomId`，TTL 4h。
+- **MySQL `rooms`**: GORM AutoMigrate; seed 20 rows at startup (the first 12 match `streams.ts`; the remaining 8 cover additional categories).
+- **Follows**: Redis ZSets, forward `user:<uid>:follows` and reverse `channel:<cid>:followers`, with millisecond timestamps as scores.
+- **Likes**: Redis Hash `like:<sid>:<uid>` stores `liked/disliked`; `like:<sid>:count` holds the count. Four Lua scripts perform mutually exclusive transitions, keeping INCR/DECR atomic with Hash state changes.
+- **streamKey**: Redis `streamkey:<key> → roomId`, TTL 4h.
 
-## 启动
+## Startup
 
 ```bash
 cd deploy && docker compose up -d mysql redis
 cd ../app/room-service && go run ./cmd      # :8091
-# 另一终端
-cd .. && go run ./cmd/api-gateway           # :8080，反代 /api/rooms
+# In another terminal:
+cd .. && go run ./cmd/api-gateway           # :8080, proxies /api/rooms
 ```
 
-## 测试
+## Tests
 
 ```bash
 cd app/room-service
 go test ./internal/service/...
 ```
 
-覆盖：
+Coverage:
 
-- 分类规范化（empty/all/All/ALL/すべて/Music/Apex Legends/音楽）
-- streamKey JSON 序列化：空 → 不出现；非空 → 出现
-- like/dislike 状态机：9 步序列，含跨态切换（dislike→like、like→dislike、unlike 不下溢）
-- 多用户互不干扰
+- Category normalization (empty/all/All/ALL, Japanese all/music labels, Music, Apex Legends).
+- streamKey JSON serialization: omitted when empty; included when nonempty.
+- Like/dislike state machine: a 9-step sequence including transitions (dislike→like, like→dislike, and unlike without underflow).
+- Isolation between users.
 
-## 端到端 curl
+## End-to-end curl examples
 
 ```bash
-# 0) 拿 token
+# 0) Get a token.
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"demo","password":"demo"}' | tee /tmp/login.json
 TOKEN=$(jq -r .token /tmp/login.json)
 H="Authorization: Bearer $TOKEN"
 
-# 1) 列表（无分类）
+# 1) List without a category filter.
 curl -s 'http://localhost:8080/api/rooms?page=1&size=24' | jq '.total, .items | length'
 
-# 2) 列表（分类筛选，case-insensitive + 日文）
+# 2) List with category filtering: case-insensitive and Japanese matching.
 curl -s 'http://localhost:8080/api/rooms?category=music' | jq '.items[].category'
-curl -s 'http://localhost:8080/api/rooms?category=音楽'   | jq '.items[].categoryJa'
-curl -s 'http://localhost:8080/api/rooms?category=all'    | jq '.total'   # = 全部
+curl -s 'http://localhost:8080/api/rooms?category=%E9%9F%B3%E6%A5%BD' | jq '.items[].categoryJa'
+curl -s 'http://localhost:8080/api/rooms?category=all' | jq '.total'   # All categories
 
-# 3) 详情
+# 3) Details.
 curl -s http://localhost:8080/api/rooms/luna-music | jq
-# streamKey 字段不应出现：
+# The streamKey field must not appear:
 curl -s http://localhost:8080/api/rooms/luna-music | jq 'has("streamKey")'  # → false
 
-# 4) 找不到 → 404 { message:"Not found" }
+# 4) Not found → 404 { message:"Not found" }
 curl -i http://localhost:8080/api/rooms/no-such
 
 # 5) follow
@@ -84,37 +84,37 @@ curl -s -H "$H" http://localhost:8080/api/rooms/luna/follow                   # 
 curl -s -X POST -H "$H" http://localhost:8080/api/rooms/luna/follow           # → following:true
 curl -s -X DELETE -H "$H" http://localhost:8080/api/rooms/luna/follow         # → following:false
 
-# 6) like / dislike 互斥
-curl -s -H "$H" http://localhost:8080/api/rooms/luna-music/like               # 初始 likes
+# 6) Like and dislike are mutually exclusive.
+curl -s -H "$H" http://localhost:8080/api/rooms/luna-music/like               # Initial likes
 curl -s -X POST -H "$H" http://localhost:8080/api/rooms/luna-music/like       # liked:true, likes++
 curl -s -X POST -H "$H" http://localhost:8080/api/rooms/luna-music/dislike    # liked:false, disliked:true, likes--
 curl -s -X DELETE -H "$H" http://localhost:8080/api/rooms/luna-music/dislike  # disliked:false
 curl -s -X POST -H "$H" http://localhost:8080/api/rooms/luna-music/like       # liked:true, likes++
 curl -s -X DELETE -H "$H" http://localhost:8080/api/rooms/luna-music/like     # liked:false, likes--
 
-# 7) 未授权 → 401
+# 7) Unauthorized → 401.
 curl -i http://localhost:8080/api/rooms/luna-music/like
 ```
 
-## 对照 MSW 自查
+## Verify against MSW
 
-| MSW 行为                                              | 后端                                        |
+| MSW behavior | Backend |
 | ----------------------------------------------------- | ------------------------------------------- |
-| `category` 空/all/すべて 不筛选                       | `service.NormalizeCategory` ✅              |
-| 大小写不敏感 + 日文匹配                               | `LOWER(category)=? OR category_ja=?` ✅     |
-| 分页 `page`/`size`，默认 1/24                         | ✅                                          |
-| `Stream` 列表/详情都剥 `streamKey`                    | `omitempty` + 不赋值 ✅                     |
-| 详情 404 `{message:"Not found"}`                      | `ErrRoomNotFound` ✅                        |
-| follow GET/POST/DELETE 形状 `{channelId, following}`  | ✅                                          |
-| like POST：first-time 计数 +1，第二次幂等             | Lua 用 HGET 旧值判断 ✅                     |
-| like→dislike：likes-- 且 liked=false, disliked=true   | `luaDislike` ✅                             |
-| dislike→like：disliked=false, liked=true, likes++     | `luaLike` ✅                                |
-| unlike 不下溢                                         | `if cnt<0 then SET 0` ✅                    |
-| 未授权所有 social 接口 401 `{message:"Unauthorized"}` | `AuthRequired` 中间件 ✅                    |
+| Empty/all/Japanese all `category` means no filter | `service.NormalizeCategory` ✅ |
+| Case-insensitive + Japanese matching | `LOWER(category)=? OR category_ja=?` ✅ |
+| Pagination via `page`/`size`, default 1/24 | ✅ |
+| Strip `streamKey` from `Stream` lists and details | `omitempty` + leave unset ✅ |
+| Details 404 `{message:"Not found"}` | `ErrRoomNotFound` ✅ |
+| Follow GET/POST/DELETE shape `{channelId, following}` | ✅ |
+| Like POST: first request increments by 1; second is idempotent | Lua checks the old value with HGET ✅ |
+| like→dislike: likes-- and liked=false, disliked=true | `luaDislike` ✅ |
+| dislike→like: disliked=false, liked=true, likes++     | `luaLike` ✅                                |
+| Unlike never underflows | `if cnt<0 then SET 0` ✅ |
+| All unauthorized social requests return 401 `{message:"Unauthorized"}` | `AuthRequired` middleware ✅ |
 
-## SRS 集成
+## SRS integration
 
-`deploy/srs.conf` 里需要把回调指到 room-service 内网地址，不经过公网 api-gateway：
+In `deploy/srs.conf`, point callbacks to the internal room-service address, bypassing the public api-gateway:
 
 ```
 vhost __defaultVhost__ {
@@ -126,5 +126,5 @@ vhost __defaultVhost__ {
 }
 ```
 
-主播侧：`POST /api/rooms/live` 拿到 `streamKey="lk_xxxx"` 后，OBS 推到
-`rtmp://localhost:1935/live/<streamKey>`，SRS 转发回 `/srs/on_publish` 校验。
+Creator flow: after `POST /api/rooms/live` returns `streamKey="lk_xxxx"`, publish from OBS to
+`rtmp://localhost:1935/live/<streamKey>`; SRS calls `/srs/on_publish` for validation.

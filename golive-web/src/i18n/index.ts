@@ -59,7 +59,8 @@ void i18n
     nonExplicitSupportedLngs: true,
     load: 'languageOnly',
     detection: {
-      order: ['localStorage', 'navigator'],
+      // Honor a saved preference; otherwise use English regardless of browser language.
+      order: ['localStorage'],
       lookupLocalStorage: LANG_STORAGE_KEY,
       caches: ['localStorage'],
     },

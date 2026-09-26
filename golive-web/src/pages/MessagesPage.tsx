@@ -1945,10 +1945,10 @@ function shouldShowChatTimeSeparator(value: string, previousValue?: string): boo
   );
 }
 
-function formatChatSeparatorTime(value: string, locale = 'zh-CN'): string {
+function formatChatSeparatorTime(value: string, locale = 'en-US'): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  const normalizedLocale = locale || 'zh-CN';
+  const normalizedLocale = locale || 'en-US';
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
@@ -1982,8 +1982,8 @@ function isSameCalendarDay(left: Date, right: Date): boolean {
   );
 }
 
-function formatMessageTime(value: string, locale = 'zh-CN'): string {
-  return new Intl.DateTimeFormat(locale || 'zh-CN', {
+function formatMessageTime(value: string, locale = 'en-US'): string {
+  return new Intl.DateTimeFormat(locale || 'en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

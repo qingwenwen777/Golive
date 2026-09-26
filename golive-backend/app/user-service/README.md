@@ -1,52 +1,52 @@
 # user-service
 
-负责认证（login / refresh / logout）和用户资料（GET /users/me）。
-**自身路由不带 `/api` 前缀**，由 api-gateway 反代时附加。
+Handles authentication (login / refresh / logout) and user profiles (GET /users/me).
+**Its own routes omit the `/api` prefix**; api-gateway exposes them under that prefix through its reverse proxy.
 
-## 端口
+## Ports
 
 - HTTP: `:8090`
 - pprof: `:6062`
 
-## 配置
+## Configuration
 
-`configs/config.yaml`，可用 `--config` 覆盖路径。
-JWT secret、demo 用户开关等全在里面。
+Use `configs/config.yaml`; override its path with `--config`.
+It contains the JWT secret, demo-user toggle, and other settings.
 
-## 启动
+## Startup
 
-依赖：MySQL / Redis 已起（`deploy/docker-compose.yml`）。
+Dependencies: MySQL / Redis must be running (`deploy/docker-compose.yml`).
 
 ```bash
-# 1. 启动依赖
+# 1. Start dependencies.
 cd deploy && docker compose up -d mysql redis
 
-# 2. 启动 user-service（监听 :8090）
+# 2. Start user-service (listening on :8090).
 cd ../app/user-service
 go run ./cmd
 
-# 3. 启动 api-gateway（监听 :8080，反代 /api/auth/*、/api/users/me 到 user-service）
+# 3. Start api-gateway (listening on :8080; proxies /api/auth/* and /api/users/me to user-service).
 cd ../../
 go run ./cmd/api-gateway
 ```
 
-启动时自动 `AutoMigrate users` 表，并按 `bootstrap.demo_user` 配置插入
-`username=demo / password=demo / coinBalance=100000` 的 demo 账号
-（已存在则跳过）。
+At startup, `AutoMigrate` creates or updates the `users` table. Depending on `bootstrap.demo_user`, it inserts
+a demo account with `username=demo / password=demo / coinBalance=100000`
+(skipping insertion if the account already exists).
 
-## 跑测试
+## Run tests
 
 ```bash
 cd app/user-service
 go test ./internal/service/...
 ```
 
-覆盖：登录成功 / 密码错误 / 用户不存在 / refresh 轮换 + 旧 token 失效 /
-refresh 无效 / logout 撤销 / JWT round-trip。
+Coverage: successful login / wrong password / missing user / refresh rotation and old-token invalidation /
+invalid refresh / logout revocation / JWT round-trip.
 
-## 联调（前端关掉 MSW）
+## Integration (disable frontend MSW)
 
-在 `golive-web/` 创建 `.env.development.local`：
+Create `.env.development.local` under `golive-web/`:
 
 ```env
 VITE_ENABLE_MSW=false
@@ -55,7 +55,7 @@ VITE_WS_BASE=ws://localhost:8081/ws
 VITE_FLV_BASE=http://localhost:8082
 ```
 
-并在 `src/main.tsx` 把 MSW 启动包一层判断（如果还没做）：
+Wrap MSW startup in `src/main.tsx` in a condition if it is not already guarded:
 
 ```ts
 if (import.meta.env.VITE_ENABLE_MSW !== 'false') {
@@ -63,9 +63,9 @@ if (import.meta.env.VITE_ENABLE_MSW !== 'false') {
 }
 ```
 
-然后 `npm run dev`，登录页用 `demo / demo` 直接打到这个后端。
+Then run `npm run dev` and sign in with `demo / demo` to call this backend directly.
 
-## 端到端 curl
+## End-to-end curl examples
 
 ```bash
 # 1) login
@@ -81,19 +81,19 @@ RTOKEN=$(jq -r .refreshToken /tmp/login.json)
 curl -s http://localhost:8080/api/users/me -H "Authorization: Bearer $TOKEN"
 # → { "id":"...", "username":"demo", "avatar":"...", "coinBalance":100000, "verified":true }
 
-# 3) refresh —— 旧 refreshToken 必须作废
+# 3) Refresh: the old refreshToken must become invalid.
 curl -s -X POST http://localhost:8080/api/auth/refresh \
   -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$RTOKEN\"}" | tee /tmp/refresh.json
 # → { "token":"NEW", "refreshToken":"NEW" }
 
-# 4) 用旧 refreshToken 再 refresh，应该 401
+# 4) Refresh again with the old refreshToken; expect 401.
 curl -i -X POST http://localhost:8080/api/auth/refresh \
   -H 'Content-Type: application/json' \
   -d "{\"refreshToken\":\"$RTOKEN\"}"
 # → HTTP/1.1 401  { "message":"Invalid refresh token" }
 
-# 5) 错误密码
+# 5) Wrong password.
 curl -i -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"demo","password":"wrong"}'
@@ -106,15 +106,15 @@ curl -s -X POST http://localhost:8080/api/auth/logout \
 # → { "ok": true }
 ```
 
-## 对照前端 MSW 自查
+## Verify against frontend MSW
 
-| 项目             | MSW 行为                              | 本服务行为                                    |
+| Item | MSW behavior | Service behavior |
 | ---------------- | ------------------------------------- | --------------------------------------------- |
-| `demo/demo` 登录 | 200 + token/refreshToken/user         | ✅ bootstrap 插入 demo 用户                   |
-| 错误凭据         | 401 `{ message: "Invalid username..." }` | ✅ `service.ErrInvalidCredentials`           |
+| `demo/demo` login | 200 + token/refreshToken/user | ✅ Demo user inserted by bootstrap |
+| Invalid credentials | 401 `{ message: "Invalid username..." }` | ✅ `service.ErrInvalidCredentials` |
 | /users/me 401    | `{ message: "Unauthorized" }`         | ✅ `service.ErrUnauthorized`                  |
-| refresh 轮换     | 旧 refreshToken 立即失效              | ✅ Redis pipeline DEL + SET                   |
-| refresh 无效     | 401 `{ message: "Invalid refresh token" }` | ✅                                       |
-| User 字段        | id/username/avatar/coinBalance/verified | ✅ `model.PublicUser`                       |
-| LoginResp 字段   | token/refreshToken/user               | ✅ `service.LoginResp`                        |
-| logout 响应      | `{ ok: true }`                        | ✅                                            |
+| Refresh rotation | Old refreshToken becomes invalid immediately | ✅ Redis pipeline DEL + SET |
+| Invalid refresh | 401 `{ message: "Invalid refresh token" }` | ✅ |
+| User fields | id/username/avatar/coinBalance/verified | ✅ `model.PublicUser` |
+| LoginResp fields | token/refreshToken/user | ✅ `service.LoginResp` |
+| Logout response | `{ ok: true }` | ✅ |
