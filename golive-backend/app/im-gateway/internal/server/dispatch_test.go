@@ -45,6 +45,7 @@ func newTestConn(identity auth.Identity, p producer.Producer) *Conn {
 		roomID:   "R1",
 		identity: identity,
 		send:     make(chan []byte, 16),
+		done:     make(chan struct{}),
 		producer: p,
 		cfg:      WSConfig{MaxMessageRate: 5},
 	}

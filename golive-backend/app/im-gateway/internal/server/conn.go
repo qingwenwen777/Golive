@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -30,10 +29,12 @@ type Conn struct {
 	ownerID  string
 	identity auth.Identity
 
-	ws     *websocket.Conn
-	send   chan []byte
-	closed atomic.Bool
-	once   sync.Once
+	ws *websocket.Conn
+	// send is never closed: fanout goroutines may call Send concurrently with
+	// Close, and a send on a closed channel panics. done signals shutdown.
+	send chan []byte
+	done chan struct{}
+	once sync.Once
 
 	hub        *hub.Hub
 	producer   producer.Producer
@@ -60,6 +61,7 @@ func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity,
 		identity:   identity,
 		ws:         ws,
 		send:       make(chan []byte, cfg.SendBuffer),
+		done:       make(chan struct{}),
 		hub:        h,
 		producer:   p,
 		moderation: m,
@@ -83,8 +85,10 @@ func (c *Conn) ID() string { return c.id }
 // Send is non-blocking. Returns false when the queue is full so the caller
 // (room.fanout) can evict this connection.
 func (c *Conn) Send(payload []byte) bool {
-	if c.closed.Load() {
+	select {
+	case <-c.done:
 		return false
+	default:
 	}
 	select {
 	case c.send <- payload:
@@ -96,8 +100,7 @@ func (c *Conn) Send(payload []byte) bool {
 
 func (c *Conn) Close() {
 	c.once.Do(func() {
-		c.closed.Store(true)
-		close(c.send)
+		close(c.done)
 		_ = c.ws.Close()
 	})
 }
@@ -140,14 +143,19 @@ func (c *Conn) readPump(ctx context.Context) {
 	}
 }
 
-// writePump drains the send chan onto the websocket. Closes the ws on any
-// write error — readPump's Close will then no-op.
+// writePump drains the send chan onto the websocket until Close. Closes the
+// ws on any write error — readPump's Close will then no-op.
 func (c *Conn) writePump() {
 	defer c.Close()
-	for payload := range c.send {
-		_ = c.ws.SetWriteDeadline(time.Now().Add(c.cfg.WriteDeadline))
-		if err := c.ws.WriteMessage(websocket.TextMessage, payload); err != nil {
+	for {
+		select {
+		case <-c.done:
 			return
+		case payload := <-c.send:
+			_ = c.ws.SetWriteDeadline(time.Now().Add(c.cfg.WriteDeadline))
+			if err := c.ws.WriteMessage(websocket.TextMessage, payload); err != nil {
+				return
+			}
 		}
 	}
 }
