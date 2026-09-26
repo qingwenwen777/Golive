@@ -92,6 +92,16 @@ go test ./app/gift-service/...
 go test ./app/im-gateway/...
 ```
 
+## Coin wallet
+
+Balances live in the shared database (`users.coin_balance`, `users.frozen_coins`) with the
+`coin_transactions` ledger. All changes go through `pkg/wallet` (`Debit`, `AdminDebit`, `Credit`,
+`Freeze`, `Unfreeze`), called with the caller's GORM transaction so the balance change, its ledger
+row and the caller's own writes (order, outbox) commit together. No other code may `UPDATE` these
+columns or write `coin_transactions`; `go test ./pkg/wallet/` scans the module and fails on direct
+writes. Creating a user row with an opening balance (sign-up bonus, seeded accounts) is not a
+balance change and stays in user-service.
+
 ## Frontend contract
 
 - The frontend uses same-origin requests by default: `VITE_API_BASE=/api`, `VITE_WS_BASE=/ws`,
