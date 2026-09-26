@@ -24,6 +24,7 @@ func (allowPostPermission) HasApprovedLivePermission(context.Context, string) (b
 type postFixture struct {
 	svc    *service.PostService
 	social *repo.SocialRepo
+	db     *gorm.DB
 }
 
 func newPostFixture(t *testing.T) postFixture {
@@ -67,7 +68,21 @@ CREATE TABLE users (
 	return postFixture{
 		svc:    service.NewPostService(posts, rooms, social, allowPostPermission{}),
 		social: social,
+		db:     db,
 	}
+}
+
+// A failed post query for a non-owner used to be swallowed by a shadowed err
+// and returned as an empty page.
+func TestListChannelReturnsQueryErrorForViewers(t *testing.T) {
+	fx := newPostFixture(t)
+	ctx := context.Background()
+	require.NoError(t, fx.db.Exec("DROP TABLE channel_posts").Error)
+
+	_, err := fx.svc.ListChannel(ctx, "fan-1", "creator", 1, 10)
+	require.Error(t, err)
+	_, err = fx.svc.ListChannel(ctx, "", "creator", 1, 10)
+	require.Error(t, err)
 }
 
 func TestPosts_VisibilityAndFollowerComments(t *testing.T) {

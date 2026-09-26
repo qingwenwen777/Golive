@@ -231,7 +231,8 @@ func (s *PostService) ListChannel(ctx context.Context, viewerID, channelKey stri
 		posts, total, err = s.posts.ListByOwner(ctx, ownerID, page, size)
 	} else {
 		visibilities := []string{model.PostVisibilityPublic}
-		following, err := s.isFollower(ctx, viewerID, channelIDForOwner(ownerID))
+		var following bool
+		following, err = s.isFollower(ctx, viewerID, channelIDForOwner(ownerID))
 		if err != nil {
 			return nil, err
 		}
