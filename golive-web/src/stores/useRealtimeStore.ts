@@ -51,6 +51,9 @@ function indexMessages(messages: Message[]): Record<string, number> {
 function mergeMessageFields(current: Message | undefined, incoming: Message): Message {
   if (!current || current.kind !== incoming.kind) return incoming;
   if (current.kind !== 'chat' || incoming.kind !== 'chat') return incoming;
+  // Same id from a different sender is never an update of this message; keep
+  // what is on screen rather than let it be rewritten.
+  if (current.userId && current.userId !== incoming.userId) return current;
   return {
     ...incoming,
     avatar: incoming.avatar ?? current.avatar,

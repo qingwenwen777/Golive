@@ -16,13 +16,15 @@ import (
 )
 
 // ChatEvent is what im-gateway puts on the chat topic. chat-service does
-// dedup, sensitive-word filtering, persistence, and Redis publish.
+// dedup, sensitive-word filtering, persistence, and Redis publish. ID and all
+// display fields are server-derived; nothing here comes from the client
+// except Text.
 type ChatEvent struct {
+	ID        string           `json:"id"`
 	RoomID    string           `json:"roomId"`
 	UserID    string           `json:"userId"`
 	Username  string           `json:"username,omitempty"`
 	Avatar    string           `json:"avatar,omitempty"`
-	ClientID  string           `json:"clientId,omitempty"`
 	Text      string           `json:"text"`
 	Role      string           `json:"role,omitempty"`
 	FanBadge  *FanBadgePayload `json:"fanBadge,omitempty"`

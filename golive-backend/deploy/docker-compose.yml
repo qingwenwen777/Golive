@@ -227,6 +227,7 @@ services:
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
+      - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
     depends_on:
       redis:
         condition: service_healthy

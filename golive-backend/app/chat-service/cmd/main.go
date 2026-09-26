@@ -18,13 +18,13 @@ import (
 
 	"github.com/qingwenwen777/golive/app/chat-service/internal/config"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/consumer"
-	"github.com/qingwenwen777/golive/app/chat-service/internal/filter"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/handler"
-	"github.com/qingwenwen777/golive/app/chat-service/internal/ratelimit"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/redissub"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/server"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/chatfilter"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -67,13 +67,13 @@ func main() {
 		log.Fatal("migrate shards", zap.Error(err))
 	}
 
-	words, err := filter.LoadWords(cfg.Filter.SensitivePath)
+	words, err := chatfilter.LoadWords(cfg.Filter.SensitivePath)
 	if err != nil {
 		log.Warn("load sensitive words", zap.Error(err))
 	}
-	f := filter.New(words, filter.WithMask(cfg.Filter.Mask), filter.WithSkipChars(" .*-_"))
+	f := chatfilter.New(words, chatfilter.WithMask(cfg.Filter.Mask), chatfilter.WithSkipChars(chatfilter.DefaultSkipChars))
 
-	limiter := ratelimit.New(rdb, cfg.RateLimit.PerUserPerSec, cfg.RateLimit.BucketSeconds)
+	limiter := chatlimit.New(rdb, "rl:chat:", cfg.RateLimit.PerUserPerSec, cfg.RateLimit.Window())
 	pub := repo.NewPublisher(rdb)
 	svc := service.New(f, limiter, danmuRepo, pub)
 
@@ -88,7 +88,7 @@ func main() {
 	}
 
 	histH := handler.NewHistoryHandler(svc, cfg.Room.HistoryDefaultLimit, cfg.Room.HistoryMaxLimit)
-	r := server.NewRouter(histH)
+	r := server.NewRouter(histH, handler.NewFanBadgeHandler(svc))
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 
 	go func() {

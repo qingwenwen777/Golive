@@ -21,17 +21,18 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/qingwenwen777/golive/app/chat-service/internal/filter"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/model"
-	"github.com/qingwenwen777/golive/app/chat-service/internal/ratelimit"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/chatfilter"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 )
 
-// Event is the Kafka payload im-gateway puts on the danmu topic.
+// Event is the Kafka payload im-gateway puts on the danmu topic. im-gateway
+// derives ID and every display field server-side; only Text is user input.
 type Event struct {
+	ID        string                 `json:"id"`
 	RoomID    string                 `json:"roomId"`
 	UserID    string                 `json:"userId"`
-	ClientID  string                 `json:"clientId,omitempty"`
 	Username  string                 `json:"username,omitempty"`
 	Avatar    string                 `json:"avatar,omitempty"`
 	Text      string                 `json:"text"`
@@ -47,13 +48,13 @@ type Event struct {
 var ErrRateLimited = errors.New("rate limited")
 
 type ChatService struct {
-	filter  *filter.Filter
-	limiter *ratelimit.Limiter
+	filter  *chatfilter.Filter
+	limiter *chatlimit.Limiter
 	danmus  *repo.DanmuRepo
 	pub     *repo.Publisher
 }
 
-func New(f *filter.Filter, l *ratelimit.Limiter, d *repo.DanmuRepo, p *repo.Publisher) *ChatService {
+func New(f *chatfilter.Filter, l *chatlimit.Limiter, d *repo.DanmuRepo, p *repo.Publisher) *ChatService {
 	return &ChatService{filter: f, limiter: l, danmus: d, pub: p}
 }
 
@@ -80,8 +81,10 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 		username = ev.UserID
 	}
 
-	id := safeClientID(ev.ClientID)
-	if id == "" {
+	// Message ids are server-generated uuids (never a client-chosen string
+	// that could collide with, and overwrite, someone else's message).
+	id := ev.ID
+	if _, err := uuid.Parse(id); err != nil {
 		id = uuid.NewString()
 	}
 	fanBadge := safeFanBadge(ev.FanBadge)
@@ -113,18 +116,6 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 		return fmt.Errorf("publish: %w", err)
 	}
 	return nil
-}
-
-func safeClientID(id string) string {
-	if id == "" || len(id) > 80 {
-		return ""
-	}
-	for _, r := range id {
-		if r == ' ' || r == '\t' || r == '\r' || r == '\n' {
-			return ""
-		}
-	}
-	return id
 }
 
 func safeFanBadge(in *model.FanBadgePayload) *model.FanBadgePayload {
@@ -171,25 +162,21 @@ func (s *ChatService) History(ctx context.Context, roomID string, before int64, 
 		return nil, err
 	}
 	userIDs := make([]string, 0, len(rows))
-	names := make([]string, 0, len(rows))
 	for i := range rows {
 		userIDs = append(userIDs, rows[i].UserID)
-		names = append(names, rows[i].Username)
 	}
-	fanBadges, err := s.danmus.FanBadgesForRoomUsers(ctx, roomID, userIDs, names)
+	fanBadges, err := s.danmus.FanBadgesForRoomUsers(ctx, roomID, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	profiles, err := s.danmus.UserProfiles(ctx, userIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	out := make([]model.Public, 0, len(rows)+len(superChats))
 	for i := range rows {
-		item := rows[i].ToPublic()
-		if badge := fanBadges.ByUserID[item.UserID]; badge != nil {
-			item.FanBadge = badge
-		} else if badge := fanBadges.ByName[normalizeName(item.User)]; badge != nil {
-			item.FanBadge = badge
-		}
-		out = append(out, item)
+		out = append(out, decorateChat(rows[i].ToPublic(), fanBadges, profiles))
 	}
 	for i := range superChats {
 		tier := superChats[i].Tier
@@ -220,6 +207,26 @@ func formatCoinAmount(amount int64) string {
 	return strconv.FormatInt(amount, 10)
 }
 
-func normalizeName(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
+// decorateChat replaces a history chat's identity with current server-side
+// data looked up by user id: the fan badge (nil if none — the badge stored
+// with the row is ignored, older rows may carry a client-supplied one) and,
+// when the user is known, name, avatar and level.
+func decorateChat(item model.Public, badges map[string]*model.FanBadgePayload, profiles map[string]repo.UserProfile) model.Public {
+	item.FanBadge = badges[item.UserID]
+	if p, ok := profiles[item.UserID]; ok && item.UserID != "" {
+		item.User = p.Name
+		item.Avatar = p.Avatar
+		item.UserLevel = p.Level
+	}
+	return item
+}
+
+// FanBadge returns userID's badge for roomID's owner, or nil. It backs
+// im-gateway's live chat decoration (internal endpoint).
+func (s *ChatService) FanBadge(ctx context.Context, roomID, userID string) (*model.FanBadgePayload, error) {
+	badges, err := s.danmus.FanBadgesForRoomUsers(ctx, roomID, []string{userID})
+	if err != nil {
+		return nil, err
+	}
+	return badges[userID], nil
 }

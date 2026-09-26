@@ -1,4 +1,4 @@
-package ratelimit_test
+package chatlimit_test
 
 import (
 	"context"
@@ -9,16 +9,16 @@ import (
 	"github.com/go-redis/redis/v9"
 	"github.com/stretchr/testify/require"
 
-	"github.com/qingwenwen777/golive/app/chat-service/internal/ratelimit"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 )
 
-func newLimiter(t *testing.T, limit int, window time.Duration) (*ratelimit.Limiter, *miniredis.Miniredis) {
+func newLimiter(t *testing.T, limit int, window time.Duration) (*chatlimit.Limiter, *miniredis.Miniredis) {
 	t.Helper()
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
 	t.Cleanup(mr.Close)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	return ratelimit.New(rdb, limit, window), mr
+	return chatlimit.New(rdb, "rl:test:", limit, window), mr
 }
 
 func TestLimiter_AllowsUnderLimit(t *testing.T) {
@@ -46,6 +46,31 @@ func TestLimiter_PerUserIsolation(t *testing.T) {
 	ok2, _ := l.Allow(context.Background(), "u2")
 	require.True(t, ok1)
 	require.True(t, ok2, "different users have separate buckets")
+}
+
+func TestLimiter_PrefixesAreIndependent(t *testing.T) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	a := chatlimit.New(rdb, "rl:a:", 1, time.Second)
+	b := chatlimit.New(rdb, "rl:b:", 1, time.Second)
+	ok, _ := a.Allow(context.Background(), "u1")
+	require.True(t, ok)
+	ok, _ = b.Allow(context.Background(), "u1")
+	require.True(t, ok, "a different prefix has its own budget")
+}
+
+// A nanosecond window (what `bucket_seconds: 1` used to decode to) put every
+// call in its own bucket, so nothing was ever limited.
+func TestLimiter_SubMillisecondWindowStillLimits(t *testing.T) {
+	l, _ := newLimiter(t, 1, time.Nanosecond)
+	ok, err := l.Allow(context.Background(), "u1")
+	require.NoError(t, err)
+	require.True(t, ok)
+	ok, err = l.Allow(context.Background(), "u1")
+	require.NoError(t, err)
+	require.False(t, ok)
 }
 
 func TestLimiter_ResetsAcrossWindow(t *testing.T) {

@@ -12,10 +12,11 @@ Gateway for persistent real-time messaging connections. Handles all live-room We
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Connection management | `Hub` (rooms map) → `Room` (conns map) → `Conn` (per-connection send channel + two goroutines for read/write pumps). Two RWMutex layers; fanout takes a snapshot and releases the lock before network operations. |
 | Cross-instance distribution | Redis Pub/Sub. `im-gateway` does not process chat business logic directly; chat-service / gift-service publish to `room:<id>`, and all im-gateway instances subscribe and fan out. |
-| **Lazy subscriptions** | First connection enters a room → SUBSCRIBE; last connection leaves → UNSUBSCRIBE. This avoids hundreds of millions of idle subscriptions in inactive processes. Reacquire the lock and double-check after the last departure to prevent races. |
+| **Lazy subscriptions** | First connection enters a room → SUBSCRIBE; last connection leaves → UNSUBSCRIBE. All rooms share **one** Redis PubSub connection (go-redis re-subscribes after reconnects), so the number of rooms never multiplies Redis connections. The hub lock is not held across SUBSCRIBE; the reaper re-checks the connection count (owners included) under the room lock and marks the room closed so late joiners retry. |
 | Slow consumers | Each `Conn.send` channel has capacity 256; **evict immediately when full** (nonblocking). One slow client cannot stall the other 50k viewers in a room. |
-| Client→server | No direct broadcast. Write `chat` to Kafka topic `danmu` (partition=roomId for ordering); chat-service moderates, persists, and republishes. This gateway only validates tokens and rate limits. |
+| Client→server | With `kafka.enabled=false` (production) the gateway itself moderates chat — per-user Redis rate limit (`pkg/chatlimit`), mute/ban state, admin blocked words, sensitive-word masking (`pkg/chatfilter`) — then publishes to `room:<id>`; chat-service persists passively. With Kafka on, `chat` goes to topic `danmu` (partition=roomId) and chat-service moderates, persists, and republishes. |
 | Authentication | The handshake query must contain a valid `token`: missing/invalid → 401; valid → populate `Identity`. |
+| Handshake limits | `roomId` must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` (400) and, with `room.require_known`, exist (404): Redis `room:owner:<id>` (written by room-service when a room goes live; also the trusted owner id — the client's `ownerId` is ignored for known rooms), else a cached, rate-limited room-service `GET /rooms/<id>`. Concurrent connections are capped per user (`ws.max_conns_per_user`) and per client IP (`ws.max_conns_per_ip`, X-Real-IP honoured only from `ws.trusted_proxies`) → 429. The caps are per instance. |
 | Heartbeats/timeouts | `ReadIdleTimeout=60s`, renewed by any frame including heartbeat and pong; `WriteDeadline=10s`; `ReadLimit=4KB` prevents abuse. |
 | Metrics | Prometheus: connection/room counts, sent/received counts by type, drop reasons, and broadcast latency histogram. Top-N data lives separately at `/debug/rooms` to avoid high-cardinality roomId labels. |
 
@@ -27,12 +28,14 @@ Handshake: `ws://host:8081/ws?roomId=<id>&token=<jwt>`
 | ---------- | --------------- | --------------------------------------------------------------------- |
 | S→C        | `system`        | `text, ts(ms)`                                                        |
 | S→C        | `viewer_count`  | `count`                                                               |
-| S→C        | `chat`          | `id, user, avatar?, text, color?, ts`                                 |
+| S→C        | `chat`          | `id, userId, user, avatar?, text, role?, fanBadge?, userLevel?, ts` — all but `text` server-derived (id = server uuid; name/avatar/level from user-service, fan badge from chat-service, cached 30s) |
+| S→C        | `chat_ack`      | `clientId, id` — only to the sender, mapping its `clientId` to the server id |
 | S→C        | `super_chat`    | `id, user, avatar?, amount, tier(0–5), text, ts`                      |
 | S→C        | `gift`          | `user, giftName, ts`                                                  |
 | C→S        | `heartbeat`     | —                                                                     |
 | C→S | `resume` | `lastMessageId?` (MVP only replies with `system: "resumed"`; no replay buffer) |
-| C→S | `chat` | `text` (≤200 bytes; rate limit 5 msg/s/conn) |
+| C→S | `chat` | `text` (≤200 chars), `clientId?`. Identity/display fields a client sends (`user`, `avatar`, `userLevel`, `fanBadge`, ...) are ignored. Per-user limit `chat_ratelimit`; every frame type also counts against `ws.max_message_rate` per connection. |
+| C→S | `viewer_profile` | — (payload ignored; asks the gateway to re-resolve the user's server-side profile) |
 
 Immediately after the handshake, send one `system: "Welcome to the live room!"` and one `viewer_count: 1`, matching the frontend mock.
 

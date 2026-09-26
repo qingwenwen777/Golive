@@ -7,7 +7,7 @@ import (
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
 
-func NewRouter(h *handler.HistoryHandler) *gin.Engine {
+func NewRouter(h *handler.HistoryHandler, badges *handler.FanBadgeHandler) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(obs.HTTPMiddleware("chat-service"))
@@ -20,6 +20,11 @@ func NewRouter(h *handler.HistoryHandler) *gin.Engine {
 
 	chat := r.Group("/chat")
 	chat.GET("/rooms/:id/danmus", h.Get)
+
+	// Service-to-service only: api-gateway proxies /api/chat/* here, never
+	// /internal/*, and chat-service publishes no port.
+	internal := r.Group("/internal")
+	internal.GET("/rooms/:id/fan-badges/:userId", badges.Get)
 
 	return r
 }

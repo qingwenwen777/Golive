@@ -50,6 +50,22 @@ describe('useRealtimeStore', () => {
     expect(slice.messageIndex.m1).toBe(0);
   });
 
+  it('does not let a message from another user rewrite one with the same id', () => {
+    useRealtimeStore
+      .getState()
+      .appendMessage('room-1', chat('m1', { userId: 'u1', user: 'Luna', text: 'original' }));
+    useRealtimeStore
+      .getState()
+      .appendMessage('room-1', chat('m1', { userId: 'u2', user: 'Luna', text: 'rewritten' }));
+    useRealtimeStore
+      .getState()
+      .mergeMessages('room-1', [chat('m1', { userId: 'u3', user: 'Host', text: 'rewritten' })]);
+
+    const slice = useRealtimeStore.getState().rooms['room-1'];
+    expect(slice.messages).toHaveLength(1);
+    expect(slice.messages[0]).toMatchObject({ id: 'm1', userId: 'u1', text: 'original' });
+  });
+
   it('optimistically updates viewer contribution ranking', () => {
     useRealtimeStore.getState().setViewers('room-1', [
       { userId: 'u1', user: 'aaaa', contribution: 20 },
