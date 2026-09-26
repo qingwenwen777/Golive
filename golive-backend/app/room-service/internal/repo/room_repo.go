@@ -975,13 +975,21 @@ func (r *RoomRepo) SetPublishing(ctx context.Context, id string) error {
 	}).Error
 }
 
-// SetLive marks a room live with the given start time.
-func (r *RoomRepo) SetLive(ctx context.Context, id string, startedAt any) error {
-	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(map[string]any{
-		"status":     model.StatusLive,
-		"started_at": startedAt,
-		"ended_at":   nil,
-	}).Error
+// SetLive marks a publishing (or ending) room live with the given start time.
+// It reports whether this call made the transition; false means the room is
+// already live or was ended meanwhile, and an ended room must stay ended.
+func (r *RoomRepo) SetLive(ctx context.Context, id string, startedAt any) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND status IN ?", id, []string{model.StatusPublishing, model.StatusEnding}).
+		Updates(map[string]any{
+			"status":     model.StatusLive,
+			"started_at": startedAt,
+			"ended_at":   nil,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 // SetEnded marks a room ended.
@@ -992,7 +1000,10 @@ func (r *RoomRepo) SetEnded(ctx context.Context, id string, endedAt any) error {
 	}).Error
 }
 
-func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt any, viewers, peakViewers int64) error {
+// SetEndedWithMetrics ends a publishing, live or ending room. It reports
+// whether this call ended it, so only one of several concurrent stop paths
+// runs the follow-up work (broadcast, replay upload).
+func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt any, viewers, peakViewers int64) (bool, error) {
 	updates := map[string]any{
 		"status":   model.StatusEnded,
 		"ended_at": endedAt,
@@ -1003,7 +1014,13 @@ func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt a
 	if peakViewers >= 0 {
 		updates["peak_viewers"] = peakViewers
 	}
-	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(updates).Error
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND status IN ?", id, []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Updates(updates)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 func roomStatusRank(status string) int {

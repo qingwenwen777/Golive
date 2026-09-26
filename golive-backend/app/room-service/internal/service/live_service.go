@@ -111,6 +111,34 @@ func (s *LiveService) disconnectPublisher(ctx context.Context, roomID, streamKey
 	}
 }
 
+// startLockTTL bounds how long a crashed GoLive or appointment Start can
+// block the owner from starting another live.
+const startLockTTL = 15 * time.Second
+
+// lockOwnerStart serialises starting a live for ownerID (GoLive, appointment
+// Start): each ends the owner's active room and creates a new one, so two
+// concurrent starts would otherwise leave two active rooms.
+func (s *LiveService) lockOwnerStart(ctx context.Context, ownerID string) (func(), error) {
+	if s == nil || s.live == nil {
+		return func() {}, nil
+	}
+	name := "start:" + ownerID
+	token, ok, err := s.live.AcquireLock(ctx, name, startLockTTL)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errcode.New(409, "A live is already being started. Please try again.")
+	}
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := s.live.ReleaseLock(ctx, name, token); err != nil {
+			logger.L().Warn("release live start lock", zap.Error(err), zap.String("owner_id", ownerID))
+		}
+	}, nil
+}
+
 // GoLiveReq is the body of POST /rooms/live.
 type GoLiveReq struct {
 	Title       string `json:"title" binding:"required"`
@@ -132,6 +160,11 @@ type UpdateLiveReq struct {
 // GoLive provisions or refreshes a streaming session for the user. Returns a
 // Stream WITH streamKey populated — only the publisher ever sees this.
 func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq) (*model.Stream, error) {
+	unlock, err := s.lockOwnerStart(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	now := s.now()
 	if s.appointments != nil {
 		if appt, err := s.appointments.DueStartWindowForOwner(ctx, ownerID, now); err == nil && appt != nil {
@@ -141,15 +174,18 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		}
 	}
 	if active, err := s.rooms.ActiveByOwner(ctx, ownerID); err == nil {
-		if err := s.endRoom(ctx, active, now); err != nil {
+		ended, err := s.endRoom(ctx, active, now)
+		if err != nil {
 			return nil, err
 		}
-		s.disconnectPublisher(ctx, active.ID, active.StreamKey)
-		if active.StreamKey != "" {
-			_ = s.live.Delete(ctx, active.StreamKey)
-			_ = s.live.DeletePublishSession(ctx, active.StreamKey)
+		if ended {
+			s.disconnectPublisher(ctx, active.ID, active.StreamKey)
+			if active.StreamKey != "" {
+				_ = s.live.Delete(ctx, active.StreamKey)
+				_ = s.live.DeletePublishSession(ctx, active.StreamKey)
+			}
+			_ = s.broadcastEnded(ctx, active.ID, now)
 		}
-		_ = s.broadcastEnded(ctx, active.ID, now)
 	} else if !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
 	}
@@ -334,23 +370,8 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 		return nil
 	}
 	for _, room := range rooms {
-		if err := s.endRoom(ctx, &room, endedAt); err != nil {
+		if _, err := s.stopRoom(ctx, &room, endedAt, true); err != nil {
 			return err
-		}
-		s.disconnectPublisher(ctx, room.ID, room.StreamKey)
-		if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
-			return err
-		}
-		if s.replay != nil {
-			s.replay.EnqueueUpload(ctx, room)
-		}
-		if room.StreamKey != "" {
-			if err := s.live.Delete(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
-				return err
-			}
-			if err := s.live.DeletePublishSession(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
-				return err
-			}
 		}
 	}
 	return nil
@@ -371,26 +392,8 @@ func (s *LiveService) ForceStopRoom(ctx context.Context, roomID string) error {
 	if room.Status != model.StatusPublishing && room.Status != model.StatusLive && room.Status != model.StatusEnding {
 		return nil
 	}
-	endedAt := s.now()
-	if err := s.endRoom(ctx, room, endedAt); err != nil {
-		return err
-	}
-	s.disconnectPublisher(ctx, room.ID, room.StreamKey)
-	if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
-		return err
-	}
-	if s.replay != nil {
-		s.replay.EnqueueUpload(ctx, *room)
-	}
-	if room.StreamKey != "" {
-		if err := s.live.Delete(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
-			return err
-		}
-		if err := s.live.DeletePublishSession(ctx, room.StreamKey); err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
-			return err
-		}
-	}
-	return nil
+	_, err = s.stopRoom(ctx, room, s.now(), true)
+	return err
 }
 
 func (s *LiveService) PublishSystemNotice(ctx context.Context, roomID, text string) error {
@@ -515,12 +518,24 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 		return err
 	}
 	switch room.Status {
-	case model.StatusPublishing:
-		return s.rooms.SetLive(ctx, roomID, s.now())
+	case model.StatusPublishing, model.StatusEnding:
+		wentLive, err := s.rooms.SetLive(ctx, roomID, s.now())
+		if err != nil || wentLive {
+			return err
+		}
+		// The room changed since it was read: fine if a concurrent publish
+		// already set it live, but a stop in between must not be undone.
+		if room, err = s.rooms.GetByID(ctx, roomID); err != nil {
+			return fmt.Errorf("load room: %w", err)
+		}
+		if room.Status == model.StatusLive {
+			return nil
+		}
+		_ = s.live.Delete(ctx, streamKey)
+		_ = s.live.DeletePublishSession(ctx, streamKey)
+		return errors.New("stream has ended")
 	case model.StatusLive:
 		return nil
-	case model.StatusEnding:
-		return s.rooms.SetLive(ctx, roomID, s.now())
 	case model.StatusEnded:
 		_ = s.live.Delete(ctx, streamKey)
 		_ = s.live.DeletePublishSession(ctx, streamKey)
@@ -624,22 +639,40 @@ func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID, 
 		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return s.live.Delete(ctx, streamKey)
 	}
-	if err := s.endRoom(ctx, room, endedAt); err != nil {
-		return err
+	_, err = s.stopRoom(ctx, room, endedAt, false)
+	return err
+}
+
+// stopRoom ends room and does the follow-up work of every stop: kick the SRS
+// publisher (when kick is set), queue the replay upload or recording cleanup,
+// drop the stream key and publish session, and tell viewers. It reports
+// whether this call ended the room; when another path ended it first, that
+// path owns the follow-up work and nothing more is done here.
+func (s *LiveService) stopRoom(ctx context.Context, room *model.Room, endedAt time.Time, kick bool) (bool, error) {
+	ended, err := s.endRoom(ctx, room, endedAt)
+	if err != nil || !ended {
+		return false, err
 	}
-	if err := s.broadcastEnded(ctx, roomID, endedAt); err != nil {
-		return err
+	if kick {
+		s.disconnectPublisher(ctx, room.ID, room.StreamKey)
 	}
 	if s.replay != nil {
 		s.replay.EnqueueUpload(ctx, *room)
 	}
-	if err := s.live.DeletePublishSession(ctx, streamKey); err != nil {
-		return err
+	var errs []error
+	if room.StreamKey != "" {
+		errs = append(errs,
+			s.live.Delete(ctx, room.StreamKey),
+			s.live.DeletePublishSession(ctx, room.StreamKey),
+		)
 	}
-	return s.live.Delete(ctx, streamKey)
+	errs = append(errs, s.broadcastEnded(ctx, room.ID, endedAt))
+	return true, errors.Join(errs...)
 }
 
-func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt time.Time) error {
+// endRoom moves room to ended and reports whether this call did so; false
+// means it was no longer active (another stop won) and nothing was changed.
+func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt time.Time) (bool, error) {
 	viewers, peak := int64(-1), int64(-1)
 	if metrics, err := s.live.ViewerMetrics(ctx, room.ID); err == nil && metrics != nil {
 		viewers = metrics.Viewers
@@ -654,21 +687,22 @@ func (s *LiveService) endRoom(ctx context.Context, room *model.Room, endedAt tim
 	if peak < viewers {
 		peak = viewers
 	}
-	if err := s.rooms.SetEndedWithMetrics(ctx, room.ID, endedAt, viewers, peak); err != nil {
-		return err
+	ended, err := s.rooms.SetEndedWithMetrics(ctx, room.ID, endedAt, viewers, peak)
+	if err != nil || !ended {
+		return false, err
 	}
 	if s.appointments != nil {
 		if err := s.appointments.MarkCompletedByRoom(ctx, room.ID, endedAt); err != nil {
-			return err
+			return true, err
 		}
 	}
 	if s.replay != nil && room.ReplayUploadEnabled && normalizeReplayStatus(room.ReplayStatus) == model.ReplayStatusNone {
 		if err := s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, ""); err != nil {
-			return err
+			return true, err
 		}
 		room.ReplayStatus = model.ReplayStatusPending
 	}
-	return nil
+	return true, nil
 }
 
 func (s *LiveService) broadcastEnded(ctx context.Context, roomID string, endedAt time.Time) error {
