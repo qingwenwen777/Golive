@@ -150,7 +150,9 @@ capabilities) prepares what they use and exits:
   owning the directory is what lets room-service read and delete them;
 - `deploy/secrets` keeps its owner and gets group 10001 with group read access (directories:
   read and traverse), for example `root:10001 0640`. Do not give GID 10001 to a group that
-  people log in with on the host: its members could read the JWT keys.
+  people log in with on the host: its members could read the JWT keys. Where the filesystem
+  refuses the group change (for example Docker Desktop bind mounts) the job only warns; it
+  fails, listing the paths, if UID/GID 10001 still cannot read something.
 
 After adding or replacing a file in `deploy/secrets`, run `docker compose up -d` (it re-runs
 `init-permissions`), then restart the services that read the file, for example

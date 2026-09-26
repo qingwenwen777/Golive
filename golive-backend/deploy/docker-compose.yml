@@ -111,6 +111,9 @@ services:
   #   as root; owning the directory is what lets room-service delete them);
   # - deploy/secrets keeps its owner and gains group 10001 with group read
   #   (directories: read + traverse). Nothing else on the host is touched.
+  #   Where the host filesystem refuses chgrp (e.g. Docker Desktop bind
+  #   mounts) that is only a warning; the job fails, naming the paths, only
+  #   if UID/GID 10001 still cannot read something.
   init-permissions:
     image: alpine:3.22
     container_name: golive-init-permissions
@@ -132,9 +135,13 @@ services:
       - -euc
       - |
         find /fix/avatars /fix/covers /fix/posts /fix/records \( ! -user 10001 -o ! -group 10001 \) -exec chown -h 10001:10001 {} +
-        find /fix/secrets ! -type l ! -group 10001 -exec chgrp 10001 {} +
-        find /fix/secrets -type d ! -perm -050 -exec chmod g+rx {} +
-        find /fix/secrets -type f ! -perm -040 -exec chmod g+r {} +
+        find /fix/secrets ! -type l ! -group 10001 -exec chgrp 10001 {} + || echo "init-permissions: could not change the group of deploy/secrets" >&2
+        find /fix/secrets -type d ! -perm -050 -exec chmod g+rx {} + || true
+        find /fix/secrets -type f ! -perm -040 -exec chmod g+r {} + || true
+        if find /fix/secrets \( -type d ! -perm -001 ! \( -group 10001 -perm -010 \) \) -o \( -type f ! -perm -004 ! \( -group 10001 -perm -040 \) \) | grep .; then
+          echo "init-permissions: UID/GID 10001 cannot read the deploy/secrets paths above" >&2
+          exit 1
+        fi
         echo "init-permissions: volumes and deploy/secrets are ready for UID/GID 10001"
 
   # ========== Go application services ==========
