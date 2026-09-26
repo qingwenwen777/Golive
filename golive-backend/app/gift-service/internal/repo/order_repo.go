@@ -1280,17 +1280,19 @@ WHERE id = ?
 	return ownerID, nil
 }
 
+// applyFanBadgeContribution adds coin to userID's badge for creatorID. The
+// total is incremented in SQL (an upsert when the badge may be created)
+// rather than read, added to and written back: under REPEATABLE READ a plain
+// SELECT here sees the snapshot from the transaction's first query, which can
+// predate a concurrent gift's commit, so that gift's contribution was lost or
+// the second first-time Fan Light failed on the duplicate key.
 func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, coin int64, mode FanBadgeContributionMode) error {
 	if mode == FanBadgeNoChange || coin <= 0 || userID == "" || creatorID == "" || userID == creatorID {
 		return nil
 	}
 
-	var badge model.FanBadge
-	err := tx.Where("user_id = ? AND creator_id = ?", userID, creatorID).Take(&badge).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if mode != FanBadgeCreate {
-			return nil
-		}
+	now := time.Now()
+	if mode == FanBadgeCreate {
 		name, avatar, err := creatorProfileForFanBadge(tx, roomID, creatorID)
 		if err != nil {
 			return err
@@ -1298,7 +1300,7 @@ func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, co
 		if strings.TrimSpace(name) == "" {
 			name = creatorID
 		}
-		badge = model.FanBadge{
+		badge := model.FanBadge{
 			UserID:            userID,
 			CreatorID:         creatorID,
 			CreatorName:       strings.TrimSpace(name),
@@ -1306,20 +1308,49 @@ func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, co
 			TotalContribution: coin,
 			Level:             FanBadgeLevel(coin),
 		}
-		return tx.Create(&badge).Error
-	}
-	if err != nil {
-		return err
+		// The bare column in ON DUPLICATE KEY UPDATE (MySQL) and DO UPDATE
+		// (SQLite) is the stored value, so this adds to the existing total.
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}, {Name: "creator_id"}},
+			DoUpdates: clause.Set{
+				{Column: clause.Column{Name: "total_contribution"}, Value: gorm.Expr("total_contribution + ?", coin)},
+				{Column: clause.Column{Name: "updated_at"}, Value: now},
+			},
+		}).Create(&badge).Error; err != nil {
+			return err
+		}
+	} else {
+		res := tx.Model(&model.FanBadge{}).
+			Where("user_id = ? AND creator_id = ?", userID, creatorID).
+			Updates(map[string]any{
+				"total_contribution": gorm.Expr("total_contribution + ?", coin),
+				"updated_at":         now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return nil
+		}
 	}
 
-	total := badge.TotalContribution + coin
+	// Re-derive the level from the stored total. The write above already
+	// holds the row lock; the locking read makes this a current read rather
+	// than a snapshot one.
+	var badge model.FanBadge
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("total_contribution", "level").
+		Where("user_id = ? AND creator_id = ?", userID, creatorID).
+		Take(&badge).Error; err != nil {
+		return err
+	}
+	level := FanBadgeLevel(badge.TotalContribution)
+	if level == badge.Level {
+		return nil
+	}
 	return tx.Model(&model.FanBadge{}).
 		Where("user_id = ? AND creator_id = ?", userID, creatorID).
-		Updates(map[string]any{
-			"total_contribution": total,
-			"level":              FanBadgeLevel(total),
-			"updated_at":         time.Now(),
-		}).Error
+		Update("level", level).Error
 }
 
 func creatorProfileForFanBadge(tx *gorm.DB, roomID, creatorID string) (string, string, error) {
