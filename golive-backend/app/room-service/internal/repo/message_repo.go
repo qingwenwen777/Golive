@@ -411,6 +411,29 @@ func (r *MessageRepo) BlocksEitherWay(ctx context.Context, userA, userB string) 
 	return count > 0, err
 }
 
+// BlockedPeerIDs returns every user that userID blocks or is blocked by.
+func (r *MessageRepo) BlockedPeerIDs(ctx context.Context, userID string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if userID == "" {
+		return out, nil
+	}
+	var rows []model.UserBlock
+	if err := r.db.WithContext(ctx).
+		Select("blocker_id", "target_user_id").
+		Where("blocker_id = ? OR target_user_id = ?", userID, userID).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if row.BlockerID == userID {
+			out[row.TargetUserID] = true
+		} else {
+			out[row.BlockerID] = true
+		}
+	}
+	return out, nil
+}
+
 func (r *MessageRepo) ListBlocks(ctx context.Context, blockerID string, page, size int) ([]model.UserBlock, int64, error) {
 	page, size = normalizeMessagePage(page, size)
 	tx := r.db.WithContext(ctx).Model(&model.UserBlock{}).Where("blocker_id = ?", blockerID)
@@ -452,13 +475,17 @@ func (r *MessageRepo) UpsertPreference(ctx context.Context, pref *model.MessageP
 	}).Create(pref).Error
 }
 
+// FanClubMemberIDs lists a creator's fan club members in the order they
+// joined. Fan groups are filled in this order, so it must be a key that does
+// not change when a badge levels up (updated_at does), or members would hop
+// between groups on every sync.
 func (r *MessageRepo) FanClubMemberIDs(ctx context.Context, creatorID string) ([]string, error) {
 	var ids []string
 	err := r.db.WithContext(ctx).
 		Table("fan_badges").
 		Select("user_id").
 		Where("creator_id = ? AND user_id <> ?", creatorID, creatorID).
-		Order("updated_at ASC").
+		Order("created_at ASC, user_id ASC").
 		Pluck("user_id", &ids).Error
 	if isMissingTableName(err) {
 		return []string{}, nil
@@ -478,6 +505,10 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 	}
 	groups := make([]model.FanGroupChat, 0, groupCount)
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		carried, err := creatorFanGroupSanctions(tx, creatorID, now)
+		if err != nil {
+			return err
+		}
 		stale := tx.Model(&model.FanGroupMember{}).
 			Where("group_id IN (SELECT id FROM fan_group_chats WHERE creator_id = ?) AND user_id <> ? AND kicked_at IS NULL", creatorID, creatorID)
 		if err := stale.Updates(map[string]any{
@@ -549,7 +580,7 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 				end = len(memberIDs)
 			}
 			for _, userID := range memberIDs[start:end] {
-				if err := syncFanGroupMember(tx, group.ID, userID, now); err != nil {
+				if err := syncFanGroupMember(tx, group.ID, userID, carried[userID], now); err != nil {
 					return err
 				}
 			}
@@ -570,19 +601,57 @@ func (r *MessageRepo) SyncFanGroups(ctx context.Context, creatorID, creatorName 
 	return groups, err
 }
 
-func syncFanGroupMember(tx *gorm.DB, groupID, userID string, now time.Time) error {
+// fanGroupSanction is what a member carries between a creator's fan groups.
+type fanGroupSanction struct {
+	manuallyKicked bool
+	mutedUntil     *time.Time
+}
+
+// creatorFanGroupSanctions collects, per user, whether they are manually
+// kicked from any of the creator's groups and their latest active mute. Both
+// apply creator-wide, so a member assigned to a different group on sync
+// cannot shed them.
+func creatorFanGroupSanctions(tx *gorm.DB, creatorID string, now time.Time) (map[string]fanGroupSanction, error) {
+	var rows []model.FanGroupMember
+	if err := tx.Model(&model.FanGroupMember{}).
+		Where("group_id IN (SELECT id FROM fan_group_chats WHERE creator_id = ?) AND user_id <> ?", creatorID, creatorID).
+		Where("(kicked_at IS NOT NULL AND kick_reason = ?) OR muted_until > ?", model.FanGroupKickReasonManual, now).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string]fanGroupSanction, len(rows))
+	for _, row := range rows {
+		sanction := out[row.UserID]
+		if row.KickedAt != nil && row.KickReason == model.FanGroupKickReasonManual {
+			sanction.manuallyKicked = true
+		}
+		if row.MutedUntil != nil && row.MutedUntil.After(now) && (sanction.mutedUntil == nil || row.MutedUntil.After(*sanction.mutedUntil)) {
+			sanction.mutedUntil = row.MutedUntil
+		}
+		out[row.UserID] = sanction
+	}
+	return out, nil
+}
+
+func syncFanGroupMember(tx *gorm.DB, groupID, userID string, sanction fanGroupSanction, now time.Time) error {
 	var member model.FanGroupMember
 	res := tx.Where("group_id = ? AND user_id = ?", groupID, userID).Find(&member)
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
+		// A member kicked from another of the creator's groups stays out; they
+		// can still ask to rejoin from the group they were kicked from.
+		if sanction.manuallyKicked {
+			return nil
+		}
 		if err := tx.Create(&model.FanGroupMember{
-			GroupID:   groupID,
-			UserID:    userID,
-			Role:      model.FanGroupRoleMember,
-			CreatedAt: now,
-			UpdatedAt: now,
+			GroupID:    groupID,
+			UserID:     userID,
+			Role:       model.FanGroupRoleMember,
+			MutedUntil: sanction.mutedUntil,
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		}).Error; err != nil {
 			return err
 		}
@@ -598,12 +667,16 @@ func syncFanGroupMember(tx *gorm.DB, groupID, userID string, now time.Time) erro
 			Where("group_id = ? AND user_id = ?", groupID, userID).
 			Update("updated_at", now).Error
 	}
+	if sanction.manuallyKicked {
+		// Kicked from another of the creator's groups: leave this row inactive.
+		return nil
+	}
+	// muted_until is left alone so a sync never lifts an owner/admin mute.
 	updates := map[string]any{
 		"kicked_at":           nil,
 		"kick_reason":         "",
 		"rejoin_requested_at": nil,
 		"rejoin_rejected_at":  nil,
-		"muted_until":         nil,
 		"updated_at":          now,
 	}
 	if member.Role == "" {
@@ -789,6 +862,22 @@ func (r *MessageRepo) UpdateFanGroupMember(ctx context.Context, creatorID, group
 				return ErrFanGroupRejoinNotFound
 			}
 			return ErrFanGroupMemberNotFound
+		}
+		if approveRejoin {
+			// Manual kicks apply creator-wide, so approving a rejoin lifts any
+			// other manual kick the user has in this creator's groups; the next
+			// sync then places them in their assigned group.
+			if err := tx.Model(&model.FanGroupMember{}).
+				Where("user_id = ? AND group_id <> ? AND kicked_at IS NOT NULL AND kick_reason = ?", userID, group.ID, model.FanGroupKickReasonManual).
+				Where("group_id IN (SELECT id FROM fan_group_chats WHERE creator_id = ?)", creatorID).
+				Updates(map[string]any{
+					"kick_reason":         model.FanGroupKickReasonSync,
+					"rejoin_requested_at": nil,
+					"rejoin_rejected_at":  nil,
+					"updated_at":          now,
+				}).Error; err != nil {
+				return err
+			}
 		}
 		var count int64
 		if err := tx.Model(&model.FanGroupMember{}).

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -225,4 +226,161 @@ func TestAppointmentTextPolicyAppliesToCreateUpdateAndStart(t *testing.T) {
 	appt, err := svc.appointments.Get(ctx, created.ID)
 	require.NoError(t, err)
 	require.Equal(t, model.AppointmentScheduled, appt.Status)
+}
+
+func newAppointmentTestPayload(scheduledAt time.Time) AppointmentPayload {
+	return AppointmentPayload{
+		ScheduledAt: scheduledAt,
+		Title:       "Big show",
+		Description: "A scheduled live",
+		Category:    "Gaming",
+		Cover:       "/uploads/gaming.jpg",
+		ChannelName: "Creator Channel",
+	}
+}
+
+func appointmentNotificationUsers(t *testing.T, db *gorm.DB, kind string) []string {
+	t.Helper()
+	var users []string
+	require.NoError(t, db.Model(&model.Notification{}).Where("type = ?", kind).Order("user_id").Pluck("user_id", &users).Error)
+	return users
+}
+
+func requireReason(t *testing.T, err error, reason string) {
+	t.Helper()
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr), "expected %s error, got %v", reason, err)
+	require.Equal(t, reason, appErr.Reason)
+}
+
+// Blocked users can neither reserve a creator's appointment nor keep getting
+// reminders through a reservation made before the block.
+func TestAppointmentBlocksStopReservationsAndReminders(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newAppointmentServiceTestDeps(t)
+	messages := repo.NewMessageRepo(db)
+	require.NoError(t, messages.AutoMigrate())
+	svc.SetBlockChecker(NewMessageService(messages, svc.rooms, nil))
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	created, err := svc.Create(ctx, "owner-block", newAppointmentTestPayload(now.Add(2*time.Hour)))
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-1", created.ID)
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-2", created.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, messages.UpsertBlock(ctx, "owner-block", "fan-1", "user", "", now))
+	require.NoError(t, messages.UpsertBlock(ctx, "fan-3", "owner-block", "creator", "", now))
+	_, err = svc.Reserve(ctx, "fan-3", created.ID)
+	requireReason(t, err, "channel_blocked")
+
+	now = now.Add(2*time.Hour - 5*time.Minute)
+	require.NoError(t, svc.ProcessDue(ctx))
+	require.Equal(t, []string{"fan-2"}, appointmentNotificationUsers(t, db, "appointment_reminder"))
+}
+
+func reserveMany(t *testing.T, db *gorm.DB, appointmentID string, n int) {
+	t.Helper()
+	rows := make([]model.AppointmentReservation, 0, n)
+	for i := 0; i < n; i++ {
+		rows = append(rows, model.AppointmentReservation{AppointmentID: appointmentID, UserID: fmt.Sprintf("watcher-%05d", i), CreatedAt: time.Now()})
+	}
+	require.NoError(t, db.CreateInBatches(&rows, 500).Error)
+}
+
+// A reminder for an audience spanning several watcher pages reaches everyone
+// and is marked sent. SQLite caps a statement at 32,766 placeholders, so the
+// old single INSERT failed here just as it did past 65,535 on MySQL.
+func TestAppointmentReminderReachesLargeAudience(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newAppointmentServiceTestDeps(t)
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	created, err := svc.Create(ctx, "owner-popular", newAppointmentTestPayload(now.Add(2*time.Hour)))
+	require.NoError(t, err)
+	audience := 2*watcherPageSize + 600
+	reserveMany(t, db, created.ID, audience)
+
+	now = now.Add(2*time.Hour - 5*time.Minute)
+	require.NoError(t, svc.ProcessDue(ctx))
+	require.Len(t, appointmentNotificationUsers(t, db, "appointment_reminder"), audience)
+	appt, err := svc.appointments.Get(ctx, created.ID)
+	require.NoError(t, err)
+	require.NotNil(t, appt.ReminderSentAt)
+}
+
+// failingBlockChecker errors for any lookup involving failOwner.
+type failingBlockChecker struct{ failOwner string }
+
+func (c *failingBlockChecker) BlocksInteraction(_ context.Context, viewerID, creatorID string) (bool, error) {
+	if c.failOwner != "" && (viewerID == c.failOwner || creatorID == c.failOwner) {
+		return false, errors.New("block lookup failed")
+	}
+	return false, nil
+}
+
+func (c *failingBlockChecker) CreatorBlocks(context.Context, string, string) (bool, error) {
+	return false, nil
+}
+
+// One appointment whose reminder fails must not stop the scheduler from
+// reminding later appointments; the failed one is retried on the next run.
+func TestAppointmentReminderFailureDoesNotStallLaterAppointments(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newAppointmentServiceTestDeps(t)
+	checker := &failingBlockChecker{}
+	svc.SetBlockChecker(checker)
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	bad, err := svc.Create(ctx, "owner-bad", newAppointmentTestPayload(now.Add(2*time.Hour)))
+	require.NoError(t, err)
+	good, err := svc.Create(ctx, "owner-good", newAppointmentTestPayload(now.Add(2*time.Hour+3*time.Minute)))
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-bad", bad.ID)
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-good", good.ID)
+	require.NoError(t, err)
+
+	checker.failOwner = "owner-bad"
+	now = now.Add(2*time.Hour - 5*time.Minute)
+	require.NoError(t, svc.ProcessDue(ctx))
+	require.Equal(t, []string{"fan-good"}, appointmentNotificationUsers(t, db, "appointment_reminder"))
+	appt, err := svc.appointments.Get(ctx, bad.ID)
+	require.NoError(t, err)
+	require.Nil(t, appt.ReminderSentAt)
+	appt, err = svc.appointments.Get(ctx, good.ID)
+	require.NoError(t, err)
+	require.NotNil(t, appt.ReminderSentAt)
+
+	checker.failOwner = ""
+	now = now.Add(time.Minute)
+	require.NoError(t, svc.ProcessDue(ctx))
+	require.Equal(t, []string{"fan-bad", "fan-good"}, appointmentNotificationUsers(t, db, "appointment_reminder"))
+	appt, err = svc.appointments.Get(ctx, bad.ID)
+	require.NoError(t, err)
+	require.NotNil(t, appt.ReminderSentAt)
+}
+
+// A start notification that failed when the appointment went live is resent
+// by the scheduler instead of being lost.
+func TestAppointmentStartNotificationIsRetried(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newAppointmentServiceTestDeps(t)
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	created, err := svc.Create(ctx, "owner-live", newAppointmentTestPayload(now.Add(20*time.Minute)))
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-1", created.ID)
+	require.NoError(t, err)
+	now = now.Add(15 * time.Minute)
+	require.NoError(t, svc.appointments.MarkLive(ctx, created.ID, now))
+
+	now = now.Add(time.Minute)
+	require.NoError(t, svc.ProcessDue(ctx))
+	require.Equal(t, []string{"fan-1"}, appointmentNotificationUsers(t, db, "appointment_started"))
+	appt, err := svc.appointments.Get(ctx, created.ID)
+	require.NoError(t, err)
+	require.NotNil(t, appt.StartNotifiedAt)
 }
