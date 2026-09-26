@@ -488,7 +488,7 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if streamKey == "" {
 		return errors.New("missing stream key")
 	}
-	roomID, err := s.live.Resolve(ctx, streamKey)
+	roomID, err := s.resolveStreamKey(ctx, streamName, streamKey)
 	if err != nil {
 		return fmt.Errorf("resolve stream key: %w", err)
 	}
@@ -515,6 +515,13 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 		}
 	}
 	if err := s.live.SavePublishSession(ctx, streamKey, req.ClientID, s.keyTTL); err != nil {
+		return err
+	}
+	// (Re)connected: restart the key's TTL and cancel a pending unpublish.
+	if err := s.live.Save(ctx, streamKey, roomID, s.keyTTL); err != nil {
+		return err
+	}
+	if err := s.live.DeleteDisconnect(ctx, roomID); err != nil {
 		return err
 	}
 	switch room.Status {
@@ -562,7 +569,7 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 	if streamKey == "" {
 		return nil
 	}
-	roomID, err := s.live.Resolve(ctx, streamKey)
+	roomID, err := s.resolveStreamKey(ctx, streamName, streamKey)
 	if err != nil || roomID != streamName {
 		// Unknown key, or a key for a different stream: nothing to update.
 		return nil
@@ -587,40 +594,72 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		_ = s.live.DeletePublishSession(ctx, streamKey)
 		return s.live.Delete(ctx, streamKey)
 	}
-	disconnectedAt := s.now()
+	// Record the disconnect before waiting out the grace period, so a restart
+	// meanwhile does not lose it: the reconciler finishes it instead.
+	disconnect := repo.PublishDisconnect{ClientID: req.ClientID, At: s.now(), Hook: true}
+	if err := s.live.SaveDisconnect(ctx, roomID, disconnect, disconnectRecordTTL); err != nil {
+		return err
+	}
 	if s.unpublishGrace > 0 {
-		go s.finalizeUnpublishAfterGrace(streamKey, roomID, req.ClientID, disconnectedAt)
+		go s.finalizeUnpublishAfterGrace(streamKey, roomID)
 		return nil
 	}
-	return s.finalizeUnpublish(ctx, streamKey, roomID, req.ClientID, disconnectedAt)
+	return s.finalizeUnpublish(ctx, streamKey, roomID)
 }
 
-func (s *LiveService) finalizeUnpublishAfterGrace(streamKey, roomID, clientID string, disconnectedAt time.Time) {
+// disconnectRecordTTL bounds how long a recorded disconnect lingers if
+// nothing finishes or clears it.
+const disconnectRecordTTL = 24 * time.Hour
+
+// resolveStreamKey returns the room bound to a publish key. When Redis lost
+// the binding (TTL expiry after downtime, flush) the key of a room that is
+// already live is still accepted from the room row, and the binding restored,
+// so its publisher can reconnect and its unpublish still ends the room.
+func (s *LiveService) resolveStreamKey(ctx context.Context, streamName, streamKey string) (string, error) {
+	roomID, err := s.live.Resolve(ctx, streamKey)
+	if !errors.Is(err, repo.ErrStreamKeyNotFound) {
+		return roomID, err
+	}
+	room, rerr := s.rooms.GetByID(ctx, streamName)
+	if rerr != nil || room.StreamKey == "" || subtle.ConstantTimeCompare([]byte(room.StreamKey), []byte(streamKey)) != 1 {
+		return "", err
+	}
+	if room.Status != model.StatusLive && room.Status != model.StatusEnding {
+		return "", err
+	}
+	if err := s.live.Save(ctx, streamKey, room.ID, s.keyTTL); err != nil {
+		return "", err
+	}
+	return room.ID, nil
+}
+
+func (s *LiveService) finalizeUnpublishAfterGrace(streamKey, roomID string) {
 	time.Sleep(s.unpublishGrace)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_ = s.finalizeUnpublish(ctx, streamKey, roomID, clientID, disconnectedAt)
+	_ = s.finalizeUnpublish(ctx, streamKey, roomID)
 }
 
-func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID, clientID string, endedAt time.Time) error {
-	if clientID != "" {
-		activeClient, err := s.live.PublishSession(ctx, streamKey)
-		if err == nil && activeClient != clientID {
-			return nil
-		}
-		if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
-			return err
-		}
-	}
-	activeRoomID, err := s.live.Resolve(ctx, streamKey)
+// finalizeUnpublish ends roomID when the disconnect recorded for it is still
+// pending: the publisher did not reconnect (which clears the record) and no
+// newer publisher took over the stream key. The room ends at the disconnect.
+func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID string) error {
+	disconnect, err := s.live.Disconnect(ctx, roomID)
 	if errors.Is(err, repo.ErrStreamKeyNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if activeRoomID != roomID {
-		return nil
+	if disconnect.ClientID != "" {
+		activeClient, err := s.live.PublishSession(ctx, streamKey)
+		if err == nil && activeClient != disconnect.ClientID {
+			// A late unpublish of a publisher that was already replaced.
+			return s.live.DeleteDisconnect(ctx, roomID)
+		}
+		if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+			return err
+		}
 	}
 	room, err := s.rooms.GetByID(ctx, roomID)
 	if errors.Is(err, repo.ErrRoomNotFound) {
@@ -637,9 +676,10 @@ func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID, 
 	}
 	if room.Status == model.StatusEnded {
 		_ = s.live.DeletePublishSession(ctx, streamKey)
+		_ = s.live.DeleteDisconnect(ctx, roomID)
 		return s.live.Delete(ctx, streamKey)
 	}
-	_, err = s.stopRoom(ctx, room, endedAt, false)
+	_, err = s.stopRoom(ctx, room, disconnect.At, false)
 	return err
 }
 
@@ -659,7 +699,7 @@ func (s *LiveService) stopRoom(ctx context.Context, room *model.Room, endedAt ti
 	if s.replay != nil {
 		s.replay.EnqueueUpload(ctx, *room)
 	}
-	var errs []error
+	errs := []error{s.live.DeleteDisconnect(ctx, room.ID)}
 	if room.StreamKey != "" {
 		errs = append(errs,
 			s.live.Delete(ctx, room.StreamKey),

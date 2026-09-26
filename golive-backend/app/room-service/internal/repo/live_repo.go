@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"time"
@@ -19,6 +20,7 @@ const streamKeyPrefix = "streamkey:"
 const streamSessionPrefix = "streamsession:"
 const roomChannelPrefix = "room:"
 const liveLockPrefix = "livelock:"
+const streamDisconnectPrefix = "streamdisconnect:"
 
 type LiveRepo struct {
 	rdb *redis.Client
@@ -66,8 +68,80 @@ func (r *LiveRepo) PublishSession(ctx context.Context, key string) (string, erro
 	return v, nil
 }
 
+// RefreshPublishSession extends the publish session's TTL, or returns
+// ErrStreamKeyNotFound when there is none.
+func (r *LiveRepo) RefreshPublishSession(ctx context.Context, key string, ttl time.Duration) error {
+	ok := false
+	var err error
+	if ttl > 0 {
+		ok, err = r.rdb.Expire(ctx, streamSessionPrefix+key, ttl).Result()
+	} else {
+		var n int64
+		n, err = r.rdb.Exists(ctx, streamSessionPrefix+key).Result()
+		ok = n > 0
+	}
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrStreamKeyNotFound
+	}
+	return nil
+}
+
 func (r *LiveRepo) DeletePublishSession(ctx context.Context, key string) error {
 	return r.rdb.Del(ctx, streamSessionPrefix+key).Err()
+}
+
+// PublishDisconnect records that a live room's publisher went away. It is
+// kept in Redis rather than only in a timer, so the unpublish grace period
+// survives restarts and the reconciler can finish it.
+type PublishDisconnect struct {
+	ClientID string    `json:"clientId,omitempty"`
+	At       time.Time `json:"at"`
+	// Hook is set when SRS reported the disconnect (on_unpublish). Otherwise
+	// the reconciler only saw the publisher missing from SRS's stream list.
+	Hook bool `json:"hook,omitempty"`
+}
+
+// SaveDisconnect records a disconnect for roomID, replacing any earlier one.
+func (r *LiveRepo) SaveDisconnect(ctx context.Context, roomID string, d PublishDisconnect, ttl time.Duration) error {
+	raw, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+	return r.rdb.Set(ctx, streamDisconnectPrefix+roomID, raw, ttl).Err()
+}
+
+// SaveDisconnectIfAbsent records a disconnect unless one is already pending,
+// so repeated observations do not restart the grace period.
+func (r *LiveRepo) SaveDisconnectIfAbsent(ctx context.Context, roomID string, d PublishDisconnect, ttl time.Duration) error {
+	raw, err := json.Marshal(d)
+	if err != nil {
+		return err
+	}
+	return r.rdb.SetNX(ctx, streamDisconnectPrefix+roomID, raw, ttl).Err()
+}
+
+// Disconnect returns the pending disconnect for roomID, or
+// ErrStreamKeyNotFound when its publisher is not known to be gone.
+func (r *LiveRepo) Disconnect(ctx context.Context, roomID string) (*PublishDisconnect, error) {
+	raw, err := r.rdb.Get(ctx, streamDisconnectPrefix+roomID).Bytes()
+	if errors.Is(err, redis.Nil) {
+		return nil, ErrStreamKeyNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	var d PublishDisconnect
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func (r *LiveRepo) DeleteDisconnect(ctx context.Context, roomID string) error {
+	return r.rdb.Del(ctx, streamDisconnectPrefix+roomID).Err()
 }
 
 // AcquireLock takes the named lock for ttl. It returns a token for

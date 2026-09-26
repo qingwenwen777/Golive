@@ -192,6 +192,7 @@ func main() {
 	}()
 	go replaySvc.RecoverInterruptedUploads(schedulerCtx)
 	go appointmentSvc.RunScheduler(schedulerCtx)
+	go liveSvc.RunReconciler(schedulerCtx, cfg.Live.ReconcileInterval)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

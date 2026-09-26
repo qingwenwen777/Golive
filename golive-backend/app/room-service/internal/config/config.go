@@ -61,6 +61,9 @@ type LiveCfg struct {
 	// SRSAPIBase is the SRS HTTP API (e.g. "http://srs:1985"), used to kick
 	// the publisher when a room is stopped. Empty disables kicking.
 	SRSAPIBase string `mapstructure:"srs_api_base"`
+	// ReconcileInterval is how often live rooms are checked against SRS's
+	// stream list, so rooms whose publisher is gone get ended (default 1m).
+	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
 }
 
 type ReplayCfg struct {
