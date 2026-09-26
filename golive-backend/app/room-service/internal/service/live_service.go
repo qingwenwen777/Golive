@@ -110,22 +110,29 @@ func (s *LiveService) srsPublishers(ctx context.Context, roomID string) map[stri
 
 // disconnectPublisher kicks the SRS clients publishing room, so a stopped
 // room stops streaming and recording instead of only changing state: the
-// publisher SRS lists for the room's play name, and the one on_publish last
-// accepted, which SRS may not list yet (or at all while its API cannot be
-// asked). Best effort: failures are logged and never fail the stop.
-func (s *LiveService) disconnectPublisher(ctx context.Context, room *model.Room) {
+// publishers SRS lists for the room's play name and, for a room that went
+// live before play names, for its raw publish key; with includeSession also
+// the one on_publish last accepted, which SRS may not list yet (or at all
+// while its API cannot be asked). Best effort: failures are logged and never
+// fail the stop.
+func (s *LiveService) disconnectPublisher(ctx context.Context, room *model.Room, includeSession bool) {
 	if s.srs == nil || room.StreamKey == "" {
 		return
 	}
 	var clientIDs []string
-	if clientID := s.srsPublishers(ctx, room.ID)[playStreamName(room.ID, room.StreamKey)]; clientID != "" {
-		clientIDs = append(clientIDs, clientID)
+	publishers := s.srsPublishers(ctx, room.ID)
+	for _, stream := range []string{playStreamName(room.ID, room.StreamKey), room.StreamKey} {
+		if clientID := publishers[stream]; clientID != "" && !slices.Contains(clientIDs, clientID) {
+			clientIDs = append(clientIDs, clientID)
+		}
 	}
-	clientID, err := s.live.PublishSession(ctx, room.StreamKey)
-	if err == nil && !slices.Contains(clientIDs, clientID) {
-		clientIDs = append(clientIDs, clientID)
-	} else if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
-		logger.L().Warn("load srs publish session", zap.Error(err), zap.String("room_id", room.ID))
+	if includeSession {
+		clientID, err := s.live.PublishSession(ctx, room.StreamKey)
+		if err == nil && !slices.Contains(clientIDs, clientID) {
+			clientIDs = append(clientIDs, clientID)
+		} else if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
+			logger.L().Warn("load srs publish session", zap.Error(err), zap.String("room_id", room.ID))
+		}
 	}
 	for _, clientID := range clientIDs {
 		if err := s.srs.kickClient(ctx, clientID); err != nil {
@@ -754,18 +761,21 @@ func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID s
 }
 
 // stopRoom ends room and does the follow-up work of every stop: kick the SRS
-// publisher (when kick is set), queue the replay upload or recording cleanup,
-// drop the stream key and publish session, and tell viewers. It reports
-// whether this call ended the room; when another path ended it first, that
-// path owns the follow-up work and nothing more is done here.
+// publishers (the one on_publish stored only when kick is set), queue the
+// replay upload or recording cleanup, drop the stream key and publish
+// session, and tell viewers. It reports whether this call ended the room;
+// when another path ended it first, that path owns the follow-up work and
+// nothing more is done here.
 func (s *LiveService) stopRoom(ctx context.Context, room *model.Room, endedAt time.Time, kick bool) (bool, error) {
 	ended, err := s.endRoom(ctx, room, endedAt)
 	if err != nil || !ended {
 		return false, err
 	}
-	if kick {
-		s.disconnectPublisher(ctx, room)
-	}
+	// Even a room whose publisher is gone can have one SRS lists: one that
+	// raced the stop, or one still publishing under the raw key from before
+	// play names. Kicked, it stops streaming into nothing and SRS closes the
+	// recording the replay upload waits for.
+	s.disconnectPublisher(ctx, room, kick)
 	if s.replay != nil {
 		s.replay.EnqueueUpload(ctx, *room)
 	}

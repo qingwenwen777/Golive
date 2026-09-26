@@ -93,3 +93,54 @@ func TestReconcilerStoresThePublisherSRSLists(t *testing.T) {
 	env.svc.Reconcile(ctx)
 	requirePublishSession(t, env, st, "client-A")
 }
+
+// prePlayNameLive stores a live that went live before play names: OBS
+// publishes it under the raw key (live/lk_...), without ?key=, and SRS lists
+// it under that name. Its playbackUrl now names a play name nobody publishes.
+func prePlayNameLive(t *testing.T, env *lifecycleTestEnv, srs *fakeSRS, ownerID string) *model.Room {
+	t.Helper()
+	ctx := context.Background()
+	room := &model.Room{
+		ID: "live-" + ownerID, Title: "Old scheme", Status: model.StatusLive, OwnerID: ownerID,
+		StreamKey: "lk_0123456789abcdef0123456789abcdef", StartedAt: time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC),
+		ReplayStatus: model.ReplayStatusNone, ReplayVisibility: model.PostVisibilityPublic,
+	}
+	require.NoError(t, env.rooms.Upsert(ctx, room))
+	require.NoError(t, env.live.Save(ctx, room.StreamKey, room.ID, time.Hour))
+	srs.setPublisher(room.StreamKey, "client-old")
+	return room
+}
+
+func TestReconcilerEndsPrePlayNameLiveAndKicksItsPublisher(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	srs, base := newFakeSRS(t)
+	room := prePlayNameLive(t, env, srs, "owner-old-scheme")
+	t0 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+
+	// OBS reconnecting with the old stream key is refused and changes nothing.
+	old := SRSPublishReq{App: "live", Stream: room.StreamKey, ClientID: "client-old-2"}
+	require.Error(t, env.restarted(20*time.Second, t0, base).OnPublish(ctx, old))
+	requireRoomStatus(t, env, room.ID, model.StatusLive)
+	_, err := env.live.PublishSession(ctx, room.StreamKey)
+	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+
+	env.restarted(20*time.Second, t0, base).Reconcile(ctx)
+	env.restarted(20*time.Second, t0.Add(time.Minute), base).Reconcile(ctx)
+	requireRoomStatus(t, env, room.ID, model.StatusEnded)
+	// Disconnected, OBS stops streaming into nothing and SRS closes the
+	// recording the replay upload waits for.
+	require.Equal(t, []string{"client-old"}, srs.kicks())
+}
+
+func TestStopKicksPrePlayNamePublisher(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	srs, base := newFakeSRS(t)
+	env.svc.SetSRSAPIBase(base)
+	room := prePlayNameLive(t, env, srs, "owner-old-scheme-stop")
+
+	require.NoError(t, env.svc.ForceStopRoom(ctx, room.ID))
+	requireRoomStatus(t, env, room.ID, model.StatusEnded)
+	require.Equal(t, []string{"client-old"}, srs.kicks())
+}

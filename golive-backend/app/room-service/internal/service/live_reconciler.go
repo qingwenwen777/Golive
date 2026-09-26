@@ -51,7 +51,9 @@ type staleRoom struct {
 //
 // A room counts as without publisher when SRS's stream list lacks its play
 // name, or, while SRS cannot be asked, only when on_unpublish recorded a
-// disconnect: an SRS outage alone never ends rooms.
+// disconnect: an SRS outage alone never ends rooms. A room that went live
+// before play names still publishes under its raw key, which nobody can play:
+// it ends like a room without publisher, and stopRoom kicks that publisher.
 func (s *LiveService) Reconcile(ctx context.Context) {
 	rooms, err := s.rooms.ActiveRooms(ctx)
 	if err != nil {
