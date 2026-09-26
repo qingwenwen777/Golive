@@ -19,6 +19,8 @@ type Config struct {
 	Replay   ReplayCfg   `mapstructure:"replay"`
 	Upload   UploadCfg   `mapstructure:"upload"`
 	Users    UsersCfg    `mapstructure:"users"`
+	Gifts    GiftsCfg    `mapstructure:"gifts"`
+	Chat     ChatCfg     `mapstructure:"chat"`
 	Internal InternalCfg `mapstructure:"internal"`
 }
 
@@ -83,6 +85,18 @@ type UploadCfg struct {
 type UsersCfg struct {
 	ServiceURL string `mapstructure:"service_url"`
 	GRPCAddr   string `mapstructure:"grpc_addr"`
+}
+
+// GiftsCfg locates gift-service, which report moderation calls to hide a
+// super chat.
+type GiftsCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
+}
+
+// ChatCfg locates chat-service, which report moderation calls to hide a
+// chat message.
+type ChatCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
 }
 
 // InternalCfg holds the shared secret sent on (and required by) /internal

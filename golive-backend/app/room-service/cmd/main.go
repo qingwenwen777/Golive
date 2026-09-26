@@ -103,6 +103,10 @@ func main() {
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
+	moderationSvc.SetOwnerServices(service.NewOwnerServices(cfg.Users.ServiceURL, cfg.Gifts.ServiceURL, cfg.Chat.ServiceURL, cfg.Internal.Token))
+	if cfg.Internal.Token == "" {
+		log.Warn("internal.token is empty: moderation calls to user/gift/chat-service will be rejected")
+	}
 	messageSvc := service.NewMessageService(messageRepo, roomRepo, socialRepo)
 	moderationSvc.SetLiveService(liveSvc)
 	moderationSvc.SetSystemRuntimeConfig(service.SystemRuntimeConfig{

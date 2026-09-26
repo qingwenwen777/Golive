@@ -35,7 +35,9 @@ func TestLiveHTTP_BannedCreatorCannotGoLive(t *testing.T) {
 	t.Cleanup(func() { _ = rdb.Close() })
 	moderationRepo := repo.NewModerationRepo(db, rdb)
 	require.NoError(t, moderationRepo.AutoMigrate())
-	require.NoError(t, moderationRepo.ApplyUserSanction(context.Background(), "banned-creator", "", "admin-1", model.UserSanctionBan, "", "abuse", 0, time.Now()))
+	// user-service owns the ban state; seed it the way its ban API writes it.
+	now := time.Now()
+	require.NoError(t, db.Create(&model.UserModerationState{UserID: "banned-creator", Banned: true, BanReason: "abuse", UpdatedBy: "admin-1", UpdatedAt: now, CreatedAt: now}).Error)
 
 	router := server.NewRouter(server.Deps{
 		JWTSecret:  jwtSecret,
