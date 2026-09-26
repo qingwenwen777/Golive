@@ -751,6 +751,47 @@ func TestReportsCannotSanctionStaff(t *testing.T) {
 	require.True(t, restriction.Banned)
 }
 
+// A ban from a report must take the user off air, not only block the next
+// GoLive.
+func TestReportBanEndsBannedUsersLiveRooms(t *testing.T) {
+	ctx := context.Background()
+	svc, db, rdb := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	liveRepo := repo.NewLiveRepo(rdb)
+	svc.SetLiveService(NewLiveService(svc.rooms, liveRepo, "test-secret", time.Hour, "http://srs/live"))
+
+	require.NoError(t, db.Create(&model.Room{
+		ID:        "room-bad",
+		Title:     "Bad stream",
+		OwnerID:   "bad-user",
+		ChannelID: "ch-bad-user",
+		Status:    model.StatusLive,
+		StreamKey: "lk_bad",
+		StartedAt: now.Add(-time.Hour),
+	}).Error)
+	require.NoError(t, liveRepo.Save(ctx, "lk_bad", "room-bad", time.Hour))
+	seedReportDanmu(t, db, "room-1", "danmu-ban", "bad-user", "abuse")
+
+	require.NoError(t, svc.EnsureUserNotBanned(ctx, "bad-user"))
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-ban", RoomID: "room-1", Reason: "harassment"})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"ban_user"}})
+	require.NoError(t, err)
+
+	requireAppErrReason(t, svc.EnsureUserNotBanned(ctx, "bad-user"), http.StatusForbidden, "user_banned")
+	room, err := svc.rooms.GetByID(ctx, "room-bad")
+	require.NoError(t, err)
+	require.Equal(t, model.StatusEnded, room.Status)
+	_, err = liveRepo.Resolve(ctx, "lk_bad")
+	require.Error(t, err)
+
+	// The room the danmu was posted in belongs to someone else and stays live.
+	other, err := svc.rooms.GetByID(ctx, "room-1")
+	require.NoError(t, err)
+	require.Equal(t, model.StatusLive, other.Status)
+}
+
 func requireAppErrStatus(t *testing.T, err error, status int) {
 	t.Helper()
 	var appErr *errcode.AppError

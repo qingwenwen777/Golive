@@ -14,10 +14,11 @@ import (
 type AppointmentHandler struct {
 	svc        *service.AppointmentService
 	permission service.LivePermissionChecker
+	bans       service.UserBanChecker
 }
 
-func NewAppointmentHandler(svc *service.AppointmentService, permission service.LivePermissionChecker) *AppointmentHandler {
-	return &AppointmentHandler{svc: svc, permission: permission}
+func NewAppointmentHandler(svc *service.AppointmentService, permission service.LivePermissionChecker, bans service.UserBanChecker) *AppointmentHandler {
+	return &AppointmentHandler{svc: svc, permission: permission, bans: bans}
 }
 
 type appointmentReq struct {
@@ -36,7 +37,7 @@ func (h *AppointmentHandler) Create(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !requireLivePermission(c, h.permission, uid) {
+	if !requireLivePublisher(c, h.permission, h.bans, uid) {
 		return
 	}
 	payload, ok := bindAppointmentPayload(c)
@@ -56,7 +57,7 @@ func (h *AppointmentHandler) Update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !requireLivePermission(c, h.permission, uid) {
+	if !requireLivePublisher(c, h.permission, h.bans, uid) {
 		return
 	}
 	payload, ok := bindAppointmentPayload(c)
@@ -101,7 +102,7 @@ func (h *AppointmentHandler) Start(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !requireLivePermission(c, h.permission, uid) {
+	if !requireLivePublisher(c, h.permission, h.bans, uid) {
 		return
 	}
 	resp, err := h.svc.Start(c.Request.Context(), uid, c.Param("id"))

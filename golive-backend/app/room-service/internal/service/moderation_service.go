@@ -1069,7 +1069,10 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	case model.ReportActionBanUser:
 		if targetUserID != "" {
 			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
-			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now)
+			if err := s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now); err != nil {
+				return err
+			}
+			return s.endUserLiveRooms(ctx, targetUserID)
 		}
 	case model.ReportActionForceEndLive:
 		roomID := firstNonEmptyString(report.RoomID, report.TargetID)
@@ -1080,6 +1083,24 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 		}
 		if report.TargetOwnerID != "" {
 			_ = s.notifyModeration(ctx, report.TargetOwnerID, "moderation_live_ended", "直播已被管理员结束", moderationForceEndBody(note), targetLink, adminID, now)
+		}
+	}
+	return nil
+}
+
+// endUserLiveRooms force-ends every active room owned by userID so a ban also
+// takes the user off air instead of only blocking their next GoLive.
+func (s *ModerationService) endUserLiveRooms(ctx context.Context, userID string) error {
+	if s.live == nil || s.rooms == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	rooms, err := s.rooms.ActiveRoomsByOwner(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, room := range rooms {
+		if err := s.live.ForceStopRoom(ctx, room.ID); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1260,6 +1281,27 @@ func (s *ModerationService) EnsureUserCanInteract(ctx context.Context, userID st
 	}
 	if restriction.Muted {
 		return errcode.New(http.StatusForbidden, "user is muted").WithReason("site_muted")
+	}
+	return nil
+}
+
+// UserBanChecker rejects banned users. *ModerationService implements it.
+type UserBanChecker interface {
+	EnsureUserNotBanned(ctx context.Context, userID string) error
+}
+
+// EnsureUserNotBanned is EnsureUserCanInteract without the site-mute check:
+// a mute only silences chat/comments, a ban also takes away going live.
+func (s *ModerationService) EnsureUserNotBanned(ctx context.Context, userID string) error {
+	if s == nil || s.moderation == nil || strings.TrimSpace(userID) == "" {
+		return nil
+	}
+	restriction, err := s.moderation.UserRestriction(ctx, userID, s.now())
+	if err != nil {
+		return err
+	}
+	if restriction.Banned {
+		return errcode.New(http.StatusForbidden, "user is banned").WithReason("user_banned")
 	}
 	return nil
 }

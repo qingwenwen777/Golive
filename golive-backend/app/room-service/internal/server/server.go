@@ -42,11 +42,16 @@ func NewRouter(d Deps) *gin.Engine {
 	roomH := handler.NewRoomHandler(d.Room)
 	socialH := handler.NewSocialHandler(d.Social)
 	postH := handler.NewPostHandler(d.Posts, d.Permission, d.PostImageDir, d.PostPublicURL)
-	liveH := handler.NewLiveHandler(d.Live, d.Permission)
+	// Avoid a typed-nil interface when Moderation is not wired (tests).
+	var bans service.UserBanChecker
+	if d.Moderation != nil {
+		bans = d.Moderation
+	}
+	liveH := handler.NewLiveHandler(d.Live, d.Permission, bans)
 	replayH := handler.NewReplayHandler(d.Replay)
 	replayCommentH := handler.NewReplayCommentHandler(d.ReplayComments)
 	searchH := handler.NewSearchHandler(d.Search)
-	appointmentH := handler.NewAppointmentHandler(d.Appointments, d.Permission)
+	appointmentH := handler.NewAppointmentHandler(d.Appointments, d.Permission, bans)
 	moderationH := handler.NewModerationHandler(d.Moderation)
 	messageH := handler.NewMessageHandler(d.Messages)
 	srsH := handler.NewSRSHandler(d.Live)
