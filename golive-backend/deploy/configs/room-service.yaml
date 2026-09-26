@@ -26,6 +26,7 @@ live:
   stream_key_ttl: 4h
   flv_base: "https://golive.us.ci/live"
   srs_api_base: "http://srs:1985"
+  reconcile_interval: 1m
 
 replay:
   record_dir: "/tmp/golive/records"
@@ -34,6 +35,7 @@ replay:
   bunny_api_base: "https://video.bunnycdn.com"
   bunny_player_base: "https://player.mediadelivery.net/embed"
   upload_timeout: 30m
+  stale_recording_age: 24h
 
 upload:
   cover_dir: "/tmp/golive/covers"

@@ -134,3 +134,9 @@ Viewers play `/live/<roomId>.flv`, so the secret never appears in public URLs.
 When a live is stopped (stop, force-end/ban, or a new go-live replacing it), room-service
 disconnects the publisher through the SRS HTTP API (`DELETE /api/v1/clients/{client_id}`) at
 `live.srs_api_base` (`http://srs:1985` in deploy). Failures are logged and do not fail the stop.
+
+A reconciler (every `live.reconcile_interval`, default 1m) checks live rooms against
+`GET /api/v1/streams/` on the same API. It keeps live rooms' stream keys from expiring, and ends
+rooms whose publisher has been gone longer than the unpublish grace period (lost `on_unpublish`,
+restart during the grace period), or that were never published to before their key expired.
+While the SRS API is unreachable it only ends rooms whose `on_unpublish` was recorded.

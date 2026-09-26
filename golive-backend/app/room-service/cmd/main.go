@@ -89,12 +89,13 @@ func main() {
 	socialSvc.SetMaxFollows(cfg.Social.MaxFollows)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 	replaySvc := service.NewReplayService(roomRepo, socialRepo, service.ReplayConfig{
-		RecordDir:       cfg.Replay.RecordDir,
-		BunnyLibraryID:  cfg.Replay.BunnyLibraryID,
-		BunnyAPIKey:     cfg.Replay.BunnyAPIKey,
-		BunnyAPIBase:    cfg.Replay.BunnyAPIBase,
-		BunnyPlayerBase: cfg.Replay.BunnyPlayerBase,
-		UploadTimeout:   cfg.Replay.UploadTimeout,
+		RecordDir:         cfg.Replay.RecordDir,
+		BunnyLibraryID:    cfg.Replay.BunnyLibraryID,
+		BunnyAPIKey:       cfg.Replay.BunnyAPIKey,
+		BunnyAPIBase:      cfg.Replay.BunnyAPIBase,
+		BunnyPlayerBase:   cfg.Replay.BunnyPlayerBase,
+		UploadTimeout:     cfg.Replay.UploadTimeout,
+		StaleRecordingAge: cfg.Replay.StaleRecordingAge,
 	})
 	roomSvc.SetReplayService(replaySvc)
 	roomSvc.SetLiveRepo(liveRepo)
@@ -198,6 +199,7 @@ func main() {
 	}()
 	go replaySvc.RecoverInterruptedUploads(schedulerCtx)
 	go appointmentSvc.RunScheduler(schedulerCtx)
+	go liveSvc.RunReconciler(schedulerCtx, cfg.Live.ReconcileInterval)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

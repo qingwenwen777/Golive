@@ -442,6 +442,11 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 	if err := s.cleanupExpired(ctx); err != nil {
 		return nil, err
 	}
+	unlock, err := s.live.lockOwnerStart(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	now := s.now()
 	appt, err := s.appointments.OwnerAppointment(ctx, ownerID, id)
 	if err != nil {
@@ -471,15 +476,9 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 		return nil, err
 	}
 	if active, err := s.rooms.ActiveByOwner(ctx, ownerID); err == nil && active.ID != room.ID {
-		if err := s.live.endRoom(ctx, active, now); err != nil {
+		if _, err := s.live.stopRoom(ctx, active, now, true); err != nil {
 			return nil, err
 		}
-		s.live.disconnectPublisher(ctx, active.ID, active.StreamKey)
-		if active.StreamKey != "" {
-			_ = s.live.live.Delete(ctx, active.StreamKey)
-			_ = s.live.live.DeletePublishSession(ctx, active.StreamKey)
-		}
-		_ = s.live.broadcastEnded(ctx, active.ID, now)
 	} else if err != nil && !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
 	}
