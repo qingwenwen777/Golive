@@ -340,9 +340,7 @@ func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, erro
 	if key == "" {
 		return "", ErrRoomNotFound
 	}
-	if strings.HasPrefix(key, "ch-") {
-		key = strings.TrimPrefix(key, "ch-")
-	}
+	key = strings.TrimPrefix(key, "ch-")
 	if IsUUIDLike(key) {
 		return key, nil
 	}

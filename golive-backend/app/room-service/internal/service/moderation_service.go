@@ -1530,19 +1530,6 @@ func muteStateResp(roomID, targetUserID string, mute *model.RoomMute, now time.T
 	return resp
 }
 
-func excludeUserID(ids []string, userID string) []string {
-	if userID == "" || len(ids) == 0 {
-		return ids
-	}
-	out := ids[:0]
-	for _, id := range ids {
-		if id != userID {
-			out = append(out, id)
-		}
-	}
-	return out
-}
-
 func moderationUsers(rows []repo.ModerationUser) []ModerationUserDTO {
 	out := make([]ModerationUserDTO, 0, len(rows))
 	for _, row := range rows {
@@ -1835,17 +1822,6 @@ func statusForReportActions(actions []string) string {
 		}
 	}
 	return model.ReportStatusResolved
-}
-
-func statusForReportAction(action string) string {
-	switch action {
-	case model.ReportActionReview:
-		return model.ReportStatusReviewing
-	case model.ReportActionDismiss:
-		return model.ReportStatusDismissed
-	default:
-		return model.ReportStatusResolved
-	}
 }
 
 func (p adminSystemPolicy) normalizeSanctionDuration(actions []string, minutes int) int {

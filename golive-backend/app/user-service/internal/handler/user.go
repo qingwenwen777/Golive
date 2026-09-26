@@ -418,43 +418,6 @@ func (h *UserHandler) ConfirmTopupCoins(c *gin.Context) {
 	})
 }
 
-// TopupCoins increments the authenticated user's coin balance by the given
-// amount and returns the updated public user. This is a stub for development;
-// real billing integration is out of scope.
-func (h *UserHandler) legacyTopupCoins(c *gin.Context) {
-	uid := UserIDFromCtx(c)
-	if uid == "" {
-		errcode.Respond(c, service.ErrUnauthorized)
-		return
-	}
-	var req topupReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid amount"})
-		return
-	}
-	if req.Amount < 10 {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 10 coins"})
-		return
-	}
-	u, _, err := h.users.IncrementCoinsWithTransaction(
-		c.Request.Context(),
-		uid,
-		req.Amount,
-		model.CoinTxTopup,
-		"充值获得",
-		"模拟充值成功，后续接入真实支付接口。",
-		"topup",
-		"",
-		"",
-		"",
-	)
-	if err != nil {
-		errcode.Respond(c, service.ErrUnauthorized)
-		return
-	}
-	c.JSON(http.StatusOK, u.Public())
-}
-
 func (h *UserHandler) CoinTransactions(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {

@@ -18,9 +18,9 @@ import (
 )
 
 func TestUploadAvatarReturnsRelativeURLAndPersistsUser(t *testing.T) {
-	router, users, auth := newCoinsTestRouter(t)
+	_, users, auth := newCoinsTestRouter(t)
 	uploadDir := t.TempDir()
-	router = NewRouter(Deps{
+	router := NewRouter(Deps{
 		Auth:            auth,
 		Users:           users,
 		AvatarDir:       uploadDir,
@@ -70,9 +70,9 @@ func TestUploadAvatarRejectsInvalidType(t *testing.T) {
 }
 
 func TestUploadCoverReturnsRelativeURLAndPersistsUser(t *testing.T) {
-	router, users, auth := newCoinsTestRouter(t)
+	_, users, auth := newCoinsTestRouter(t)
 	coverDir := t.TempDir()
-	router = NewRouter(Deps{
+	router := NewRouter(Deps{
 		Auth:           auth,
 		Users:          users,
 		CoverDir:       coverDir,

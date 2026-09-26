@@ -489,10 +489,6 @@ func removeRecording(recordPath string) error {
 	return nil
 }
 
-func waitForStableRecording(ctx context.Context, recordPath string) (os.FileInfo, error) {
-	return waitForStableFile(ctx, recordPath, replayRecordingStableInterval, replayRecordingStableChecks)
-}
-
 func waitForStableFile(
 	ctx context.Context,
 	recordPath string,

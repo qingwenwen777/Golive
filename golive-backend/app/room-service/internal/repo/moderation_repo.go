@@ -467,10 +467,7 @@ func (r *ModerationRepo) UnmuteUser(ctx context.Context, ownerID, roomID, operat
 		return nil, err
 	}
 	target, err := r.UserProfile(ctx, targetUserID)
-	if err == nil {
-		targetName = target.Name
-		targetAvatar = target.Avatar
-	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		target = ModerationUser{ID: targetUserID, Name: strings.TrimSpace(targetName), Avatar: strings.TrimSpace(targetAvatar)}
 		if target.Name == "" && current != nil {
 			target.Name = current.TargetName
@@ -479,7 +476,7 @@ func (r *ModerationRepo) UnmuteUser(ctx context.Context, ownerID, roomID, operat
 		if target.Name == "" {
 			target.Name = targetUserID
 		}
-	} else {
+	} else if err != nil {
 		return nil, err
 	}
 	if current == nil {
@@ -575,14 +572,6 @@ func (r *ModerationRepo) CreateContentReport(ctx context.Context, report *model.
 		}
 		return tx.Create(report).Error
 	})
-}
-
-func (r *ModerationRepo) openReportGroupID(ctx context.Context, tx *gorm.DB, targetType, targetID string) (string, error) {
-	existing, err := r.openReportGroup(ctx, tx, targetType, targetID, "")
-	if err != nil || existing == nil {
-		return "", err
-	}
-	return existing.GroupID, nil
 }
 
 func (r *ModerationRepo) openReportGroup(ctx context.Context, tx *gorm.DB, targetType, targetID, roomID string) (*model.ContentReport, error) {

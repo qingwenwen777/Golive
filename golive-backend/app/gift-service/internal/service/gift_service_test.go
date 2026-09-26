@@ -171,7 +171,7 @@ func TestGiftSend_BalanceBoundary(t *testing.T) {
 
 	// Second send must fail with insufficient_coin AND persist a failed
 	// order so that retries with same requestId replay the same failure.
-	order, replayed, err = svc.Send(ctx, service.SendGiftReq{
+	order, _, err = svc.Send(ctx, service.SendGiftReq{
 		UserID: "u-demo", RoomID: "r", GiftID: "donut", Count: 1, RequestID: "r2",
 	})
 	require.ErrorIs(t, err, service.ErrInsufficientCoin)
