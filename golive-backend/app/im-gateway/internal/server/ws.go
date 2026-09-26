@@ -15,6 +15,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/rooms"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -36,16 +37,27 @@ type WSHandler struct {
 	deps     Deps
 	cfg      WSConfig
 	welcome  string
+	caps     *connCaps
 }
 
 func NewWSHandler(d Deps, v auth.Verifier, cfg WSConfig, welcome string) *WSHandler {
-	return &WSHandler{hub: d.Hub, verifier: v, deps: d, cfg: cfg, welcome: welcome}
+	return &WSHandler{
+		hub:      d.Hub,
+		verifier: v,
+		deps:     d,
+		cfg:      cfg,
+		welcome:  welcome,
+		caps:     newConnCaps(cfg.MaxConnsPerUser, cfg.MaxConnsPerIP),
+	}
 }
 
 // ServeHTTP performs the handshake. Failure modes (per spec):
 //
-//	roomId missing -> 400
+//	roomId missing / malformed -> 400
 //	token missing/invalid -> 401
+//	room unknown (with RequireKnownRoom) -> 404
+//	too many connections for the user / IP -> 429
+//	room lookup unavailable -> 503
 //	upgrade fails -> upgrader writes the response itself
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	roomID := strings.TrimSpace(r.URL.Query().Get("roomId"))
@@ -54,7 +66,11 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing roomId", http.StatusBadRequest)
 		return
 	}
-	ownerID := strings.TrimSpace(r.URL.Query().Get("ownerId"))
+	if !rooms.ValidID(roomID) {
+		metrics.HandshakeFailures.WithLabelValues("bad_room").Inc()
+		http.Error(w, "invalid roomId", http.StatusBadRequest)
+		return
+	}
 	identity, err := h.verifier.Verify(r.URL.Query().Get("token"))
 	if err != nil {
 		reason := "invalid_token"
@@ -68,10 +84,43 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The owner comes from room-service's data when the room is known; the
+	// client-supplied ownerId is only a fallback for unknown rooms when they
+	// are allowed at all.
+	ownerID := ""
+	known := false
+	if h.deps.Rooms != nil {
+		info, found, err := h.deps.Rooms.Lookup(r.Context(), roomID)
+		if err != nil {
+			logger.L().Warn("room lookup", zap.String("room", roomID), zap.Error(err))
+			metrics.HandshakeFailures.WithLabelValues("room_lookup").Inc()
+			http.Error(w, "room lookup unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		known = found
+		ownerID = info.OwnerID
+	}
+	if !known {
+		if h.cfg.RequireKnownRoom {
+			metrics.HandshakeFailures.WithLabelValues("unknown_room").Inc()
+			http.Error(w, "unknown room", http.StatusNotFound)
+			return
+		}
+		ownerID = strings.TrimSpace(r.URL.Query().Get("ownerId"))
+	}
+
+	release, capped := h.caps.acquire(identity.UserID, clientIP(r, h.cfg.TrustedProxies))
+	if capped != "" {
+		metrics.HandshakeFailures.WithLabelValues("too_many_conns_" + capped).Inc()
+		http.Error(w, "too many connections", http.StatusTooManyRequests)
+		return
+	}
+
 	up := upgrader
 	up.CheckOrigin = h.checkOrigin
 	ws, err := up.Upgrade(w, r, nil)
 	if err != nil {
+		release()
 		metrics.HandshakeFailures.WithLabelValues("upgrade").Inc()
 		return
 	}
@@ -79,6 +128,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := newConn(ws, roomID, ownerID, identity, h.deps, h.cfg)
 	room, err := h.hub.Join(roomID, c, c.initialViewerProfile())
 	if err != nil {
+		release()
 		logger.L().Error("hub join", zap.Error(err))
 		_ = ws.Close()
 		return
@@ -89,9 +139,13 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.Send(hub.EncodeSystem(h.welcome))
 	c.Send(hub.EncodeViewerCount(room.Size()))
 
-	// Each conn gets its own pumps. readPump exits on disconnect → leave hub.
+	// Each conn gets its own pumps. readPump exits on disconnect → leave hub
+	// and free the connection slot.
 	go c.writePump()
-	go c.readPump(context.Background())
+	go func() {
+		defer release()
+		c.readPump(context.Background())
+	}()
 }
 
 func (h *WSHandler) checkOrigin(r *http.Request) bool {

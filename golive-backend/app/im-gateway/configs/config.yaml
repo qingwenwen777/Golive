@@ -12,6 +12,11 @@ ws:
   send_buffer: 256         # per-conn outbound queue; overflow → kick
   pong_wait: 60s
   max_message_rate: 5      # client→server frames / sec / conn (all types)
+  max_conns_per_user: 8    # concurrent sockets per account
+  max_conns_per_ip: 64     # per client IP (see trusted_proxies)
+  trusted_proxies:         # peers whose X-Real-IP / X-Forwarded-For is trusted
+    - "127.0.0.1/32"
+    - "::1/128"
 
   allowed_origins:
     - "http://localhost:5173"
@@ -39,6 +44,8 @@ kafka:
 room:
   viewer_push_interval: 5s
   welcome_text: "Welcome to the live room!"
+  require_known: true      # reject roomIds room-service doesn't know
+  service_url: "http://127.0.0.1:8091"
 
 # Sensitive words are masked in live chat (same list chat-service uses).
 filter:

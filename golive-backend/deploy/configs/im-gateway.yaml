@@ -10,7 +10,15 @@ ws:
   write_deadline: 10s
   send_buffer: 256
   pong_wait: 60s
-  max_message_rate: 5
+  max_message_rate: 5      # inbound frames / sec / conn (all types)
+  max_conns_per_user: 8    # concurrent sockets per account
+  max_conns_per_ip: 64     # generous for NAT / campus networks
+  # Only nginx reaches im-gateway (no published port); trust its X-Real-IP.
+  trusted_proxies:
+    - "127.0.0.1/32"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
   allowed_origins:
     - "https://golive.us.ci"
     - "http://golive.us.ci"
@@ -46,6 +54,10 @@ kafka:
 room:
   viewer_push_interval: 5s
   welcome_text: "Welcome to the live room!"
+  # Reject roomIds room-service doesn't know: Redis room:owner:<id> first,
+  # then room-service GET /rooms/<id> (e.g. scheduled rooms).
+  require_known: true
+  service_url: "http://room-service:8091"
 
 # Mounted read-only by docker-compose (same file chat-service uses).
 filter:

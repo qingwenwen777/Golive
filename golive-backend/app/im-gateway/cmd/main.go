@@ -20,6 +20,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/pubsub"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/rooms"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/server"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
@@ -73,14 +74,22 @@ func main() {
 	}
 	defer p.Close()
 
+	trustedProxies, err := cfg.WS.TrustedProxyNets()
+	if err != nil {
+		log.Fatal("ws config", zap.Error(err))
+	}
 	wsCfg := server.WSConfig{
-		ReadLimitBytes:  cfg.WS.ReadLimitBytes,
-		ReadIdleTimeout: cfg.WS.ReadIdleTimeout,
-		WriteDeadline:   cfg.WS.WriteDeadline,
-		SendBuffer:      cfg.WS.SendBuffer,
-		PongWait:        cfg.WS.PongWait,
-		MaxMessageRate:  cfg.WS.MaxMessageRate,
-		AllowedOrigins:  cfg.WS.AllowedOrigins,
+		ReadLimitBytes:   cfg.WS.ReadLimitBytes,
+		ReadIdleTimeout:  cfg.WS.ReadIdleTimeout,
+		WriteDeadline:    cfg.WS.WriteDeadline,
+		SendBuffer:       cfg.WS.SendBuffer,
+		PongWait:         cfg.WS.PongWait,
+		MaxMessageRate:   cfg.WS.MaxMessageRate,
+		AllowedOrigins:   cfg.WS.AllowedOrigins,
+		MaxConnsPerUser:  cfg.WS.MaxConnsPerUser,
+		MaxConnsPerIP:    cfg.WS.MaxConnsPerIP,
+		TrustedProxies:   trustedProxies,
+		RequireKnownRoom: cfg.Room.RequireKnown,
 	}
 	words, err := chatfilter.LoadWords(cfg.Filter.SensitivePath)
 	if err != nil {
@@ -94,6 +103,7 @@ func main() {
 		Moderation:  moderation.NewRedisChecker(rdb),
 		Filter:      chatfilter.New(words, chatfilter.WithMask(cfg.Filter.Mask), chatfilter.WithSkipChars(chatfilter.DefaultSkipChars)),
 		ChatLimiter: chatlimit.New(rdb, "rl:imgw:chat:", cfg.ChatRateLimit.PerUserPerSec, cfg.ChatRateLimit.Window()),
+		Rooms:       rooms.NewRedisDirectory(rdb, rooms.Config{RoomServiceURL: cfg.Room.ServiceURL}),
 	}
 	wsH := server.NewWSHandler(deps, verifier, wsCfg, cfg.Room.WelcomeText)
 	mux := server.NewMux(wsH, h)

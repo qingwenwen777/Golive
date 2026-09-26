@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -38,6 +39,32 @@ type WSCfg struct {
 	PongWait        time.Duration `mapstructure:"pong_wait"`
 	MaxMessageRate  float64       `mapstructure:"max_message_rate"`
 	AllowedOrigins  []string      `mapstructure:"allowed_origins"`
+	MaxConnsPerUser int           `mapstructure:"max_conns_per_user"`
+	MaxConnsPerIP   int           `mapstructure:"max_conns_per_ip"`
+	// TrustedProxies are CIDRs (or bare IPs) of reverse proxies whose
+	// X-Real-IP / X-Forwarded-For headers identify the client.
+	TrustedProxies []string `mapstructure:"trusted_proxies"`
+}
+
+// TrustedProxyNets parses TrustedProxies.
+func (c WSCfg) TrustedProxyNets() ([]*net.IPNet, error) {
+	out := make([]*net.IPNet, 0, len(c.TrustedProxies))
+	for _, raw := range c.TrustedProxies {
+		raw = strings.TrimSpace(raw)
+		if !strings.Contains(raw, "/") {
+			if ip := net.ParseIP(raw); ip != nil && ip.To4() != nil {
+				raw += "/32"
+			} else {
+				raw += "/128"
+			}
+		}
+		_, n, err := net.ParseCIDR(raw)
+		if err != nil {
+			return nil, fmt.Errorf("ws.trusted_proxies: %w", err)
+		}
+		out = append(out, n)
+	}
+	return out, nil
 }
 
 type RedisCfg struct {
@@ -67,6 +94,11 @@ type KafkaCfg struct {
 type RoomCfg struct {
 	ViewerPushInterval time.Duration `mapstructure:"viewer_push_interval"`
 	WelcomeText        string        `mapstructure:"welcome_text"`
+	// RequireKnown rejects handshakes for rooms room-service doesn't know
+	// (Redis room:owner:<id>, else ServiceURL's GET /rooms/<id>).
+	RequireKnown bool `mapstructure:"require_known"`
+	// ServiceURL is room-service's base URL for the lookup fallback.
+	ServiceURL string `mapstructure:"service_url"`
 }
 
 // FilterCfg points at the sensitive-word list (one word per line) whose
@@ -96,6 +128,9 @@ func (c *Config) validate() error {
 	}
 	if strings.TrimSpace(c.Filter.SensitivePath) == "" {
 		return fmt.Errorf("filter.sensitive_path is required")
+	}
+	if _, err := c.WS.TrustedProxyNets(); err != nil {
+		return err
 	}
 	return nil
 }

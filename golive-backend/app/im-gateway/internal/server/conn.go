@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/rooms"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
@@ -64,6 +66,9 @@ type Deps struct {
 	Filter *chatfilter.Filter
 	// ChatLimiter enforces the per-user chat rate. Nil disables it.
 	ChatLimiter UserLimiter
+	// Rooms validates roomIds and supplies the trusted owner. Nil accepts
+	// any well-formed id.
+	Rooms rooms.Directory
 }
 
 type WSConfig struct {
@@ -74,6 +79,14 @@ type WSConfig struct {
 	PongWait        time.Duration
 	MaxMessageRate  float64 // inbound frames/sec per connection, all types
 	AllowedOrigins  []string
+	// MaxConnsPerUser / MaxConnsPerIP cap concurrent connections on this
+	// instance (<= 0 disables). TrustedProxies are the peers whose
+	// X-Real-IP / X-Forwarded-For is believed.
+	MaxConnsPerUser int
+	MaxConnsPerIP   int
+	TrustedProxies  []*net.IPNet
+	// RequireKnownRoom rejects roomIds the room directory doesn't know.
+	RequireKnownRoom bool
 }
 
 func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, d Deps, cfg WSConfig) *Conn {
