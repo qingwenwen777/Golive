@@ -150,6 +150,11 @@ func (s *PostService) CreatePost(ctx context.Context, ownerID string, req Create
 	if err := s.requireCreatorPermission(ctx, ownerID); err != nil {
 		return nil, err
 	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, ownerID); err != nil {
+			return nil, err
+		}
+	}
 	content := cleanPostText(req.Content, maxPostContentLen)
 	images, err := cleanPostImages(req.Images)
 	if err != nil {
@@ -259,24 +264,15 @@ func (s *PostService) ListSubscriptionLatest(ctx context.Context, viewerID strin
 		return &PostListResp{Items: []ChannelPostDTO{}, Total: 0, Page: 1, Size: size}, nil
 	}
 	_, size = normalizeListPage(1, size)
-	channelIDs, err := s.social.Following(ctx, viewerID)
+	// Blocked owners are dropped here, as ListChannel hides their posts too.
+	targets, err := followedChannels(ctx, s.social, s.rooms, s.blocks, viewerID)
 	if err != nil {
 		return nil, err
 	}
-	ownerIDs := make([]string, 0, len(channelIDs))
+	ownerIDs := make([]string, 0, len(targets))
 	seen := map[string]bool{}
-	for _, channelID := range channelIDs {
-		ownerID := ownerIDFromChannelID(channelID)
-		if ownerID == "" && s.rooms != nil {
-			resolved, err := s.rooms.ResolveOwnerID(ctx, channelID)
-			if errors.Is(err, repo.ErrRoomNotFound) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			ownerID = resolved
-		}
+	for _, target := range targets {
+		ownerID := target.ownerID
 		if ownerID == "" || seen[ownerID] {
 			continue
 		}
@@ -433,6 +429,13 @@ func (s *PostService) CreateComment(ctx context.Context, userID, postID string, 
 		if parent.Depth >= maxCommentTreeDepth {
 			return nil, errcode.New(http.StatusConflict, "reply depth limit reached").WithReason("reply_depth_limit")
 		}
+		blocked, err := blocksBetween(ctx, s.blocks, userID, parent.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, userBlockedError()
+		}
 		depth = parent.Depth + 1
 		rootID = parent.RootID
 		if rootID == "" {
@@ -541,6 +544,13 @@ func (s *PostService) LikeComment(ctx context.Context, userID, postID, commentID
 	comment, err := s.posts.GetComment(ctx, postID, commentID)
 	if err != nil {
 		return nil, postError(err)
+	}
+	blocked, err := blocksBetween(ctx, s.blocks, userID, comment.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, userBlockedError()
 	}
 	alreadyLiked, err := s.posts.CommentLikedIDs(ctx, userID, []string{commentID})
 	if err != nil {
@@ -792,6 +802,9 @@ func (s *PostService) notifyPostComment(ctx context.Context, post model.ChannelP
 	if targetID == "" || targetID == comment.UserID {
 		return nil
 	}
+	if blocked, err := blocksBetween(ctx, s.blocks, comment.UserID, targetID); err != nil || blocked {
+		return err
+	}
 	actor := s.authorForUser(ctx, comment.UserID)
 	return s.notify.CreateNotifications(ctx, []model.Notification{{
 		ID:            kind + "-" + notificationHash(post.ID, comment.ID, targetID),
@@ -833,6 +846,9 @@ func (s *PostService) notifyPostLiked(ctx context.Context, post model.ChannelPos
 func (s *PostService) notifyCommentLiked(ctx context.Context, post model.ChannelPost, comment model.PostComment, actorID string) error {
 	if s.notify == nil || comment.UserID == "" || comment.UserID == actorID {
 		return nil
+	}
+	if blocked, err := blocksBetween(ctx, s.blocks, actorID, comment.UserID); err != nil || blocked {
+		return err
 	}
 	actor := s.authorForUser(ctx, actorID)
 	return s.notify.CreateNotifications(ctx, []model.Notification{{

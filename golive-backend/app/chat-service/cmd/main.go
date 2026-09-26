@@ -88,7 +88,10 @@ func main() {
 	}
 
 	histH := handler.NewHistoryHandler(svc, cfg.Room.HistoryDefaultLimit, cfg.Room.HistoryMaxLimit)
-	r := server.NewRouter(histH, handler.NewFanBadgeHandler(svc))
+	r := server.NewRouter(histH, handler.NewFanBadgeHandler(svc), handler.NewModerationHandler(svc), cfg.Internal.Token)
+	if cfg.Internal.Token == "" {
+		log.Warn("internal.token is empty: /internal endpoints reject every call")
+	}
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 
 	go func() {

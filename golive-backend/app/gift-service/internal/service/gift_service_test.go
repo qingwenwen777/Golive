@@ -470,6 +470,36 @@ func TestJoinFanClubWithoutLiveCreatesBadgeAndIncomeLedger(t *testing.T) {
 	require.Equal(t, "加入粉丝团收入", title)
 }
 
+// Repeat Fan Light gifts take the upsert's conflict path and other gifts only
+// add to an existing badge; both keep the stored level in step with the total.
+func TestFanBadgeContributionAccumulates(t *testing.T) {
+	db := newTestDB(t, 5000)
+	orders := repo.NewOrderRepo(db)
+	place := func(requestID, giftID string, coin int64, mode repo.FanBadgeContributionMode) {
+		t.Helper()
+		_, _, err := orders.PlaceGiftOrder(context.Background(), &model.GiftOrder{
+			OrderID: "gift-" + requestID, RequestID: requestID, UserID: "u-demo", RoomID: "r1",
+			GiftID: giftID, Count: 1, TotalCoin: coin, Status: model.StatusSuccess,
+		}, []byte("{}"), mode)
+		require.NoError(t, err)
+	}
+
+	place("rq-1", "rocket", 500, repo.FanBadgeIfExists)
+	var n int64
+	require.NoError(t, db.Model(&model.FanBadge{}).Count(&n).Error)
+	require.Zero(t, n, "a non-Fan-Light gift must not create a badge")
+
+	place("rq-2", "fan_light", 1000, repo.FanBadgeCreate)
+	place("rq-3", "fan_light", 1000, repo.FanBadgeCreate)
+	place("rq-4", "rocket", 500, repo.FanBadgeIfExists)
+
+	var badge model.FanBadge
+	require.NoError(t, db.Where("user_id = ? AND creator_id = ?", "u-demo", "u-owner").Take(&badge).Error)
+	require.EqualValues(t, 2500, badge.TotalContribution)
+	require.Equal(t, 2, badge.Level)
+	require.Equal(t, "Streamer", badge.CreatorName)
+}
+
 // 7) SC tier 0 rejected.
 func TestSuperChat_TierZeroRejected(t *testing.T) {
 	db := newTestDB(t, 1000)

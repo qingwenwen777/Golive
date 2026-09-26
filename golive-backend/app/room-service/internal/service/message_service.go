@@ -17,10 +17,11 @@ const (
 )
 
 type MessageService struct {
-	messages *repo.MessageRepo
-	rooms    *repo.RoomRepo
-	social   *repo.SocialRepo
-	now      func() time.Time
+	messages   *repo.MessageRepo
+	rooms      *repo.RoomRepo
+	social     *repo.SocialRepo
+	textPolicy TextPolicy
+	now        func() time.Time
 }
 
 func NewMessageService(messages *repo.MessageRepo, rooms *repo.RoomRepo, social *repo.SocialRepo) *MessageService {
@@ -30,6 +31,22 @@ func NewMessageService(messages *repo.MessageRepo, rooms *repo.RoomRepo, social 
 		social:   social,
 		now:      time.Now,
 	}
+}
+
+func (s *MessageService) SetTextPolicy(policy TextPolicy) {
+	s.textPolicy = policy
+}
+
+// ensureCanSend applies the site ban/mute and blocked-word policy to a direct
+// or fan group message, the same as live chat and comments.
+func (s *MessageService) ensureCanSend(ctx context.Context, senderID, body string) error {
+	if s.textPolicy == nil {
+		return nil
+	}
+	if err := s.textPolicy.EnsureUserCanInteract(ctx, senderID); err != nil {
+		return err
+	}
+	return s.textPolicy.EnsureTextAllowed(ctx, body)
 }
 
 type MessageUserDTO struct {
@@ -276,6 +293,9 @@ func (s *MessageService) SendDirect(ctx context.Context, senderID string, req Se
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureCanSend(ctx, senderID, body); err != nil {
+		return nil, err
+	}
 	thread, _, err := s.messages.SendDirectMessage(ctx, repo.DirectSendInput{
 		ViewerID:   senderID,
 		CreatorID:  creatorID,
@@ -319,6 +339,9 @@ func (s *MessageService) SendThreadMessage(ctx context.Context, senderID, thread
 	}
 	body, err := cleanDirectMessage(content)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanSend(ctx, senderID, body); err != nil {
 		return nil, err
 	}
 	receiverID := thread.CreatorID
@@ -423,7 +446,20 @@ func (s *MessageService) BlockUser(ctx context.Context, userID, targetID string,
 	if approved, err := s.messages.IsApprovedCreator(ctx, targetID); err == nil && approved {
 		role = "creator"
 	}
-	return s.messages.UpsertBlock(ctx, userID, targetID, role, req.Reason, s.now())
+	if err := s.messages.UpsertBlock(ctx, userID, targetID, role, req.Reason, s.now()); err != nil {
+		return err
+	}
+	// A block ends the follow relationship both ways, so neither side keeps
+	// followers-only access or follower-gated features through a stale follow.
+	if s.social != nil {
+		if err := s.social.Unfollow(ctx, userID, channelIDForOwner(targetID)); err != nil {
+			return err
+		}
+		if err := s.social.Unfollow(ctx, targetID, channelIDForOwner(userID)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *MessageService) UnblockUser(ctx context.Context, userID, targetID string) error {
@@ -591,6 +627,9 @@ func (s *MessageService) SendFanGroupMessage(ctx context.Context, userID, groupI
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureCanSend(ctx, userID, body); err != nil {
+		return nil, err
+	}
 	msg, err := s.messages.SendFanGroupMessage(ctx, groupID, userID, body, s.now())
 	if err != nil {
 		return nil, fanGroupError(err)
@@ -715,6 +754,69 @@ func (s *MessageService) CreatorBlocks(ctx context.Context, creatorID, viewerID 
 
 func (s *MessageService) BlocksInteraction(ctx context.Context, viewerID, creatorID string) (bool, error) {
 	return s.messages.BlocksEitherWay(ctx, viewerID, creatorID)
+}
+
+func (s *MessageService) BlockedPeerIDs(ctx context.Context, userID string) (map[string]bool, error) {
+	return s.messages.BlockedPeerIDs(ctx, userID)
+}
+
+// BlockedPeerLister lists every user a user blocks or is blocked by, so list
+// and fan-out paths can filter with one query. *MessageService implements it.
+type BlockedPeerLister interface {
+	BlockedPeerIDs(ctx context.Context, userID string) (map[string]bool, error)
+}
+
+// blocksBetween reports whether userA and userB block each other either way.
+func blocksBetween(ctx context.Context, blocks ChannelBlockChecker, userA, userB string) (bool, error) {
+	if blocks == nil || userA == "" || userB == "" || userA == userB {
+		return false, nil
+	}
+	return blocks.BlocksInteraction(ctx, userA, userB)
+}
+
+func userBlockedError() error {
+	return errcode.New(http.StatusForbidden, "cannot interact with this user").WithReason("user_blocked")
+}
+
+// blockedPeerSet returns which of candidates block userID or are blocked by
+// it. It uses one query when blocks can list peers and falls back to checking
+// each candidate otherwise.
+func blockedPeerSet(ctx context.Context, blocks ChannelBlockChecker, userID string, candidates []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if blocks == nil || userID == "" {
+		return out, nil
+	}
+	if lister, ok := blocks.(BlockedPeerLister); ok {
+		peers, err := lister.BlockedPeerIDs(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range candidates {
+			if peers[id] {
+				out[id] = true
+			}
+		}
+		return out, nil
+	}
+	for _, id := range candidates {
+		if id == "" || id == userID || out[id] {
+			continue
+		}
+		blocked, err := blocks.BlocksInteraction(ctx, userID, id)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			out[id] = true
+		}
+	}
+	return out, nil
+}
+
+// BlocksInteractionAmong is BlocksInteraction for a page of creators in one
+// query; it returns the creators blocked either way.
+func (s *MessageService) BlocksInteractionAmong(ctx context.Context, viewerID string, creatorIDs []string) (map[string]bool, error) {
+	return s.messages.BlockedEitherWayAmong(ctx, viewerID, creatorIDs)
 }
 
 func (s *MessageService) directThreadDTO(ctx context.Context, thread model.DirectThread, userID string) (DirectThreadDTO, error) {

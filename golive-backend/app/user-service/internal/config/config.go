@@ -20,6 +20,7 @@ type Config struct {
 	Upload    UploadCfg    `mapstructure:"upload"`
 	Stripe    StripeCfg    `mapstructure:"stripe"`
 	Bootstrap BootstrapCfg `mapstructure:"bootstrap"`
+	Internal  InternalCfg  `mapstructure:"internal"`
 }
 
 type ServiceCfg struct {
@@ -105,6 +106,12 @@ type AdminCfg struct {
 	DisplayName string `mapstructure:"display_name"`
 }
 
+// InternalCfg holds the shared secret other services send on /internal
+// calls (USERSVC_INTERNAL_TOKEN). Empty rejects every internal call.
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
+}
+
 // Load reads config from a yaml file. Pass "" for the default search path.
 func Load(path string) (*Config, error) {
 	v := viper.New()
@@ -136,6 +143,7 @@ func Load(path string) (*Config, error) {
 	_ = v.BindEnv("stripe.currency")
 	_ = v.BindEnv("stripe.coins_per_currency_unit")
 	_ = v.BindEnv("stripe.connect_country")
+	_ = v.BindEnv("internal.token")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

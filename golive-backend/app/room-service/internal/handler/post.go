@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -283,7 +282,5 @@ func (h *PostHandler) UnlikeComment(c *gin.Context) {
 }
 
 func postPageQuery(c *gin.Context, defaultPage, defaultSize int) (int, int) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(defaultPage)))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", strconv.Itoa(defaultSize)))
-	return page, size
+	return pageQuery(c, defaultPage, defaultSize)
 }

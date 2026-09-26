@@ -75,3 +75,8 @@ filter:
 chat_ratelimit:
   per_user_per_sec: 3
   bucket_seconds: 1
+
+# Shared secret for service-to-service /internal APIs; set via IMGW_INTERNAL_TOKEN
+# (docker-compose maps GOLIVE_INTERNAL_TOKEN). Empty rejects internal calls.
+internal:
+  token: ""

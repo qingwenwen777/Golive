@@ -86,14 +86,16 @@ func main() {
 
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase, socialRepo)
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
+	socialSvc.SetMaxFollows(cfg.Social.MaxFollows)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 	replaySvc := service.NewReplayService(roomRepo, socialRepo, service.ReplayConfig{
-		RecordDir:       cfg.Replay.RecordDir,
-		BunnyLibraryID:  cfg.Replay.BunnyLibraryID,
-		BunnyAPIKey:     cfg.Replay.BunnyAPIKey,
-		BunnyAPIBase:    cfg.Replay.BunnyAPIBase,
-		BunnyPlayerBase: cfg.Replay.BunnyPlayerBase,
-		UploadTimeout:   cfg.Replay.UploadTimeout,
+		RecordDir:         cfg.Replay.RecordDir,
+		BunnyLibraryID:    cfg.Replay.BunnyLibraryID,
+		BunnyAPIKey:       cfg.Replay.BunnyAPIKey,
+		BunnyAPIBase:      cfg.Replay.BunnyAPIBase,
+		BunnyPlayerBase:   cfg.Replay.BunnyPlayerBase,
+		UploadTimeout:     cfg.Replay.UploadTimeout,
+		StaleRecordingAge: cfg.Replay.StaleRecordingAge,
 	})
 	roomSvc.SetReplayService(replaySvc)
 	roomSvc.SetLiveRepo(liveRepo)
@@ -103,6 +105,10 @@ func main() {
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
+	moderationSvc.SetOwnerServices(service.NewOwnerServices(cfg.Users.ServiceURL, cfg.Gifts.ServiceURL, cfg.Chat.ServiceURL, cfg.Internal.Token))
+	if cfg.Internal.Token == "" {
+		log.Warn("internal.token is empty: moderation calls to user/gift/chat-service will be rejected")
+	}
 	messageSvc := service.NewMessageService(messageRepo, roomRepo, socialRepo)
 	moderationSvc.SetLiveService(liveSvc)
 	moderationSvc.SetSystemRuntimeConfig(service.SystemRuntimeConfig{
@@ -118,11 +124,12 @@ func main() {
 	})
 	liveSvc.SetTextPolicy(moderationSvc)
 	appointmentSvc.SetTextPolicy(moderationSvc)
+	messageSvc.SetTextPolicy(moderationSvc)
 	roomSvc.SetBlockChecker(messageSvc)
 	appointmentSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetNotificationWriter(messageRepo)
-	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL)
+	permission, err := service.NewUserPermissionClient(cfg.Users.GRPCAddr, cfg.Users.ServiceURL, cfg.Internal.Token)
 	if err != nil {
 		log.Fatal("new user permission client", zap.Error(err))
 	}
@@ -192,6 +199,7 @@ func main() {
 	}()
 	go replaySvc.RecoverInterruptedUploads(schedulerCtx)
 	go appointmentSvc.RunScheduler(schedulerCtx)
+	go liveSvc.RunReconciler(schedulerCtx, cfg.Live.ReconcileInterval)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

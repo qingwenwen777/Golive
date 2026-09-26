@@ -26,6 +26,7 @@ live:
   stream_key_ttl: 4h
   flv_base: "https://golive.us.ci/live"
   srs_api_base: "http://srs:1985"
+  reconcile_interval: 1m
 
 replay:
   record_dir: "/tmp/golive/records"
@@ -34,6 +35,7 @@ replay:
   bunny_api_base: "https://video.bunnycdn.com"
   bunny_player_base: "https://player.mediadelivery.net/embed"
   upload_timeout: 30m
+  stale_recording_age: 24h
 
 upload:
   cover_dir: "/tmp/golive/covers"
@@ -44,3 +46,19 @@ upload:
 users:
   service_url: "http://user-service:8090"
   grpc_addr: "user-service:19090"
+
+social:
+  # Most channels one user can follow.
+  max_follows: 2000
+
+# Report moderation hides super chats / chat messages through their owners.
+gifts:
+  service_url: "http://gift-service:8092"
+
+chat:
+  service_url: "http://chat-service:8093"
+
+# Shared secret for service-to-service /internal APIs; set via ROOMSVC_INTERNAL_TOKEN
+# (docker-compose maps GOLIVE_INTERNAL_TOKEN). Empty rejects internal calls.
+internal:
+  token: ""

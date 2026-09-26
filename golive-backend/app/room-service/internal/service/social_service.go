@@ -13,11 +13,16 @@ import (
 	"github.com/qingwenwen777/golive/pkg/errcode"
 )
 
+// DefaultMaxFollows caps how many channels one user can follow when no limit
+// is configured. Every follow costs work on subscription pages and feeds.
+const DefaultMaxFollows = 2000
+
 type SocialService struct {
-	social *repo.SocialRepo
-	rooms  *repo.RoomRepo
-	blocks ChannelBlockChecker
-	notify NotificationWriter
+	social     *repo.SocialRepo
+	rooms      *repo.RoomRepo
+	blocks     ChannelBlockChecker
+	notify     NotificationWriter
+	maxFollows int
 }
 
 func NewSocialService(social *repo.SocialRepo, rooms ...*repo.RoomRepo) *SocialService {
@@ -25,7 +30,15 @@ func NewSocialService(social *repo.SocialRepo, rooms ...*repo.RoomRepo) *SocialS
 	if len(rooms) > 0 {
 		roomRepo = rooms[0]
 	}
-	return &SocialService{social: social, rooms: roomRepo}
+	return &SocialService{social: social, rooms: roomRepo, maxFollows: DefaultMaxFollows}
+}
+
+// SetMaxFollows sets the per-user follow cap; n <= 0 keeps the default.
+func (s *SocialService) SetMaxFollows(n int) {
+	if n <= 0 {
+		n = DefaultMaxFollows
+	}
+	s.maxFollows = n
 }
 
 func (s *SocialService) SetBlockChecker(blocks ChannelBlockChecker) {
@@ -44,24 +57,103 @@ type FollowState struct {
 	SubscriberCount int64  `json:"subscriberCount"`
 }
 
-func (s *SocialService) GetFollow(ctx context.Context, uid, channelID string) (*FollowState, error) {
-	selfChannel, err := s.isSelfChannel(ctx, uid, channelID)
+// followTarget is a follow key normalised to "ch-<ownerID>" plus that owner.
+type followTarget struct {
+	key     string
+	ownerID string
+}
+
+// resolveFollowTarget maps a channel id, owner id or username to the
+// canonical "ch-<ownerID>" follow key, so block checks, follower counts and
+// followers-only visibility all agree on one key. It returns
+// repo.ErrRoomNotFound when the key names no real channel.
+func (s *SocialService) resolveFollowTarget(ctx context.Context, channelID string) (followTarget, error) {
+	key := strings.TrimSpace(channelID)
+	if key == "" {
+		return followTarget{}, repo.ErrRoomNotFound
+	}
+	if s.rooms == nil {
+		return followTarget{key: key, ownerID: ownerIDFromChannelID(key)}, nil
+	}
+	ownerID := strings.TrimPrefix(key, "ch-")
+	if ownerID == "" {
+		return followTarget{}, repo.ErrRoomNotFound
+	}
+	exists, err := s.channelExists(ctx, ownerID)
 	if err != nil {
+		return followTarget{}, err
+	}
+	if !exists {
+		ownerID, err = s.rooms.ResolveOwnerID(ctx, key)
+		if err != nil {
+			return followTarget{}, err
+		}
+		// ResolveOwnerID accepts any UUID-like key as an owner id unchecked.
+		exists, err = s.channelExists(ctx, ownerID)
+		if err != nil {
+			return followTarget{}, err
+		}
+		if !exists {
+			return followTarget{}, repo.ErrRoomNotFound
+		}
+	}
+	return followTarget{key: channelIDForOwner(ownerID), ownerID: ownerID}, nil
+}
+
+// channelExists reports whether ownerID is a user or owns a room.
+func (s *SocialService) channelExists(ctx context.Context, ownerID string) (bool, error) {
+	if ownerID == "" {
+		return false, nil
+	}
+	_, err := s.rooms.OwnerProfile(ctx, ownerID)
+	if err == nil {
+		return true, nil
+	}
+	if !errors.Is(err, repo.ErrRoomNotFound) {
+		return false, err
+	}
+	rooms, err := s.rooms.LatestByChannelIDs(ctx, []string{channelIDForOwner(ownerID)})
+	if err != nil {
+		return false, err
+	}
+	return len(rooms) > 0, nil
+}
+
+func (s *SocialService) GetFollow(ctx context.Context, uid, channelID string) (*FollowState, error) {
+	target, err := s.resolveFollowTarget(ctx, channelID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		target = followTarget{key: channelID}
+	} else if err != nil {
 		return nil, err
 	}
+	return s.followState(ctx, uid, target, channelID)
+}
+
+// followState reports the follow state of target. rawKey is the key the
+// client used; a follow stored under it before keys were normalised still
+// counts as following.
+func (s *SocialService) followState(ctx context.Context, uid string, target followTarget, rawKey string) (*FollowState, error) {
+	selfChannel := uid != "" && target.ownerID == uid
 	on := false
 	if uid != "" && !selfChannel {
-		on, err = s.social.IsFollowing(ctx, uid, channelID)
+		var err error
+		on, err = s.social.IsFollowing(ctx, uid, target.key)
 		if err != nil {
 			return nil, err
 		}
+		if !on && rawKey != target.key {
+			on, err = s.social.IsFollowing(ctx, uid, rawKey)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
-	count, err := s.social.FollowerCount(ctx, channelID)
+	count, err := s.social.FollowerCount(ctx, target.key)
 	if err != nil {
 		return nil, err
 	}
 	if selfChannel {
-		selfFollowing, err := s.social.IsFollowing(ctx, uid, channelID)
+		selfFollowing, err := s.social.IsFollowing(ctx, uid, target.key)
 		if err != nil {
 			return nil, err
 		}
@@ -69,19 +161,22 @@ func (s *SocialService) GetFollow(ctx context.Context, uid, channelID string) (*
 			count--
 		}
 	}
-	return &FollowState{ChannelID: channelID, Following: on, SubscriberCount: count}, nil
+	return &FollowState{ChannelID: target.key, Following: on, SubscriberCount: count}, nil
 }
 
 func (s *SocialService) Follow(ctx context.Context, uid, channelID string) (*FollowState, error) {
-	selfChannel, err := s.isSelfChannel(ctx, uid, channelID)
+	target, err := s.resolveFollowTarget(ctx, channelID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		return nil, errcode.New(404, "channel not found").WithReason("channel_not_found")
+	}
 	if err != nil {
 		return nil, err
 	}
-	if selfChannel {
+	if uid != "" && target.ownerID == uid {
 		return nil, errcode.New(409, "cannot follow your own channel").WithReason("self_follow")
 	}
-	if ownerID := ownerIDFromChannelID(channelID); ownerID != "" && s.blocks != nil {
-		blocked, err := s.blocks.BlocksInteraction(ctx, uid, ownerID)
+	if target.ownerID != "" && s.blocks != nil {
+		blocked, err := s.blocks.BlocksInteraction(ctx, uid, target.ownerID)
 		if err != nil {
 			return nil, err
 		}
@@ -89,17 +184,33 @@ func (s *SocialService) Follow(ctx context.Context, uid, channelID string) (*Fol
 			return nil, errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
 		}
 	}
-	if err := s.social.Follow(ctx, uid, channelID); err != nil {
+	stored, err := s.social.FollowWithLimit(ctx, uid, target.key, s.maxFollows)
+	if err != nil {
 		return nil, err
 	}
-	return s.GetFollow(ctx, uid, channelID)
+	if !stored {
+		return nil, errcode.New(409, "follow limit reached").WithReason("follow_limit")
+	}
+	return s.followState(ctx, uid, target, target.key)
 }
 
 func (s *SocialService) Unfollow(ctx context.Context, uid, channelID string) (*FollowState, error) {
-	if err := s.social.Unfollow(ctx, uid, channelID); err != nil {
+	target, err := s.resolveFollowTarget(ctx, channelID)
+	if errors.Is(err, repo.ErrRoomNotFound) {
+		target = followTarget{key: channelID}
+	} else if err != nil {
 		return nil, err
 	}
-	return s.GetFollow(ctx, uid, channelID)
+	if err := s.social.Unfollow(ctx, uid, target.key); err != nil {
+		return nil, err
+	}
+	// Also drop a follow stored under the raw key before keys were normalised.
+	if channelID != target.key {
+		if err := s.social.Unfollow(ctx, uid, channelID); err != nil {
+			return nil, err
+		}
+	}
+	return s.followState(ctx, uid, target, target.key)
 }
 
 type SubscriptionChannel struct {
@@ -153,10 +264,80 @@ type CreatorSearchItem struct {
 	Score           int    `json:"-"`
 }
 
-func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*SubscriptionsResp, error) {
-	channelIDs, err := s.social.Following(ctx, uid)
+// followedChannels returns uid's follow keys, newest first, each with the
+// owner it resolves to. Owners that block uid or are blocked by it are left
+// out.
+//
+// Follows stored before keys were normalised (usernames, channel names) need
+// a ResolveOwnerID lookup, which may scan users by display name. Each such
+// key is rewritten to "ch-<ownerID>" (or dropped when it names no channel,
+// the user itself or a blocked owner) so the lookup happens only once.
+func followedChannels(ctx context.Context, social *repo.SocialRepo, rooms *repo.RoomRepo, blocks ChannelBlockChecker, uid string) ([]followTarget, error) {
+	keys, err := social.Following(ctx, uid)
 	if err != nil {
 		return nil, err
+	}
+	targets := make([]followTarget, 0, len(keys))
+	ownerIDs := make([]string, 0, len(keys))
+	var legacy []followTarget
+	for _, key := range keys {
+		ownerID := ownerIDFromChannelID(key)
+		if ownerID == "" && rooms != nil {
+			resolved, err := rooms.ResolveOwnerID(ctx, key)
+			if err != nil && !errors.Is(err, repo.ErrRoomNotFound) {
+				return nil, err
+			}
+			legacy = append(legacy, followTarget{key: key, ownerID: resolved})
+			ownerID = resolved
+		}
+		targets = append(targets, followTarget{key: key, ownerID: ownerID})
+		if ownerID != "" {
+			ownerIDs = append(ownerIDs, ownerID)
+		}
+	}
+	blocked, err := blockedPeerSet(ctx, blocks, uid, ownerIDs)
+	if err != nil {
+		return nil, err
+	}
+	dropped := map[string]bool{}
+	for _, target := range legacy {
+		newKey := ""
+		if target.ownerID != "" && target.ownerID != uid && !blocked[target.ownerID] {
+			newKey = channelIDForOwner(target.ownerID)
+		}
+		if err := social.ReplaceFollowKey(ctx, uid, target.key, newKey); err != nil {
+			return nil, err
+		}
+		if newKey == "" {
+			dropped[target.key] = true
+		}
+	}
+	visible := targets[:0]
+	seen := make(map[string]bool, len(targets))
+	for _, target := range targets {
+		if dropped[target.key] || blocked[target.ownerID] {
+			continue
+		}
+		if target.ownerID != "" {
+			target.key = channelIDForOwner(target.ownerID)
+		}
+		if seen[target.key] {
+			continue
+		}
+		seen[target.key] = true
+		visible = append(visible, target)
+	}
+	return visible, nil
+}
+
+func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*SubscriptionsResp, error) {
+	targets, err := followedChannels(ctx, s.social, s.rooms, s.blocks, uid)
+	if err != nil {
+		return nil, err
+	}
+	channelIDs := make([]string, 0, len(targets))
+	for _, target := range targets {
+		channelIDs = append(channelIDs, target.key)
 	}
 	latest := map[string]model.Room{}
 	if s.rooms != nil {
@@ -165,21 +346,19 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 			return nil, err
 		}
 	}
+	counts, err := s.social.FollowerCounts(ctx, channelIDs)
+	if err != nil {
+		return nil, err
+	}
 
-	items := make([]SubscriptionChannel, 0, len(channelIDs))
-	for _, channelID := range channelIDs {
-		selfChannel, err := s.isSelfChannel(ctx, uid, channelID)
-		if err != nil {
-			return nil, err
-		}
-		if selfChannel {
+	items := make([]SubscriptionChannel, 0, len(targets))
+	for _, target := range targets {
+		channelID := target.key
+		if uid != "" && target.ownerID == uid {
 			continue
 		}
-		count, err := s.social.FollowerCount(ctx, channelID)
-		if err != nil {
-			return nil, err
-		}
-		profile, hasProfile, err := s.ownerProfileForChannel(ctx, channelID)
+		count := counts[channelID]
+		profile, hasProfile, err := s.ownerProfile(ctx, target.ownerID)
 		if err != nil {
 			return nil, err
 		}
@@ -435,40 +614,9 @@ func recommendationScore(candidate repo.CreatorRecommendationCandidate, subscrib
 	return score
 }
 
-func (s *SocialService) isSelfChannel(ctx context.Context, uid, channelID string) (bool, error) {
-	if uid == "" || channelID == "" {
-		return false, nil
-	}
-	if ownerIDFromChannelID(channelID) == uid {
-		return true, nil
-	}
-	if s.rooms == nil {
-		return false, nil
-	}
-	ownerID, err := s.rooms.ResolveOwnerID(ctx, channelID)
-	if errors.Is(err, repo.ErrRoomNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return ownerID == uid, nil
-}
-
-func (s *SocialService) ownerProfileForChannel(ctx context.Context, channelID string) (repo.OwnerProfile, bool, error) {
-	if s.rooms == nil || strings.TrimSpace(channelID) == "" {
+func (s *SocialService) ownerProfile(ctx context.Context, ownerID string) (repo.OwnerProfile, bool, error) {
+	if s.rooms == nil || ownerID == "" {
 		return repo.OwnerProfile{}, false, nil
-	}
-	ownerID := ownerIDFromChannelID(channelID)
-	if ownerID == "" {
-		resolved, err := s.rooms.ResolveOwnerID(ctx, channelID)
-		if errors.Is(err, repo.ErrRoomNotFound) {
-			return repo.OwnerProfile{}, false, nil
-		}
-		if err != nil {
-			return repo.OwnerProfile{}, false, err
-		}
-		ownerID = resolved
 	}
 	profile, err := s.rooms.OwnerProfile(ctx, ownerID)
 	if errors.Is(err, repo.ErrRoomNotFound) {

@@ -96,6 +96,36 @@ func (h *AdminHandler) UpdateGift(c *gin.Context) {
 	}
 }
 
+type moderateSuperChatReq struct {
+	OperatorID string `json:"operatorId"`
+}
+
+// ModerateSuperChat serves POST /internal/super-chats/:id/moderation for
+// room-service's report moderation: it hides the super chat but keeps its
+// status and the coin ledger untouched (no automatic refund).
+func (h *AdminHandler) ModerateSuperChat(c *gin.Context) {
+	var req moderateSuperChatReq
+	if c.Request.ContentLength != 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			errcode.Respond(c, errcode.New(http.StatusBadRequest, "Bad request"))
+			return
+		}
+	}
+	order, err := h.svc.ModerateSuperChat(c.Request.Context(), c.Param("id"), req.OperatorID)
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, gin.H{
+			"orderId":     order.OrderID,
+			"status":      order.Status,
+			"moderatedAt": order.ModeratedAt,
+		})
+	case errors.Is(err, repo.ErrSuperChatNotFound):
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "Super chat not found"))
+	default:
+		errcode.Respond(c, err)
+	}
+}
+
 func (h *AdminHandler) Orders(c *gin.Context) {
 	items, total, page, size, err := h.svc.ListOrders(c.Request.Context(), repo.AdminOrderFilter{
 		Type:   c.Query("type"),

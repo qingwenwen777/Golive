@@ -8,6 +8,7 @@ import (
 	"github.com/qingwenwen777/golive/app/user-service/internal/handler"
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
 
@@ -21,6 +22,8 @@ type Deps struct {
 	AvatarPublicURL string
 	CoverDir        string
 	CoverPublicURL  string
+	// InternalToken guards /internal/*; empty rejects every internal call.
+	InternalToken string
 }
 
 // NewRouter builds a Gin engine. Logger/Recovery is wired by the caller's
@@ -37,7 +40,7 @@ func NewRouter(d Deps) *gin.Engine {
 	userH := handler.NewUserHandler(d.Users, d.EmailCodes, d.Stripe)
 	creatorH := handler.NewCreatorHandler(d.Users)
 	adminH := handler.NewAdminHandler(d.Users, d.Auth)
-	internalH := handler.NewInternalHandler(d.Users)
+	internalH := handler.NewInternalHandler(d.Users, d.Auth)
 	avatarH := handler.NewAvatarUploadHandler(d.Users, d.AvatarDir, d.AvatarPublicURL)
 	coverH := handler.NewCoverUploadHandler(d.Users, d.CoverDir, d.CoverPublicURL)
 
@@ -109,9 +112,12 @@ func NewRouter(d Deps) *gin.Engine {
 		admin.POST("/admins", adminH.CreateAdmin)
 	}
 
-	internal := r.Group("/internal")
+	// Service-to-service only: api-gateway proxies /api/<prefix>/* and never
+	// maps onto /internal, and every call must carry the internal token.
+	internal := r.Group("/internal", internalauth.Middleware(d.InternalToken))
 	{
 		internal.GET("/users/:id/permission", internalH.UserPermission)
+		internal.POST("/users/:id/restriction", internalH.SetRestriction)
 	}
 
 	avatarDir := d.AvatarDir

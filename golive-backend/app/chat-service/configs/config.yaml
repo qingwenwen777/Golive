@@ -32,3 +32,8 @@ ratelimit:
 room:
   history_default_limit: 50
   history_max_limit: 200
+
+# Shared secret for service-to-service /internal APIs. Every service must use
+# the same value; an empty token rejects all internal calls. Env: CHATSVC_INTERNAL_TOKEN.
+internal:
+  token: "dev-only-internal-token-change-me"

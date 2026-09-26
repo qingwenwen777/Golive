@@ -62,8 +62,11 @@ Test coverage: 10 goroutines using the same `requestId` concurrently → balance
 
 ```sql
 UPDATE users SET coin_balance = coin_balance - ?
- WHERE id = ? AND coin_balance >= ?
+ WHERE id = ? AND COALESCE(banned, false) = false
+   AND coin_balance - COALESCE(frozen_coins, 0) >= ?
 ```
+
+The statement lives in `pkg/wallet` (`wallet.Debit`), which also writes the `coin_transactions` row; every balance change goes through that package inside the order's transaction.
 
 `affected_rows = 0` means insufficient balance and rolls back the entire transaction. The outer layer inserts a `failed` order into `gift_orders` separately, outside the transaction. A retry with the same requestId hits the unique constraint and retrieves the failed row, **without another debit**.
 
@@ -77,12 +80,19 @@ TX:
 COMMIT
 
 Background worker (polls every 1s):
-  CLAIM (status=pending AND next_at<=now) → set next_at = now+30s to prevent concurrent claims
-  Kafka.Publish(payload)
+  CLAIM (status=pending AND next_at<=now, FOR UPDATE SKIP LOCKED) → set next_at = now+30s
+        so each row goes to one worker; a batch stops publishing once half the hold is used
+  Kafka.Publish(payload + "eventId": local_messages.id)
   ┌── ok  → UPDATE status='sent'
   └── err → UPDATE retries+=1, next_at = now + base*2^retries
               if retries >= MaxRetries → status='dead'
 ```
+
+The claim needs MySQL 8.0+ or MariaDB 10.6+ (`SKIP LOCKED`). Publishing is
+still at-least-once (a publish can succeed and the `sent` update fail), so the
+publisher stamps the outbox row id into the payload as `eventId` and
+im-gateway ignores an `eventId` it has already counted into the contribution
+leaderboard.
 
 `payload` field names strictly match im-gateway `internal/hub/messages.go`:
 ```json
@@ -121,11 +131,17 @@ Coverage:
   - `AmountToTier`: 12 boundary values.
   - Reject SC tier=0 without debiting.
 
-- **outbox_service_test.go** (4 cases)
+- **outbox_service_test.go** (5 cases)
   - Fail twice, retry, then succeed on the third attempt → status=sent.
   - MaxRetries=3 with all attempts failing → status=dead.
   - Claim skips rows whose next_at is in the future.
   - Claim excludes rows already marked sent.
+  - A batch outliving half its claim hold stops publishing; the rest are published once, later.
+
+- **\*_mysql_test.go** (run only when `GOLIVE_TEST_MYSQL_DSN` is set, e.g.
+  `root:root@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC`; each test creates
+  and drops its own database): bet settle/cancel races, concurrent fan-badge
+  contributions, and concurrent outbox claims/drains.
 
 ## Verify against the frontend mock
 

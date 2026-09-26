@@ -122,7 +122,7 @@ func TestOutbox_ClaimSkipsFutureNextAt(t *testing.T) {
 		Status: model.OutboxStatusPending, NextAt: time.Now().Add(-time.Second),
 	}).Error)
 
-	rows, err := or.Claim(context.Background(), 10)
+	rows, err := or.Claim(context.Background(), 10, time.Minute)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, "ready", rows[0].BizID)
@@ -135,7 +135,68 @@ func TestOutbox_DoesNotPickAlreadySent(t *testing.T) {
 		BizID: "x", Topic: "gift", Payload: "{}",
 		Status: model.OutboxStatusSent, NextAt: time.Now().Add(-time.Second),
 	}).Error)
-	rows, err := or.Claim(context.Background(), 10)
+	rows, err := or.Claim(context.Background(), 10, time.Minute)
 	require.NoError(t, err)
 	require.Empty(t, rows)
+}
+
+// gatedProducer blocks its first Publish until release is closed.
+type gatedProducer struct {
+	mu        sync.Mutex
+	started   chan struct{}
+	release   chan struct{}
+	published map[uint64]int
+}
+
+func (g *gatedProducer) Publish(_ context.Context, m *model.LocalMessage) error {
+	g.mu.Lock()
+	first := len(g.published) == 0
+	g.mu.Unlock()
+	if first {
+		close(g.started)
+		<-g.release
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.published[m.ID]++
+	return nil
+}
+func (g *gatedProducer) Close() error { return nil }
+
+// A batch that outlives half its claim hold stops publishing, so rows another
+// worker can re-claim once the hold lapses are not published twice.
+func TestOutbox_SlowBatchStopsBeforeHoldLapses(t *testing.T) {
+	db := newTestDB(t, 0)
+	or := repo.NewOutboxRepo(db)
+	for _, biz := range []string{"a", "b", "c"} {
+		require.NoError(t, db.Create(&model.LocalMessage{
+			BizID: biz, Topic: "gift", Payload: "{}",
+			Status: model.OutboxStatusPending, NextAt: time.Now().Add(-time.Second),
+		}).Error)
+	}
+	const hold = time.Second
+	prod := &gatedProducer{started: make(chan struct{}), release: make(chan struct{}), published: map[uint64]int{}}
+	svc := service.NewOutboxService(or, prod, service.OutboxConfig{BatchSize: 10, ClaimHold: hold})
+
+	claimedBy := time.Now()
+	drained := make(chan int, 1)
+	go func() { drained <- svc.DrainOnce(context.Background()) }()
+	<-prod.started
+	time.Sleep(hold/2 + 50*time.Millisecond)
+	close(prod.release)
+	require.Equal(t, 3, <-drained)
+	require.Len(t, prod.published, 1, "publishing must stop once half the hold is used")
+
+	var pending int64
+	require.NoError(t, db.Model(&model.LocalMessage{}).Where("status = ?", model.OutboxStatusPending).Count(&pending).Error)
+	require.EqualValues(t, 2, pending)
+	require.Zero(t, svc.DrainOnce(context.Background()), "held rows are not re-claimed early")
+
+	// The unpublished rows come back once the hold has lapsed.
+	time.Sleep(time.Until(claimedBy.Add(hold + 50*time.Millisecond)))
+	require.Equal(t, 2, svc.DrainOnce(context.Background()))
+	require.Len(t, prod.published, 3)
+	for id, n := range prod.published {
+		require.Equalf(t, 1, n, "row %d published %d times", id, n)
+	}
 }

@@ -122,6 +122,64 @@ func (s *SocialRepo) Follow(ctx context.Context, uid, channelID string) error {
 	return err
 }
 
+// KEYS[1]=user follows, KEYS[2]=channel followers.
+// ARGV[1]=score, ARGV[2]=uid, ARGV[3]=channelID, ARGV[4]=limit (<=0: none).
+// Returns 0 when a new follow would exceed the limit, else 1.
+var luaFollowWithLimit = redis.NewScript(`
+local limit = tonumber(ARGV[4])
+if limit > 0 and not redis.call('ZSCORE', KEYS[1], ARGV[3]) and redis.call('ZCARD', KEYS[1]) >= limit then
+  return 0
+end
+redis.call('ZADD', KEYS[1], ARGV[1], ARGV[3])
+redis.call('ZADD', KEYS[2], ARGV[1], ARGV[2])
+return 1
+`)
+
+// FollowWithLimit follows like Follow but refuses a new follow once uid
+// already follows limit channels. Re-following an existing channel is always
+// allowed. It reports whether the follow was stored.
+func (s *SocialRepo) FollowWithLimit(ctx context.Context, uid, channelID string, limit int) (bool, error) {
+	now := time.Now().UnixMilli()
+	res, err := luaFollowWithLimit.Run(ctx, s.rdb,
+		[]string{userFollowsKey(uid), channelFansKey(channelID)},
+		now, uid, channelID, limit,
+	).Int()
+	if err != nil {
+		return false, err
+	}
+	return res == 1, nil
+}
+
+// KEYS[1]=user follows, KEYS[2]=old channel followers, KEYS[3]=new channel
+// followers. ARGV[1]=uid, ARGV[2]=old key, ARGV[3]=new key ("" drops it).
+var luaReplaceFollowKey = redis.NewScript(`
+local score = redis.call('ZSCORE', KEYS[1], ARGV[2])
+if not score then
+  return 0
+end
+redis.call('ZREM', KEYS[1], ARGV[2])
+redis.call('ZREM', KEYS[2], ARGV[1])
+if ARGV[3] ~= '' then
+  redis.call('ZADD', KEYS[1], 'NX', score, ARGV[3])
+  redis.call('ZADD', KEYS[3], 'NX', score, ARGV[1])
+end
+return 1
+`)
+
+// ReplaceFollowKey moves uid's follow from oldKey to newKey, keeping the
+// original follow time (or an existing follow of newKey). An empty newKey
+// drops the follow.
+func (s *SocialRepo) ReplaceFollowKey(ctx context.Context, uid, oldKey, newKey string) error {
+	newFans := channelFansKey(oldKey)
+	if newKey != "" {
+		newFans = channelFansKey(newKey)
+	}
+	return luaReplaceFollowKey.Run(ctx, s.rdb,
+		[]string{userFollowsKey(uid), channelFansKey(oldKey), newFans},
+		uid, oldKey, newKey,
+	).Err()
+}
+
 func (s *SocialRepo) Unfollow(ctx context.Context, uid, channelID string) error {
 	pipe := s.rdb.TxPipeline()
 	pipe.ZRem(ctx, userFollowsKey(uid), channelID)

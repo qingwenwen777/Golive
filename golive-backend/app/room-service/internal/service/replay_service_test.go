@@ -150,11 +150,15 @@ type fakeBunny struct {
 	onUpload func() error
 	errs     []error
 	deleted  []string
+	created  int
 }
 
 func (b *fakeBunny) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && r.URL.Path == "/library/lib/videos":
+		b.mu.Lock()
+		b.created++
+		b.mu.Unlock()
 		fmt.Fprint(w, `{"guid":"video-1"}`)
 	case r.Method == http.MethodPut && r.URL.Path == "/library/lib/videos/video-1":
 		_, _ = io.Copy(io.Discard, r.Body)
@@ -262,4 +266,94 @@ func TestUploadRecordingDoesNotPublishReplayDeletedMidUpload(t *testing.T) {
 	require.False(t, canView)
 	require.Equal(t, []string{"video-1"}, bunny.deleted)
 	require.NoFileExists(t, recordPath)
+}
+
+// fastRecordingWaits drops the delays before a recording is looked for, so
+// upload and cleanup goroutines finish quickly in tests.
+func fastRecordingWaits(svc *ReplayService) {
+	svc.settleDelay = 0
+	svc.stableInterval = time.Millisecond
+}
+
+func (b *fakeBunny) createdCount() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.created
+}
+
+func TestRecoverInterruptedUploadsDoesNotRetryFailed(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+	fastRecordingWaits(svc)
+	require.NoError(t, rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "bunny stream request failed"))
+
+	svc.RecoverInterruptedUploads(ctx)
+
+	got, err := rooms.GetByID(ctx, room.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.ReplayStatusFailed, got.ReplayStatus)
+	time.Sleep(50 * time.Millisecond)
+	require.Zero(t, bunny.createdCount())
+	require.FileExists(t, recordPath)
+}
+
+func TestRecoverInterruptedUploadsResumesPending(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+	fastRecordingWaits(svc)
+
+	svc.RecoverInterruptedUploads(ctx)
+
+	require.Eventually(t, func() bool {
+		got, err := rooms.GetByID(ctx, room.ID)
+		return err == nil && got.ReplayStatus == model.ReplayStatusReady
+	}, 2*time.Second, 10*time.Millisecond)
+	require.Equal(t, 1, bunny.createdCount())
+	require.NoFileExists(t, recordPath)
+}
+
+func TestCleanupStaleRecordingsKeepsRecordingsStillNeeded(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _, pending, _ := newReplayUploadTest(t)
+	now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	endedAt := now.Add(-48 * time.Hour)
+	for _, room := range []model.Room{
+		{ID: "room-live", Status: model.StatusLive, StreamKey: "lk_live", StartedAt: endedAt},
+		{ID: "room-failed", Status: model.StatusEnded, EndedAt: &endedAt, ReplayUploadEnabled: true, ReplayStatus: model.ReplayStatusFailed},
+		{ID: "room-none", Status: model.StatusEnded, EndedAt: &endedAt, ReplayStatus: model.ReplayStatusNone},
+	} {
+		room.Title, room.OwnerID = room.ID, "owner-"+room.ID
+		require.NoError(t, rooms.Upsert(ctx, &room))
+	}
+
+	old, fresh := now.Add(-25*time.Hour), now.Add(-time.Hour)
+	files := map[string]time.Time{
+		pending.ID + ".flv":           old,   // pending upload
+		"room-live.flv":               old,   // active room
+		"room-live_q720.flv":          old,   // its transcoded variant
+		"lk_live.flv":                 old,   // legacy key-named recording of the active room
+		"room-failed.flv":             old,   // failed upload, never retried
+		"room-none.flv.tmp":           old,   // SRS died mid-recording
+		"room-none.flv":               fresh, // cleanup may still be on its way
+		"miclink-live-room-guest.flv": old,   // mic-link guest stream
+		"notes.txt":                   old,   // not a recording
+	}
+	dir := svc.recordDir
+	for name, mod := range files {
+		path := filepath.Join(dir, name)
+		require.NoError(t, os.WriteFile(path, []byte("flv"), 0o644))
+		require.NoError(t, os.Chtimes(path, mod, mod))
+	}
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "sub.flv"), 0o755))
+
+	svc.CleanupStaleRecordings(ctx)
+
+	for _, name := range []string{pending.ID + ".flv", "room-live.flv", "room-live_q720.flv", "lk_live.flv", "room-none.flv", "notes.txt"} {
+		require.FileExists(t, filepath.Join(dir, name), name)
+	}
+	require.DirExists(t, filepath.Join(dir, "sub.flv"))
+	for _, name := range []string{"room-failed.flv", "room-none.flv.tmp", "miclink-live-room-guest.flv"} {
+		require.NoFileExists(t, filepath.Join(dir, name), name)
+	}
 }

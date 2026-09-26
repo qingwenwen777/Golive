@@ -41,6 +41,10 @@ func (r *RoomRepo) AutoMigrate() error {
 	return ensureMySQLFullTextIndexes(r.db, sharedSearchFullTextIndexes()...)
 }
 
+// maxListSize bounds one List page. RecommendedLive reads the largest page
+// (its candidate pool); public endpoints are capped lower by the service.
+const maxListSize = 200
+
 // ListQuery is what the service layer hands to the repo. Empty Category means
 // "no filter". The repo applies a case-insensitive match on category OR an
 // exact match on category_ja.
@@ -70,6 +74,9 @@ func (r *RoomRepo) List(ctx context.Context, q ListQuery) ([]model.Room, int64, 
 	}
 	if q.Size < 1 {
 		q.Size = 24
+	}
+	if q.Size > maxListSize {
+		q.Size = maxListSize
 	}
 	offset := (q.Page - 1) * q.Size
 
@@ -156,6 +163,31 @@ func (r *RoomRepo) OwnerProfile(ctx context.Context, ownerID string) (OwnerProfi
 		return OwnerProfile{}, ErrRoomNotFound
 	}
 	return row, err
+}
+
+// OwnerProfiles is OwnerProfile for many owners in one query, keyed by id.
+// Owners without a users row are absent from the result.
+func (r *RoomRepo) OwnerProfiles(ctx context.Context, ownerIDs []string) (map[string]OwnerProfile, error) {
+	out := make(map[string]OwnerProfile, len(ownerIDs))
+	if len(ownerIDs) == 0 {
+		return out, nil
+	}
+	var rows []OwnerProfile
+	err := r.db.WithContext(ctx).
+		Table("users").
+		Select("id, username, display_name, avatar, verified").
+		Where("id IN ?", ownerIDs).
+		Scan(&rows).Error
+	if isMissingTable(err) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
 }
 
 func (r *RoomRepo) CreatorRecommendationCandidates(ctx context.Context, limit int, category string) ([]CreatorRecommendationCandidate, error) {
@@ -269,6 +301,31 @@ func (r *RoomRepo) IsFanClubMember(ctx context.Context, userID, creatorID string
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// FanClubCreators returns which of creatorIDs userID holds a fan badge for:
+// IsFanClubMember for many creators in one query.
+func (r *RoomRepo) FanClubCreators(ctx context.Context, userID string, creatorIDs []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	userID = strings.TrimSpace(userID)
+	if userID == "" || len(creatorIDs) == 0 {
+		return out, nil
+	}
+	var ids []string
+	err := r.db.WithContext(ctx).
+		Table("fan_badges").
+		Where("user_id = ? AND creator_id IN ?", userID, creatorIDs).
+		Pluck("creator_id", &ids).Error
+	if isMissingTable(err) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
 }
 
 func (r *RoomRepo) ActiveByOwner(ctx context.Context, ownerID string) (*model.Room, error) {
@@ -435,6 +492,9 @@ func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID stri
 	return rooms, err
 }
 
+// ReplayRecoverableUploads returns ended rooms whose replay upload was
+// interrupted. Failed uploads are not retried: each attempt creates a new
+// Bunny video, so retrying on every restart would pile up orphaned videos.
 func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]model.Room, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -442,13 +502,27 @@ func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]m
 	statuses := []string{
 		model.ReplayStatusPending,
 		model.ReplayStatusUploading,
-		model.ReplayStatusFailed,
 	}
 	var rooms []model.Room
 	err := r.db.WithContext(ctx).Model(&model.Room{}).
 		Where("status = ? AND replay_upload_enabled = ? AND replay_status IN ?", model.StatusEnded, true, statuses).
 		Order("COALESCE(ended_at, updated_at) ASC").
 		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+// RecordingRooms returns the id and stream key of rooms whose DVR recording
+// may still be needed: active rooms, and ended rooms whose replay upload is
+// pending or in progress.
+func (r *RoomRepo) RecordingRooms(ctx context.Context) ([]model.Room, error) {
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).Model(&model.Room{}).
+		Select("id", "stream_key").
+		Where("status IN ? OR (status = ? AND replay_upload_enabled = ? AND replay_status IN ?)",
+			[]string{model.StatusPublishing, model.StatusLive, model.StatusEnding},
+			model.StatusEnded, true,
+			[]string{model.ReplayStatusPending, model.ReplayStatusUploading}).
 		Find(&rooms).Error
 	return rooms, err
 }
@@ -814,36 +888,94 @@ type FanBadgeDistributionRow struct {
 	TotalContribution int64  `gorm:"column:total_contribution"`
 }
 
-func (r *RoomRepo) RevenueRowsByRooms(ctx context.Context, roomIDs []string) ([]RevenueRow, error) {
+// RevenueTotals is a room's successful gift and super chat income.
+type RevenueTotals struct {
+	Gift      int64
+	SuperChat int64
+}
+
+func (t RevenueTotals) Total() int64 { return t.Gift + t.SuperChat }
+
+// RevenueTotalsByRooms sums successful orders per room in SQL, so callers
+// that only need totals don't load every order row.
+func (r *RoomRepo) RevenueTotalsByRooms(ctx context.Context, roomIDs []string) (map[string]RevenueTotals, error) {
+	out := make(map[string]RevenueTotals, len(roomIDs))
 	if len(roomIDs) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		RoomID string
+		Kind   string
+		Amount int64
+	}
+	err := r.db.WithContext(ctx).Raw(`
+SELECT room_id, 'gift' AS kind, COALESCE(SUM(total_coin), 0) AS amount
+FROM gift_orders
+WHERE status = 'success' AND room_id IN ?
+GROUP BY room_id
+UNION ALL
+SELECT room_id, 'super_chat' AS kind, COALESCE(SUM(amount), 0) AS amount
+FROM super_chat_orders
+WHERE status = 'success' AND room_id IN ?
+GROUP BY room_id
+`, roomIDs, roomIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		totals := out[row.RoomID]
+		if row.Kind == "super_chat" {
+			totals.SuperChat += row.Amount
+		} else {
+			totals.Gift += row.Amount
+		}
+		out[row.RoomID] = totals
+	}
+	return out, nil
+}
+
+// TopFanRow is one fan's successful gift and super chat total in a room.
+type TopFanRow struct {
+	RoomID   string
+	UserID   string
+	UserName string
+	Avatar   string
+	Amount   int64
+}
+
+// TopFansByRooms returns each room's top limit fans by total spend, ranked in
+// SQL (ties broken by user id), ordered by room then rank.
+func (r *RoomRepo) TopFansByRooms(ctx context.Context, roomIDs []string, limit int) ([]TopFanRow, error) {
+	if len(roomIDs) == 0 || limit < 1 {
 		return nil, nil
 	}
-	var rows []RevenueRow
+	var rows []TopFanRow
 	err := r.db.WithContext(ctx).Raw(`
-SELECT
-  o.room_id,
-  o.user_id,
-  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), o.user_id) AS user_name,
-  COALESCE(u.avatar, '') AS avatar,
-  o.total_coin AS amount,
-  o.created_at,
-  'gift' AS kind
-FROM gift_orders o
-LEFT JOIN users u ON u.id = o.user_id
-WHERE o.status = 'success' AND o.room_id IN ?
-UNION ALL
-SELECT
-  s.room_id,
-  s.user_id,
-  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), s.user_id) AS user_name,
-  COALESCE(u.avatar, '') AS avatar,
-  s.amount AS amount,
-  s.created_at,
-  'super_chat' AS kind
-FROM super_chat_orders s
-LEFT JOIN users u ON u.id = s.user_id
-WHERE s.status = 'success' AND s.room_id IN ?
-`, roomIDs, roomIDs).Scan(&rows).Error
+SELECT room_id, user_id, user_name, avatar, amount
+FROM (
+  SELECT
+    t.room_id,
+    t.user_id,
+    COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), t.user_id) AS user_name,
+    COALESCE(u.avatar, '') AS avatar,
+    t.amount,
+    ROW_NUMBER() OVER (PARTITION BY t.room_id ORDER BY t.amount DESC, t.user_id ASC) AS fan_rank
+  FROM (
+    SELECT room_id, user_id, SUM(amount) AS amount
+    FROM (
+      SELECT room_id, user_id, total_coin AS amount FROM gift_orders
+      WHERE status = 'success' AND room_id IN ? AND user_id <> ''
+      UNION ALL
+      SELECT room_id, user_id, amount FROM super_chat_orders
+      WHERE status = 'success' AND room_id IN ? AND user_id <> ''
+    ) x
+    GROUP BY room_id, user_id
+  ) t
+  LEFT JOIN users u ON u.id = t.user_id
+) ranked
+WHERE fan_rank <= ?
+ORDER BY room_id, fan_rank
+`, roomIDs, roomIDs, limit).Scan(&rows).Error
 	return rows, err
 }
 
@@ -975,13 +1107,21 @@ func (r *RoomRepo) SetPublishing(ctx context.Context, id string) error {
 	}).Error
 }
 
-// SetLive marks a room live with the given start time.
-func (r *RoomRepo) SetLive(ctx context.Context, id string, startedAt any) error {
-	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(map[string]any{
-		"status":     model.StatusLive,
-		"started_at": startedAt,
-		"ended_at":   nil,
-	}).Error
+// SetLive marks a publishing (or ending) room live with the given start time.
+// It reports whether this call made the transition; false means the room is
+// already live or was ended meanwhile, and an ended room must stay ended.
+func (r *RoomRepo) SetLive(ctx context.Context, id string, startedAt any) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND status IN ?", id, []string{model.StatusPublishing, model.StatusEnding}).
+		Updates(map[string]any{
+			"status":     model.StatusLive,
+			"started_at": startedAt,
+			"ended_at":   nil,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 // SetEnded marks a room ended.
@@ -992,7 +1132,10 @@ func (r *RoomRepo) SetEnded(ctx context.Context, id string, endedAt any) error {
 	}).Error
 }
 
-func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt any, viewers, peakViewers int64) error {
+// SetEndedWithMetrics ends a publishing, live or ending room. It reports
+// whether this call ended it, so only one of several concurrent stop paths
+// runs the follow-up work (broadcast, replay upload).
+func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt any, viewers, peakViewers int64) (bool, error) {
 	updates := map[string]any{
 		"status":   model.StatusEnded,
 		"ended_at": endedAt,
@@ -1003,7 +1146,13 @@ func (r *RoomRepo) SetEndedWithMetrics(ctx context.Context, id string, endedAt a
 	if peakViewers >= 0 {
 		updates["peak_viewers"] = peakViewers
 	}
-	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(updates).Error
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND status IN ?", id, []string{model.StatusPublishing, model.StatusLive, model.StatusEnding}).
+		Updates(updates)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 func roomStatusRank(status string) int {

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,6 +27,11 @@ const replayRecordingStableInterval = 2 * time.Second
 const replayRecordingStableChecks = 5
 const replayRecoveryLimit = 20
 
+// replayRecordingSettleDelay gives SRS time to close a stream's DVR file
+// after the room ends, before it is looked for.
+const replayRecordingSettleDelay = 5 * time.Second
+const defaultStaleRecordingAge = 24 * time.Hour
+
 var errRecordingNotFound = errors.New("recording file not found")
 
 type ReplayConfig struct {
@@ -35,16 +41,22 @@ type ReplayConfig struct {
 	BunnyAPIBase    string
 	BunnyPlayerBase string
 	UploadTimeout   time.Duration
+	// StaleRecordingAge is how long a recording must be untouched before
+	// CleanupStaleRecordings may remove it (default 24h).
+	StaleRecordingAge time.Duration
 }
 
 type ReplayService struct {
-	rooms      *repo.RoomRepo
-	social     *repo.SocialRepo
-	bunny      *BunnyClient
-	recordDir  string
-	libraryID  string
-	playerBase string
-	now        func() time.Time
+	rooms             *repo.RoomRepo
+	social            *repo.SocialRepo
+	bunny             *BunnyClient
+	recordDir         string
+	libraryID         string
+	playerBase        string
+	staleRecordingAge time.Duration
+	settleDelay       time.Duration
+	stableInterval    time.Duration
+	now               func() time.Time
 }
 
 type ReplayListResp struct {
@@ -76,14 +88,21 @@ func NewReplayService(rooms *repo.RoomRepo, social *repo.SocialRepo, cfg ReplayC
 	if timeout <= 0 {
 		timeout = 30 * time.Minute
 	}
+	staleAge := cfg.StaleRecordingAge
+	if staleAge <= 0 {
+		staleAge = defaultStaleRecordingAge
+	}
 	return &ReplayService{
-		rooms:      rooms,
-		social:     social,
-		bunny:      NewBunnyClient(apiBase, cfg.BunnyAPIKey, timeout),
-		recordDir:  strings.TrimSpace(cfg.RecordDir),
-		libraryID:  strings.TrimSpace(cfg.BunnyLibraryID),
-		playerBase: playerBase,
-		now:        time.Now,
+		rooms:             rooms,
+		social:            social,
+		bunny:             NewBunnyClient(apiBase, cfg.BunnyAPIKey, timeout),
+		recordDir:         strings.TrimSpace(cfg.RecordDir),
+		libraryID:         strings.TrimSpace(cfg.BunnyLibraryID),
+		playerBase:        playerBase,
+		staleRecordingAge: staleAge,
+		settleDelay:       replayRecordingSettleDelay,
+		stableInterval:    replayRecordingStableInterval,
+		now:               time.Now,
 	}
 }
 
@@ -275,7 +294,7 @@ func (s *ReplayService) embedURL(room model.Room) string {
 func (s *ReplayService) uploadRoomReplay(room model.Room) {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
 	defer cancel()
-	time.Sleep(5 * time.Second)
+	time.Sleep(s.settleDelay)
 	if s.recordDir == "" {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "record_dir is not configured")
 		return
@@ -325,7 +344,7 @@ func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, re
 }
 
 func (s *ReplayService) cleanupRoomRecording(room model.Room) {
-	time.Sleep(5 * time.Second)
+	time.Sleep(s.settleDelay)
 	if s.recordDir == "" {
 		return
 	}
@@ -346,7 +365,7 @@ func (s *ReplayService) cleanupStreamRecording(stream string) {
 	if s.recordDir == "" || stream == "" || strings.ContainsAny(stream, `/\*?[`) {
 		return
 	}
-	time.Sleep(5 * time.Second)
+	time.Sleep(s.settleDelay)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	recordPath, err := s.waitForUploadableRecording(ctx, stream)
@@ -384,6 +403,65 @@ func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
 		)
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
 		go s.uploadRoomReplay(room)
+	}
+}
+
+// CleanupStaleRecordings removes DVR files nothing will upload or clean up
+// any more: files untouched for staleRecordingAge (SRS keeps writing a live
+// stream's file) that belong to no active room and no pending or uploading
+// replay. These are left by failed uploads, mic-link streams, and restarts
+// before a room's recording cleanup ran.
+func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
+	if s == nil || s.rooms == nil || s.recordDir == "" {
+		return
+	}
+	entries, err := os.ReadDir(s.recordDir)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.L().Warn("list recordings", zap.Error(err), zap.String("dir", s.recordDir))
+		}
+		return
+	}
+	cutoff := s.now().Add(-s.staleRecordingAge)
+	var stale []string
+	for _, entry := range entries {
+		name := strings.ToLower(entry.Name())
+		if !entry.Type().IsRegular() || !(strings.HasSuffix(name, ".flv") || strings.HasSuffix(name, ".flv.tmp")) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		stale = append(stale, entry.Name())
+	}
+	if len(stale) == 0 {
+		return
+	}
+	rooms, err := s.rooms.RecordingRooms(ctx)
+	if err != nil {
+		logger.L().Warn("load rooms that need recordings", zap.Error(err))
+		return
+	}
+	var keep []string
+	for _, room := range rooms {
+		keep = append(keep, room.ID)
+		if room.StreamKey != "" {
+			keep = append(keep, room.StreamKey)
+		}
+	}
+	for _, name := range stale {
+		// Recordings are named after the stream, possibly with a suffix
+		// (transcoded variant, DVR segment), so match by prefix.
+		if slices.ContainsFunc(keep, func(stream string) bool { return strings.HasPrefix(name, stream) }) {
+			continue
+		}
+		recordPath := filepath.Join(s.recordDir, name)
+		if err := removeRecording(recordPath); err != nil {
+			logger.L().Warn("remove stale recording", zap.Error(err), zap.String("path", recordPath))
+			continue
+		}
+		logger.L().Info("removed stale recording", zap.String("path", recordPath))
 	}
 }
 
@@ -443,7 +521,7 @@ func (s *ReplayService) waitForUploadableRecording(ctx context.Context, streamKe
 	return s.waitForUploadableRecordingWith(
 		ctx,
 		streamKey,
-		replayRecordingStableInterval,
+		s.stableInterval,
 		replayRecordingStableChecks,
 	)
 }

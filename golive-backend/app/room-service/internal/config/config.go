@@ -11,14 +11,18 @@ import (
 )
 
 type Config struct {
-	Service ServiceCfg `mapstructure:"service"`
-	MySQL   MySQLCfg   `mapstructure:"mysql"`
-	Redis   RedisCfg   `mapstructure:"redis"`
-	JWT     JWTCfg     `mapstructure:"jwt"`
-	Live    LiveCfg    `mapstructure:"live"`
-	Replay  ReplayCfg  `mapstructure:"replay"`
-	Upload  UploadCfg  `mapstructure:"upload"`
-	Users   UsersCfg   `mapstructure:"users"`
+	Service  ServiceCfg  `mapstructure:"service"`
+	MySQL    MySQLCfg    `mapstructure:"mysql"`
+	Redis    RedisCfg    `mapstructure:"redis"`
+	JWT      JWTCfg      `mapstructure:"jwt"`
+	Live     LiveCfg     `mapstructure:"live"`
+	Replay   ReplayCfg   `mapstructure:"replay"`
+	Upload   UploadCfg   `mapstructure:"upload"`
+	Users    UsersCfg    `mapstructure:"users"`
+	Social   SocialCfg   `mapstructure:"social"`
+	Gifts    GiftsCfg    `mapstructure:"gifts"`
+	Chat     ChatCfg     `mapstructure:"chat"`
+	Internal InternalCfg `mapstructure:"internal"`
 }
 
 type ServiceCfg struct {
@@ -61,6 +65,9 @@ type LiveCfg struct {
 	// SRSAPIBase is the SRS HTTP API (e.g. "http://srs:1985"), used to kick
 	// the publisher when a room is stopped. Empty disables kicking.
 	SRSAPIBase string `mapstructure:"srs_api_base"`
+	// ReconcileInterval is how often live rooms are checked against SRS's
+	// stream list, so rooms whose publisher is gone get ended (default 1m).
+	ReconcileInterval time.Duration `mapstructure:"reconcile_interval"`
 }
 
 type ReplayCfg struct {
@@ -70,6 +77,10 @@ type ReplayCfg struct {
 	BunnyAPIBase    string        `mapstructure:"bunny_api_base"`
 	BunnyPlayerBase string        `mapstructure:"bunny_player_base"`
 	UploadTimeout   time.Duration `mapstructure:"upload_timeout"`
+	// StaleRecordingAge is how long a DVR file in RecordDir must be untouched
+	// before it is removed, unless an active room or pending replay upload
+	// still needs it (default 24h).
+	StaleRecordingAge time.Duration `mapstructure:"stale_recording_age"`
 }
 
 type UploadCfg struct {
@@ -79,9 +90,33 @@ type UploadCfg struct {
 	PostPublicURL  string `mapstructure:"post_public_url"`
 }
 
+type SocialCfg struct {
+	// MaxFollows caps how many channels one user can follow. 0 uses
+	// service.DefaultMaxFollows.
+	MaxFollows int `mapstructure:"max_follows"`
+}
+
 type UsersCfg struct {
 	ServiceURL string `mapstructure:"service_url"`
 	GRPCAddr   string `mapstructure:"grpc_addr"`
+}
+
+// GiftsCfg locates gift-service, which report moderation calls to hide a
+// super chat.
+type GiftsCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
+}
+
+// ChatCfg locates chat-service, which report moderation calls to hide a
+// chat message.
+type ChatCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
+}
+
+// InternalCfg holds the shared secret sent on (and required by) /internal
+// service-to-service calls (ROOMSVC_INTERNAL_TOKEN).
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
 }
 
 func Load(path string) (*Config, error) {
@@ -102,6 +137,7 @@ func Load(path string) (*Config, error) {
 	_ = v.BindEnv("live.stream_key_secret")
 	_ = v.BindEnv("replay.bunny_library_id")
 	_ = v.BindEnv("replay.bunny_api_key")
+	_ = v.BindEnv("internal.token")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

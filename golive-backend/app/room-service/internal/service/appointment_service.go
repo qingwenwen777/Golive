@@ -22,6 +22,7 @@ const (
 	startLead                  = 30 * time.Minute
 	startGrace                 = 30 * time.Minute
 	upcomingWindow             = 72 * time.Hour
+	watcherPageSize            = 1000
 	defaultAppointmentCategory = "Just Chatting"
 	legacyAppointmentCategory  = "Scheduled"
 )
@@ -408,6 +409,13 @@ func (s *AppointmentService) Reserve(ctx context.Context, viewerID, id string) (
 	if !s.isPubliclyActive(*appt) {
 		return nil, errcode.New(409, "appointment is no longer available")
 	}
+	blocked, err := blocksBetween(ctx, s.blocks, viewerID, appt.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
+	}
 	if err := s.appointments.Reserve(ctx, id, viewerID); err != nil {
 		return nil, err
 	}
@@ -434,6 +442,11 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 	if err := s.cleanupExpired(ctx); err != nil {
 		return nil, err
 	}
+	unlock, err := s.live.lockOwnerStart(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	now := s.now()
 	appt, err := s.appointments.OwnerAppointment(ctx, ownerID, id)
 	if err != nil {
@@ -463,15 +476,9 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 		return nil, err
 	}
 	if active, err := s.rooms.ActiveByOwner(ctx, ownerID); err == nil && active.ID != room.ID {
-		if err := s.live.endRoom(ctx, active, now); err != nil {
+		if _, err := s.live.stopRoom(ctx, active, now, true); err != nil {
 			return nil, err
 		}
-		s.live.disconnectPublisher(ctx, active.ID, active.StreamKey)
-		if active.StreamKey != "" {
-			_ = s.live.live.Delete(ctx, active.StreamKey)
-			_ = s.live.live.DeletePublishSession(ctx, active.StreamKey)
-		}
-		_ = s.live.broadcastEnded(ctx, active.ID, now)
 	} else if err != nil && !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
 	}
@@ -646,10 +653,9 @@ func (s *AppointmentService) RunScheduler(ctx context.Context) {
 }
 
 func (s *AppointmentService) ProcessDue(ctx context.Context) error {
-	if err := s.sendReminders(ctx); err != nil {
-		return err
-	}
-	return s.cleanupExpired(ctx)
+	reminderErr := s.sendReminders(ctx)
+	startErr := s.retryStartNotifications(ctx)
+	return errors.Join(reminderErr, startErr, s.cleanupExpired(ctx))
 }
 
 func (s *AppointmentService) listResp(ctx context.Context, items []model.LiveAppointment, viewerID string, page, size int, total int64) (*AppointmentListResp, error) {
@@ -805,12 +811,31 @@ func (s *AppointmentService) sendReminders(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// One failing appointment must not hold back the others; it stays unsent
+	// and is retried on the next run. Notification ids are deterministic, so
+	// a retry does not duplicate what was already delivered.
 	for _, appt := range due {
 		if err := s.notifyWatchers(ctx, appt, "appointment_reminder"); err != nil {
-			return err
+			logger.L().Warn("send appointment reminder", zap.Error(err), zap.String("appointment", appt.ID))
+			continue
 		}
 		if err := s.appointments.MarkReminderSent(ctx, appt.ID, now); err != nil {
-			return err
+			logger.L().Warn("mark appointment reminder sent", zap.Error(err), zap.String("appointment", appt.ID))
+		}
+	}
+	return nil
+}
+
+// retryStartNotifications resends start notifications that failed when the
+// appointment was started.
+func (s *AppointmentService) retryStartNotifications(ctx context.Context) error {
+	due, err := s.appointments.StartNotificationDue(ctx, s.now().Add(-startGrace))
+	if err != nil {
+		return err
+	}
+	for _, appt := range due {
+		if err := s.notifyStart(ctx, appt); err != nil {
+			logger.L().Warn("retry appointment start notification", zap.Error(err), zap.String("appointment", appt.ID))
 		}
 	}
 	return nil
@@ -823,14 +848,9 @@ func (s *AppointmentService) notifyStart(ctx context.Context, appt model.LiveApp
 	return s.appointments.MarkStartNotified(ctx, appt.ID, s.now())
 }
 
+// notifyWatchers notifies everyone who reserved appt, a page of watchers at
+// a time so popular appointments never build one huge query or insert.
 func (s *AppointmentService) notifyWatchers(ctx context.Context, appt model.LiveAppointment, kind string) error {
-	watchers, err := s.appointments.WatcherIDs(ctx, appt.ID)
-	if err != nil {
-		return err
-	}
-	if len(watchers) == 0 {
-		return nil
-	}
 	now := s.now()
 	title := "预约直播即将开始"
 	body := appt.Title
@@ -838,25 +858,53 @@ func (s *AppointmentService) notifyWatchers(ctx context.Context, appt model.Live
 		title = "预约直播已开播"
 		body = appt.Title
 	}
-	actor := s.notificationActor(ctx, appt)
-	notifications := make([]model.Notification, 0, len(watchers))
-	for _, userID := range watchers {
-		notifications = append(notifications, model.Notification{
-			ID:            notificationID(kind, appt.ID, userID),
-			UserID:        userID,
-			Type:          kind,
-			Title:         title,
-			Body:          body,
-			Link:          "/live/" + appt.RoomID,
-			ActorID:       actor.id,
-			ActorUsername: actor.username,
-			ActorName:     actor.name,
-			ActorAvatar:   actor.avatar,
-			ActorVerified: actor.verified,
-			CreatedAt:     now,
-		})
+	var actor *notificationActor
+	after := ""
+	for {
+		watchers, err := s.appointments.WatcherIDsAfter(ctx, appt.ID, after, watcherPageSize)
+		if err != nil {
+			return err
+		}
+		if len(watchers) == 0 {
+			return nil
+		}
+		after = watchers[len(watchers)-1]
+		// Reservations made before a block must not keep delivering the
+		// blocked side reminders about the creator.
+		blocked, err := blockedPeerSet(ctx, s.blocks, appt.OwnerID, watchers)
+		if err != nil {
+			return err
+		}
+		if actor == nil {
+			actor = ptr(s.notificationActor(ctx, appt))
+		}
+		notifications := make([]model.Notification, 0, len(watchers))
+		for _, userID := range watchers {
+			if blocked[userID] {
+				continue
+			}
+			notifications = append(notifications, model.Notification{
+				ID:            notificationID(kind, appt.ID, userID),
+				UserID:        userID,
+				Type:          kind,
+				Title:         title,
+				Body:          body,
+				Link:          "/live/" + appt.RoomID,
+				ActorID:       actor.id,
+				ActorUsername: actor.username,
+				ActorName:     actor.name,
+				ActorAvatar:   actor.avatar,
+				ActorVerified: actor.verified,
+				CreatedAt:     now,
+			})
+		}
+		if err := s.appointments.CreateNotifications(ctx, notifications); err != nil {
+			return err
+		}
+		if len(watchers) < watcherPageSize {
+			return nil
+		}
 	}
-	return s.appointments.CreateNotifications(ctx, notifications)
 }
 
 type notificationActor struct {

@@ -61,14 +61,17 @@ func (s *RoomService) ListUserLibrary(ctx context.Context, userID, rawType strin
 	if err != nil {
 		return nil, err
 	}
-	now := s.now()
-	items := make([]LibraryStream, 0, len(rows))
+	rooms := make([]model.Room, 0, len(rows))
 	for _, row := range rows {
-		st := s.streamFromRoom(ctx, &row.Room, now, userID)
-		if err := s.addSubscriberCount(ctx, &st); err != nil {
-			return nil, err
-		}
-		items = append(items, libraryStreamFromRoom(st, row.Item))
+		rooms = append(rooms, row.Room)
+	}
+	streams, err := s.streamsFromRooms(ctx, rooms, s.now(), userID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]LibraryStream, 0, len(rows))
+	for i, row := range rows {
+		items = append(items, libraryStreamFromRoom(streams[i], row.Item))
 	}
 	return &UserLibraryResp{Items: items}, nil
 }

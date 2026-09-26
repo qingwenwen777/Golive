@@ -105,7 +105,7 @@ func TestBannedAdminLosesAdminAccess(t *testing.T) {
 	admin, err := auth.Register(ctx, "admin", "secret123", "Admin")
 	require.NoError(t, err)
 	require.NoError(t, users.EnsureAdmin(ctx, "admin"))
-	_, err = users.AdminSetUserBan(ctx, admin.User.ID, true, "compromised")
+	_, err = users.AdminSetUserBan(ctx, admin.User.ID, true, "compromised", "")
 	require.NoError(t, err)
 
 	rec := serveJSON(router, http.MethodGet, "/admin/users", admin.Token, "")

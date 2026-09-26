@@ -2,8 +2,9 @@
 //
 // The hot path uses a single transaction containing:
 //
-//  1. UPDATE users SET coin_balance = coin_balance - amount
-//     WHERE id = ? AND available balance >= amount and account is active
+//  1. wallet.Debit: UPDATE users SET coin_balance = coin_balance - amount
+//     WHERE id = ? AND available balance >= amount and account is active,
+//     plus its coin_transactions row (all balance writes go through pkg/wallet)
 //  2. INSERT INTO {gift_orders | super_chat_orders}     -- success ledger
 //  3. INSERT INTO local_messages (status='pending')      -- outbox
 //
@@ -24,16 +25,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/pkg/userlevel"
+	"github.com/qingwenwen777/golive/pkg/wallet"
 )
 
 var (
-	ErrInsufficientFunds = errors.New("insufficient funds")
+	ErrInsufficientFunds = wallet.ErrInsufficientFunds
 	ErrDuplicateRequest  = errors.New("duplicate request")
 	ErrRoomOwnerNotFound = errors.New("room owner not found")
 	ErrActiveBetExists   = errors.New("active bet round exists")
@@ -135,65 +136,14 @@ WHERE id = ?
 	return name, strings.TrimSpace(row.Avatar), nil
 }
 
-func createCoinTransaction(
-	tx *gorm.DB,
-	userID string,
-	amount int64,
-	txType string,
-	title string,
-	description string,
-	sourceType string,
-	sourceID string,
-	roomID string,
-	counterpartyID string,
-) error {
-	if userID == "" || amount == 0 {
-		return nil
+// creditRoomOwner pays a gift's or super chat's receiver. A missing receiver
+// row is reported as ErrRoomOwnerNotFound.
+func creditRoomOwner(tx *gorm.DB, receiverID string, amount int64, e wallet.Entry) error {
+	_, err := wallet.Credit(tx, receiverID, amount, e)
+	if errors.Is(err, wallet.ErrUserNotFound) {
+		return ErrRoomOwnerNotFound
 	}
-	var balanceAfter int64
-	if err := tx.Raw("SELECT coin_balance FROM users WHERE id = ?", userID).Row().Scan(&balanceAfter); err != nil {
-		return err
-	}
-	return tx.Create(&model.CoinTransaction{
-		ID:             uuid.NewString(),
-		UserID:         userID,
-		Type:           txType,
-		Amount:         amount,
-		BalanceAfter:   balanceAfter,
-		Title:          title,
-		Description:    description,
-		SourceType:     sourceType,
-		SourceID:       sourceID,
-		RoomID:         roomID,
-		CounterpartyID: counterpartyID,
-	}).Error
-}
-
-// ErrInvalidAmount rejects zero or negative balance changes, which would turn
-// a debit into a credit (or a credit into a debit).
-var ErrInvalidAmount = errors.New("amount must be positive")
-
-func debitUserBalance(tx *gorm.DB, userID string, amount int64) error {
-	if amount <= 0 {
-		return ErrInvalidAmount
-	}
-	res := tx.Exec(
-		"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND COALESCE(banned, false) = false AND coin_balance - COALESCE(frozen_coins, 0) >= ?",
-		amount, userID, amount,
-	)
-	if isMissingUserControlColumn(res.Error) {
-		res = tx.Exec(
-			"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND coin_balance >= ?",
-			amount, userID, amount,
-		)
-	}
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrInsufficientFunds
-	}
-	return nil
+	return err
 }
 
 func FanBadgeLevel(totalContribution int64) int {
@@ -480,27 +430,21 @@ func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, ou
 		}
 		wager.RoomID = round.RoomID
 		wager.Amount = round.Amount
-		if err := debitUserBalance(tx, wager.UserID, wager.Amount); err != nil {
+		if _, err := wallet.Debit(tx, wager.UserID, wager.Amount, wallet.Entry{
+			Type:           model.CoinTxBetWager,
+			Title:          "竞猜消费",
+			Description:    round.Question,
+			SourceType:     "bet_wager",
+			SourceID:       wager.ID,
+			RoomID:         wager.RoomID,
+			CounterpartyID: round.OwnerID,
+		}); err != nil {
 			return err
 		}
 		if err := tx.Create(wager).Error; err != nil {
 			if isDuplicateKey(err) {
 				return ErrBetAlreadyPlaced
 			}
-			return err
-		}
-		if err := createCoinTransaction(
-			tx,
-			wager.UserID,
-			-wager.Amount,
-			model.CoinTxBetWager,
-			"竞猜消费",
-			round.Question,
-			"bet_wager",
-			wager.ID,
-			wager.RoomID,
-			round.OwnerID,
-		); err != nil {
 			return err
 		}
 		return tx.Create(&model.LocalMessage{
@@ -620,22 +564,15 @@ func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winnin
 			if w.Option == winningOption {
 				payout := payouts[i]
 				updates = map[string]any{"status": model.StatusWon, "payout": payout}
-				res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", payout, w.UserID)
-				if res.Error != nil {
-					return res.Error
-				}
-				if err := createCoinTransaction(
-					tx,
-					w.UserID,
-					payout,
-					model.CoinTxBetPayout,
-					"竞猜获得",
-					round.Question,
-					"bet_wager",
-					w.ID,
-					w.RoomID,
-					round.OwnerID,
-				); err != nil {
+				if _, err := wallet.Credit(tx, w.UserID, payout, wallet.Entry{
+					Type:           model.CoinTxBetPayout,
+					Title:          "竞猜获得",
+					Description:    round.Question,
+					SourceType:     "bet_wager",
+					SourceID:       w.ID,
+					RoomID:         w.RoomID,
+					CounterpartyID: round.OwnerID,
+				}); err != nil {
 					return err
 				}
 			}
@@ -710,21 +647,7 @@ func (r *OrderRepo) cancelBetRound(ctx context.Context, roundID, ownerID string,
 		}
 		for i := range refunded {
 			w := &refunded[i]
-			if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", w.Amount, w.UserID).Error; err != nil {
-				return err
-			}
-			if err := createCoinTransaction(
-				tx,
-				w.UserID,
-				w.Amount,
-				model.CoinTxBetRefund,
-				"竞猜返还",
-				round.Question,
-				"bet_wager",
-				w.ID,
-				w.RoomID,
-				round.OwnerID,
-			); err != nil {
+			if _, err := wallet.Credit(tx, w.UserID, w.Amount, betRefundEntry(&round, w)); err != nil {
 				return err
 			}
 			if err := tx.Model(&model.BetWager{}).Where("id = ?", w.ID).
@@ -811,21 +734,8 @@ func (r *OrderRepo) RefundOrphanedBetWagers(ctx context.Context, limit int) (int
 			if res.RowsAffected == 0 {
 				return ErrBetClosed
 			}
-			if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", w.Amount, w.UserID).Error; err != nil {
-				return err
-			}
-			return createCoinTransaction(
-				tx,
-				w.UserID,
-				w.Amount,
-				model.CoinTxBetRefund,
-				"竞猜返还",
-				round.Question,
-				"bet_wager",
-				w.ID,
-				w.RoomID,
-				round.OwnerID,
-			)
+			_, err := wallet.Credit(tx, w.UserID, w.Amount, betRefundEntry(&round, &w))
+			return err
 		})
 		if errors.Is(err, ErrBetClosed) {
 			continue
@@ -840,6 +750,19 @@ func (r *OrderRepo) RefundOrphanedBetWagers(ctx context.Context, limit int) (int
 		refunded++
 	}
 	return refunded, firstErr
+}
+
+// betRefundEntry is the ledger entry for returning a wager's stake.
+func betRefundEntry(round *model.BetRound, w *model.BetWager) wallet.Entry {
+	return wallet.Entry{
+		Type:           model.CoinTxBetRefund,
+		Title:          "竞猜返还",
+		Description:    round.Question,
+		SourceType:     "bet_wager",
+		SourceID:       w.ID,
+		RoomID:         w.RoomID,
+		CounterpartyID: round.OwnerID,
+	}
 }
 
 // lockBetRound loads a round with SELECT ... FOR UPDATE. SQLite (tests) has
@@ -937,7 +860,15 @@ func (r *OrderRepo) PlaceGiftOrder(
 		}
 
 		// Decrement balance only if sufficient.
-		if err := debitUserBalance(tx, o.UserID, o.TotalCoin); err != nil {
+		if _, err := wallet.Debit(tx, o.UserID, o.TotalCoin, wallet.Entry{
+			Type:           model.CoinTxGiftSpend,
+			Title:          "礼物消费",
+			Description:    fmt.Sprintf("%s x%d", o.GiftID, o.Count),
+			SourceType:     "gift_order",
+			SourceID:       o.OrderID,
+			RoomID:         o.RoomID,
+			CounterpartyID: receiverID,
+		}); err != nil {
 			return err
 		}
 		if err := tx.Create(o).Error; err != nil {
@@ -946,44 +877,20 @@ func (r *OrderRepo) PlaceGiftOrder(
 			}
 			return err
 		}
-		if err := createCoinTransaction(
-			tx,
-			o.UserID,
-			-o.TotalCoin,
-			model.CoinTxGiftSpend,
-			"礼物消费",
-			fmt.Sprintf("%s x%d", o.GiftID, o.Count),
-			"gift_order",
-			o.OrderID,
-			o.RoomID,
-			receiverID,
-		); err != nil {
-			return err
-		}
 		if receiverID != "" {
-			res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.TotalCoin, receiverID)
-			if res.Error != nil {
-				return res.Error
-			}
-			if res.RowsAffected == 0 {
-				return ErrRoomOwnerNotFound
-			}
 			creatorIncomeTitle := "直播礼物收入"
 			if o.GiftID == "fan_light" {
 				creatorIncomeTitle = "加入粉丝团收入"
 			}
-			if err := createCoinTransaction(
-				tx,
-				receiverID,
-				o.TotalCoin,
-				model.CoinTxCreatorGiftIncome,
-				creatorIncomeTitle,
-				fmt.Sprintf("%s x%d", o.GiftID, o.Count),
-				"gift_order",
-				o.OrderID,
-				o.RoomID,
-				o.UserID,
-			); err != nil {
+			if err := creditRoomOwner(tx, receiverID, o.TotalCoin, wallet.Entry{
+				Type:           model.CoinTxCreatorGiftIncome,
+				Title:          creatorIncomeTitle,
+				Description:    fmt.Sprintf("%s x%d", o.GiftID, o.Count),
+				SourceType:     "gift_order",
+				SourceID:       o.OrderID,
+				RoomID:         o.RoomID,
+				CounterpartyID: o.UserID,
+			}); err != nil {
 				return err
 			}
 		}
@@ -1028,7 +935,15 @@ func (r *OrderRepo) PlaceFanClubJoinOrder(
 			creatorName = creatorID
 		}
 
-		if err := debitUserBalance(tx, o.UserID, o.TotalCoin); err != nil {
+		if _, err := wallet.Debit(tx, o.UserID, o.TotalCoin, wallet.Entry{
+			Type:           model.CoinTxGiftSpend,
+			Title:          "加入粉丝团",
+			Description:    creatorName,
+			SourceType:     "gift_order",
+			SourceID:       o.OrderID,
+			RoomID:         o.RoomID,
+			CounterpartyID: creatorID,
+		}); err != nil {
 			return err
 		}
 		if err := tx.Create(o).Error; err != nil {
@@ -1037,43 +952,19 @@ func (r *OrderRepo) PlaceFanClubJoinOrder(
 			}
 			return err
 		}
-		if err := createCoinTransaction(
-			tx,
-			o.UserID,
-			-o.TotalCoin,
-			model.CoinTxGiftSpend,
-			"加入粉丝团",
-			creatorName,
-			"gift_order",
-			o.OrderID,
-			o.RoomID,
-			creatorID,
-		); err != nil {
-			return err
-		}
-		res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.TotalCoin, creatorID)
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return ErrRoomOwnerNotFound
-		}
 		fanName, _, _ := creatorProfile(tx, o.UserID)
 		if fanName == "" {
 			fanName = o.UserID
 		}
-		if err := createCoinTransaction(
-			tx,
-			creatorID,
-			o.TotalCoin,
-			model.CoinTxCreatorGiftIncome,
-			"加入粉丝团收入",
-			fanName,
-			"gift_order",
-			o.OrderID,
-			o.RoomID,
-			o.UserID,
-		); err != nil {
+		if err := creditRoomOwner(tx, creatorID, o.TotalCoin, wallet.Entry{
+			Type:           model.CoinTxCreatorGiftIncome,
+			Title:          "加入粉丝团收入",
+			Description:    fanName,
+			SourceType:     "gift_order",
+			SourceID:       o.OrderID,
+			RoomID:         o.RoomID,
+			CounterpartyID: o.UserID,
+		}); err != nil {
 			return err
 		}
 		return applyFanBadgeContribution(tx, o.UserID, o.RoomID, creatorID, o.TotalCoin, FanBadgeCreate)
@@ -1118,7 +1009,15 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			return err
 		}
 
-		if err := debitUserBalance(tx, o.UserID, o.Amount); err != nil {
+		if _, err := wallet.Debit(tx, o.UserID, o.Amount, wallet.Entry{
+			Type:           model.CoinTxSuperChatSpend,
+			Title:          "SC 消费",
+			Description:    o.Text,
+			SourceType:     "super_chat_order",
+			SourceID:       o.OrderID,
+			RoomID:         o.RoomID,
+			CounterpartyID: receiverID,
+		}); err != nil {
 			return err
 		}
 		if err := tx.Create(o).Error; err != nil {
@@ -1127,40 +1026,16 @@ func (r *OrderRepo) PlaceSuperChatOrder(
 			}
 			return err
 		}
-		if err := createCoinTransaction(
-			tx,
-			o.UserID,
-			-o.Amount,
-			model.CoinTxSuperChatSpend,
-			"SC 消费",
-			o.Text,
-			"super_chat_order",
-			o.OrderID,
-			o.RoomID,
-			receiverID,
-		); err != nil {
-			return err
-		}
 		if receiverID != "" {
-			res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", o.Amount, receiverID)
-			if res.Error != nil {
-				return res.Error
-			}
-			if res.RowsAffected == 0 {
-				return ErrRoomOwnerNotFound
-			}
-			if err := createCoinTransaction(
-				tx,
-				receiverID,
-				o.Amount,
-				model.CoinTxCreatorSuperChatIncome,
-				"直播 SC 收入",
-				o.Text,
-				"super_chat_order",
-				o.OrderID,
-				o.RoomID,
-				o.UserID,
-			); err != nil {
+			if err := creditRoomOwner(tx, receiverID, o.Amount, wallet.Entry{
+				Type:           model.CoinTxCreatorSuperChatIncome,
+				Title:          "直播 SC 收入",
+				Description:    o.Text,
+				SourceType:     "super_chat_order",
+				SourceID:       o.OrderID,
+				RoomID:         o.RoomID,
+				CounterpartyID: o.UserID,
+			}); err != nil {
 				return err
 			}
 		}
@@ -1280,17 +1155,19 @@ WHERE id = ?
 	return ownerID, nil
 }
 
+// applyFanBadgeContribution adds coin to userID's badge for creatorID. The
+// total is incremented in SQL (an upsert when the badge may be created)
+// rather than read, added to and written back: under REPEATABLE READ a plain
+// SELECT here sees the snapshot from the transaction's first query, which can
+// predate a concurrent gift's commit, so that gift's contribution was lost or
+// the second first-time Fan Light failed on the duplicate key.
 func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, coin int64, mode FanBadgeContributionMode) error {
 	if mode == FanBadgeNoChange || coin <= 0 || userID == "" || creatorID == "" || userID == creatorID {
 		return nil
 	}
 
-	var badge model.FanBadge
-	err := tx.Where("user_id = ? AND creator_id = ?", userID, creatorID).Take(&badge).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if mode != FanBadgeCreate {
-			return nil
-		}
+	now := time.Now()
+	if mode == FanBadgeCreate {
 		name, avatar, err := creatorProfileForFanBadge(tx, roomID, creatorID)
 		if err != nil {
 			return err
@@ -1298,7 +1175,7 @@ func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, co
 		if strings.TrimSpace(name) == "" {
 			name = creatorID
 		}
-		badge = model.FanBadge{
+		badge := model.FanBadge{
 			UserID:            userID,
 			CreatorID:         creatorID,
 			CreatorName:       strings.TrimSpace(name),
@@ -1306,20 +1183,49 @@ func applyFanBadgeContribution(tx *gorm.DB, userID, roomID, creatorID string, co
 			TotalContribution: coin,
 			Level:             FanBadgeLevel(coin),
 		}
-		return tx.Create(&badge).Error
-	}
-	if err != nil {
-		return err
+		// The bare column in ON DUPLICATE KEY UPDATE (MySQL) and DO UPDATE
+		// (SQLite) is the stored value, so this adds to the existing total.
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}, {Name: "creator_id"}},
+			DoUpdates: clause.Set{
+				{Column: clause.Column{Name: "total_contribution"}, Value: gorm.Expr("total_contribution + ?", coin)},
+				{Column: clause.Column{Name: "updated_at"}, Value: now},
+			},
+		}).Create(&badge).Error; err != nil {
+			return err
+		}
+	} else {
+		res := tx.Model(&model.FanBadge{}).
+			Where("user_id = ? AND creator_id = ?", userID, creatorID).
+			Updates(map[string]any{
+				"total_contribution": gorm.Expr("total_contribution + ?", coin),
+				"updated_at":         now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return nil
+		}
 	}
 
-	total := badge.TotalContribution + coin
+	// Re-derive the level from the stored total. The write above already
+	// holds the row lock; the locking read makes this a current read rather
+	// than a snapshot one.
+	var badge model.FanBadge
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("total_contribution", "level").
+		Where("user_id = ? AND creator_id = ?", userID, creatorID).
+		Take(&badge).Error; err != nil {
+		return err
+	}
+	level := FanBadgeLevel(badge.TotalContribution)
+	if level == badge.Level {
+		return nil
+	}
 	return tx.Model(&model.FanBadge{}).
 		Where("user_id = ? AND creator_id = ?", userID, creatorID).
-		Updates(map[string]any{
-			"total_contribution": total,
-			"level":              FanBadgeLevel(total),
-			"updated_at":         time.Now(),
-		}).Error
+		Update("level", level).Error
 }
 
 func creatorProfileForFanBadge(tx *gorm.DB, roomID, creatorID string) (string, string, error) {
@@ -1386,14 +1292,6 @@ func isDuplicateKey(err error) bool {
 	return strings.Contains(s, "Error 1062") ||
 		strings.Contains(s, "Duplicate entry") ||
 		strings.Contains(s, "UNIQUE constraint failed")
-}
-
-func isMissingUserControlColumn(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "unknown column") || strings.Contains(msg, "no such column")
 }
 
 func isMissingTable(err error) bool {

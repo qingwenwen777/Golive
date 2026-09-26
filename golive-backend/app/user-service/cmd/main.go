@@ -125,7 +125,11 @@ func main() {
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,
 		CoverDir:        cfg.Upload.CoverDir,
 		CoverPublicURL:  cfg.Upload.CoverPublicURL,
+		InternalToken:   cfg.Internal.Token,
 	})
+	if cfg.Internal.Token == "" {
+		log.Warn("internal.token is empty: /internal endpoints reject every call")
+	}
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 	var grpcSrv *grpc.Server
 

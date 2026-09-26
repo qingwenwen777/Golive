@@ -119,7 +119,12 @@ func main() {
 		LuckyBag:  luckyBagH,
 		MicLink:   micLinkH,
 		Admin:     adminH,
+
+		InternalToken: cfg.Internal.Token,
 	})
+	if cfg.Internal.Token == "" {
+		log.Warn("internal.token is empty: /internal endpoints reject every call")
+	}
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 
 	outboxCtx, cancelOutbox := context.WithCancel(context.Background())

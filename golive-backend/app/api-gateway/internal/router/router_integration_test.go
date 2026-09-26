@@ -176,6 +176,55 @@ func TestRoute_DoesNotExposeSRSCallbacks(t *testing.T) {
 	require.Nil(t, room.last)
 }
 
+// Upstreams serve their service-to-service API under /internal/*. The
+// gateway only proxies /api/<prefix>/* onto /<prefix>/*, so no public path
+// lands on /internal, and a client-sent internal token is dropped.
+func TestRoute_DoesNotExposeInternalAPIs(t *testing.T) {
+	user := newUpstreamSpy(t, 200, `{}`)
+	room := newUpstreamSpy(t, 200, `{}`)
+	gift := newUpstreamSpy(t, 200, `{}`)
+	chat := newUpstreamSpy(t, 200, `{}`)
+	cfg := baseCfg(user.srv.URL, room.srv.URL, gift.srv.URL)
+	cfg.Upstreams.ChatService = chat.srv.URL
+	r := newGateway(t, cfg)
+	tok := sign(t, "secret", "u1")
+	spies := []*upstreamSpy{user, room, gift, chat}
+
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, "/internal/users/u1/restriction"},
+		{http.MethodPost, "/api/internal/users/u1/restriction"},
+		{http.MethodPost, "/api/internal/super-chats/sc-1/moderation"},
+		{http.MethodDelete, "/api/internal/rooms/r1/danmus/m1"},
+		{http.MethodGet, "/api/internal/rooms/r1/fan-badges/u1"},
+		{http.MethodGet, "/api/internal/users/u1/permission"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		w := newRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusNotFound, w.Code, "%s %s", tc.method, tc.path)
+		for _, spy := range spies {
+			require.Nil(t, spy.last, "%s %s must not reach an upstream", tc.method, tc.path)
+		}
+	}
+
+	// Paths that are proxied keep their /<prefix>, even with dot segments
+	// (the upstream routers do not clean them either), and never carry a
+	// client-supplied internal token.
+	for _, path := range []string{
+		"/api/chat/../internal/rooms/r1/fan-badges/u1",
+		"/api/chat/%2e%2e/internal/rooms/r1/fan-badges/u1",
+	} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("X-Internal-Token", "guessed")
+		w := newRecorder()
+		r.ServeHTTP(w, req)
+		require.NotNil(t, chat.last, path)
+		require.True(t, strings.HasPrefix(chat.last.URL.Path, "/chat/"), "%s forwarded as %s", path, chat.last.URL.Path)
+		require.Empty(t, chat.last.Header.Get("X-Internal-Token"), path)
+	}
+}
+
 func TestRoute_InjectsUserIDFromJWT(t *testing.T) {
 	user := newUpstreamSpy(t, 200, `{"id":"u1"}`)
 	room := newUpstreamSpy(t, 200, `{"channelId":"c","following":true}`)

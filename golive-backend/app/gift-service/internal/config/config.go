@@ -19,6 +19,7 @@ type Config struct {
 	Outbox      OutboxCfg      `mapstructure:"outbox"`
 	Idempotency IdempotencyCfg `mapstructure:"idempotency"`
 	Bet         BetCfg         `mapstructure:"bet"`
+	Internal    InternalCfg    `mapstructure:"internal"`
 }
 
 type ServiceCfg struct {
@@ -70,6 +71,12 @@ type BetCfg struct {
 	SettleGrace time.Duration `mapstructure:"settle_grace"`
 }
 
+// InternalCfg holds the shared secret other services send on /internal
+// calls (GIFTSVC_INTERNAL_TOKEN). Empty rejects every internal call.
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
+}
+
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -85,6 +92,7 @@ func Load(path string) (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	_ = v.BindEnv("mysql.dsn")
 	_ = v.BindEnv("redis.password")
+	_ = v.BindEnv("internal.token")
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read: %w", err)
 	}

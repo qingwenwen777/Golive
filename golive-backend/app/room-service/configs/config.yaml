@@ -29,6 +29,9 @@ live:
   flv_base: "http://localhost:8082/live"
   # SRS http_api; used to disconnect the publisher when a live is stopped.
   srs_api_base: "http://127.0.0.1:1985"
+  # How often live rooms are checked against SRS so rooms whose publisher is
+  # gone (lost on_unpublish, restart during the unpublish grace) get ended.
+  reconcile_interval: 1m
 
 replay:
   record_dir: "./records"
@@ -37,6 +40,9 @@ replay:
   bunny_api_base: "https://video.bunnycdn.com"
   bunny_player_base: "https://player.mediadelivery.net/embed"
   upload_timeout: 30m
+  # Recordings untouched this long that no live room or pending replay
+  # upload needs are removed (failed uploads, mic-link streams, leftovers).
+  stale_recording_age: 24h
 
 upload:
   cover_dir: "./uploads/covers"
@@ -47,3 +53,19 @@ upload:
 users:
   service_url: "http://127.0.0.1:8090"
   grpc_addr: "127.0.0.1:19090"
+
+social:
+  # Most channels one user can follow.
+  max_follows: 2000
+
+# Report moderation hides super chats / chat messages through their owners.
+gifts:
+  service_url: "http://127.0.0.1:8092"
+
+chat:
+  service_url: "http://127.0.0.1:8093"
+
+# Shared secret for service-to-service /internal APIs. Every service must use
+# the same value; an empty token rejects all internal calls. Env: ROOMSVC_INTERNAL_TOKEN.
+internal:
+  token: "dev-only-internal-token-change-me"
