@@ -118,6 +118,7 @@ func main() {
 	})
 	liveSvc.SetTextPolicy(moderationSvc)
 	appointmentSvc.SetTextPolicy(moderationSvc)
+	messageSvc.SetTextPolicy(moderationSvc)
 	roomSvc.SetBlockChecker(messageSvc)
 	appointmentSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetBlockChecker(messageSvc)

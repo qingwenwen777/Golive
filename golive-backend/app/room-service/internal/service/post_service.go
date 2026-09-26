@@ -150,6 +150,11 @@ func (s *PostService) CreatePost(ctx context.Context, ownerID string, req Create
 	if err := s.requireCreatorPermission(ctx, ownerID); err != nil {
 		return nil, err
 	}
+	if s.textPolicy != nil {
+		if err := s.textPolicy.EnsureUserCanInteract(ctx, ownerID); err != nil {
+			return nil, err
+		}
+	}
 	content := cleanPostText(req.Content, maxPostContentLen)
 	images, err := cleanPostImages(req.Images)
 	if err != nil {

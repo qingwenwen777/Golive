@@ -17,10 +17,11 @@ const (
 )
 
 type MessageService struct {
-	messages *repo.MessageRepo
-	rooms    *repo.RoomRepo
-	social   *repo.SocialRepo
-	now      func() time.Time
+	messages   *repo.MessageRepo
+	rooms      *repo.RoomRepo
+	social     *repo.SocialRepo
+	textPolicy TextPolicy
+	now        func() time.Time
 }
 
 func NewMessageService(messages *repo.MessageRepo, rooms *repo.RoomRepo, social *repo.SocialRepo) *MessageService {
@@ -30,6 +31,22 @@ func NewMessageService(messages *repo.MessageRepo, rooms *repo.RoomRepo, social 
 		social:   social,
 		now:      time.Now,
 	}
+}
+
+func (s *MessageService) SetTextPolicy(policy TextPolicy) {
+	s.textPolicy = policy
+}
+
+// ensureCanSend applies the site ban/mute and blocked-word policy to a direct
+// or fan group message, the same as live chat and comments.
+func (s *MessageService) ensureCanSend(ctx context.Context, senderID, body string) error {
+	if s.textPolicy == nil {
+		return nil
+	}
+	if err := s.textPolicy.EnsureUserCanInteract(ctx, senderID); err != nil {
+		return err
+	}
+	return s.textPolicy.EnsureTextAllowed(ctx, body)
 }
 
 type MessageUserDTO struct {
@@ -276,6 +293,9 @@ func (s *MessageService) SendDirect(ctx context.Context, senderID string, req Se
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureCanSend(ctx, senderID, body); err != nil {
+		return nil, err
+	}
 	thread, _, err := s.messages.SendDirectMessage(ctx, repo.DirectSendInput{
 		ViewerID:   senderID,
 		CreatorID:  creatorID,
@@ -319,6 +339,9 @@ func (s *MessageService) SendThreadMessage(ctx context.Context, senderID, thread
 	}
 	body, err := cleanDirectMessage(content)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanSend(ctx, senderID, body); err != nil {
 		return nil, err
 	}
 	receiverID := thread.CreatorID
@@ -602,6 +625,9 @@ func (s *MessageService) SendFanGroupMessage(ctx context.Context, userID, groupI
 	}
 	body, err := cleanDirectMessage(content)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureCanSend(ctx, userID, body); err != nil {
 		return nil, err
 	}
 	msg, err := s.messages.SendFanGroupMessage(ctx, groupID, userID, body, s.now())
