@@ -104,7 +104,7 @@ func (h *GiftHandler) Send(c *gin.Context) {
 		errcode.Respond(c, errcode.New(400, "Bad request"))
 		return
 	}
-	if strings.TrimSpace(body.RoomID) == "" || strings.TrimSpace(body.GiftID) == "" || body.Count <= 0 {
+	if strings.TrimSpace(body.RoomID) == "" || strings.TrimSpace(body.GiftID) == "" || body.Count <= 0 || body.Count > service.MaxGiftCount {
 		errcode.Respond(c, errcode.New(400, "Bad request"))
 		return
 	}

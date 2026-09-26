@@ -166,7 +166,14 @@ func createCoinTransaction(
 	}).Error
 }
 
+// ErrInvalidAmount rejects zero or negative balance changes, which would turn
+// a debit into a credit (or a credit into a debit).
+var ErrInvalidAmount = errors.New("amount must be positive")
+
 func debitUserBalance(tx *gorm.DB, userID string, amount int64) error {
+	if amount <= 0 {
+		return ErrInvalidAmount
+	}
 	res := tx.Exec(
 		"UPDATE users SET coin_balance = coin_balance - ? WHERE id = ? AND COALESCE(banned, false) = false AND coin_balance - COALESCE(frozen_coins, 0) >= ?",
 		amount, userID, amount,

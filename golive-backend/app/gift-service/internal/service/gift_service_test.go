@@ -189,6 +189,28 @@ func TestGiftSend_BalanceBoundary(t *testing.T) {
 	require.Equal(t, order.OrderID, order2.OrderID, "second hit returns the persisted failed order")
 }
 
+// A count large enough to wrap price*count negative used to credit the sender.
+func TestGiftSend_RejectsOverflowingCount(t *testing.T) {
+	db := newTestDB(t, 100)
+	seedGift(t, db, "flower", 10)
+	svc := service.NewGiftService(repo.NewGiftRepo(db), repo.NewOrderRepo(db))
+	ctx := context.Background()
+
+	for i, count := range []int{0, -1, service.MaxGiftCount + 1, 1844674407270955161} {
+		order, _, err := svc.Send(ctx, service.SendGiftReq{
+			UserID: "u-demo", RoomID: "r", GiftID: "flower", Count: count, RequestID: "overflow-" + string(rune('a'+i)),
+		})
+		require.ErrorIs(t, err, service.ErrInvalidGiftCount, "count %d", count)
+		require.Nil(t, order)
+	}
+	require.EqualValues(t, 100, balanceOf(t, db, "u-demo"))
+	require.EqualValues(t, 0, balanceOf(t, db, "u-owner"))
+
+	var orders int64
+	require.NoError(t, db.Model(&model.GiftOrder{}).Count(&orders).Error)
+	require.Zero(t, orders)
+}
+
 func TestGiftSend_UsesResolvedDisplayNameInOutbox(t *testing.T) {
 	db := newTestDB(t, 1000)
 	seedGift(t, db, "flower", 10)
