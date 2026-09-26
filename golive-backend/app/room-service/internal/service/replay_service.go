@@ -289,6 +289,12 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
 		return
 	}
+	s.uploadRecording(ctx, room, recordPath)
+}
+
+// uploadRecording uploads a finished DVR file to Bunny and publishes it as the
+// room's replay, unless the creator deleted the replay in the meantime.
+func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, recordPath string) {
 	if err := s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusUploading, ""); err != nil {
 		return
 	}
@@ -301,9 +307,17 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
 		return
 	}
-	if err := s.rooms.SetReplayUploaded(ctx, room.ID, s.libraryID, videoID, model.ReplayStatusReady, s.now()); err != nil {
+	updated, err := s.rooms.SetReplayUploaded(ctx, room.ID, s.libraryID, videoID, model.ReplayStatusReady, s.now())
+	if err != nil {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
 		return
+	}
+	if !updated {
+		// Deleted mid-upload: DeleteReplay had no video id to remove yet, so
+		// drop the video here rather than leave it in the library.
+		if err := s.bunny.DeleteVideo(ctx, s.libraryID, videoID); err != nil {
+			logger.L().Warn("delete replay video after replay was deleted", zap.Error(err), zap.String("room_id", room.ID), zap.String("video_id", videoID))
+		}
 	}
 	if err := removeRecording(recordPath); err != nil {
 		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
@@ -323,6 +337,24 @@ func (s *ReplayService) cleanupRoomRecording(room model.Room) {
 	}
 	if err := removeRecording(recordPath); err != nil {
 		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
+	}
+}
+
+// cleanupStreamRecording removes the DVR file of a stream that never becomes
+// a replay, such as a mic-link guest stream published over RTMP.
+func (s *ReplayService) cleanupStreamRecording(stream string) {
+	if s.recordDir == "" || stream == "" || strings.ContainsAny(stream, `/\*?[`) {
+		return
+	}
+	time.Sleep(5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	recordPath, err := s.waitForUploadableRecording(ctx, stream)
+	if err != nil {
+		return
+	}
+	if err := removeRecording(recordPath); err != nil {
+		logger.L().Warn("remove stream recording", zap.Error(err), zap.String("stream", stream), zap.String("path", recordPath))
 	}
 }
 

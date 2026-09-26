@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +18,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/miclink"
 )
 
 func newLiveServiceTestDeps(t *testing.T) (*LiveService, *repo.RoomRepo, *repo.LiveRepo) {
@@ -240,6 +245,95 @@ func TestStopLiveDeletesStreamKeyAndEndsRoom(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.StatusEnded, room.Status)
 	require.NotNil(t, room.EndedAt)
+}
+
+// fakeSRSAPI serves SRS 5's DELETE /api/v1/clients/{id}, answering with code,
+// and returns its base URL plus the client ids it was asked to kick.
+func fakeSRSAPI(t *testing.T, code int) (string, func() []string) {
+	t.Helper()
+	var mu sync.Mutex
+	var kicked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, ok := strings.CutPrefix(r.URL.Path, "/api/v1/clients/")
+		if r.Method != http.MethodDelete || !ok {
+			http.NotFound(w, r)
+			return
+		}
+		mu.Lock()
+		kicked = append(kicked, id)
+		mu.Unlock()
+		fmt.Fprintf(w, `{"code":%d}`, code)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), kicked...)
+	}
+}
+
+func TestStopLiveKicksSRSPublisher(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _ := newLiveServiceTestDeps(t)
+	base, kicked := fakeSRSAPI(t, 0)
+	svc.SetSRSAPIBase(base)
+	st := startTestLive(t, svc, "owner-kick-stop")
+	publishTestLiveClient(t, svc, st.StreamKey, "client-stop")
+
+	require.NoError(t, svc.StopLive(ctx, "owner-kick-stop"))
+	require.Equal(t, []string{"client-stop"}, kicked())
+}
+
+func TestForceStopRoomKicksSRSPublisher(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _ := newLiveServiceTestDeps(t)
+	base, kicked := fakeSRSAPI(t, 0)
+	svc.SetSRSAPIBase(base)
+	st := startTestLive(t, svc, "owner-kick-force")
+	publishTestLiveClient(t, svc, st.StreamKey, "client-force")
+
+	require.NoError(t, svc.ForceStopRoom(ctx, st.ID))
+	require.Equal(t, []string{"client-force"}, kicked())
+
+	room, err := rooms.GetByID(ctx, st.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusEnded, room.Status)
+}
+
+func TestGoLiveKicksPublisherOfReplacedRoom(t *testing.T) {
+	svc, _, _ := newLiveServiceTestDeps(t)
+	base, kicked := fakeSRSAPI(t, 0)
+	svc.SetSRSAPIBase(base)
+	st := startTestLive(t, svc, "owner-kick-replace")
+	publishTestLiveClient(t, svc, st.StreamKey, "client-old")
+
+	next := startTestLive(t, svc, "owner-kick-replace")
+	require.NotEqual(t, st.ID, next.ID)
+	require.Equal(t, []string{"client-old"}, kicked())
+}
+
+func TestStopLiveSucceedsWhenSRSKickFails(t *testing.T) {
+	ctx := context.Background()
+	notFoundBase, _ := fakeSRSAPI(t, 2049)
+	down := httptest.NewServer(http.NotFoundHandler())
+	down.Close()
+
+	for name, base := range map[string]string{"client not found": notFoundBase, "srs unreachable": down.URL} {
+		t.Run(name, func(t *testing.T) {
+			svc, rooms, live := newLiveServiceTestDeps(t)
+			svc.SetSRSAPIBase(base)
+			st := startTestLive(t, svc, "owner-kick-fail")
+			publishTestLiveClient(t, svc, st.StreamKey, "client-fail")
+
+			require.NoError(t, svc.StopLive(ctx, "owner-kick-fail"))
+
+			room, err := rooms.GetByID(ctx, st.ID)
+			require.NoError(t, err)
+			require.Equal(t, model.StatusEnded, room.Status)
+			_, err = live.Resolve(ctx, publishSecret(st.StreamKey))
+			require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+		})
+	}
 }
 
 func TestStopLiveBroadcastsEndedEvent(t *testing.T) {
@@ -506,4 +600,33 @@ func TestOnUnpublishIgnoresMissingOrMismatchedKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.StatusLive, room.Status)
 	require.Nil(t, room.EndedAt)
+}
+
+func TestOnPublishMicLinkRequiresIssuedToken(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, rdb := newLiveServiceTestDepsWithRedis(t)
+	stream := miclink.StreamName("live-room", "guest-1")
+	other := miclink.StreamName("live-room", "guest-2")
+	require.NoError(t, rdb.Set(ctx, miclink.TokenKey(stream), "tok-guest-1", time.Minute).Err())
+	require.NoError(t, rdb.Set(ctx, miclink.TokenKey(other), "tok-guest-2", time.Minute).Err())
+
+	// SRS 5 WHIP reports the raw query string as param; RTMP prefixes "?".
+	whipParam := "app=live&stream=" + stream + "&key=tok-guest-1"
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: whipParam}))
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: "?key=tok-guest-1"}))
+
+	cases := map[string]SRSPublishReq{
+		"no token":             {App: "live", Stream: stream, Param: "app=live&stream=" + stream},
+		"wrong token":          {App: "live", Stream: stream, Param: "?key=tok-guess"},
+		"other guest's token":  {App: "live", Stream: stream, Param: "?key=tok-guest-2"},
+		"never issued stream":  {App: "live", Stream: "miclink-anything", Param: "?key=tok-guest-1"},
+		"guessable name alone": {App: "live", Stream: stream},
+	}
+	for name, req := range cases {
+		require.Error(t, svc.OnPublish(ctx, req), name)
+	}
+
+	// Revoked (guest removed) or expired tokens stop authorizing publishes.
+	require.NoError(t, rdb.Del(ctx, miclink.TokenKey(stream)).Err())
+	require.Error(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: whipParam}))
 }

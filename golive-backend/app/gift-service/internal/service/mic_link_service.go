@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/miclink"
 )
 
 // Voice mic-link lets viewers join the streamer's audio live. State is
@@ -24,6 +27,9 @@ const (
 	micLinkStateTTL = 6 * time.Hour
 	micLinkLockTTL  = 3 * time.Second
 	micLinkLockWait = 2 * time.Second
+	// micLinkTokenTTL bounds a guest's publish token. An on-air guest polling
+	// Latest gets a fresh one after it expires, so reconnects keep working.
+	micLinkTokenTTL = 10 * time.Minute
 
 	MicEligibilityAll       = "all"
 	MicEligibilityFollowers = "followers"
@@ -94,6 +100,9 @@ type MicLinkView struct {
 	IsOwner     bool         `json:"isOwner"`
 	MyStatus    string       `json:"myStatus"`
 	MyMuted     bool         `json:"myMuted"`
+	// MyPublishToken authorizes the caller's own WHIP publish while on air.
+	// Only ever returned to that guest; room-service checks it in on_publish.
+	MyPublishToken string `json:"myPublishToken,omitempty"`
 }
 
 type MicConfigReq struct {
@@ -201,7 +210,66 @@ func (s *MicLinkService) Latest(ctx context.Context, roomID, userID string) (*Mi
 		return nil, err
 	}
 	isOwner := userID != "" && userID == st.OwnerID
-	return s.viewFor(st, userID, isOwner), nil
+	view := s.viewFor(st, userID, isOwner)
+	if view.MyStatus == MicStatusOnAir {
+		// Best effort: without a token the guest's publish is rejected, and
+		// the next poll retries.
+		view.MyPublishToken, _ = s.ensurePublishToken(ctx, roomID, userID)
+	}
+	return view, nil
+}
+
+// issuePublishToken binds a fresh random token to the guest's mic stream.
+func (s *MicLinkService) issuePublishToken(ctx context.Context, roomID, userID string) (string, error) {
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	token := hex.EncodeToString(buf)
+	key := miclink.TokenKey(miclink.StreamName(roomID, userID))
+	if err := s.rdb.Set(ctx, key, token, micLinkTokenTTL).Err(); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// ensurePublishToken returns the on-air guest's token, re-issuing it once it
+// has expired. Re-issue happens under the room lock after re-checking the
+// roster, so a guest removed concurrently cannot get a new token.
+func (s *MicLinkService) ensurePublishToken(ctx context.Context, roomID, userID string) (string, error) {
+	key := miclink.TokenKey(miclink.StreamName(roomID, userID))
+	token, err := s.rdb.Get(ctx, key).Result()
+	if err == nil {
+		return token, nil
+	}
+	if !errors.Is(err, redis.Nil) {
+		return "", err
+	}
+	unlock, err := s.lock(ctx, roomID)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	st, err := s.load(ctx, roomID)
+	if err != nil {
+		return "", err
+	}
+	if !onRoster(st, userID) {
+		return "", nil
+	}
+	token, err = s.rdb.Get(ctx, key).Result()
+	if err == nil {
+		return token, nil
+	}
+	if !errors.Is(err, redis.Nil) {
+		return "", err
+	}
+	return s.issuePublishToken(ctx, roomID, userID)
+}
+
+// revokePublishToken stops the guest's token from authorizing new publishes.
+func (s *MicLinkService) revokePublishToken(ctx context.Context, roomID, userID string) error {
+	return s.rdb.Del(ctx, miclink.TokenKey(miclink.StreamName(roomID, userID))).Err()
 }
 
 func (s *MicLinkService) viewFor(st *micLinkState, userID string, isOwner bool) *MicLinkView {
@@ -276,6 +344,11 @@ func (s *MicLinkService) Config(ctx context.Context, ownerID string, req MicConf
 		st.MinFanLevel = 0
 	}
 	if !st.Enabled {
+		for _, g := range st.Roster {
+			if err := s.revokePublishToken(ctx, roomID, g.UserID); err != nil {
+				return nil, err
+			}
+		}
 		st.Roster = nil
 		st.Requests = nil
 	}
@@ -364,7 +437,7 @@ func (s *MicLinkService) Leave(ctx context.Context, userID, roomID string) (*Mic
 		if !removeGuest(st, userID) {
 			return ErrMicLinkRequestNotFound
 		}
-		return nil
+		return s.revokePublishToken(ctx, st.RoomID, userID)
 	})
 }
 
@@ -429,7 +502,9 @@ func (s *MicLinkService) Approve(ctx context.Context, ownerID, roomID, targetID 
 			Avatar:   req.Avatar,
 			JoinedAt: time.Now().UnixMilli(),
 		})
-		return nil
+		// The guest picks the token up from their own Latest poll.
+		_, err := s.issuePublishToken(ctx, st.RoomID, req.UserID)
+		return err
 	})
 }
 
@@ -449,7 +524,7 @@ func (s *MicLinkService) Remove(ctx context.Context, ownerID, roomID, targetID s
 		if !removeGuest(st, targetID) {
 			return ErrMicLinkRequestNotFound
 		}
-		return nil
+		return s.revokePublishToken(ctx, st.RoomID, targetID)
 	})
 }
 
