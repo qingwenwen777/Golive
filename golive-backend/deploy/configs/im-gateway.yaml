@@ -12,7 +12,7 @@ ws:
   pong_wait: 60s
   max_message_rate: 5      # inbound frames / sec / conn (all types)
   max_conns_per_user: 8    # concurrent sockets per account
-  max_conns_per_ip: 64     # generous for NAT / campus networks
+  max_conns_per_ip: 1024   # whole CGNAT / campus networks share one IP
   # Only nginx reaches im-gateway (no published port); trust its X-Real-IP.
   trusted_proxies:
     - "127.0.0.1/32"

@@ -71,12 +71,33 @@ func clientIP(r *http.Request, trusted []*net.IPNet) string {
 	if peer == nil || !ipIn(peer, trusted) {
 		return host
 	}
-	for _, v := range []string{r.Header.Get("X-Real-IP"), firstHeaderValue(r.Header.Get("X-Forwarded-For"))} {
-		if ip := net.ParseIP(strings.TrimSpace(v)); ip != nil {
-			return ip.String()
-		}
+	if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); ip != nil {
+		return ip.String()
+	}
+	if ip := forwardedFor(r.Header.Values("X-Forwarded-For"), trusted); ip != nil {
+		return ip.String()
 	}
 	return host
+}
+
+// forwardedFor returns the right-most X-Forwarded-For hop that isn't a
+// trusted proxy: the address the outermost trusted proxy saw. Each proxy
+// appends to the list, so everything left of that hop came from the client.
+func forwardedFor(values []string, trusted []*net.IPNet) net.IP {
+	var hops []string
+	for _, v := range values {
+		hops = append(hops, strings.Split(v, ",")...)
+	}
+	for i := len(hops) - 1; i >= 0; i-- {
+		ip := net.ParseIP(strings.TrimSpace(hops[i]))
+		if ip == nil {
+			return nil
+		}
+		if !ipIn(ip, trusted) {
+			return ip
+		}
+	}
+	return nil
 }
 
 func ipIn(ip net.IP, nets []*net.IPNet) bool {

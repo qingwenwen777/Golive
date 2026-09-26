@@ -36,7 +36,7 @@ Handshake: `ws://host:8081/ws?roomId=<id>` with `Sec-WebSocket-Protocol: golive.
 | C→S        | `heartbeat`     | —                                                                     |
 | C→S | `resume` | `lastMessageId?` (MVP only replies with `system: "resumed"`; no replay buffer) |
 | C→S | `chat` | `text` (≤200 chars), `clientId?`. Identity/display fields a client sends (`user`, `avatar`, `userLevel`, `fanBadge`, ...) are ignored. Per-user limit `chat_ratelimit`; every frame type also counts against `ws.max_message_rate` per connection. |
-| C→S | `viewer_profile` | — (payload ignored; asks the gateway to re-resolve the user's server-side profile) |
+| C→S | `viewer_profile` | — (payload ignored; asks the gateway to refetch the user's server-side profile, at most once per 5s per user). Identity is resolved when it is used (chat, viewer list), not kept per connection; a fallback name from a failed lookup is retried on a later frame. |
 
 Immediately after the handshake, send one `system: "Welcome to the live room!"` and one `viewer_count: 1`, matching the frontend mock.
 

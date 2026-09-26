@@ -18,17 +18,24 @@
 //   - normalisation before matching, so trivial bypasses fail: zero-width /
 //     format characters and variation selectors are ignored, compatibility
 //     forms are folded (NFKD: fullwidth "ｆｕｃｋ", math bold, ligatures),
-//     combining marks on alphabetic letters are dropped ("fúck"), and case
-//     is folded. Output keeps the original text outside masked spans.
+//     combining marks on alphabetic letters are dropped ("fúck"), Cyrillic
+//     and Greek letters that look Latin are folded to it ("fuсk" with a
+//     Cyrillic с), and case is folded. Output keeps the original text outside
+//     masked spans. List entries are normalised the same way.
 //   - longest-match preferred when overlapping prefixes (e.g. ["sh", "shit"] →
 //     "shit" wins over "sh")
-//   - optional skip-character set (e.g. spaces / dots / asterisks ignored
-//     while matching, so "s.h.i.t" still hits)
+//   - optional separator skipping: whitespace, punctuation and control
+//     characters inside a word are ignored while matching, so "s.h.i.t",
+//     "f,u,c,k" and "傻、逼" still hit. They are dropped from list entries
+//     too, so "kill yourself" also matches "killyourself".
 //   - word boundaries for alphabetic scripts: short words (≤ 3 letters, e.g.
 //     "sb") only match as whole words so "usb" stays intact, and a match that
 //     skipped separator characters must start at a word boundary so it cannot
-//     straddle two words ("this bad" is not "s b"). CJK has no word
-//     boundaries and always matches as a substring.
+//     straddle two words ("this bad" is not "s b"). One that skipped
+//     whitespace spans words, so it must end at a boundary too ("an
+//     alternative" is not "anal"). An apostrophe between letters belongs to
+//     the word ("let's hit" is not "s hit"). CJK has no word boundaries and
+//     always matches as a substring.
 package chatfilter
 
 import (
@@ -39,7 +46,9 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// DefaultSkipChars are the separators both services ignore inside a word.
+// DefaultSkipChars turns on separator skipping for both services. Every
+// whitespace, punctuation and control character is skipped once skipping is
+// on (see WithSkipChars); these are the common ones.
 const DefaultSkipChars = " .*-_"
 
 // strictWordLen is the longest alphabetic word that must match as a whole
@@ -51,6 +60,7 @@ type node struct {
 	children map[rune]*node
 	end      bool
 	wordLen  int  // rune length of the matched word ending here
+	alpha    bool // word is all word runes, so word boundaries apply
 	strict   bool // word must stand alone (short alphabetic word)
 }
 
@@ -59,7 +69,16 @@ type Filter struct {
 	root *node
 	mask string
 	skip map[rune]struct{}
+	// asciiSkip caches skipClass for ASCII runes, which the trie walk tests
+	// at every step.
+	asciiSkip [utf8.RuneSelf]uint8
 }
+
+// skipClass bits.
+const (
+	skipRune  = 1 << iota // may be skipped inside a match
+	skipSpace             // whitespace: a match skipping it spans words
+)
 
 // Option configures a Filter at build time.
 type Option func(*Filter)
@@ -67,9 +86,12 @@ type Option func(*Filter)
 // WithMask sets the replacement string. Default "***".
 func WithMask(s string) Option { return func(f *Filter) { f.mask = s } }
 
-// WithSkipChars marks runes that may appear inside a word and be ignored
-// during matching (typical bypass attempts: spaces, dots, asterisks).
-// Pass an empty string to disable.
+// WithSkipChars turns on skipping of separators inside a word (typical
+// bypass attempts: spaces, dots, asterisks, commas). Separators are chars
+// plus every Unicode whitespace, punctuation and control character, except
+// apostrophes, which belong to the word ("let's"). Symbols such as "$" are
+// not separators: leet entries like "$hit" keep them. Pass an empty string
+// to disable skipping.
 func WithSkipChars(chars string) Option {
 	return func(f *Filter) {
 		if chars == "" {
@@ -93,6 +115,9 @@ func New(words []string, opts ...Option) *Filter {
 	for _, o := range opts {
 		o(f)
 	}
+	for r := range f.asciiSkip {
+		f.asciiSkip[r] = f.skipClass(rune(r))
+	}
 	for _, w := range words {
 		f.addWord(w)
 	}
@@ -100,7 +125,14 @@ func New(words []string, opts ...Option) *Filter {
 }
 
 func (f *Filter) addWord(w string) {
-	runes := normalize([]rune(strings.TrimSpace(w))).runes
+	var runes []rune
+	for _, r := range normalize([]rune(strings.TrimSpace(w))).runes {
+		// Separators are skipped in the text, so an entry that kept one
+		// ("kill yourself", "hand-job") could never match.
+		if skip, _ := f.skippable(r); !skip {
+			runes = append(runes, r)
+		}
+	}
 	if len(runes) == 0 {
 		return
 	}
@@ -119,6 +151,7 @@ func (f *Filter) addWord(w string) {
 	}
 	cur.end = true
 	cur.wordLen = len(runes)
+	cur.alpha = alphabetic
 	cur.strict = alphabetic && len(runes) <= strictWordLen
 }
 
@@ -175,14 +208,15 @@ func (f *Filter) Replace(text string) string {
 func (f *Filter) longestMatchAt(t []rune, start int) int {
 	cur := f.root
 	best := 0
-	skipped := false
+	skipped, spaced := false, false
 	for i := start; i < len(t); i++ {
 		r := t[i]
-		if f.skip != nil && cur != f.root {
+		if cur != f.root {
 			// Allow skipping inside a word, but not before any match
 			// has started — otherwise "..." would always "match" empty.
-			if _, sk := f.skip[r]; sk {
+			if sk, space := f.skippable(r); sk {
 				skipped = true
+				spaced = spaced || space
 				continue
 			}
 		}
@@ -191,7 +225,7 @@ func (f *Filter) longestMatchAt(t []rune, start int) int {
 			break
 		}
 		cur = next
-		if cur.end && acceptable(t, start, i, cur.strict, skipped) {
+		if cur.end && acceptable(t, start, i, cur, skipped, spaced) {
 			best = i + 1
 			// keep going — there might be a longer word continuing past here
 		}
@@ -199,12 +233,16 @@ func (f *Filter) longestMatchAt(t []rune, start int) int {
 	return best
 }
 
-// acceptable applies the word-boundary rules to a candidate match t[start..last].
-func acceptable(t []rune, start, last int, strict, skipped bool) bool {
-	leftOK := start == 0 || !isWordRune(t[start-1])
-	if strict {
-		rightOK := last+1 >= len(t) || !isWordRune(t[last+1])
-		return leftOK && rightOK
+// acceptable applies the word-boundary rules to a candidate match
+// t[start..last] of the word ending at n. skipped reports whether the match
+// skipped separators, spaced whether any of them was whitespace.
+func acceptable(t []rune, start, last int, n *node, skipped, spaced bool) bool {
+	if !n.alpha {
+		return true
+	}
+	leftOK := !wordAt(t, start-1)
+	if n.strict || spaced {
+		return leftOK && !wordAt(t, last+1)
 	}
 	if skipped {
 		return leftOK
@@ -223,6 +261,61 @@ func isWordRune(r rune) bool {
 		return true
 	}
 	return unicode.IsLetter(r) && unicode.In(r, unicode.Latin, unicode.Greek, unicode.Cyrillic)
+}
+
+// wordAt reports whether t[i] is part of a word: a word rune, or an
+// apostrophe between two of them ("let's", "It’s"). Out of range is not.
+func wordAt(t []rune, i int) bool {
+	if i < 0 || i >= len(t) {
+		return false
+	}
+	if isWordRune(t[i]) {
+		return true
+	}
+	return isApostrophe(t[i]) && i > 0 && i+1 < len(t) && isWordRune(t[i-1]) && isWordRune(t[i+1])
+}
+
+// isApostrophe reports the runes typed as an apostrophe inside words.
+func isApostrophe(r rune) bool {
+	switch r {
+	case '\'', '’', '‘', 'ʼ', '`':
+		return true
+	}
+	return false
+}
+
+// skippable reports whether r may be skipped inside a match, and whether it
+// is whitespace, which means the match spans words.
+func (f *Filter) skippable(r rune) (skip, space bool) {
+	var c uint8
+	if r < utf8.RuneSelf {
+		c = f.asciiSkip[r]
+	} else {
+		c = f.skipClass(r)
+	}
+	return c&skipRune != 0, c&skipSpace != 0
+}
+
+// skipClass is skippable's answer for r as skipRune/skipSpace bits.
+func (f *Filter) skipClass(r rune) uint8 {
+	if f.skip == nil {
+		return 0
+	}
+	if !separator(r) {
+		if _, ok := f.skip[r]; !ok {
+			return 0
+		}
+	}
+	if unicode.IsSpace(r) {
+		return skipRune | skipSpace
+	}
+	return skipRune
+}
+
+// separator reports whitespace, punctuation and control characters, which can
+// split a word without changing it. Apostrophes belong to their word.
+func separator(r rune) bool {
+	return (unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsControl(r)) && !isApostrophe(r)
 }
 
 // normalized is the folded form of a text used for matching.
@@ -256,11 +349,44 @@ func normalize(orig []rune) normalized {
 			if unicode.Is(unicode.Mn, d) && len(n.runes) > 0 && isWordRune(n.runes[len(n.runes)-1]) {
 				continue
 			}
-			n.runes = append(n.runes, unicode.ToLower(d))
+			n.runes = append(n.runes, fold(d))
 			n.src = append(n.src, i)
 		}
 	}
 	return n
+}
+
+// fold lower-cases r, mapping a Cyrillic or Greek letter that looks Latin to
+// that Latin letter first.
+func fold(r rune) rune {
+	if 0x0370 <= r && r <= 0x052f { // Greek, Cyrillic and Cyrillic Supplement
+		if l, ok := lookalikes[r]; ok {
+			return l
+		}
+	}
+	return unicode.ToLower(r)
+}
+
+// lookalikes maps Cyrillic and Greek letters to the Latin letter they are
+// read as ("fuсk" with a Cyrillic с, "ѕhit" with a Cyrillic ѕ). Capitals and
+// small letters map separately where their shapes differ (Greek Η reads as
+// h, η as n). Real Cyrillic or Greek words don't fold into Latin entries:
+// they would need a look-alike for every letter.
+var lookalikes = map[rune]rune{
+	// Cyrillic
+	'А': 'a', 'а': 'a', 'В': 'b', 'в': 'b', 'Е': 'e', 'е': 'e',
+	'К': 'k', 'к': 'k', 'М': 'm', 'м': 'm', 'Н': 'h', 'н': 'h',
+	'О': 'o', 'о': 'o', 'Р': 'p', 'р': 'p', 'С': 'c', 'с': 'c',
+	'Т': 't', 'т': 't', 'У': 'y', 'у': 'y', 'Х': 'x', 'х': 'x',
+	'Ѕ': 's', 'ѕ': 's', 'І': 'i', 'і': 'i', 'Ј': 'j', 'ј': 'j',
+	'Һ': 'h', 'һ': 'h', 'Ӏ': 'l', 'ӏ': 'l', 'Ү': 'y', 'ү': 'y',
+	'Ԁ': 'd', 'ԁ': 'd', 'Ԛ': 'q', 'ԛ': 'q', 'Ԝ': 'w', 'ԝ': 'w',
+	// Greek
+	'Α': 'a', 'α': 'a', 'Β': 'b', 'β': 'b', 'Ε': 'e', 'ε': 'e',
+	'Ζ': 'z', 'Η': 'h', 'η': 'n', 'Ι': 'i', 'ι': 'i', 'Κ': 'k',
+	'κ': 'k', 'Μ': 'm', 'Ν': 'n', 'ν': 'v', 'Ο': 'o', 'ο': 'o',
+	'Ρ': 'p', 'ρ': 'p', 'Τ': 't', 'τ': 't', 'Υ': 'y', 'υ': 'u',
+	'Χ': 'x', 'χ': 'x', 'γ': 'y', 'ω': 'w', 'Ϲ': 'c', 'ϲ': 'c',
 }
 
 // ignorable reports invisible runes commonly inserted to split a word:

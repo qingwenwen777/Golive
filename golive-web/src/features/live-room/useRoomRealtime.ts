@@ -243,7 +243,10 @@ export function useRoomRealtime(
     getToken: getAuthToken,
     heartbeatMs: 20000,
     reconnect: true,
-    maxRetries: 10,
+    // Never give up: while the gateway restarts or refuses a crowded NAT
+    // address, a closed socket would leave the room without chat and the
+    // viewer count until a reload. Delays top out at 30s, jittered.
+    maxRetries: Infinity,
   });
 
   // The gateway resolves name/avatar/level server-side from the token's user;

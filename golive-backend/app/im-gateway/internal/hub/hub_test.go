@@ -58,14 +58,6 @@ func (b *fakeBroker) RecordViewerCount(_ context.Context, _ string, _ int64) err
 	return nil
 }
 
-func (b *fakeBroker) AddPresence(_ context.Context, _ string, _ string) error {
-	return nil
-}
-
-func (b *fakeBroker) RemovePresence(_ context.Context, _ string, _ string) error {
-	return nil
-}
-
 func (b *fakeBroker) onUnsubscribe(channel string, s *fakeSub) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
