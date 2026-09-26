@@ -66,6 +66,11 @@ func main() {
 	if err := orderRepo.AutoMigrate(); err != nil {
 		log.Fatal("migrate orders", zap.Error(err))
 	}
+	if n, err := orderRepo.MigrateLegacyModeratedSuperChats(context.Background()); err != nil {
+		log.Fatal("migrate moderated super chats", zap.Error(err))
+	} else if n > 0 {
+		log.Info("restored super chats hidden by the old moderation to success", zap.Int64("rows", n))
+	}
 	outboxRepo := repo.NewOutboxRepo(db)
 
 	if err := seed.SeedGifts(context.Background(), giftRepo); err != nil {

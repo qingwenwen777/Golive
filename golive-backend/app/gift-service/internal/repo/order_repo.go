@@ -65,6 +65,27 @@ func (r *OrderRepo) AutoMigrate() error {
 	)
 }
 
+// legacyFailModerated is the fail_reason moderation used to set on a paid
+// super chat, together with status "failed", before moderated_at existed.
+const legacyFailModerated = "moderated"
+
+// MigrateLegacyModeratedSuperChats converts super chats hidden by the old
+// moderation, which turned a paid super chat (only ever status "success")
+// into status "failed" with fail_reason "moderated". That dropped it from
+// revenue and top fans although its coins had moved. Such rows are paid:
+// restore "success" and record the hiding in moderated_at, as moderation
+// does now. Safe to run on every start; it returns the rows it changed.
+func (r *OrderRepo) MigrateLegacyModeratedSuperChats(ctx context.Context) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&model.SuperChatOrder{}).
+		Where("status = ? AND fail_reason = ?", model.StatusFailed, legacyFailModerated).
+		Updates(map[string]any{
+			"status":       model.StatusSuccess,
+			"fail_reason":  "",
+			"moderated_at": gorm.Expr("COALESCE(moderated_at, created_at)"),
+		})
+	return res.RowsAffected, res.Error
+}
+
 type FanBadgeContributionMode int
 
 const (
