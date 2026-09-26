@@ -4,6 +4,17 @@ x-logging: &default-logging
     max-size: "20m"
     max-file: "3"
 
+# Probe timing for the Go services' /healthz checks (busybox wget from the
+# alpine runtime image; -Y off ignores proxy variables Docker may inject).
+# start_period covers the schema migrations user/room/gift/chat-service run
+# before they open their HTTP port: probe failures during it do not count,
+# and the first success marks the container healthy immediately.
+x-go-healthcheck: &go-healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 3
+  start_period: 5m
+
 services:
   mysql:
     # Deliberately left on the 8.0 series tag: mysqld refuses a data directory
@@ -140,6 +151,9 @@ services:
     cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/user-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8090/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -181,6 +195,9 @@ services:
     cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/room-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8091/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -219,6 +236,9 @@ services:
     cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/gift-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8092/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -251,6 +271,9 @@ services:
     cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/chat-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8093/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
@@ -281,6 +304,10 @@ services:
     cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/api-gateway.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      start_period: 30s   # no migrations
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8080/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -290,12 +317,15 @@ services:
     depends_on:
       init-permissions:
         condition: service_completed_successfully
+      # Start routing only once the upstreams answer /healthz.
       user-service:
-        condition: service_started
+        condition: service_healthy
       room-service:
-        condition: service_started
+        condition: service_healthy
       gift-service:
-        condition: service_started
+        condition: service_healthy
+      chat-service:
+        condition: service_healthy
       otel-collector:
         condition: service_started
 
@@ -313,6 +343,10 @@ services:
     cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/im-gateway.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      start_period: 30s   # no migrations
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8081/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -324,6 +358,12 @@ services:
       init-permissions:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      # Handshakes look rooms up in room-service; chat identity comes from
+      # user-service. Clients reconnect right after a deploy, so wait for both.
+      room-service:
+        condition: service_healthy
+      user-service:
         condition: service_healthy
 
   srs:
@@ -354,7 +394,13 @@ services:
     restart: unless-stopped
     logging: *default-logging
     security_opt: [no-new-privileges:true]
-    depends_on: [srs, api-gateway, im-gateway]
+    depends_on:
+      srs:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
+      im-gateway:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
