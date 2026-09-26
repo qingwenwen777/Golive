@@ -47,3 +47,15 @@ upload:
 users:
   service_url: "http://127.0.0.1:8090"
   grpc_addr: "127.0.0.1:19090"
+
+# Report moderation hides super chats / chat messages through their owners.
+gifts:
+  service_url: "http://127.0.0.1:8092"
+
+chat:
+  service_url: "http://127.0.0.1:8093"
+
+# Shared secret for service-to-service /internal APIs. Every service must use
+# the same value; an empty token rejects all internal calls. Env: ROOMSVC_INTERNAL_TOKEN.
+internal:
+  token: "dev-only-internal-token-change-me"

@@ -90,6 +90,7 @@ services:
       USERSVC_STRIPE_SECRET_KEY: ${USERSVC_STRIPE_SECRET_KEY:-}
       USERSVC_STRIPE_CURRENCY: ${USERSVC_STRIPE_CURRENCY:-}
       USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT: ${USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT:-}
+      USERSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -122,6 +123,7 @@ services:
       ROOMSVC_LIVE_STREAM_KEY_SECRET: ${ROOMSVC_LIVE_STREAM_KEY_SECRET:?set ROOMSVC_LIVE_STREAM_KEY_SECRET in deploy/.env}
       ROOMSVC_REPLAY_BUNNY_LIBRARY_ID: ${BUNNY_STREAM_LIBRARY_ID:-}
       ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
+      ROOMSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -148,6 +150,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       GIFTSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      GIFTSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -174,6 +177,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       CHATSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      CHATSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -228,6 +232,8 @@ services:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
       - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
+    environment:
+      IMGW_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       redis:
         condition: service_healthy

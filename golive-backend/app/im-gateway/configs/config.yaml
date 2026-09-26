@@ -63,3 +63,8 @@ filter:
 chat_ratelimit:
   per_user_per_sec: 3
   bucket_seconds: 1        # integer seconds
+
+# Shared secret for service-to-service /internal APIs. Every service must use
+# the same value; an empty token rejects all internal calls. Env: IMGW_INTERNAL_TOKEN.
+internal:
+  token: "dev-only-internal-token-change-me"
