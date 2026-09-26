@@ -81,6 +81,16 @@ type ReplayCfg struct {
 	// before it is removed, unless an active room or pending replay upload
 	// still needs it (default 24h).
 	StaleRecordingAge time.Duration `mapstructure:"stale_recording_age"`
+	// UploadAttempts is how many times a replay upload is tried before it
+	// gives up (default 7; 1 disables retries). A failed upload is retried
+	// UploadRetryDelay later (default 15m), twice as long after each further
+	// failure, and right away on restart.
+	UploadAttempts   int           `mapstructure:"upload_attempts"`
+	UploadRetryDelay time.Duration `mapstructure:"upload_retry_delay"`
+	// FailedRecordingRetention is how long the recording of an upload that
+	// gave up is kept, for a manual retry, before it may be removed as stale
+	// (default 168h).
+	FailedRecordingRetention time.Duration `mapstructure:"failed_recording_retention"`
 }
 
 type UploadCfg struct {

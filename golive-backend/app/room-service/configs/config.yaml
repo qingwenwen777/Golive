@@ -43,6 +43,14 @@ replay:
   # Recordings untouched this long that no live room or pending replay
   # upload needs are removed (failed uploads, mic-link streams, leftovers).
   stale_recording_age: 24h
+  # A failed upload is tried up to upload_attempts times in all: again
+  # upload_retry_delay after it failed, twice as long after each further
+  # failure, and right away when room-service restarts. Its recording is kept
+  # meanwhile, and for failed_recording_retention after the last attempt.
+  # FLV recordings take roughly 1-2 GB per hour of live.
+  upload_attempts: 7
+  upload_retry_delay: 15m
+  failed_recording_retention: 168h
 
 upload:
   cover_dir: "./uploads/covers"

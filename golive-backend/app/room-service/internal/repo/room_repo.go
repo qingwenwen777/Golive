@@ -538,8 +538,8 @@ func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID stri
 }
 
 // ReplayRecoverableUploads returns ended rooms whose replay upload was
-// interrupted. Failed uploads are not retried: each attempt creates a new
-// Bunny video, so retrying on every restart would pile up orphaned videos.
+// interrupted. Failed uploads are retried separately, a limited number of
+// times (see ReplayRetryableUploads).
 func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]model.Room, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -557,17 +557,42 @@ func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]m
 	return rooms, err
 }
 
-// RecordingRooms returns the id and stream key of rooms whose DVR recording
-// may still be needed: active rooms, and ended rooms whose replay upload is
-// pending or in progress.
-func (r *RoomRepo) RecordingRooms(ctx context.Context) ([]model.Room, error) {
+// ReplayRetryableUploads returns ended rooms whose failed replay upload has
+// retries left: the upload is still on, and a retry is scheduled or the
+// failure predates retry scheduling (no attempts counted). A non-zero dueBy
+// limits it to the retries due by then; oldest first.
+func (r *RoomRepo) ReplayRetryableUploads(ctx context.Context, dueBy time.Time, limit int) ([]model.Room, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	tx := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("status = ? AND replay_upload_enabled = ? AND replay_status = ?", model.StatusEnded, true, model.ReplayStatusFailed)
+	if dueBy.IsZero() {
+		tx = tx.Where("(replay_retry_at IS NOT NULL OR replay_attempts = ?)", 0)
+	} else {
+		tx = tx.Where("(replay_retry_at <= ? OR (replay_retry_at IS NULL AND replay_attempts = ?))", dueBy, 0)
+	}
+	var rooms []model.Room
+	err := tx.Order("replay_retry_at ASC, COALESCE(ended_at, updated_at) ASC").
+		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+// RecordingRooms returns the rooms whose DVR recording may still be needed:
+// active rooms, and ended rooms with replay upload on whose upload is pending,
+// in progress, or failed and either has retries left (see
+// ReplayRetryableUploads) or gave up after keepFailedSince, as such a
+// recording is kept a while for a manual retry.
+func (r *RoomRepo) RecordingRooms(ctx context.Context, keepFailedSince time.Time) ([]model.Room, error) {
 	var rooms []model.Room
 	err := r.db.WithContext(ctx).Model(&model.Room{}).
-		Select("id", "stream_key").
-		Where("status IN ? OR (status = ? AND replay_upload_enabled = ? AND replay_status IN ?)",
+		Where("status IN ? OR (status = ? AND replay_upload_enabled = ? AND (replay_status IN ? OR "+
+			"(replay_status = ? AND (replay_retry_at IS NOT NULL OR replay_attempts = ? OR replay_failed_at >= ?))))",
 			[]string{model.StatusPublishing, model.StatusLive, model.StatusEnding},
 			model.StatusEnded, true,
-			[]string{model.ReplayStatusPending, model.ReplayStatusUploading}).
+			[]string{model.ReplayStatusPending, model.ReplayStatusUploading},
+			model.ReplayStatusFailed, 0, keepFailedSince).
 		Find(&rooms).Error
 	return rooms, err
 }
@@ -883,6 +908,47 @@ func (r *RoomRepo) SetReplayStatus(ctx context.Context, roomID, status, message 
 			"replay_status": status,
 			"replay_error":  message,
 		}).Error
+}
+
+// SetReplayFailed records a failed replay upload attempt: the reason shown
+// to the creator, the attempts failed so far, and when to retry (nil for no
+// retry). A deleted replay stays deleted; it reports whether the row changed.
+func (r *RoomRepo) SetReplayFailed(ctx context.Context, roomID, message string, attempts int, failedAt time.Time, retryAt *time.Time) (bool, error) {
+	var retry any
+	if retryAt != nil {
+		retry = *retryAt
+	}
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND replay_status <> ?", roomID, model.ReplayStatusDeleted).
+		Updates(map[string]any{
+			"replay_status":    model.ReplayStatusFailed,
+			"replay_error":     message,
+			"replay_attempts":  attempts,
+			"replay_failed_at": failedAt,
+			"replay_retry_at":  retry,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
+// ClaimReplayRetry moves a failed replay upload back to pending for a retry.
+// It reports false when the replay changed since attempts was read: deleted,
+// its upload turned off, or retried already.
+func (r *RoomRepo) ClaimReplayRetry(ctx context.Context, roomID string, attempts int) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND status = ? AND replay_upload_enabled = ? AND replay_status = ? AND replay_attempts = ?",
+			roomID, model.StatusEnded, true, model.ReplayStatusFailed, attempts).
+		Updates(map[string]any{
+			"replay_status":   model.ReplayStatusPending,
+			"replay_error":    "",
+			"replay_retry_at": nil,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 // SetReplayUploaded records the uploaded video, but only while the upload is

@@ -96,6 +96,10 @@ func main() {
 		BunnyPlayerBase:   cfg.Replay.BunnyPlayerBase,
 		UploadTimeout:     cfg.Replay.UploadTimeout,
 		StaleRecordingAge: cfg.Replay.StaleRecordingAge,
+		// Retries of failed uploads, and how long a recording outlives them.
+		UploadAttempts:           cfg.Replay.UploadAttempts,
+		UploadRetryDelay:         cfg.Replay.UploadRetryDelay,
+		FailedRecordingRetention: cfg.Replay.FailedRecordingRetention,
 	})
 	roomSvc.SetReplayService(replaySvc)
 	roomSvc.SetLiveRepo(liveRepo)
@@ -194,7 +198,7 @@ func main() {
 			log.Fatal("http exit", zap.Error(err))
 		}
 	}()
-	go replaySvc.RecoverInterruptedUploads(schedulerCtx)
+	go replaySvc.RunUploadRetries(schedulerCtx)
 	go appointmentSvc.RunScheduler(schedulerCtx)
 	go liveSvc.RunReconciler(schedulerCtx, cfg.Live.ReconcileInterval)
 
