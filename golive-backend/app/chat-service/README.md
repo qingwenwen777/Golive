@@ -38,7 +38,7 @@ client → ws → im-gateway →(produce)→ kafka:danmu
 | Stage | Implementation |
 | ---------- | --------------------------------------------------------------------------------------------- |
 | Rate limiting | `pkg/chatlimit`: Redis fixed window + Lua (`INCR` + `PEXPIRE`), 3 msg/sec per user by default (`ratelimit.bucket_seconds` is an integer number of seconds). Drop immediately when exceeded. |
-| Sensitive-word filtering | `pkg/chatfilter` (shared with im-gateway): custom DFA (rune-level trie) over normalised text (zero-width chars ignored, NFKD/fullwidth and case folded). Longest match first; short Latin words match whole words only; optional skipped characters `". *-_"`. |
+| Sensitive-word filtering | `pkg/chatfilter` (shared with im-gateway): custom DFA (rune-level trie) over normalised text (zero-width chars ignored, NFKD/fullwidth, Cyrillic/Greek look-alikes and case folded). Longest match first; short Latin words match whole words only; whitespace and punctuation inside a word are skipped. |
 | Persistence | MySQL **8 sharded tables** `danmus_0..7`, selected by `fnv32(roomId) % 8`. A room always uses the same table. |
 | Broadcasting | Redis `PUBLISH room:<roomId>`; im-gateway subscribes and fans out to WebSocket clients. |
 
@@ -57,7 +57,8 @@ Offsets use `DisableAutoCommit + CommitUncommittedOffsets` and are committed onl
 - Rune trie (`map[rune]*node`) with first-class CJK support.
 - `Replace(text)` scans once; at each starting position it takes the longest match and skips to its end, preventing overlapping replacements.
 - Fold ASCII letters to lowercase; use `unicode.ToLower` for non-ASCII characters.
-- `WithSkipChars(" .*-")` also matches `s.h.i.t`; characters are skipped only after matching has begun, avoiding empty matches.
+- `WithSkipChars(DefaultSkipChars)` skips whitespace, punctuation and control characters inside a word (not apostrophes: `let's` is one word), so `s.h.i.t`, `f,u,c,k` and `傻、逼` match. Separators are skipped only after matching has begun, avoiding empty matches, and are dropped from list entries too, so `kill yourself` matches.
+- A match that skipped separators must start on a word boundary; one that skipped whitespace spans words and must end on one as well (`an alternative` is not `anal`). CJK entries have no word boundaries.
 
 Test coverage: basic matches, case folding, longest prefix (`sh` vs `shit`), nonoverlap (`abcab → ***ab`), empty dictionary, skipped characters, no false match for a partial CJK prefix, and a large-dictionary smoke test.
 
