@@ -19,8 +19,7 @@ func NewRoomHandler(svc *service.RoomService) *RoomHandler {
 }
 
 func (h *RoomHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
+	page, size := pageQuery(c, 1, 24)
 	resp, err := h.svc.List(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), page, size)
 	if err != nil {
 		errcode.Respond(c, err)
@@ -30,7 +29,7 @@ func (h *RoomHandler) List(c *gin.Context) {
 }
 
 func (h *RoomHandler) Recommended(c *gin.Context) {
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "12"))
+	size := sizeQuery(c, 12, maxPageSize)
 	resp, err := h.svc.RecommendedLive(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), size)
 	if err != nil {
 		errcode.Respond(c, err)
@@ -113,14 +112,7 @@ func (h *RoomHandler) Get(c *gin.Context) {
 }
 
 func (h *RoomHandler) ChannelHistory(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "24"))
-	if page < 1 {
-		page = 1
-	}
-	if size < 1 || size > 100 {
-		size = 24
-	}
+	page, size := pageQuery(c, 1, 24)
 	replaysOnly := c.Query("mode") == "replay" || c.Query("replaysOnly") == "1" || c.Query("replaysOnly") == "true"
 	resp, err := h.svc.HistoryByChannel(c.Request.Context(), c.Param("channel"), UserIDFromCtx(c), page, size, replaysOnly)
 	if err != nil {
@@ -132,7 +124,7 @@ func (h *RoomHandler) ChannelHistory(c *gin.Context) {
 
 func (h *RoomHandler) HotReplays(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "3"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "4"))
+	size := sizeQuery(c, 4, maxPageSize)
 	resp, err := h.svc.HotReplays(c.Request.Context(), UserIDFromCtx(c), c.Query("category"), days, size)
 	if err != nil {
 		errcode.Respond(c, err)

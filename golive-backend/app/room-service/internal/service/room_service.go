@@ -70,6 +70,10 @@ func NormalizeCategory(raw string) string {
 	return c
 }
 
+// maxListPageSize caps List's page size: every listed room costs follow-up
+// lookups (blocks, owner profile, viewer metrics, followers).
+const maxListPageSize = 100
+
 type ListResp struct {
 	Items []model.Stream `json:"items"`
 	Total int64          `json:"total"`
@@ -83,6 +87,9 @@ func (s *RoomService) List(ctx context.Context, viewerID, rawCategory string, pa
 	}
 	if size < 1 {
 		size = 24
+	}
+	if size > maxListPageSize {
+		size = maxListPageSize
 	}
 	cat := NormalizeCategory(rawCategory)
 

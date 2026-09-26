@@ -41,6 +41,10 @@ func (r *RoomRepo) AutoMigrate() error {
 	return ensureMySQLFullTextIndexes(r.db, sharedSearchFullTextIndexes()...)
 }
 
+// maxListSize bounds one List page. RecommendedLive reads the largest page
+// (its candidate pool); public endpoints are capped lower by the service.
+const maxListSize = 200
+
 // ListQuery is what the service layer hands to the repo. Empty Category means
 // "no filter". The repo applies a case-insensitive match on category OR an
 // exact match on category_ja.
@@ -70,6 +74,9 @@ func (r *RoomRepo) List(ctx context.Context, q ListQuery) ([]model.Room, int64, 
 	}
 	if q.Size < 1 {
 		q.Size = 24
+	}
+	if q.Size > maxListSize {
+		q.Size = maxListSize
 	}
 	offset := (q.Page - 1) * q.Size
 
