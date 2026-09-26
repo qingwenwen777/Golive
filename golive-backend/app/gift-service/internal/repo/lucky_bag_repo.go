@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
+	"github.com/qingwenwen777/golive/pkg/wallet"
 )
 
 func shuffleEntries(entries []model.LuckyBagEntry) {
@@ -157,24 +158,17 @@ func (r *OrderRepo) CreateLuckyBag(ctx context.Context, bag *model.LuckyBag, out
 		if active > 0 {
 			return ErrActiveLuckyBagExists
 		}
-		if err := debitUserBalance(tx, bag.OwnerID, bag.TotalCoin); err != nil {
+		if _, err := wallet.Debit(tx, bag.OwnerID, bag.TotalCoin, wallet.Entry{
+			Type:        model.CoinTxLuckyBagSend,
+			Title:       "福袋发放",
+			Description: luckyBagDesc(bag),
+			SourceType:  "lucky_bag",
+			SourceID:    bag.ID,
+			RoomID:      bag.RoomID,
+		}); err != nil {
 			return err
 		}
 		if err := tx.Create(bag).Error; err != nil {
-			return err
-		}
-		if err := createCoinTransaction(
-			tx,
-			bag.OwnerID,
-			-bag.TotalCoin,
-			model.CoinTxLuckyBagSend,
-			"福袋发放",
-			luckyBagDesc(bag),
-			"lucky_bag",
-			bag.ID,
-			bag.RoomID,
-			"",
-		); err != nil {
 			return err
 		}
 		return tx.Create(&model.LocalMessage{
@@ -297,22 +291,20 @@ func (r *OrderRepo) DrawLuckyBag(ctx context.Context, bagID string, packets []in
 			e := eligible[i]
 			payout := packets[i]
 			paid += payout
-			if res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", payout, e.UserID); res.Error != nil {
-				return res.Error
-			}
-			if err := createCoinTransaction(
-				tx,
-				e.UserID,
-				payout,
-				model.CoinTxLuckyBagPayout,
-				"福袋中奖",
-				luckyBagDesc(&bag),
-				"lucky_bag",
-				bag.ID,
-				bag.RoomID,
-				bag.OwnerID,
-			); err != nil {
-				return err
+			// A degenerate split can hand a winner an empty packet: no
+			// balance change and no ledger row for it.
+			if payout > 0 {
+				if _, err := wallet.Credit(tx, e.UserID, payout, wallet.Entry{
+					Type:           model.CoinTxLuckyBagPayout,
+					Title:          "福袋中奖",
+					Description:    luckyBagDesc(&bag),
+					SourceType:     "lucky_bag",
+					SourceID:       bag.ID,
+					RoomID:         bag.RoomID,
+					CounterpartyID: bag.OwnerID,
+				}); err != nil {
+					return err
+				}
 			}
 			if err := tx.Model(&model.LuckyBagEntry{}).Where("id = ?", e.ID).
 				Updates(map[string]any{"status": model.LuckyBagEntryWon, "payout": payout}).Error; err != nil {
@@ -329,21 +321,7 @@ func (r *OrderRepo) DrawLuckyBag(ctx context.Context, bagID string, packets []in
 		// Refund the unused remainder to the owner.
 		refund := bag.TotalCoin - paid
 		if refund > 0 {
-			if res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", refund, bag.OwnerID); res.Error != nil {
-				return res.Error
-			}
-			if err := createCoinTransaction(
-				tx,
-				bag.OwnerID,
-				refund,
-				model.CoinTxLuckyBagRefund,
-				"福袋退还",
-				luckyBagDesc(&bag),
-				"lucky_bag",
-				bag.ID,
-				bag.RoomID,
-				"",
-			); err != nil {
+			if _, err := wallet.Credit(tx, bag.OwnerID, refund, luckyBagRefundEntry(&bag)); err != nil {
 				return err
 			}
 		}
@@ -371,6 +349,18 @@ func (r *OrderRepo) DrawLuckyBag(ctx context.Context, bagID string, packets []in
 		return nil, nil, err
 	}
 	return &drawnBag, winners, nil
+}
+
+// luckyBagRefundEntry is the ledger entry for returning escrow to the owner.
+func luckyBagRefundEntry(bag *model.LuckyBag) wallet.Entry {
+	return wallet.Entry{
+		Type:        model.CoinTxLuckyBagRefund,
+		Title:       "福袋退还",
+		Description: luckyBagDesc(bag),
+		SourceType:  "lucky_bag",
+		SourceID:    bag.ID,
+		RoomID:      bag.RoomID,
+	}
 }
 
 // CancelLuckyBag refunds the full escrow to the owner before any draw.
@@ -405,21 +395,7 @@ func (r *OrderRepo) CancelLuckyBag(ctx context.Context, bagID, ownerID string, o
 			Update("status", model.LuckyBagEntryMissed).Error; err != nil {
 			return err
 		}
-		if res := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", bag.TotalCoin, bag.OwnerID); res.Error != nil {
-			return res.Error
-		}
-		if err := createCoinTransaction(
-			tx,
-			bag.OwnerID,
-			bag.TotalCoin,
-			model.CoinTxLuckyBagRefund,
-			"福袋退还",
-			luckyBagDesc(&bag),
-			"lucky_bag",
-			bag.ID,
-			bag.RoomID,
-			"",
-		); err != nil {
+		if _, err := wallet.Credit(tx, bag.OwnerID, bag.TotalCoin, luckyBagRefundEntry(&bag)); err != nil {
 			return err
 		}
 		if err := tx.Create(&model.LocalMessage{
