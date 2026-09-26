@@ -53,8 +53,6 @@ func (b *gateBroker) Publish(_ context.Context, channel string, payload []byte) 
 }
 
 func (b *gateBroker) RecordViewerCount(context.Context, string, int64) error { return nil }
-func (b *gateBroker) AddPresence(context.Context, string, string) error      { return nil }
-func (b *gateBroker) RemovePresence(context.Context, string, string) error   { return nil }
 
 type gateSub struct {
 	mu     sync.Mutex

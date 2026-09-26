@@ -47,8 +47,6 @@ func (memBroker) Subscribe(context.Context, string) (pubsub.Subscription, error)
 }
 func (memBroker) Publish(context.Context, string, []byte) error          { return nil }
 func (memBroker) RecordViewerCount(context.Context, string, int64) error { return nil }
-func (memBroker) AddPresence(context.Context, string, string) error      { return nil }
-func (memBroker) RemovePresence(context.Context, string, string) error   { return nil }
 
 // fakeRooms knows a fixed set of rooms and their owners.
 type fakeRooms map[string]string

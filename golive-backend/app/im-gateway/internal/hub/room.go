@@ -106,7 +106,6 @@ func (r *Room) add(c Sink, profile ViewerProfile) bool {
 	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
 	r.viewers.Store(n)
-	r.addPresence(profile)
 	r.markViewersDirty()
 	return true
 }
@@ -119,17 +118,12 @@ func (r *Room) remove(connID string) (removed, empty bool) {
 		r.mu.Unlock()
 		return false, false
 	}
-	gone := r.viewerProfiles[connID]
 	delete(r.conns, connID)
 	delete(r.viewerProfiles, connID)
-	stillPresent := r.userStillPresentLocked(gone.UserID)
 	n := r.uniqueViewerCountLocked()
 	empty = len(r.conns) == 0
 	r.mu.Unlock()
 	r.viewers.Store(n)
-	if !stillPresent {
-		r.removePresence(gone)
-	}
 	r.markViewersDirty()
 	return true, empty
 }
@@ -213,7 +207,6 @@ func (r *Room) updateViewer(connID string, profile ViewerProfile) {
 	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
 	r.viewers.Store(n)
-	r.addPresence(profile)
 	r.markViewersDirty()
 }
 
@@ -409,76 +402,6 @@ func (r *Room) uniqueViewerCountLocked() int64 {
 	return int64(len(seen))
 }
 
-// userStillPresentLocked reports whether any remaining connection belongs to
-// the given userID, so presence is only cleared on the user's last connection.
-func (r *Room) userStillPresentLocked(userID string) bool {
-	if userID == "" {
-		return false
-	}
-	for _, profile := range r.viewerProfiles {
-		if profile.UserID == userID {
-			return true
-		}
-	}
-	return false
-}
-
-// addPresence records an authenticated, non-owner viewer in the room presence
-// set (best-effort) so gift-service can resolve lucky-bag draw eligibility.
-func (r *Room) addPresence(profile ViewerProfile) {
-	if profile.IsOwner || profile.UserID == "" {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	if err := r.hub.broker.AddPresence(ctx, r.id, profile.UserID); err != nil {
-		logger.L().Debug("add room presence", zap.String("room", r.id), zap.Error(err))
-	}
-}
-
-func (r *Room) removePresence(profile ViewerProfile) {
-	if profile.IsOwner || profile.UserID == "" {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	if err := r.hub.broker.RemovePresence(ctx, r.id, profile.UserID); err != nil {
-		logger.L().Debug("remove room presence", zap.String("room", r.id), zap.Error(err))
-	}
-}
-
-// refreshPresence re-asserts the presence set from the live connection list.
-// Presence is otherwise only written on join/profile and cleared on leave, so
-// a reconnect race (token refresh, network blip) could drop a viewer from the
-// set even though they are still watching. Re-asserting on the viewer pump
-// makes a missed add self-heal well within a lucky-bag countdown.
-func (r *Room) refreshPresence() {
-	r.mu.RLock()
-	userIDs := make([]string, 0, len(r.viewerProfiles))
-	seen := make(map[string]struct{}, len(r.viewerProfiles))
-	for _, profile := range r.viewerProfiles {
-		if profile.IsOwner || profile.UserID == "" {
-			continue
-		}
-		if _, ok := seen[profile.UserID]; ok {
-			continue
-		}
-		seen[profile.UserID] = struct{}{}
-		userIDs = append(userIDs, profile.UserID)
-	}
-	r.mu.RUnlock()
-	if len(userIDs) == 0 {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	for _, userID := range userIDs {
-		if err := r.hub.broker.AddPresence(ctx, r.id, userID); err != nil {
-			logger.L().Debug("refresh room presence", zap.String("room", r.id), zap.Error(err))
-		}
-	}
-}
-
 func viewerIdentityKey(connID string, profile ViewerProfile) string {
 	if profile.IsOwner {
 		return ""
@@ -535,9 +458,9 @@ func parseCoinAmount(amount string) int64 {
 // pumpViewers pushes viewer_count + viewer_list to all sinks in this room:
 // on change (markViewersDirty), at most once per minGap — the first change
 // after a quiet period goes out immediately, later ones are folded into one
-// trailing push — and additionally every interval (if > 0), which also
-// re-asserts presence. In a multi-instance deployment the count should read
-// from a Redis HINCRBY counter rather than the local count; MVP uses local.
+// trailing push — and additionally every interval (if > 0). In a
+// multi-instance deployment the count should read from a Redis HINCRBY
+// counter rather than the local count; MVP uses local.
 func (r *Room) pumpViewers(ctx context.Context, interval, minGap time.Duration) {
 	var tick <-chan time.Time
 	if interval > 0 {
@@ -568,7 +491,6 @@ func (r *Room) pumpViewers(ctx context.Context, interval, minGap time.Duration) 
 			r.flushViewers()
 			last = time.Now()
 		case <-tick:
-			r.refreshPresence()
 			r.flushViewers()
 			last = time.Now()
 		}
