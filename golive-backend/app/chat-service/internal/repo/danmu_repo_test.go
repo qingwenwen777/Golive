@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
 	"github.com/qingwenwen777/golive/app/chat-service/internal/model"
@@ -95,4 +97,52 @@ func TestAutoMigrateCreatesRoomTsIndexPerShard(t *testing.T) {
 		require.NoError(t, db.Raw("SELECT name FROM pragma_index_info(?) ORDER BY seqno", index).Scan(&columns).Error)
 		require.Equal(t, []string{"room_id", "ts"}, columns, index)
 	}
+}
+
+func TestHide_SoftDeletesFromHistory(t *testing.T) {
+	db := newTestDB(t)
+	r := NewDanmuRepo(db, 8)
+	require.NoError(t, r.AutoMigrate())
+	ctx := context.Background()
+	for _, d := range []*model.Danmu{
+		{ID: "m-1", RoomID: "live-1", UserID: "u", Text: "bad", Ts: 1},
+		{ID: "m-2", RoomID: "live-1", UserID: "u", Text: "fine", Ts: 2},
+	} {
+		require.NoError(t, r.Insert(ctx, d))
+	}
+
+	require.NoError(t, r.Hide(ctx, "live-1", "m-1"))
+	rows, err := r.History(ctx, "live-1", 0, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "m-2", rows[0].ID)
+
+	// Hiding again is a no-op; unknown ids and other rooms are not found.
+	require.NoError(t, r.Hide(ctx, "live-1", "m-1"))
+	require.ErrorIs(t, r.Hide(ctx, "live-1", "missing"), ErrDanmuNotFound)
+	require.ErrorIs(t, r.Hide(ctx, "live-2", "m-2"), ErrDanmuNotFound)
+	var stored int64
+	require.NoError(t, db.Table(r.TableFor("live-1")).Unscoped().Count(&stored).Error)
+	require.EqualValues(t, 2, stored, "hide is a soft delete")
+}
+
+// Moderated super chats keep status=success (the payment stands) but must
+// not come back in public history. The query is MySQL-only, so assert on
+// the SQL it sends.
+func TestSuperChatHistory_ExcludesModerated(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
+	require.NoError(t, err)
+
+	mock.ExpectQuery(`FROM super_chat_orders AS sc .*WHERE sc\.room_id = \? AND sc\.status = \? AND sc\.moderated_at IS NULL`).
+		WithArgs("live-1", "success", 50).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user", "avatar", "amount", "tier", "text", "ts"}).
+			AddRow("sc-1", "Fan", "", 1000, 2, "hi", 1))
+
+	rows, err := NewDanmuRepo(db, 8).SuperChatHistory(context.Background(), "live-1", 0, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.NoError(t, mock.ExpectationsWereMet())
 }

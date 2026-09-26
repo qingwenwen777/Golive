@@ -16,6 +16,7 @@ type Config struct {
 	Filter    FilterCfg    `mapstructure:"filter"`
 	RateLimit RateLimitCfg `mapstructure:"ratelimit"`
 	Room      RoomCfg      `mapstructure:"room"`
+	Internal  InternalCfg  `mapstructure:"internal"`
 }
 
 type ServiceCfg struct {
@@ -79,6 +80,12 @@ type RoomCfg struct {
 	HistoryMaxLimit     int `mapstructure:"history_max_limit"`
 }
 
+// InternalCfg holds the shared secret other services send on /internal
+// calls (CHATSVC_INTERNAL_TOKEN). Empty rejects every internal call.
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
+}
+
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -94,6 +101,7 @@ func Load(path string) (*Config, error) {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	_ = v.BindEnv("mysql.dsn")
 	_ = v.BindEnv("redis.password")
+	_ = v.BindEnv("internal.token")
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}

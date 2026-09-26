@@ -13,6 +13,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"regexp"
@@ -82,6 +83,31 @@ func (r *DanmuRepo) AutoMigrate() error {
 
 func (r *DanmuRepo) Insert(ctx context.Context, d *model.Danmu) error {
 	return r.db.WithContext(ctx).Table(r.TableFor(d.RoomID)).Create(d).Error
+}
+
+// ErrDanmuNotFound means no message (hidden or not) has that id in the room.
+var ErrDanmuNotFound = errors.New("danmu not found")
+
+// Hide soft-deletes a chat message (sets deleted_at) so history no longer
+// returns it. Hiding an already hidden message is a no-op.
+func (r *DanmuRepo) Hide(ctx context.Context, roomID, id string) error {
+	table := r.TableFor(roomID)
+	res := r.db.WithContext(ctx).Table(table).
+		Where("room_id = ? AND id = ?", roomID, id).
+		Delete(&model.Danmu{})
+	if res.Error != nil || res.RowsAffected > 0 {
+		return res.Error
+	}
+	var count int64
+	if err := r.db.WithContext(ctx).Table(table).Unscoped().
+		Where("room_id = ? AND id = ?", roomID, id).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrDanmuNotFound
+	}
+	return nil
 }
 
 // History returns the most recent `limit` danmus before `before` (ms ts).
@@ -248,6 +274,7 @@ func fanBadgeLevel(totalContribution int64) int {
 
 // SuperChatHistory returns successful SuperChats for the same room so the
 // public history endpoint can restore paid messages when a viewer enters.
+// Moderated ones (moderated_at set by gift-service) stay paid but hidden.
 func (r *DanmuRepo) SuperChatHistory(ctx context.Context, roomID string, before int64, limit int) ([]SuperChatHistoryRow, error) {
 	if limit <= 0 {
 		limit = 50
@@ -263,7 +290,7 @@ sc.text AS text,
 CAST(UNIX_TIMESTAMP(sc.created_at) * 1000 AS SIGNED) AS ts
 `).
 		Joins("LEFT JOIN users AS u ON u.id = sc.user_id").
-		Where("sc.room_id = ? AND sc.status = ?", roomID, "success")
+		Where("sc.room_id = ? AND sc.status = ? AND sc.moderated_at IS NULL", roomID, "success")
 	if before > 0 {
 		q = q.Where("sc.created_at < FROM_UNIXTIME(?)", float64(before)/1000)
 	}

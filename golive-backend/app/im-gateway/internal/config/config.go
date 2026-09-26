@@ -23,6 +23,14 @@ type Config struct {
 	// ChatRateLimit is the per-user (not per-connection) chat limit, shared
 	// through Redis by all of a user's connections.
 	ChatRateLimit ChatRateLimitCfg `mapstructure:"chat_ratelimit"`
+	// Internal holds the token sent on other services' /internal APIs.
+	Internal InternalCfg `mapstructure:"internal"`
+}
+
+// InternalCfg holds the shared secret im-gateway sends on /internal calls
+// (IMGW_INTERNAL_TOKEN).
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
 }
 
 type ServiceCfg struct {
@@ -158,6 +166,7 @@ func Load(path string) (*Config, error) {
 	v.SetEnvPrefix("IMGW")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	_ = v.BindEnv("redis.password")
+	_ = v.BindEnv("internal.token")
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}

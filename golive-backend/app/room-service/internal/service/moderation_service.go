@@ -95,6 +95,7 @@ type ModerationService struct {
 	rooms      *repo.RoomRepo
 	social     *repo.SocialRepo
 	live       *LiveService
+	owners     OwnerServices
 	runtime    SystemRuntimeConfig
 	now        func() time.Time
 }
@@ -110,6 +111,12 @@ func NewModerationService(moderation *repo.ModerationRepo, rooms *repo.RoomRepo,
 
 func (s *ModerationService) SetLiveService(live *LiveService) {
 	s.live = live
+}
+
+// SetOwnerServices wires the clients report actions use for data other
+// services own (bans/mutes, super chats, chat messages).
+func (s *ModerationService) SetOwnerServices(owners OwnerServices) {
+	s.owners = owners
 }
 
 type SystemRuntimeConfig struct {
@@ -1042,7 +1049,7 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	targetLink := firstNonEmptyString(safeReportLink(report.TargetURL), reportLink(report))
 	switch action {
 	case model.ReportActionDeleteContent:
-		if err := s.moderation.DeleteReportedContent(ctx, report.TargetType, report.TargetID, report.RoomID, now); err != nil {
+		if err := s.deleteReportedContent(ctx, adminID, report); err != nil {
 			return err
 		}
 		if targetUserID != "" {
@@ -1051,7 +1058,7 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	case model.ReportActionWarnUser:
 		if targetUserID != "" {
 			_ = s.notifyModeration(ctx, targetUserID, "moderation_warning", "你收到一条平台警告", moderationWarnBody(note), targetLink, adminID, now)
-			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionWarn, report.ID, note, 0, now)
+			return s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionWarn, report.ID, note, 0, now)
 		}
 	case model.ReportActionWarnRoom:
 		roomID := firstNonEmptyString(report.RoomID, report.TargetID)
@@ -1064,12 +1071,33 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 	case model.ReportActionSiteMute:
 		if targetUserID != "" {
 			_ = s.notifyModeration(ctx, targetUserID, "moderation_site_mute", "你已被全站禁言", moderationMuteBody(durationMinutes, note), targetLink, adminID, now)
-			return s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionSiteMute, report.ID, note, durationMinutes, now)
+			if durationMinutes <= 0 {
+				return errcode.New(http.StatusBadRequest, "invalid mute duration").WithReason("invalid_mute_duration")
+			}
+			mutedUntil := now.Add(time.Duration(durationMinutes) * time.Minute)
+			if err := s.setUserRestriction(ctx, targetUserID, UserRestrictionUpdate{
+				Action:     RestrictionMute,
+				Reason:     note,
+				MutedUntil: &mutedUntil,
+				OperatorID: adminID,
+			}); err != nil {
+				return err
+			}
+			return s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionSiteMute, report.ID, note, durationMinutes, now)
 		}
 	case model.ReportActionBanUser:
 		if targetUserID != "" {
 			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
-			if err := s.moderation.ApplyUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now); err != nil {
+			// user-service owns the ban; its ban path also revokes the
+			// user's refresh tokens.
+			if err := s.setUserRestriction(ctx, targetUserID, UserRestrictionUpdate{
+				Action:     RestrictionBan,
+				Reason:     note,
+				OperatorID: adminID,
+			}); err != nil {
+				return err
+			}
+			if err := s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now); err != nil {
 				return err
 			}
 			return s.endUserLiveRooms(ctx, targetUserID)
@@ -1086,6 +1114,42 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 		}
 	}
 	return nil
+}
+
+// deleteReportedContent removes the reported content. Posts and comments
+// live in room-service; chat messages and super chats are removed by the
+// services that own them.
+func (s *ModerationService) deleteReportedContent(ctx context.Context, adminID string, report *model.ContentReport) error {
+	targetID := strings.TrimSpace(report.TargetID)
+	if targetID == "" {
+		return nil
+	}
+	switch report.TargetType {
+	case model.ReportTargetDanmu:
+		roomID := strings.TrimSpace(report.RoomID)
+		if roomID == "" {
+			return nil
+		}
+		if s.owners.Chat == nil {
+			return errors.New("chat-service client is not configured")
+		}
+		return s.owners.Chat.HideChatMessage(ctx, roomID, targetID)
+	case model.ReportTargetSuperChat:
+		// Hidden, not failed: the payment stands and is not refunded here.
+		if s.owners.SuperChats == nil {
+			return errors.New("gift-service client is not configured")
+		}
+		return s.owners.SuperChats.ModerateSuperChat(ctx, targetID, adminID)
+	default:
+		return s.moderation.DeleteReportedContent(ctx, report.TargetType, targetID)
+	}
+}
+
+func (s *ModerationService) setUserRestriction(ctx context.Context, userID string, update UserRestrictionUpdate) error {
+	if s.owners.Users == nil {
+		return errors.New("user-service client is not configured")
+	}
+	return s.owners.Users.SetUserRestriction(ctx, userID, update)
 }
 
 // endUserLiveRooms force-ends every active room owned by userID so a ban also

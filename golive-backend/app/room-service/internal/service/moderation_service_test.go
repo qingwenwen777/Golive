@@ -20,9 +20,21 @@ import (
 )
 
 func newModerationFixture(t *testing.T) (*ModerationService, *gorm.DB, *redis.Client) {
+	svc, db, rdb, _ := newModerationFixtureWithOwners(t)
+	return svc, db, rdb
+}
+
+// newModerationFixtureWithOwners also returns the fake owner services that
+// report actions call for bans/mutes, super chats and chat messages.
+func newModerationFixtureWithOwners(t *testing.T) (*ModerationService, *gorm.DB, *redis.Client, *fakeOwners) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	// One connection: every ":memory:" connection is a separate database,
+	// and the fake owner services write through the same handle.
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 	rooms := repo.NewRoomRepo(db)
 	require.NoError(t, rooms.AutoMigrate())
 	require.NoError(t, db.Exec(`
@@ -101,7 +113,8 @@ CREATE TABLE super_chat_orders (
 	room_id varchar(64),
 	text varchar(500),
 	status varchar(16),
-	fail_reason varchar(32)
+	fail_reason varchar(32),
+	moderated_at datetime
 )`).Error)
 	seedReportRoom(t, db, "room-1", "creator-1")
 
@@ -111,7 +124,10 @@ CREATE TABLE super_chat_orders (
 
 	moderation := repo.NewModerationRepo(db, rdb)
 	require.NoError(t, moderation.AutoMigrate())
-	return NewModerationService(moderation, rooms, repo.NewSocialRepo(rdb)), db, rdb
+	svc := NewModerationService(moderation, rooms, repo.NewSocialRepo(rdb))
+	owners := newFakeOwners(t, db)
+	svc.SetOwnerServices(owners.services())
+	return svc, db, rdb, owners
 }
 
 func seedReportRoom(t *testing.T, db *gorm.DB, roomID, ownerID string) {
@@ -801,3 +817,95 @@ func requireAppErrStatus(t *testing.T, err error, status int) {
 
 func boolPtr(v bool) *bool { return &v }
 func intPtr(v int) *int    { return &v }
+
+// Deleting a reported super chat asks gift-service to hide it; the order
+// keeps status=success (no refund, ledger intact) and room-service no
+// longer writes super_chat_orders itself.
+func TestReportDeleteSuperChatHidesViaGiftService(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _, owners := newModerationFixtureWithOwners(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+	require.NoError(t, db.Exec(
+		`INSERT INTO super_chat_orders (order_id, user_id, room_id, text, status) VALUES (?, ?, ?, ?, ?)`,
+		"sc-bad", "bad-user", "room-1", "paid abuse", "success",
+	).Error)
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "super_chat", TargetID: "sc-bad", Reason: "harassment"})
+	require.NoError(t, err)
+	resolved, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content"}})
+	require.NoError(t, err)
+	require.Equal(t, "resolved", resolved.Status)
+	require.Contains(t, owners.called(), "POST /internal/super-chats/sc-bad/moderation")
+
+	var row struct {
+		Status      string
+		FailReason  *string
+		ModeratedAt *time.Time
+	}
+	require.NoError(t, db.Raw(`SELECT status, fail_reason, moderated_at FROM super_chat_orders WHERE order_id = ?`, "sc-bad").Scan(&row).Error)
+	require.Equal(t, "success", row.Status)
+	require.Nil(t, row.FailReason)
+	require.NotNil(t, row.ModeratedAt)
+}
+
+// Danmu deletion and site mutes go to chat-service / user-service.
+func TestReportDanmuDeleteAndMuteGoThroughOwners(t *testing.T) {
+	ctx := context.Background()
+	svc, db, rdb, owners := newModerationFixtureWithOwners(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	svc.now = func() time.Time { return now }
+	seedReportDanmu(t, db, "room-1", "danmu-owned", "bad-user", "bad message")
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-owned", RoomID: "room-1", Reason: "spam"})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content", "site_mute"}, DurationMinutes: 120})
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"DELETE /internal/rooms/room-1/danmus/danmu-owned",
+		"POST /internal/users/bad-user/restriction",
+	}, owners.called())
+
+	var deletedAt *time.Time
+	require.NoError(t, db.Raw(`SELECT deleted_at FROM danmus_0 WHERE id = ?`, "danmu-owned").Scan(&deletedAt).Error)
+	require.NotNil(t, deletedAt)
+	restriction, err := svc.moderation.UserRestriction(ctx, "bad-user", now)
+	require.NoError(t, err)
+	require.True(t, restriction.Muted)
+	require.Equal(t, now.Add(2*time.Hour), restriction.MuteExpiresAt.UTC())
+	require.Positive(t, rdb.TTL(ctx, contentpolicy.RedisSiteMutePrefix+"bad-user").Val())
+
+	var logs int64
+	require.NoError(t, db.Model(&model.UserSanctionLog{}).Where("target_user_id = ? AND action = ?", "bad-user", model.UserSanctionSiteMute).Count(&logs).Error)
+	require.EqualValues(t, 1, logs)
+}
+
+// If the owning service fails, the action fails visibly: the report stays
+// open and nothing is recorded as done.
+func TestReportActionFailsVisiblyWhenOwnerServiceFails(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _, owners := newModerationFixtureWithOwners(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportDanmu(t, db, "room-1", "danmu-down", "bad-user", "abuse")
+	owners.fail("/internal/users/bad-user/restriction", http.StatusServiceUnavailable)
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-down", RoomID: "room-1", Reason: "harassment"})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"ban_user"}})
+	require.ErrorContains(t, err, "user-service ban user bad-user")
+
+	detail, err := svc.ReportDetail(ctx, "admin-1", report.ID)
+	require.NoError(t, err)
+	require.NotEqual(t, "resolved", detail.Status)
+	restriction, err := svc.moderation.UserRestriction(ctx, "bad-user", now)
+	require.NoError(t, err)
+	require.False(t, restriction.Banned)
+	var logs int64
+	require.NoError(t, db.Model(&model.UserSanctionLog{}).Where("target_user_id = ?", "bad-user").Count(&logs).Error)
+	require.Zero(t, logs)
+
+	// Without clients configured the action is refused rather than skipped.
+	svc.SetOwnerServices(OwnerServices{})
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content"}})
+	require.ErrorContains(t, err, "chat-service client is not configured")
+}

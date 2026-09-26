@@ -35,6 +35,12 @@ func (s *AdminService) UpdateGift(ctx context.Context, id string, patch repo.Adm
 	return s.admin.UpdateGift(ctx, id, patch)
 }
 
+// ModerateSuperChat hides a super chat from public history; see
+// repo.AdminRepo.ModerateSuperChat for why it does not refund.
+func (s *AdminService) ModerateSuperChat(ctx context.Context, orderID, operatorID string) (*model.SuperChatOrder, error) {
+	return s.admin.ModerateSuperChat(ctx, orderID, operatorID, time.Now().UTC())
+}
+
 func (s *AdminService) ListOrders(ctx context.Context, f repo.AdminOrderFilter) ([]repo.AdminOrderRecord, int64, int, int, error) {
 	return s.admin.ListOrders(ctx, f)
 }

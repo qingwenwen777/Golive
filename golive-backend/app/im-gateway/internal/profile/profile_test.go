@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 )
 
 type clock struct{ t time.Time }
@@ -17,7 +19,7 @@ func (c *clock) now() time.Time { return c.t }
 
 func newResolver(t *testing.T, users, chat http.HandlerFunc) (*HTTPResolver, *clock) {
 	t.Helper()
-	cfg := Config{}
+	cfg := Config{InternalToken: "internal-tok"}
 	if users != nil {
 		srv := httptest.NewServer(users)
 		t.Cleanup(srv.Close)
@@ -39,6 +41,7 @@ func TestProfile_ResolvedFromUserService(t *testing.T) {
 	r, clk := newResolver(t, func(w http.ResponseWriter, req *http.Request) {
 		calls.Add(1)
 		require.Equal(t, "/users/profile/u-1", req.URL.Path)
+		require.Empty(t, req.Header.Get(internalauth.Header), "public profile calls carry no internal token")
 		_, _ = w.Write([]byte(`{"id":"u-1","username":"luna","displayName":"Luna","avatar":"/a.png","levelInfo":{"level":7}}`))
 	}, nil)
 
@@ -86,6 +89,10 @@ func TestFanBadge_ResolvedFromChatService(t *testing.T) {
 	var calls atomic.Int32
 	r, _ := newResolver(t, nil, func(w http.ResponseWriter, req *http.Request) {
 		calls.Add(1)
+		if req.Header.Get(internalauth.Header) != "internal-tok" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		switch req.URL.Path {
 		case "/internal/rooms/live-1/fan-badges/u-1":
 			_, _ = w.Write([]byte(`{"fanBadge":{"creatorId":"owner-1","level":4}}`))

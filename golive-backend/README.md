@@ -21,6 +21,49 @@ WebSockets, stream callbacks, gift orders, chat processing, uploads, and admin c
 | gift-service | `app/gift-service/cmd` | Gifts, SuperChat, betting, idempotent orders, transactional outbox |
 | im-gateway | `app/im-gateway/cmd` | Persistent WebSocket connections, room fanout, Redis Pub/Sub |
 
+## Data ownership
+
+All services share one MySQL database, but each table is owned by the service whose models
+and `AutoMigrate` define it. Only the owner writes its tables; another service that needs a
+change calls the owner's `/internal/...` HTTP API. Those routes are never proxied by nginx or
+api-gateway (which only forwards `/api/<prefix>/*` to `/<prefix>/*` and drops client-sent
+`X-Internal-Token`), and every call must carry `X-Internal-Token` matching the shared
+`GOLIVE_INTERNAL_TOKEN` (compared in constant time; an unset token rejects all calls).
+
+| Internal API | Owner | Caller |
+| ---- | ---- | ---- |
+| `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens) | user-service | room-service report moderation |
+| `GET /internal/users/:id/permission` | user-service | room-service (HTTP fallback to gRPC) |
+| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund) | gift-service | room-service report moderation |
+| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete) | chat-service | room-service report moderation |
+| `GET /internal/rooms/:id/fan-badges/:userId` | chat-service | im-gateway |
+
+Cross-service reads remain (direct SQL on the shared database):
+
+| Table | Owner | Also read by |
+| ---- | ---- | ---- |
+| `users` | user-service | room-service, gift-service, chat-service |
+| `user_moderation_states` | user-service | room-service (ban/mute checks) |
+| `coin_transactions` | user-service + gift-service (wallet) | room-service (admin overview), chat-service (user level) |
+| `rooms` | room-service | user-service, gift-service, chat-service |
+| `room_watch_events` | room-service | user-service (daily tasks) |
+| `content_reports` | room-service | user-service (admin user detail) |
+| `fan_badges` | gift-service | room-service, chat-service |
+| `gift_orders` | gift-service | room-service (analytics, recommendations) |
+| `super_chat_orders` | gift-service | room-service (analytics, report targets), chat-service (history, hides `moderated_at`) |
+| `danmus_<n>` | chat-service | room-service (report targets, chat counts) |
+
+Cross-service writes that remain, by design or pending a decision:
+
+- Coin wallet: `users.coin_balance` / `users.frozen_coins` and `coin_transactions` are written by
+  both user-service and gift-service inside single transactions (undecided; not moved).
+- `rooms.avatar` is synced by user-service when a creator changes their avatar.
+- `user_moderation_states`, `unban_appeals` and `admin_audit_logs` are migrated by both
+  user-service and room-service; room-service still creates unban appeals and appends its own
+  admin audit entries.
+- Redis ban/mute flags (`contentpolicy` keys) are refreshed by both user-service and
+  room-service from `user_moderation_states`.
+
 ## Port conventions
 
 | Component | Port | Description |

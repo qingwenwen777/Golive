@@ -10,6 +10,7 @@ import (
 	"time"
 
 	userv1 "github.com/qingwenwen777/golive/api/gen/go/user/v1"
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,13 +27,17 @@ type UserPermissionClient struct {
 	grpcClient userv1.UserServiceClient
 	grpcConn   *grpc.ClientConn
 	baseURL    string
+	token      string
 	client     *http.Client
 	timeout    time.Duration
 }
 
-func NewUserPermissionClient(grpcAddr, fallbackURL string) (*UserPermissionClient, error) {
+// NewUserPermissionClient prefers gRPC and falls back to user-service's
+// /internal HTTP API, authenticated with internalToken.
+func NewUserPermissionClient(grpcAddr, fallbackURL, internalToken string) (*UserPermissionClient, error) {
 	c := &UserPermissionClient{
 		baseURL: strings.TrimRight(fallbackURL, "/"),
+		token:   internalToken,
 		client:  &http.Client{Timeout: 3 * time.Second},
 		timeout: 3 * time.Second,
 	}
@@ -88,6 +93,7 @@ func (c *UserPermissionClient) hasApprovedLivePermissionHTTP(ctx context.Context
 	if err != nil {
 		return false, err
 	}
+	internalauth.SetToken(req, c.token)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return false, err

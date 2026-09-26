@@ -64,3 +64,8 @@ bootstrap:
     username: demo
     password: ""
     coin_balance: 100000
+
+# Shared secret for service-to-service /internal APIs. Every service must use
+# the same value; an empty token rejects all internal calls. Env: USERSVC_INTERNAL_TOKEN.
+internal:
+  token: "dev-only-internal-token-change-me"

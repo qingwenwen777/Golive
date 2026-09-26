@@ -11,15 +11,18 @@ import (
 )
 
 type Config struct {
-	Service ServiceCfg `mapstructure:"service"`
-	MySQL   MySQLCfg   `mapstructure:"mysql"`
-	Redis   RedisCfg   `mapstructure:"redis"`
-	JWT     JWTCfg     `mapstructure:"jwt"`
-	Live    LiveCfg    `mapstructure:"live"`
-	Replay  ReplayCfg  `mapstructure:"replay"`
-	Upload  UploadCfg  `mapstructure:"upload"`
-	Users   UsersCfg   `mapstructure:"users"`
-	Social  SocialCfg  `mapstructure:"social"`
+	Service  ServiceCfg  `mapstructure:"service"`
+	MySQL    MySQLCfg    `mapstructure:"mysql"`
+	Redis    RedisCfg    `mapstructure:"redis"`
+	JWT      JWTCfg      `mapstructure:"jwt"`
+	Live     LiveCfg     `mapstructure:"live"`
+	Replay   ReplayCfg   `mapstructure:"replay"`
+	Upload   UploadCfg   `mapstructure:"upload"`
+	Users    UsersCfg    `mapstructure:"users"`
+	Social   SocialCfg   `mapstructure:"social"`
+	Gifts    GiftsCfg    `mapstructure:"gifts"`
+	Chat     ChatCfg     `mapstructure:"chat"`
+	Internal InternalCfg `mapstructure:"internal"`
 }
 
 type ServiceCfg struct {
@@ -91,6 +94,24 @@ type UsersCfg struct {
 	GRPCAddr   string `mapstructure:"grpc_addr"`
 }
 
+// GiftsCfg locates gift-service, which report moderation calls to hide a
+// super chat.
+type GiftsCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
+}
+
+// ChatCfg locates chat-service, which report moderation calls to hide a
+// chat message.
+type ChatCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
+}
+
+// InternalCfg holds the shared secret sent on (and required by) /internal
+// service-to-service calls (ROOMSVC_INTERNAL_TOKEN).
+type InternalCfg struct {
+	Token string `mapstructure:"token"`
+}
+
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -109,6 +130,7 @@ func Load(path string) (*Config, error) {
 	_ = v.BindEnv("live.stream_key_secret")
 	_ = v.BindEnv("replay.bunny_library_id")
 	_ = v.BindEnv("replay.bunny_api_key")
+	_ = v.BindEnv("internal.token")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)

@@ -59,6 +59,12 @@ type SuperChatOrder struct {
 	Status     string    `gorm:"type:varchar(16);not null"        json:"status"`
 	FailReason string    `gorm:"type:varchar(32)"                 json:"failReason,omitempty"`
 	CreatedAt  time.Time `                                        json:"createdAt"`
+
+	// ModeratedAt marks a super chat removed by moderation. It only hides
+	// the message from public history; Status keeps the financial outcome,
+	// so a paid super chat stays "success" in the ledger and revenue.
+	ModeratedAt *time.Time `gorm:"index"            json:"moderatedAt,omitempty"`
+	ModeratedBy string     `gorm:"type:varchar(36)" json:"-"`
 }
 
 func (SuperChatOrder) TableName() string { return "super_chat_orders" }

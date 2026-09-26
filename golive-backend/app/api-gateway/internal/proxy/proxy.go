@@ -3,6 +3,7 @@
 //   - Strips the /api prefix on the way out (upstreams mount routes at root).
 //   - Forces X-User-Id and X-Request-Id headers onto the outbound request
 //     (already set by middleware on c.Request.Header).
+//   - Drops any client-supplied X-Internal-Token (service-to-service only).
 //   - Wraps upstream 5xx into the unified {message, reason} shape.
 //   - Bounded per-request timeout so a hung upstream can't pile up sockets.
 package proxy
@@ -22,6 +23,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -71,6 +73,9 @@ func New(upstream *url.URL, opts Options) *httputil.ReverseProxy {
 			if req.URL.Path == "" {
 				req.URL.Path = "/"
 			}
+			// The internal token is only for service-to-service calls; never
+			// relay one supplied by a public client.
+			req.Header.Del(internalauth.Header)
 		},
 		ModifyResponse: wrapUpstreamErrors,
 		ErrorHandler:   handleProxyError,

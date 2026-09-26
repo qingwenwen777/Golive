@@ -108,6 +108,7 @@ func main() {
 		Profiles: profile.NewHTTPResolver(profile.Config{
 			UserServiceURL: cfg.Profile.UserServiceURL,
 			ChatServiceURL: cfg.Profile.ChatServiceURL,
+			InternalToken:  cfg.Internal.Token,
 			TTL:            cfg.Profile.TTL,
 		}),
 	}

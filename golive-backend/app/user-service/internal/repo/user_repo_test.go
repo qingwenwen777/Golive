@@ -60,7 +60,9 @@ CREATE TABLE fan_badges (
 	require.NoError(t, db.Raw(`SELECT avatar FROM rooms WHERE id = ?`, "room-1").Scan(&roomAvatar).Error)
 	require.Equal(t, "/new.jpg", roomAvatar)
 
+	// fan_badges belongs to gift-service, which reads the current avatar
+	// from users when listing badges; user-service leaves it alone.
 	var badgeAvatar string
 	require.NoError(t, db.Raw(`SELECT creator_avatar FROM fan_badges WHERE creator_id = ?`, creator.ID).Scan(&badgeAvatar).Error)
-	require.Equal(t, "/new.jpg", badgeAvatar)
+	require.Equal(t, "/old.jpg", badgeAvatar)
 }

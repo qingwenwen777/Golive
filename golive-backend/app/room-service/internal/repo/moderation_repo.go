@@ -3,7 +3,6 @@ package repo
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -1009,7 +1008,10 @@ OR LOWER(COALESCE(target_id, '')) LIKE ?
 	return q
 }
 
-func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, targetID, roomID string, now time.Time) error {
+// DeleteReportedContent deletes reported content stored by room-service
+// (posts and post comments). Chat messages and super chats belong to
+// chat-service / gift-service and are removed through their APIs.
+func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, targetID string) error {
 	targetID = strings.TrimSpace(targetID)
 	if targetID == "" {
 		return nil
@@ -1019,13 +1021,6 @@ func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, 
 		return r.deletePostAny(ctx, targetID)
 	case model.ReportTargetPostComment:
 		return r.deletePostCommentAny(ctx, targetID)
-	case model.ReportTargetDanmu:
-		return r.hideDanmu(ctx, strings.TrimSpace(roomID), targetID, now)
-	case model.ReportTargetSuperChat:
-		return r.db.WithContext(ctx).
-			Table("super_chat_orders").
-			Where("order_id = ? AND status = ?", targetID, "success").
-			Updates(map[string]any{"status": "failed", "fail_reason": "moderated"}).Error
 	default:
 		return nil
 	}
@@ -1112,22 +1107,6 @@ func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID str
 	})
 }
 
-func (r *ModerationRepo) hideDanmu(ctx context.Context, roomID, danmuID string, now time.Time) error {
-	if roomID == "" {
-		return nil
-	}
-	for i := 0; i < 8; i++ {
-		table := fmt.Sprintf("danmus_%d", i)
-		err := r.db.WithContext(ctx).Table(table).
-			Where("room_id = ? AND id = ?", roomID, danmuID).
-			Update("deleted_at", now).Error
-		if err != nil && !isMissingTableName(err) && !isMissingColumn(err) {
-			return err
-		}
-	}
-	return nil
-}
-
 func (r *ModerationRepo) CreateNotification(ctx context.Context, n model.Notification) error {
 	if strings.TrimSpace(n.UserID) == "" {
 		return nil
@@ -1204,7 +1183,10 @@ func (r *ModerationRepo) AdminAuditStats(ctx context.Context, now time.Time) (Ad
 	return stats, nil
 }
 
-func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, targetName, operatorID, action, sourceReportID, note string, durationMinutes int, now time.Time) error {
+// RecordUserSanction logs a sanction in user_sanction_logs and refreshes
+// the Redis restriction flags from the current state. The ban / mute itself
+// is applied by user-service, which owns users and user_moderation_states.
+func (r *ModerationRepo) RecordUserSanction(ctx context.Context, targetUserID, targetName, operatorID, action, sourceReportID, note string, durationMinutes int, now time.Time) error {
 	targetUserID = strings.TrimSpace(targetUserID)
 	if targetUserID == "" {
 		return nil
@@ -1217,80 +1199,22 @@ func (r *ModerationRepo) ApplyUserSanction(ctx context.Context, targetUserID, ta
 		expires := now.Add(time.Duration(durationMinutes) * time.Minute)
 		expiresAt = &expires
 	}
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		updates := map[string]any{
-			"updated_by": operatorID,
-			"updated_at": now,
-		}
-		state := model.UserModerationState{
-			UserID:    targetUserID,
-			UpdatedBy: operatorID,
-			UpdatedAt: now,
-			CreatedAt: now,
-		}
-		switch action {
-		case model.UserSanctionBan:
-			state.Banned = true
-			state.BanReason = note
-			updates["banned"] = true
-			updates["ban_reason"] = note
-			if err := updateUserBanColumns(tx, targetUserID, true, note); err != nil {
-				return err
-			}
-		case model.UserSanctionUnban:
-			state.Banned = false
-			state.MutedUntil = nil
-			updates["banned"] = false
-			updates["ban_reason"] = ""
-			updates["muted_until"] = nil
-			updates["mute_reason"] = ""
-			if err := updateUserBanColumns(tx, targetUserID, false, ""); err != nil {
-				return err
-			}
-		case model.UserSanctionSiteMute:
-			state.MutedUntil = expiresAt
-			state.MuteReason = note
-			updates["muted_until"] = expiresAt
-			updates["mute_reason"] = note
-		}
-		if action == model.UserSanctionBan || action == model.UserSanctionUnban || action == model.UserSanctionSiteMute {
-			if err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "user_id"}},
-				DoUpdates: clause.Assignments(updates),
-			}).Create(&state).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.UserSanctionLog{
-			ID:              uuid.NewString(),
-			TargetUserID:    targetUserID,
-			TargetUserName:  trimForDB(targetName, 128),
-			Action:          action,
-			OperatorID:      operatorID,
-			SourceReportID:  sourceReportID,
-			Note:            note,
-			DurationMinutes: durationMinutes,
-			ExpiresAt:       expiresAt,
-			CreatedAt:       now,
-		}).Error
-	})
+	err := r.db.WithContext(ctx).Create(&model.UserSanctionLog{
+		ID:              uuid.NewString(),
+		TargetUserID:    targetUserID,
+		TargetUserName:  trimForDB(targetName, 128),
+		Action:          action,
+		OperatorID:      operatorID,
+		SourceReportID:  sourceReportID,
+		Note:            note,
+		DurationMinutes: durationMinutes,
+		ExpiresAt:       expiresAt,
+		CreatedAt:       now,
+	}).Error
 	if err != nil {
 		return err
 	}
 	return r.syncUserRestriction(ctx, targetUserID, now)
-}
-
-func updateUserBanColumns(tx *gorm.DB, userID string, banned bool, reason string) error {
-	err := tx.Table("users").
-		Where("id = ?", userID).
-		Updates(map[string]any{
-			"banned":     banned,
-			"ban_reason": reason,
-		}).Error
-	if isMissingTableName(err) || isMissingColumn(err) {
-		return nil
-	}
-	return err
 }
 
 func (r *ModerationRepo) UserRestriction(ctx context.Context, userID string, now time.Time) (UserRestriction, error) {
