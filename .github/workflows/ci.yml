@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.24.x"
-  STATICCHECK_VERSION: "2025.1.1"
+  GO_VERSION: "1.26.x"
+  STATICCHECK_VERSION: "v0.8.1"
 
 jobs:
   backend-lint:
@@ -44,7 +44,8 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@${{ env.STATICCHECK_VERSION }} ./...
+        # Generated protobuf code is excluded; it changes only via buf generate.
+        run: go run honnef.co/go/tools/cmd/staticcheck@${{ env.STATICCHECK_VERSION }} $(go list ./... | grep -v /api/gen/)
 
   backend-test:
     name: Backend tests
@@ -79,8 +80,6 @@ jobs:
   backend-vulncheck:
     name: Backend vulnerability scan
     runs-on: ubuntu-latest
-    # Report-only until the dependency upgrades it asks for have landed.
-    continue-on-error: true
     defaults:
       run:
         working-directory: golive-backend

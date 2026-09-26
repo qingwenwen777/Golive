@@ -17,7 +17,7 @@ Go microservices, streaming services, and local and production deployment config
 
 - Node.js >= 20
 - pnpm
-- Go >= 1.24
+- Go >= 1.25
 - Docker Engine + Docker Compose plugin
 
 ## Local development
