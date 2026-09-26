@@ -5,7 +5,7 @@ WebSockets, stream callbacks, gift orders, chat processing, uploads, and admin c
 
 ## Technology stack
 
-- Go 1.22+, Gin, gorilla/websocket, gRPC + Protobuf
+- Go 1.24+, Gin, gorilla/websocket, gRPC + Protobuf
 - MySQL 8 + GORM, Redis 7, Kafka, etcd, MinIO
 - Viper, zap, OpenTelemetry, Jaeger, Prometheus, Grafana
 - SRS 5(RTMP → HTTP-FLV/HLS), Docker Compose, nginx
