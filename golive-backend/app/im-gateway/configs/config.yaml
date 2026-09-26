@@ -11,7 +11,7 @@ ws:
   write_deadline: 10s
   send_buffer: 256         # per-conn outbound queue; overflow → kick
   pong_wait: 60s
-  max_message_rate: 5      # client→server msgs / sec / conn (chat)
+  max_message_rate: 5      # client→server frames / sec / conn (all types)
 
   allowed_origins:
     - "http://localhost:5173"

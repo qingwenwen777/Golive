@@ -42,8 +42,11 @@ type Conn struct {
 	moderation  moderation.Checker
 	filter      *chatfilter.Filter
 	chatLimiter UserLimiter
-	limiter     *rate.Limiter
-	cfg         WSConfig
+	// limiter bounds inbound frames of every type on this connection;
+	// droppedFrames counts rejections (readPump goroutine only).
+	limiter       *rate.Limiter
+	droppedFrames int
+	cfg           WSConfig
 }
 
 // UserLimiter is the per-user chat rate limit. It is shared by all of a
@@ -69,7 +72,7 @@ type WSConfig struct {
 	WriteDeadline   time.Duration
 	SendBuffer      int
 	PongWait        time.Duration
-	MaxMessageRate  float64
+	MaxMessageRate  float64 // inbound frames/sec per connection, all types
 	AllowedOrigins  []string
 }
 
@@ -156,13 +159,34 @@ func (c *Conn) readPump(ctx context.Context) {
 		// Any frame bumps the idle timeout — heartbeat doubles as keep-alive.
 		_ = c.ws.SetReadDeadline(time.Now().Add(c.cfg.ReadIdleTimeout))
 
-		var in hub.Inbound
-		if err := json.Unmarshal(raw, &in); err != nil || in.Type == "" {
-			metrics.MessagesDropped.WithLabelValues("bad_json").Inc()
-			continue
+		if !c.handleFrame(ctx, raw) {
+			logger.L().Info("closing flooding connection", zap.String("conn", c.id), zap.String("user", c.identity.UserID))
+			return
 		}
-		c.dispatchInbound(ctx, in)
 	}
+}
+
+// maxDroppedFrames is how many rate-limited frames a connection may send
+// before it is closed. Well-behaved clients stay far below the frame rate.
+const maxDroppedFrames = 50
+
+// handleFrame rate-limits, decodes and dispatches one inbound frame. Every
+// frame type counts against the per-connection limit — not just chat — so
+// cheap-looking frames (viewer_profile, resume) cannot be flooded. Returns
+// false when the connection should be closed for flooding.
+func (c *Conn) handleFrame(ctx context.Context, raw []byte) bool {
+	if c.limiter != nil && !c.limiter.Allow() {
+		metrics.MessagesDropped.WithLabelValues("rate_limited").Inc()
+		c.droppedFrames++
+		return c.droppedFrames <= maxDroppedFrames
+	}
+	var in hub.Inbound
+	if err := json.Unmarshal(raw, &in); err != nil || in.Type == "" {
+		metrics.MessagesDropped.WithLabelValues("bad_json").Inc()
+		return true
+	}
+	c.dispatchInbound(ctx, in)
+	return true
 }
 
 // writePump drains the send chan onto the websocket until Close. Closes the
@@ -182,10 +206,22 @@ func (c *Conn) writePump() {
 	}
 }
 
+// inboundTypeLabel bounds the metric label to the known frame types; the
+// type string is client-controlled and every distinct value would otherwise
+// create a new Prometheus series.
+func inboundTypeLabel(t string) string {
+	switch t {
+	case "heartbeat", "resume", "viewer_profile", "chat":
+		return t
+	default:
+		return "unknown"
+	}
+}
+
 // dispatchInbound implements the client→server protocol from
 // frontend src/mocks/ws-server.ts.
 func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
-	metrics.MessagesReceived.WithLabelValues(in.Type).Inc()
+	metrics.MessagesReceived.WithLabelValues(inboundTypeLabel(in.Type)).Inc()
 	switch in.Type {
 	case "heartbeat":
 		// already bumped read deadline above
@@ -246,10 +282,6 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 	if !c.identity.CanChat() {
 		_ = c.Send(hub.EncodeSystem("login required to chat"))
 		metrics.MessagesDropped.WithLabelValues("anonymous_chat").Inc()
-		return
-	}
-	if c.limiter != nil && !c.limiter.Allow() {
-		metrics.MessagesDropped.WithLabelValues("rate_limited").Inc()
 		return
 	}
 	text = strings.TrimSpace(text)

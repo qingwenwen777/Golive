@@ -3,17 +3,20 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v9"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
@@ -114,9 +117,55 @@ func TestDispatch_Chat_RateLimited(t *testing.T) {
 	c := newTestConn(auth.Identity{UserID: "u-7"}, p)
 	// Burst is int(MaxMessageRate)=5; 10 sends should yield ≤6 events.
 	for i := 0; i < 10; i++ {
-		c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "x"})
+		require.True(t, c.handleFrame(context.Background(), []byte(`{"type":"chat","text":"x"}`)))
 	}
 	require.LessOrEqual(t, len(p.snapshot()), 6)
+}
+
+// Only chat used to be limited, so a flood of other frames (viewer_profile
+// fans out to the whole room) went straight through.
+func TestHandleFrame_RateLimitsEveryType(t *testing.T) {
+	c := newTestConn(auth.Identity{UserID: "u-7"}, &fakeProducer{})
+	for i := 0; i < 20; i++ {
+		c.handleFrame(context.Background(), []byte(`{"type":"resume"}`))
+	}
+	require.LessOrEqual(t, len(c.send), 6, "each accepted resume frame produces one reply")
+}
+
+func TestHandleFrame_ClosesFloodingConnection(t *testing.T) {
+	c := newTestConn(auth.Identity{UserID: "u-7"}, &fakeProducer{})
+	keepOpen := true
+	for i := 0; i < 200 && keepOpen; i++ {
+		keepOpen = c.handleFrame(context.Background(), []byte(`{"type":"heartbeat"}`))
+	}
+	require.False(t, keepOpen)
+}
+
+func seriesCount(c prometheus.Collector) int {
+	ch := make(chan prometheus.Metric)
+	go func() {
+		c.Collect(ch)
+		close(ch)
+	}()
+	n := 0
+	for range ch {
+		n++
+	}
+	return n
+}
+
+// The frame type is client-controlled; using it as a label verbatim created
+// one Prometheus series per distinct value.
+func TestDispatch_MetricLabelIsBounded(t *testing.T) {
+	c := newTestConn(auth.Identity{UserID: "u-7"}, &fakeProducer{})
+	c.dispatchInbound(context.Background(), hub.Inbound{Type: "warmup-unknown"})
+	before := seriesCount(metrics.MessagesReceived)
+	for i := 0; i < 50; i++ {
+		c.dispatchInbound(context.Background(), hub.Inbound{Type: fmt.Sprintf("junk-%d", i)})
+	}
+	require.Equal(t, before, seriesCount(metrics.MessagesReceived))
+	require.Equal(t, "chat", inboundTypeLabel("chat"))
+	require.Equal(t, "unknown", inboundTypeLabel("junk"))
 }
 
 func TestDispatch_Chat_TooLong_Dropped(t *testing.T) {
