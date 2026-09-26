@@ -44,3 +44,7 @@ upload:
 users:
   service_url: "http://user-service:8090"
   grpc_addr: "user-service:19090"
+
+social:
+  # Most channels one user can follow.
+  max_follows: 2000

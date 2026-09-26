@@ -13,11 +13,16 @@ import (
 	"github.com/qingwenwen777/golive/pkg/errcode"
 )
 
+// DefaultMaxFollows caps how many channels one user can follow when no limit
+// is configured. Every follow costs work on subscription pages and feeds.
+const DefaultMaxFollows = 2000
+
 type SocialService struct {
-	social *repo.SocialRepo
-	rooms  *repo.RoomRepo
-	blocks ChannelBlockChecker
-	notify NotificationWriter
+	social     *repo.SocialRepo
+	rooms      *repo.RoomRepo
+	blocks     ChannelBlockChecker
+	notify     NotificationWriter
+	maxFollows int
 }
 
 func NewSocialService(social *repo.SocialRepo, rooms ...*repo.RoomRepo) *SocialService {
@@ -25,7 +30,15 @@ func NewSocialService(social *repo.SocialRepo, rooms ...*repo.RoomRepo) *SocialS
 	if len(rooms) > 0 {
 		roomRepo = rooms[0]
 	}
-	return &SocialService{social: social, rooms: roomRepo}
+	return &SocialService{social: social, rooms: roomRepo, maxFollows: DefaultMaxFollows}
+}
+
+// SetMaxFollows sets the per-user follow cap; n <= 0 keeps the default.
+func (s *SocialService) SetMaxFollows(n int) {
+	if n <= 0 {
+		n = DefaultMaxFollows
+	}
+	s.maxFollows = n
 }
 
 func (s *SocialService) SetBlockChecker(blocks ChannelBlockChecker) {
@@ -53,7 +66,7 @@ type followTarget struct {
 // resolveFollowTarget maps a channel id, owner id or username to the
 // canonical "ch-<ownerID>" follow key, so block checks, follower counts and
 // followers-only visibility all agree on one key. It returns
-// repo.ErrRoomNotFound when the key names no known channel.
+// repo.ErrRoomNotFound when the key names no real channel.
 func (s *SocialService) resolveFollowTarget(ctx context.Context, channelID string) (followTarget, error) {
 	key := strings.TrimSpace(channelID)
 	if key == "" {
@@ -63,16 +76,47 @@ func (s *SocialService) resolveFollowTarget(ctx context.Context, channelID strin
 		return followTarget{key: key, ownerID: ownerIDFromChannelID(key)}, nil
 	}
 	ownerID := strings.TrimPrefix(key, "ch-")
-	if _, err := s.rooms.OwnerProfile(ctx, ownerID); err != nil {
-		if !errors.Is(err, repo.ErrRoomNotFound) {
-			return followTarget{}, err
-		}
+	if ownerID == "" {
+		return followTarget{}, repo.ErrRoomNotFound
+	}
+	exists, err := s.channelExists(ctx, ownerID)
+	if err != nil {
+		return followTarget{}, err
+	}
+	if !exists {
 		ownerID, err = s.rooms.ResolveOwnerID(ctx, key)
 		if err != nil {
 			return followTarget{}, err
 		}
+		// ResolveOwnerID accepts any UUID-like key as an owner id unchecked.
+		exists, err = s.channelExists(ctx, ownerID)
+		if err != nil {
+			return followTarget{}, err
+		}
+		if !exists {
+			return followTarget{}, repo.ErrRoomNotFound
+		}
 	}
 	return followTarget{key: channelIDForOwner(ownerID), ownerID: ownerID}, nil
+}
+
+// channelExists reports whether ownerID is a user or owns a room.
+func (s *SocialService) channelExists(ctx context.Context, ownerID string) (bool, error) {
+	if ownerID == "" {
+		return false, nil
+	}
+	_, err := s.rooms.OwnerProfile(ctx, ownerID)
+	if err == nil {
+		return true, nil
+	}
+	if !errors.Is(err, repo.ErrRoomNotFound) {
+		return false, err
+	}
+	rooms, err := s.rooms.LatestByChannelIDs(ctx, []string{channelIDForOwner(ownerID)})
+	if err != nil {
+		return false, err
+	}
+	return len(rooms) > 0, nil
 }
 
 func (s *SocialService) GetFollow(ctx context.Context, uid, channelID string) (*FollowState, error) {
@@ -140,8 +184,12 @@ func (s *SocialService) Follow(ctx context.Context, uid, channelID string) (*Fol
 			return nil, errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
 		}
 	}
-	if err := s.social.Follow(ctx, uid, target.key); err != nil {
+	stored, err := s.social.FollowWithLimit(ctx, uid, target.key, s.maxFollows)
+	if err != nil {
 		return nil, err
+	}
+	if !stored {
+		return nil, errcode.New(409, "follow limit reached").WithReason("follow_limit")
 	}
 	return s.followState(ctx, uid, target, target.key)
 }
@@ -217,8 +265,13 @@ type CreatorSearchItem struct {
 }
 
 // followedChannels returns uid's follow keys, newest first, each with the
-// owner it resolves to (empty when it resolves to none). Owners that block
-// uid or are blocked by it are left out.
+// owner it resolves to. Owners that block uid or are blocked by it are left
+// out.
+//
+// Follows stored before keys were normalised (usernames, channel names) need
+// a ResolveOwnerID lookup, which may scan users by display name. Each such
+// key is rewritten to "ch-<ownerID>" (or dropped when it names no channel,
+// the user itself or a blocked owner) so the lookup happens only once.
 func followedChannels(ctx context.Context, social *repo.SocialRepo, rooms *repo.RoomRepo, blocks ChannelBlockChecker, uid string) ([]followTarget, error) {
 	keys, err := social.Following(ctx, uid)
 	if err != nil {
@@ -226,6 +279,7 @@ func followedChannels(ctx context.Context, social *repo.SocialRepo, rooms *repo.
 	}
 	targets := make([]followTarget, 0, len(keys))
 	ownerIDs := make([]string, 0, len(keys))
+	var legacy []followTarget
 	for _, key := range keys {
 		ownerID := ownerIDFromChannelID(key)
 		if ownerID == "" && rooms != nil {
@@ -233,6 +287,7 @@ func followedChannels(ctx context.Context, social *repo.SocialRepo, rooms *repo.
 			if err != nil && !errors.Is(err, repo.ErrRoomNotFound) {
 				return nil, err
 			}
+			legacy = append(legacy, followTarget{key: key, ownerID: resolved})
 			ownerID = resolved
 		}
 		targets = append(targets, followTarget{key: key, ownerID: ownerID})
@@ -244,14 +299,33 @@ func followedChannels(ctx context.Context, social *repo.SocialRepo, rooms *repo.
 	if err != nil {
 		return nil, err
 	}
-	if len(blocked) == 0 {
-		return targets, nil
+	dropped := map[string]bool{}
+	for _, target := range legacy {
+		newKey := ""
+		if target.ownerID != "" && target.ownerID != uid && !blocked[target.ownerID] {
+			newKey = channelIDForOwner(target.ownerID)
+		}
+		if err := social.ReplaceFollowKey(ctx, uid, target.key, newKey); err != nil {
+			return nil, err
+		}
+		if newKey == "" {
+			dropped[target.key] = true
+		}
 	}
 	visible := targets[:0]
+	seen := make(map[string]bool, len(targets))
 	for _, target := range targets {
-		if !blocked[target.ownerID] {
-			visible = append(visible, target)
+		if dropped[target.key] || blocked[target.ownerID] {
+			continue
 		}
+		if target.ownerID != "" {
+			target.key = channelIDForOwner(target.ownerID)
+		}
+		if seen[target.key] {
+			continue
+		}
+		seen[target.key] = true
+		visible = append(visible, target)
 	}
 	return visible, nil
 }
@@ -272,6 +346,10 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 			return nil, err
 		}
 	}
+	counts, err := s.social.FollowerCounts(ctx, channelIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	items := make([]SubscriptionChannel, 0, len(targets))
 	for _, target := range targets {
@@ -279,10 +357,7 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 		if uid != "" && target.ownerID == uid {
 			continue
 		}
-		count, err := s.social.FollowerCount(ctx, channelID)
-		if err != nil {
-			return nil, err
-		}
+		count := counts[channelID]
 		profile, hasProfile, err := s.ownerProfile(ctx, target.ownerID)
 		if err != nil {
 			return nil, err

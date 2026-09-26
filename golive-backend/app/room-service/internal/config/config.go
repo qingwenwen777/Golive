@@ -19,6 +19,7 @@ type Config struct {
 	Replay  ReplayCfg  `mapstructure:"replay"`
 	Upload  UploadCfg  `mapstructure:"upload"`
 	Users   UsersCfg   `mapstructure:"users"`
+	Social  SocialCfg  `mapstructure:"social"`
 }
 
 type ServiceCfg struct {
@@ -77,6 +78,12 @@ type UploadCfg struct {
 	CoverPublicURL string `mapstructure:"cover_public_url"`
 	PostImageDir   string `mapstructure:"post_image_dir"`
 	PostPublicURL  string `mapstructure:"post_public_url"`
+}
+
+type SocialCfg struct {
+	// MaxFollows caps how many channels one user can follow. 0 uses
+	// service.DefaultMaxFollows.
+	MaxFollows int `mapstructure:"max_follows"`
 }
 
 type UsersCfg struct {

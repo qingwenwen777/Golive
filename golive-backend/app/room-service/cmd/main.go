@@ -86,6 +86,7 @@ func main() {
 
 	roomSvc := service.NewRoomService(roomRepo, cfg.Live.FlvBase, socialRepo)
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
+	socialSvc.SetMaxFollows(cfg.Social.MaxFollows)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 	replaySvc := service.NewReplayService(roomRepo, socialRepo, service.ReplayConfig{
 		RecordDir:       cfg.Replay.RecordDir,
