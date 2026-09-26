@@ -9,9 +9,14 @@ import (
 // Danmu is the persisted form. The table name is computed at runtime from
 // shard-of(roomId), so we DO NOT set TableName() — callers always pass the
 // resolved name to gorm.Table().
+//
+// History reads one room's newest messages (room_id = ? ORDER BY ts DESC),
+// served by the (room_id, ts) index. It is declared with composite:room_ts
+// rather than a fixed name so each shard gets its own idx_danmus_<n>_room_ts
+// (index names are database-wide in SQLite).
 type Danmu struct {
 	ID                string `gorm:"primaryKey;type:varchar(64)"`
-	RoomID            string `gorm:"type:varchar(64);index;not null"`
+	RoomID            string `gorm:"type:varchar(64);index;index:,composite:room_ts,priority:1;not null"`
 	UserID            string `gorm:"type:varchar(36);index"`
 	Username          string `gorm:"type:varchar(64)"`
 	Avatar            string `gorm:"type:varchar(500)"`
@@ -21,7 +26,7 @@ type Danmu struct {
 	FanBadgeCreatorID string `gorm:"type:varchar(80)"`
 	FanBadgeLevel     int
 	UserLevel         int
-	Ts                int64 `gorm:"not null;index"` // ms epoch
+	Ts                int64 `gorm:"not null;index;index:,composite:room_ts,priority:2"` // ms epoch
 	CreatedAt         time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }

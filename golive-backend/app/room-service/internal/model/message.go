@@ -42,11 +42,11 @@ func (DirectThread) TableName() string { return "direct_threads" }
 
 type DirectMessage struct {
 	ID         string    `gorm:"primaryKey;type:varchar(64)"`
-	ThreadID   string    `gorm:"type:varchar(64);not null;index"`
+	ThreadID   string    `gorm:"type:varchar(64);not null;index;index:idx_direct_messages_thread_created,priority:1"`
 	SenderID   string    `gorm:"type:varchar(36);not null;index"`
 	ReceiverID string    `gorm:"type:varchar(36);not null;index"`
 	Body       string    `gorm:"type:varchar(1200);not null"`
-	CreatedAt  time.Time `gorm:"not null;index"`
+	CreatedAt  time.Time `gorm:"not null;index;index:idx_direct_messages_thread_created,priority:2"`
 }
 
 func (DirectMessage) TableName() string { return "direct_messages" }
@@ -88,11 +88,11 @@ type FanGroupChat struct {
 func (FanGroupChat) TableName() string { return "fan_group_chats" }
 
 type FanGroupMember struct {
-	GroupID           string     `gorm:"primaryKey;type:varchar(64);index"`
+	GroupID           string     `gorm:"primaryKey;type:varchar(64);index;index:idx_fan_group_members_group_kicked,priority:1"`
 	UserID            string     `gorm:"primaryKey;type:varchar(36);index"`
 	Role              string     `gorm:"type:varchar(16);not null;default:'member';index"`
 	MutedUntil        *time.Time `gorm:"index"`
-	KickedAt          *time.Time `gorm:"index"`
+	KickedAt          *time.Time `gorm:"index;index:idx_fan_group_members_group_kicked,priority:2"`
 	KickReason        string     `gorm:"type:varchar(24);not null;default:'';index"`
 	RejoinRequestedAt *time.Time `gorm:"index"`
 	RejoinRejectedAt  *time.Time `gorm:"index"`
@@ -104,10 +104,10 @@ func (FanGroupMember) TableName() string { return "fan_group_members" }
 
 type FanGroupMessage struct {
 	ID        string    `gorm:"primaryKey;type:varchar(64)"`
-	GroupID   string    `gorm:"type:varchar(64);not null;index"`
+	GroupID   string    `gorm:"type:varchar(64);not null;index;index:idx_fan_group_messages_group_created,priority:1"`
 	SenderID  string    `gorm:"type:varchar(36);not null;index"`
 	Body      string    `gorm:"type:varchar(1200);not null"`
-	CreatedAt time.Time `gorm:"not null;index"`
+	CreatedAt time.Time `gorm:"not null;index;index:idx_fan_group_messages_group_created,priority:2"`
 }
 
 func (FanGroupMessage) TableName() string { return "fan_group_messages" }
