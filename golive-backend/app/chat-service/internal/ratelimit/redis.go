@@ -7,9 +7,9 @@
 //
 // Trade-offs:
 //
-//	+ O(1) per request, no GC sweep.
-//	- Fixed-window has a 2x burst at boundaries vs. sliding window. Acceptable
-//	  for chat (we just want to keep one user from flooding).
+//   - Pro: O(1) per request, no GC sweep.
+//   - Con: fixed-window has a 2x burst at boundaries vs. sliding window.
+//     Acceptable for chat (we just want to keep one user from flooding).
 package ratelimit
 
 import (
@@ -30,7 +30,9 @@ func New(rdb *redis.Client, limit int, window time.Duration) *Limiter {
 	if limit <= 0 {
 		limit = 1
 	}
-	if window <= 0 {
+	// Sub-millisecond windows cannot work: every call lands in its own bucket
+	// and PEXPIRE rounds the TTL to 0. Treat them as unset.
+	if window < time.Millisecond {
 		window = time.Second
 	}
 	return &Limiter{rdb: rdb, limit: limit, window: window}

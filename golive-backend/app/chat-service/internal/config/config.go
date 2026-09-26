@@ -50,9 +50,28 @@ type FilterCfg struct {
 	Mask          string `mapstructure:"mask"`
 }
 
+// RateLimitCfg is the per-user chat limit: PerUserPerSec messages per
+// BucketSeconds-long window. BucketSeconds is a plain integer number of
+// seconds — decoding it straight into a time.Duration turned the YAML value
+// `1` into 1ns, which gave every message its own window and never limited.
 type RateLimitCfg struct {
-	PerUserPerSec int           `mapstructure:"per_user_per_sec"`
-	BucketSeconds time.Duration `mapstructure:"bucket_seconds"`
+	PerUserPerSec int `mapstructure:"per_user_per_sec"`
+	BucketSeconds int `mapstructure:"bucket_seconds"`
+}
+
+// Window returns the limiter window as a duration.
+func (c RateLimitCfg) Window() time.Duration {
+	return time.Duration(c.BucketSeconds) * time.Second
+}
+
+func (c RateLimitCfg) validate() error {
+	if c.PerUserPerSec <= 0 {
+		return fmt.Errorf("ratelimit.per_user_per_sec must be > 0, got %d", c.PerUserPerSec)
+	}
+	if c.BucketSeconds <= 0 {
+		return fmt.Errorf("ratelimit.bucket_seconds must be a positive number of seconds, got %d", c.BucketSeconds)
+	}
+	return nil
 }
 
 type RoomCfg struct {
@@ -81,6 +100,9 @@ func Load(path string) (*Config, error) {
 	var c Config
 	if err := v.Unmarshal(&c); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+	if err := c.RateLimit.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &c, nil
 }

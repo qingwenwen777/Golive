@@ -73,7 +73,7 @@ func main() {
 	}
 	f := filter.New(words, filter.WithMask(cfg.Filter.Mask), filter.WithSkipChars(" .*-_"))
 
-	limiter := ratelimit.New(rdb, cfg.RateLimit.PerUserPerSec, cfg.RateLimit.BucketSeconds)
+	limiter := ratelimit.New(rdb, cfg.RateLimit.PerUserPerSec, cfg.RateLimit.Window())
 	pub := repo.NewPublisher(rdb)
 	svc := service.New(f, limiter, danmuRepo, pub)
 
