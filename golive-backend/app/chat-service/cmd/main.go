@@ -88,7 +88,7 @@ func main() {
 	}
 
 	histH := handler.NewHistoryHandler(svc, cfg.Room.HistoryDefaultLimit, cfg.Room.HistoryMaxLimit)
-	r := server.NewRouter(histH)
+	r := server.NewRouter(histH, handler.NewFanBadgeHandler(svc))
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
 
 	go func() {

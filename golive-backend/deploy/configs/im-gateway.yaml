@@ -59,6 +59,14 @@ room:
   require_known: true
   service_url: "http://room-service:8091"
 
+# Chat identity (name / avatar / level / fan badge) is resolved server-side
+# from these services by user id and cached for ttl; client-sent values are
+# ignored.
+profile:
+  user_service_url: "http://user-service:8090"
+  chat_service_url: "http://chat-service:8093"
+  ttl: 30s
+
 # Mounted read-only by docker-compose (same file chat-service uses).
 filter:
   sensitive_path: "./app/chat-service/configs/sensitive.txt"

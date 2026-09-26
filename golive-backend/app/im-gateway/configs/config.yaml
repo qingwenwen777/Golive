@@ -47,6 +47,13 @@ room:
   require_known: true      # reject roomIds room-service doesn't know
   service_url: "http://127.0.0.1:8091"
 
+# Chat identity (name / avatar / level / fan badge) is resolved server-side
+# by user id; client-sent values are ignored.
+profile:
+  user_service_url: "http://127.0.0.1:8090"
+  chat_service_url: "http://127.0.0.1:8093"
+  ttl: 30s
+
 # Sensitive words are masked in live chat (same list chat-service uses).
 filter:
   sensitive_path: "./app/chat-service/configs/sensitive.txt"

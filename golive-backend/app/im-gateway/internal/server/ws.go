@@ -126,7 +126,10 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := newConn(ws, roomID, ownerID, identity, h.deps, h.cfg)
-	room, err := h.hub.Join(roomID, c, c.initialViewerProfile())
+	// Resolve the public identity (cached; bounded by the resolver timeout)
+	// so the viewer list shows the real name from the first push.
+	c.loadProfile(r.Context())
+	room, err := h.hub.Join(roomID, c, c.viewerProfile())
 	if err != nil {
 		release()
 		logger.L().Error("hub join", zap.Error(err))

@@ -28,12 +28,14 @@ Handshake: `ws://host:8081/ws?roomId=<id>&token=<jwt>`
 | ---------- | --------------- | --------------------------------------------------------------------- |
 | S→C        | `system`        | `text, ts(ms)`                                                        |
 | S→C        | `viewer_count`  | `count`                                                               |
-| S→C        | `chat`          | `id, user, avatar?, text, color?, ts`                                 |
+| S→C        | `chat`          | `id, userId, user, avatar?, text, role?, fanBadge?, userLevel?, ts` — all but `text` server-derived (id = server uuid; name/avatar/level from user-service, fan badge from chat-service, cached 30s) |
+| S→C        | `chat_ack`      | `clientId, id` — only to the sender, mapping its `clientId` to the server id |
 | S→C        | `super_chat`    | `id, user, avatar?, amount, tier(0–5), text, ts`                      |
 | S→C        | `gift`          | `user, giftName, ts`                                                  |
 | C→S        | `heartbeat`     | —                                                                     |
 | C→S | `resume` | `lastMessageId?` (MVP only replies with `system: "resumed"`; no replay buffer) |
-| C→S | `chat` | `text` (≤200 bytes; rate limit 5 msg/s/conn) |
+| C→S | `chat` | `text` (≤200 chars), `clientId?`. Identity/display fields a client sends (`user`, `avatar`, `userLevel`, `fanBadge`, ...) are ignored. Per-user limit `chat_ratelimit`; every frame type also counts against `ws.max_message_rate` per connection. |
+| C→S | `viewer_profile` | — (payload ignored; asks the gateway to re-resolve the user's server-side profile) |
 
 Immediately after the handshake, send one `system: "Welcome to the live room!"` and one `viewer_count: 1`, matching the frontend mock.
 

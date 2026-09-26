@@ -1,6 +1,8 @@
 # chat-service
 
-Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endpoint; the only public application endpoint serves chat history for replay.
+Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endpoint; the only public application endpoint serves chat history for replay. History renders each chat's name, avatar, level and fan badge from current server-side data looked up by user id (never by display name, never the values stored with the row).
+
+Internal (service-to-service, not proxied by api-gateway): `GET /internal/rooms/:id/fan-badges/:userId` → `{"fanBadge": {"creatorId","level"} | null}`, used by im-gateway to decorate live chat.
 
 - HTTP: `:8093` (only `/rooms/:id/danmus` + `/healthz`, proxied by api-gateway)
 - pprof: `:6068`

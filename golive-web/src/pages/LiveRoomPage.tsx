@@ -156,12 +156,6 @@ export default function LiveRoomPage() {
   const reserveAppointment = useReserveAppointment(roomId);
   const unreserveAppointment = useUnreserveAppointment(roomId);
   const startAppointment = useStartAppointment(roomId);
-  const activeFanBadge = useMemo(() => {
-    if (!stream?.ownerId) return null;
-    const badge = fanBadges.data?.find((item) => item.creatorId === stream.ownerId);
-    if (!badge) return null;
-    return { creatorId: badge.creatorId, level: badge.level };
-  }, [fanBadges.data, stream?.ownerId]);
   const moderationState = useRoomModerationState(
     roomId,
     Boolean(isAuthed && roomCanWatch && roomId),
@@ -232,7 +226,6 @@ export default function LiveRoomPage() {
   const { readyState, retryCount, messages, viewers, bullets, viewerCount, sendChat, clearBullet } =
     useRoomRealtime(roomId, roomCanWatch, {
       onLiveEnded: handleLiveEnded,
-      activeFanBadge,
       ownerId: stream?.ownerId,
     });
 

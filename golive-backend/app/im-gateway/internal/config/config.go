@@ -19,6 +19,7 @@ type Config struct {
 	Kafka   KafkaCfg   `mapstructure:"kafka"`
 	Room    RoomCfg    `mapstructure:"room"`
 	Filter  FilterCfg  `mapstructure:"filter"`
+	Profile ProfileCfg `mapstructure:"profile"`
 	// ChatRateLimit is the per-user (not per-connection) chat limit, shared
 	// through Redis by all of a user's connections.
 	ChatRateLimit ChatRateLimitCfg `mapstructure:"chat_ratelimit"`
@@ -99,6 +100,14 @@ type RoomCfg struct {
 	RequireKnown bool `mapstructure:"require_known"`
 	// ServiceURL is room-service's base URL for the lookup fallback.
 	ServiceURL string `mapstructure:"service_url"`
+}
+
+// ProfileCfg locates the services chat identity is resolved from: display
+// name / avatar / level from user-service, fan badges from chat-service.
+type ProfileCfg struct {
+	UserServiceURL string        `mapstructure:"user_service_url"`
+	ChatServiceURL string        `mapstructure:"chat_service_url"`
+	TTL            time.Duration `mapstructure:"ttl"`
 }
 
 // FilterCfg points at the sensitive-word list (one word per line) whose

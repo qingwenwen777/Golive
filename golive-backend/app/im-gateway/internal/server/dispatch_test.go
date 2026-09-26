@@ -10,6 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v9"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
@@ -18,6 +19,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/profile"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
 )
@@ -90,26 +92,126 @@ func TestDispatch_Chat_Anonymous_Rejected(t *testing.T) {
 	require.Contains(t, string(payload), "login required")
 }
 
+// fakeProfiles resolves every user to p (with the user's id) and badge.
+type fakeProfiles struct {
+	p     profile.Profile
+	badge *profile.FanBadge
+}
+
+func (f fakeProfiles) Profile(_ context.Context, userID string) profile.Profile {
+	p := f.p
+	p.UserID = userID
+	return p
+}
+
+func (f fakeProfiles) FanBadge(context.Context, string, string) *profile.FanBadge { return f.badge }
+
+// captureBroker records what the hub publishes.
+type captureBroker struct {
+	memBroker
+	mu        sync.Mutex
+	published [][]byte
+}
+
+func (b *captureBroker) Publish(_ context.Context, _ string, payload []byte) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.published = append(b.published, payload)
+	return nil
+}
+
+func (b *captureBroker) snapshot() [][]byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([][]byte(nil), b.published...)
+}
+
+// spoofedChat carries every identity field a malicious client could set.
+const spoofedChat = `{"type":"chat","text":"hello","clientId":"c-1","userId":"owner-1",` +
+	`"user":"TheStreamer","avatar":"/evil.png","userLevel":99,"fanBadge":{"creatorId":"owner-1","level":99}}`
+
+var kabun = fakeProfiles{
+	p:     profile.Profile{Name: "Kabun", Avatar: "/kabun.png", Level: 5},
+	badge: &profile.FanBadge{CreatorID: "owner-1", Level: 2},
+}
+
 func TestDispatch_Chat_Authenticated_PublishesToProducer(t *testing.T) {
 	p := &fakeProducer{}
 	c := newTestConn(auth.Identity{UserID: "u-7"}, p)
-	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "hello", User: "Kabun"})
+	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "hello"})
 	events := p.snapshot()
 	require.Len(t, events, 1)
 	require.Equal(t, "u-7", events[0].UserID)
-	require.Equal(t, "Kabun", events[0].Username)
+	require.Equal(t, "Creator u-7", events[0].Username, "no profile source: id-derived name")
 	require.Equal(t, "R1", events[0].RoomID)
 	require.Equal(t, "hello", events[0].Text)
 	require.NotZero(t, events[0].Ts)
 }
 
-func TestDispatch_Chat_BadUsername_DroppedFromEvent(t *testing.T) {
+// Name, avatar, level, fan badge and message id used to be taken from the
+// client, so anyone could post as the streamer with level 99 and any badge,
+// or reuse a visible message id to rewrite that message for every viewer.
+func TestDispatch_Chat_IgnoresClientIdentity(t *testing.T) {
 	p := &fakeProducer{}
 	c := newTestConn(auth.Identity{UserID: "u-7"}, p)
-	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "hello", User: "bad\nname"})
+	c.profiles = kabun
+	require.True(t, c.handleFrame(context.Background(), []byte(spoofedChat)))
+
 	events := p.snapshot()
 	require.Len(t, events, 1)
-	require.Empty(t, events[0].Username)
+	ev := events[0]
+	require.Equal(t, "u-7", ev.UserID)
+	require.Equal(t, "Kabun", ev.Username)
+	require.Equal(t, "/kabun.png", ev.Avatar)
+	require.Equal(t, 5, ev.UserLevel)
+	require.Equal(t, &producer.FanBadgePayload{CreatorID: "owner-1", Level: 2}, ev.FanBadge)
+	_, err := uuid.Parse(ev.ID)
+	require.NoError(t, err, "message id is server-generated")
+
+	// Only the sender learns which id its clientId got.
+	var ack hub.ChatAckMsg
+	require.NoError(t, json.Unmarshal(<-c.send, &ack))
+	require.Equal(t, hub.ChatAckMsg{Type: "chat_ack", ClientID: "c-1", ID: ev.ID}, ack)
+}
+
+func TestDispatch_Chat_LocalEchoBroadcastsServerIdentity(t *testing.T) {
+	br := &captureBroker{}
+	c := newTestConn(auth.Identity{UserID: "u-7"}, producer.NewNoop())
+	c.hub = hub.New(context.Background(), br, 0)
+	c.profiles = kabun
+	require.True(t, c.handleFrame(context.Background(), []byte(spoofedChat)))
+
+	published := br.snapshot()
+	require.Len(t, published, 1)
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(published[0], &raw))
+	require.Equal(t, "chat", raw["type"])
+	require.Equal(t, "u-7", raw["userId"])
+	require.Equal(t, "Kabun", raw["user"])
+	require.Equal(t, "/kabun.png", raw["avatar"])
+	require.EqualValues(t, 5, raw["userLevel"])
+	require.Equal(t, map[string]any{"creatorId": "owner-1", "level": float64(2)}, raw["fanBadge"])
+	require.NotEqual(t, "c-1", raw["id"])
+	require.NotContains(t, raw, "clientId", "clientId is never broadcast")
+}
+
+// The room owner doesn't wear a badge of their own fan club.
+func TestDispatch_Chat_OwnerHasNoFanBadge(t *testing.T) {
+	p := &fakeProducer{}
+	c := newTestConn(auth.Identity{UserID: "owner-1"}, p)
+	c.ownerID = "owner-1"
+	c.profiles = kabun
+	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "hi"})
+	require.Len(t, p.snapshot(), 1)
+	require.Nil(t, p.snapshot()[0].FanBadge)
+}
+
+func TestDispatch_ViewerProfile_IgnoresPayload(t *testing.T) {
+	c := newTestConn(auth.Identity{UserID: "u-7"}, &fakeProducer{})
+	c.hub = hub.New(context.Background(), &captureBroker{}, 0)
+	c.profiles = kabun
+	require.True(t, c.handleFrame(context.Background(), []byte(`{"type":"viewer_profile","user":"TheStreamer","avatar":"/evil.png","userLevel":99}`)))
+	require.Equal(t, hub.ViewerProfile{UserID: "u-7", User: "Kabun", Avatar: "/kabun.png", UserLevel: 5}, c.viewerProfile())
 }
 
 func TestDispatch_Chat_RateLimited(t *testing.T) {
@@ -183,7 +285,7 @@ func TestDispatch_Chat_EmojiCountsAsCharacters(t *testing.T) {
 	p := &fakeProducer{}
 	c := newTestConn(auth.Identity{UserID: "u-7"}, p)
 	text := "hello 😀😀😀"
-	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: text, User: "Kabun"})
+	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: text})
 	events := p.snapshot()
 	require.Len(t, events, 1)
 	require.Equal(t, text, events[0].Text)

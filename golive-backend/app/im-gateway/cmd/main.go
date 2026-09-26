@@ -19,6 +19,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/profile"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/pubsub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/rooms"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/server"
@@ -104,6 +105,11 @@ func main() {
 		Filter:      chatfilter.New(words, chatfilter.WithMask(cfg.Filter.Mask), chatfilter.WithSkipChars(chatfilter.DefaultSkipChars)),
 		ChatLimiter: chatlimit.New(rdb, "rl:imgw:chat:", cfg.ChatRateLimit.PerUserPerSec, cfg.ChatRateLimit.Window()),
 		Rooms:       rooms.NewRedisDirectory(rdb, rooms.Config{RoomServiceURL: cfg.Room.ServiceURL}),
+		Profiles: profile.NewHTTPResolver(profile.Config{
+			UserServiceURL: cfg.Profile.UserServiceURL,
+			ChatServiceURL: cfg.Profile.ChatServiceURL,
+			TTL:            cfg.Profile.TTL,
+		}),
 	}
 	wsH := server.NewWSHandler(deps, verifier, wsCfg, cfg.Room.WelcomeText)
 	mux := server.NewMux(wsH, h)

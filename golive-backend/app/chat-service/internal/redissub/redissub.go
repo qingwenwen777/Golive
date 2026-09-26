@@ -9,9 +9,11 @@
 // are persisted separately by gift-service, which is why a re-entering viewer
 // previously only saw SuperChats restored.
 //
-// This subscriber is idempotent: it uses the message id (set by im-gateway
-// from the WS clientId or a fresh uuid) as the danmus row primary key, so
-// reprocessing the same payload does not duplicate.
+// This subscriber is idempotent: it uses the message id (a uuid im-gateway
+// generates; never the client's clientId) as the danmus row primary key, so
+// reprocessing the same payload does not duplicate. Name, avatar, level and
+// fan badge in the payload are derived server-side by im-gateway, and
+// history re-derives them by user id on read anyway.
 package redissub
 
 import (
@@ -20,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis/v9"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/qingwenwen777/golive/app/chat-service/internal/model"
@@ -101,6 +104,11 @@ func (s *Subscriber) handle(ctx context.Context, msg *redis.Message) {
 	}
 	if ev.Type != "chat" || ev.ID == "" || ev.Text == "" {
 		// We only persist chat. SuperChat is handled by gift-service.
+		return
+	}
+	if _, err := uuid.Parse(ev.ID); err != nil {
+		// im-gateway generates uuid message ids; anything else (e.g. a
+		// client-chosen id from an older gateway) must not become a key.
 		return
 	}
 	d := &model.Danmu{
