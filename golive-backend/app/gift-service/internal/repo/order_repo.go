@@ -560,10 +560,11 @@ func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winnin
 			return err
 		}
 
-		var winnerPool, loserPool int64
+		var winnerPool, loserPool, winners int64
 		for _, wager := range wagers {
 			if wager.Option == winningOption {
 				winnerPool += wager.Amount
+				winners++
 			} else {
 				loserPool += wager.Amount
 			}
@@ -594,7 +595,10 @@ func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winnin
 			if firstWinner == -1 {
 				firstWinner = i
 			}
-			bonus := loserPool * wagers[i].Amount / winnerPool
+			// Every stake equals round.Amount (PlaceBetWager sets it), so the
+			// proportional share loserPool*Amount/winnerPool is loserPool/winners,
+			// without the product that could overflow int64.
+			bonus := loserPool / winners
 			paidBonus += bonus
 			payouts[i] = wagers[i].Amount + bonus
 		}

@@ -120,3 +120,39 @@ func TestBetCancelStaleRoundsRefundsAndUnblocksRoom(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, n)
 }
+
+func TestBetSettlePayoutDoesNotOverflowOnLargeStakes(t *testing.T) {
+	db := newBetTestDB(t)
+	svc := service.NewBetService(repo.NewOrderRepo(db))
+	ctx := context.Background()
+	// loserPool * stake = 8e9 * 4e9 overflows int64; with two winners the
+	// wrapped (negative) bonus used to shift coins from one winner to the other.
+	const stake = int64(4_000_000_000)
+	require.NoError(t, db.Exec("INSERT INTO users (id, username, coin_balance) VALUES ('u-c', 'u-c', 0)").Error)
+	picks := map[string]string{
+		"u-a":    model.BetOptionWin,
+		"u-c":    model.BetOptionWin,
+		"u-b":    model.BetOptionLose,
+		"u-demo": model.BetOptionLose,
+	}
+	for id := range picks {
+		require.NoError(t, db.Exec("UPDATE users SET coin_balance = ? WHERE id = ?", stake, id).Error)
+	}
+
+	view, err := svc.Open(ctx, "u-owner", "r1", stake, "Will blue win?")
+	require.NoError(t, err)
+	roundID := view.Round.ID
+	for id, option := range picks {
+		_, err = svc.Wager(ctx, id, "r1", roundID, option)
+		require.NoError(t, err)
+	}
+	require.NoError(t, db.Model(&model.BetRound{}).Where("id = ?", roundID).
+		Update("close_at", time.Now().UTC().Add(-time.Second)).Error)
+
+	_, err = svc.Settle(ctx, "u-owner", roundID, model.BetOptionWin)
+	require.NoError(t, err)
+	require.Equal(t, 2*stake, balanceOf(t, db, "u-a"))
+	require.Equal(t, 2*stake, balanceOf(t, db, "u-c"))
+	require.Zero(t, balanceOf(t, db, "u-b"))
+	require.Zero(t, balanceOf(t, db, "u-demo"))
+}
