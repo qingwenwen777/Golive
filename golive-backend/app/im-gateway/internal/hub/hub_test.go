@@ -3,6 +3,7 @@ package hub_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -161,11 +162,81 @@ func waitFor(t *testing.T, cond func() bool) {
 	t.Fatal("condition timed out")
 }
 
+// fastFlush keeps change-driven viewer pushes quick in tests.
+var fastFlush = hub.WithViewerFlushInterval(10 * time.Millisecond)
+
+func countType(payloads [][]byte, typ string) int {
+	n := 0
+	for _, payload := range payloads {
+		var probe struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(payload, &probe) == nil && probe.Type == typ {
+			n++
+		}
+	}
+	return n
+}
+
 // tests --------------------------------------------------------------------
+
+// Every viewer_profile / join / leave used to broadcast viewer_count and
+// viewer_list to the whole room immediately; ~130 tiny frames filled every
+// viewer's 256-slot queue and evicted the room. Pushes are now coalesced.
+func TestHub_ViewerPushesAreCoalesced(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0, hub.WithViewerFlushInterval(200*time.Millisecond))
+
+	watcher := newFakeSink("watcher")
+	_, err := joinRoom(h, "R1", watcher, hub.ViewerProfile{UserID: "w", User: "W"})
+	require.NoError(t, err)
+	attacker := newFakeSink("attacker")
+	_, err = joinRoom(h, "R1", attacker, hub.ViewerProfile{UserID: "a", User: "A"})
+	require.NoError(t, err)
+
+	for i := 0; i < 300; i++ {
+		h.UpdateViewer("R1", "attacker", hub.ViewerProfile{UserID: "a", User: fmt.Sprintf("A%d", i)})
+	}
+	// The final state still reaches viewers.
+	waitFor(t, func() bool {
+		for _, payload := range watcher.snapshot() {
+			var list hub.ViewerListMsg
+			if json.Unmarshal(payload, &list) == nil && list.Type == "viewer_list" {
+				for _, v := range list.Viewers {
+					if v.User == "A299" {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	})
+	require.LessOrEqual(t, countType(watcher.snapshot(), "viewer_list"), 4)
+	require.LessOrEqual(t, countType(watcher.snapshot(), "viewer_count"), 4)
+	watcher.mu.Lock()
+	defer watcher.mu.Unlock()
+	require.False(t, watcher.closed)
+}
+
+func TestHub_UnchangedProfileDoesNotPush(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0, fastFlush)
+	a := newFakeSink("a")
+	profile := hub.ViewerProfile{UserID: "u", User: "U"}
+	_, err := joinRoom(h, "R1", a, profile)
+	require.NoError(t, err)
+	waitFor(t, func() bool { return countType(a.snapshot(), "viewer_list") == 1 })
+
+	for i := 0; i < 20; i++ {
+		h.UpdateViewer("R1", "a", profile)
+	}
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, 1, countType(a.snapshot(), "viewer_list"))
+}
 
 func TestHub_LazySubscribeFirstJoinOnly(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0) // disable viewer ticker
+	h := hub.New(context.Background(), br, 0, fastFlush) // disable viewer ticker
 
 	a := newFakeSink("a")
 	b := newFakeSink("b")
@@ -183,7 +254,7 @@ func TestHub_LazySubscribeFirstJoinOnly(t *testing.T) {
 
 func TestHub_LastLeaveTearsDownSubscription(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 
 	a := newFakeSink("a")
 	b := newFakeSink("b")
@@ -200,7 +271,7 @@ func TestHub_LastLeaveTearsDownSubscription(t *testing.T) {
 
 func TestHub_BroadcastFansOutToAllSinks(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 
 	a, b, c := newFakeSink("a"), newFakeSink("b"), newFakeSink("c")
 	_, _ = joinRoom(h, "R1", a)
@@ -217,7 +288,7 @@ func TestHub_BroadcastFansOutToAllSinks(t *testing.T) {
 
 func TestHub_BroadcastIsolatesPerRoom(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 
 	a := newFakeSink("a")
 	b := newFakeSink("b")
@@ -233,7 +304,7 @@ func TestHub_BroadcastIsolatesPerRoom(t *testing.T) {
 
 func TestHub_EvictsSlowConsumer(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 
 	good := newFakeSink("good")
 	slow := newFakeSink("slow")
@@ -253,7 +324,7 @@ func TestHub_EvictsSlowConsumer(t *testing.T) {
 
 func TestHub_ViewerCountPushedPeriodically(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 50*time.Millisecond)
+	h := hub.New(context.Background(), br, 50*time.Millisecond, fastFlush)
 
 	a := newFakeSink("a")
 	_, _ = joinRoom(h, "R1", a)
@@ -274,7 +345,7 @@ func TestHub_ViewerCountPushedPeriodically(t *testing.T) {
 
 func TestHub_DeduplicatesAuthenticatedViewerConnections(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 
 	a := newFakeSink("a")
 	b := newFakeSink("b")
@@ -305,7 +376,7 @@ func TestHub_DeduplicatesAuthenticatedViewerConnections(t *testing.T) {
 
 func TestHub_ExcludesOwnerFromViewerMetrics(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 
 	owner := newFakeSink("owner")
 	viewer := newFakeSink("viewer")
@@ -336,7 +407,7 @@ func TestHub_ExcludesOwnerFromViewerMetrics(t *testing.T) {
 
 func TestHub_SnapshotTopN(t *testing.T) {
 	br := newFakeBroker()
-	h := hub.New(context.Background(), br, 0)
+	h := hub.New(context.Background(), br, 0, fastFlush)
 	for _, room := range []struct {
 		id string
 		n  int

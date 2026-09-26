@@ -24,21 +24,39 @@ import (
 )
 
 type Hub struct {
-	ctx                context.Context
-	broker             pubsub.Broker
-	viewerPushInterval time.Duration
+	ctx                 context.Context
+	broker              pubsub.Broker
+	viewerPushInterval  time.Duration
+	viewerFlushInterval time.Duration
 
 	mu    sync.RWMutex
 	rooms map[string]*Room
 }
 
-func New(ctx context.Context, broker pubsub.Broker, viewerPushInterval time.Duration) *Hub {
-	return &Hub{
-		ctx:                ctx,
-		broker:             broker,
-		viewerPushInterval: viewerPushInterval,
-		rooms:              make(map[string]*Room),
+// DefaultViewerFlushInterval is the minimum gap between change-driven
+// viewer_count/viewer_list pushes to a room.
+const DefaultViewerFlushInterval = time.Second
+
+// Option configures a Hub.
+type Option func(*Hub)
+
+// WithViewerFlushInterval overrides DefaultViewerFlushInterval.
+func WithViewerFlushInterval(d time.Duration) Option {
+	return func(h *Hub) { h.viewerFlushInterval = d }
+}
+
+func New(ctx context.Context, broker pubsub.Broker, viewerPushInterval time.Duration, opts ...Option) *Hub {
+	h := &Hub{
+		ctx:                 ctx,
+		broker:              broker,
+		viewerPushInterval:  viewerPushInterval,
+		viewerFlushInterval: DefaultViewerFlushInterval,
+		rooms:               make(map[string]*Room),
 	}
+	for _, o := range opts {
+		o(h)
+	}
+	return h
 }
 
 // subscribeTimeout bounds the broker SUBSCRIBE for a new room.

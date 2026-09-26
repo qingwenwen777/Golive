@@ -46,6 +46,8 @@ type Room struct {
 	closed bool
 
 	viewers atomic.Int64
+	// viewersDirty (cap 1) signals pumpViewers that count/list changed.
+	viewersDirty chan struct{}
 
 	sub pubsub.Subscription
 }
@@ -58,6 +60,7 @@ func newRoom(parent context.Context, h *Hub, id string) *Room {
 		ctx:             ctx,
 		cancel:          cancel,
 		ready:           make(chan struct{}),
+		viewersDirty:    make(chan struct{}, 1),
 		conns:           make(map[string]Sink),
 		viewerProfiles:  make(map[string]ViewerProfile),
 		contributions:   make(map[string]int64),
@@ -79,7 +82,7 @@ func (r *Room) start() {
 	}
 	r.sub = sub
 	go r.pumpFromBroker(r.ctx)
-	go r.pumpViewerCount(r.ctx, r.hub.viewerPushInterval)
+	go r.pumpViewers(r.ctx, r.hub.viewerPushInterval, r.hub.viewerFlushInterval)
 	metrics.RoomsActive.Inc()
 }
 
@@ -99,10 +102,8 @@ func (r *Room) add(c Sink, profile ViewerProfile) bool {
 	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
 	r.viewers.Store(n)
-	r.persistViewerCount(n)
 	r.addPresence(profile)
-	r.fanout(encodeViewerCount(n))
-	r.broadcastViewerList()
+	r.markViewersDirty()
 	return true
 }
 
@@ -122,12 +123,10 @@ func (r *Room) remove(connID string) (removed, empty bool) {
 	empty = len(r.conns) == 0
 	r.mu.Unlock()
 	r.viewers.Store(n)
-	r.persistViewerCount(n)
 	if !stillPresent {
 		r.removePresence(gone)
 	}
-	r.fanout(encodeViewerCount(n))
-	r.broadcastViewerList()
+	r.markViewersDirty()
 	return true, empty
 }
 
@@ -202,14 +201,16 @@ func (r *Room) updateViewer(connID string, profile ViewerProfile) {
 	if profile.User == "" {
 		profile.User = "Guest"
 	}
+	if r.viewerProfiles[connID] == profile {
+		r.mu.Unlock()
+		return
+	}
 	r.viewerProfiles[connID] = profile
 	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
 	r.viewers.Store(n)
-	r.persistViewerCount(n)
 	r.addPresence(profile)
-	r.fanout(encodeViewerCount(n))
-	r.broadcastViewerList()
+	r.markViewersDirty()
 }
 
 func (r *Room) applyContribution(payload []byte) {
@@ -262,7 +263,28 @@ func (r *Room) applyContribution(payload []byte) {
 		r.viewerProfiles[connID] = profile
 	}
 	r.mu.Unlock()
+	r.markViewersDirty()
+}
+
+// markViewersDirty schedules a viewer_count + viewer_list push. Pushes are
+// O(room size) and go to every member, so they are coalesced by
+// pumpViewers to at most one per viewerFlushInterval instead of one per
+// join, leave, profile update or gift — a burst of those used to fill every
+// viewer's send queue and evict the whole room.
+func (r *Room) markViewersDirty() {
+	select {
+	case r.viewersDirty <- struct{}{}:
+	default:
+	}
+}
+
+// flushViewers persists the viewer count and pushes count + list to the room.
+func (r *Room) flushViewers() {
+	n := r.size()
+	r.persistViewerCount(n)
+	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
+	metrics.MessagesSent.WithLabelValues("viewer_count").Inc()
 }
 
 func (r *Room) broadcastViewerList() {
@@ -470,26 +492,45 @@ func parseCoinAmount(amount string) int64 {
 	return value
 }
 
-// pumpViewerCount pushes the current local viewer count to all sinks in this
-// room every interval. In a multi-instance deployment this should read from
-// a Redis HINCRBY counter rather than the local count; MVP uses local.
-func (r *Room) pumpViewerCount(ctx context.Context, interval time.Duration) {
-	if interval <= 0 {
-		return
+// pumpViewers pushes viewer_count + viewer_list to all sinks in this room:
+// on change (markViewersDirty), at most once per minGap — the first change
+// after a quiet period goes out immediately, later ones are folded into one
+// trailing push — and additionally every interval (if > 0), which also
+// re-asserts presence. In a multi-instance deployment the count should read
+// from a Redis HINCRBY counter rather than the local count; MVP uses local.
+func (r *Room) pumpViewers(ctx context.Context, interval, minGap time.Duration) {
+	var tick <-chan time.Time
+	if interval > 0 {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		tick = t.C
 	}
-	t := time.NewTicker(interval)
-	defer t.Stop()
+	var last time.Time
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-t.C:
-			size := r.size()
-			r.persistViewerCount(size)
+		case <-r.viewersDirty:
+			if wait := minGap - time.Since(last); wait > 0 {
+				timer := time.NewTimer(wait)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+				// Changes made while waiting are covered by this flush.
+				select {
+				case <-r.viewersDirty:
+				default:
+				}
+			}
+			r.flushViewers()
+			last = time.Now()
+		case <-tick:
 			r.refreshPresence()
-			r.fanout(encodeViewerCount(size))
-			r.broadcastViewerList()
-			metrics.MessagesSent.WithLabelValues("viewer_count").Inc()
+			r.flushViewers()
+			last = time.Now()
 		}
 	}
 }
