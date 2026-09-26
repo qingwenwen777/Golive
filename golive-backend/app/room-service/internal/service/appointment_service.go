@@ -466,6 +466,7 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 		if err := s.live.endRoom(ctx, active, now); err != nil {
 			return nil, err
 		}
+		s.live.disconnectPublisher(ctx, active.ID, active.StreamKey)
 		if active.StreamKey != "" {
 			_ = s.live.live.Delete(ctx, active.StreamKey)
 			_ = s.live.live.DeletePublishSession(ctx, active.StreamKey)

@@ -30,10 +30,12 @@ type HotReplayResp struct {
 
 type HotReplayItem struct {
 	model.Stream
-	Likes        int64   `json:"likes"`
-	CommentCount int64   `json:"commentCount"`
-	RevenueCoin  int64   `json:"revenueCoin"`
-	HotScore     float64 `json:"hotScore"`
+	Likes        int64 `json:"likes"`
+	CommentCount int64 `json:"commentCount"`
+	// RevenueCoin feeds the hot score only; it is creator income, so it is
+	// never serialised on this public endpoint.
+	RevenueCoin int64   `json:"-"`
+	HotScore    float64 `json:"hotScore"`
 }
 
 // LiveHistoryItem is one past live. The channel history endpoint is public,

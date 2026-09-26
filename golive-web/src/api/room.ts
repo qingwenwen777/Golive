@@ -444,7 +444,6 @@ export interface ReplayListResp {
 export interface HotReplayItem extends Stream {
   likes: number;
   commentCount: number;
-  revenueCoin: number;
   hotScore: number;
 }
 

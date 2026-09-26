@@ -191,6 +191,9 @@ func TestHotReplaysRanksWatchableRecentReplays(t *testing.T) {
 		resp.Items[2].ID,
 	})
 	require.Equal(t, int64(900), resp.Items[0].RevenueCoin)
+	body, err := json.Marshal(resp.Items[0])
+	require.NoError(t, err)
+	require.NotContains(t, string(body), "revenueCoin")
 	require.Equal(t, int64(40), resp.Items[1].CommentCount)
 	require.Equal(t, int64(300), resp.Items[2].PeakViewers)
 }
