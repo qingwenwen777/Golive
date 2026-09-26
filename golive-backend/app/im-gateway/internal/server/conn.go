@@ -46,9 +46,10 @@ type Conn struct {
 	filter      *chatfilter.Filter
 	chatLimiter UserLimiter
 	profiles    profile.Resolver
-	// profile is the server-resolved public identity; set before the pumps
-	// start and afterwards only touched by the readPump goroutine.
-	profile profile.Profile
+	// profileRetry is when to resolve the viewer-list identity again because
+	// the last attempt only produced a fallback; zero otherwise. Set before
+	// the pumps start, then only touched by the readPump goroutine.
+	profileRetry time.Time
 	// limiter bounds inbound frames of every type on this connection;
 	// droppedFrames counts rejections (readPump goroutine only).
 	limiter       *rate.Limiter
@@ -202,6 +203,10 @@ func (c *Conn) handleFrame(ctx context.Context, raw []byte) bool {
 		c.droppedFrames++
 		return c.droppedFrames <= maxDroppedFrames
 	}
+	if !c.profileRetry.IsZero() && !time.Now().Before(c.profileRetry) {
+		// The viewer-list entry still shows a fallback identity.
+		c.updateViewer(c.resolveProfile(ctx, false))
+	}
 	var in hub.Inbound
 	if err := json.Unmarshal(raw, &in); err != nil || in.Type == "" {
 		metrics.MessagesDropped.WithLabelValues("bad_json").Inc()
@@ -255,7 +260,8 @@ func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
 		return
 	case "viewer_profile":
 		// The payload is ignored: identity comes from the server. The frame
-		// only asks us to pick up a profile change (cached, so cheap).
+		// only asks us to pick up a profile change (the resolver refetches
+		// at most every few seconds per user).
 		c.handleViewerProfile(ctx)
 		return
 	case "chat":
@@ -265,31 +271,66 @@ func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
 	}
 }
 
-// loadProfile resolves the connection's public identity from server-side
-// sources, keyed by the authenticated user id.
-func (c *Conn) loadProfile(ctx context.Context) {
-	if c.profiles != nil {
-		c.profile = c.profiles.Profile(ctx, c.identity.UserID)
+// profileRetryDelay is how long a connection whose identity was only a
+// fallback waits before asking again; the resolver also backs off per user.
+const profileRetryDelay = 5 * time.Second
+
+// resolveProfile returns the connection's public identity as of now, from
+// server-side sources keyed by the authenticated user id. The resolver
+// caches it; the connection keeps no copy, so renames and a recovered
+// user-service show up. refresh asks the resolver to refetch a profile the
+// client says changed. ok is false for a fallback served because
+// user-service couldn't be reached; the viewer-list entry is then resolved
+// again on a later frame.
+func (c *Conn) resolveProfile(ctx context.Context, refresh bool) (profile.Profile, bool) {
+	if c.profiles == nil {
+		return profile.Profile{UserID: c.identity.UserID, Name: profile.FallbackName(c.identity.UserID)}, true
 	}
-	if c.profile.UserID == "" {
-		c.profile = profile.Profile{UserID: c.identity.UserID, Name: profile.FallbackName(c.identity.UserID)}
+	var p profile.Profile
+	var ok bool
+	if refresh {
+		p, ok = c.profiles.Refresh(ctx, c.identity.UserID)
+	} else {
+		p, ok = c.profiles.Profile(ctx, c.identity.UserID)
 	}
+	c.profileRetry = time.Time{}
+	if !ok {
+		c.profileRetry = time.Now().Add(profileRetryDelay)
+	}
+	return p, ok
+}
+
+// joinRoom resolves the public identity (cached; bounded by the resolver
+// timeout), so the viewer list shows the real name from the first push, and
+// joins the room with it. A fallback isn't kept: the connection asks again on
+// a later frame.
+func (c *Conn) joinRoom(ctx context.Context) (*hub.Room, error) {
+	p, _ := c.resolveProfile(ctx, false)
+	return c.hub.Join(c.roomID, c, c.viewerProfile(p))
+}
+
+// updateViewer puts p into this connection's viewer-list entry (a no-op in
+// the hub when nothing changed). A fallback never replaces the entry.
+func (c *Conn) updateViewer(p profile.Profile, ok bool) {
+	if c.hub == nil || !ok {
+		return
+	}
+	c.hub.UpdateViewer(c.roomID, c.id, c.viewerProfile(p))
 }
 
 func (c *Conn) handleViewerProfile(ctx context.Context) {
 	if c.hub == nil {
 		return
 	}
-	c.loadProfile(ctx)
-	c.hub.UpdateViewer(c.roomID, c.id, c.viewerProfile())
+	c.updateViewer(c.resolveProfile(ctx, true))
 }
 
-func (c *Conn) viewerProfile() hub.ViewerProfile {
+func (c *Conn) viewerProfile(p profile.Profile) hub.ViewerProfile {
 	return hub.ViewerProfile{
 		UserID:    c.identity.UserID,
-		User:      c.profile.Name,
-		Avatar:    c.profile.Avatar,
-		UserLevel: c.profile.Level,
+		User:      p.Name,
+		Avatar:    p.Avatar,
+		UserLevel: p.Level,
 		IsOwner:   c.isOwner(),
 	}
 }
@@ -361,10 +402,10 @@ func (c *Conn) handleChat(ctx context.Context, text, clientID string) {
 	if c.filter != nil {
 		text = c.filter.Replace(text)
 	}
-	if c.profile.UserID == "" {
-		c.loadProfile(ctx)
-	}
-	p := c.profile
+	// The identity as of sending, not as of the handshake; the viewer list
+	// follows it.
+	p, ok := c.resolveProfile(ctx, false)
+	c.updateViewer(p, ok)
 	var hubBadge *hub.FanBadgePayload
 	var producerBadge *producer.FanBadgePayload
 	if c.profiles != nil && !c.isOwner() {

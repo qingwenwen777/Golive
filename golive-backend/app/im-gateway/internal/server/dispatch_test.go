@@ -98,10 +98,14 @@ type fakeProfiles struct {
 	badge *profile.FanBadge
 }
 
-func (f fakeProfiles) Profile(_ context.Context, userID string) profile.Profile {
+func (f fakeProfiles) Profile(_ context.Context, userID string) (profile.Profile, bool) {
 	p := f.p
 	p.UserID = userID
-	return p
+	return p, true
+}
+
+func (f fakeProfiles) Refresh(ctx context.Context, userID string) (profile.Profile, bool) {
+	return f.Profile(ctx, userID)
 }
 
 func (f fakeProfiles) FanBadge(context.Context, string, string) *profile.FanBadge { return f.badge }
@@ -208,10 +212,10 @@ func TestDispatch_Chat_OwnerHasNoFanBadge(t *testing.T) {
 
 func TestDispatch_ViewerProfile_IgnoresPayload(t *testing.T) {
 	c := newTestConn(auth.Identity{UserID: "u-7"}, &fakeProducer{})
-	c.hub = hub.New(context.Background(), &captureBroker{}, 0)
+	joinTestRoom(t, c)
 	c.profiles = kabun
 	require.True(t, c.handleFrame(context.Background(), []byte(`{"type":"viewer_profile","user":"TheStreamer","avatar":"/evil.png","userLevel":99}`)))
-	require.Equal(t, hub.ViewerProfile{UserID: "u-7", User: "Kabun", Avatar: "/kabun.png", UserLevel: 5}, c.viewerProfile())
+	require.Equal(t, hub.ViewerListItem{UserID: "u-7", User: "Kabun", Avatar: "/kabun.png", UserLevel: 5}, waitForViewer(t, c, "Kabun"))
 }
 
 func TestDispatch_Chat_RateLimited(t *testing.T) {
