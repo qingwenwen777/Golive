@@ -234,11 +234,12 @@ func (f *listPerfFixture) measure(t testing.TB, fn func() error) (int64, int64) 
 	return f.counter.sql.Load(), f.counter.redis.Load()
 }
 
-// resetCaches empties the recommendation and hot-replay pools so the next
-// call measures a cold load.
+// resetCaches empties the recommendation, hot-replay and suggestion pools so
+// the next call measures a cold load.
 func (f *listPerfFixture) resetCaches() {
 	f.svc.liveRecommendations = newTTLCache[*liveRecommendationPool](liveRecommendationCacheTTL, roomPoolCacheEntries)
 	f.svc.hotReplays = newTTLCache[*hotReplayPool](hotReplayCacheTTL, roomPoolCacheEntries)
+	f.search.suggestions = newTTLCache[*suggestionPool](suggestCacheTTL, suggestCacheEntries)
 }
 
 // TestListEndpointsQueryCounts pins the I/O of the public list endpoints for
@@ -303,7 +304,13 @@ func TestListEndpointsQueryCounts(t *testing.T) {
 			_, err := f.svc.SearchReplays(ctx, f.viewerID, "replay show", 24)
 			return err
 		}},
-		{"Suggest viewer", false, 8, 51, func() error {
+		// creators, live rooms, replay rooms, owner profiles; previously the
+		// full five-way Search (14/60).
+		{"Suggest viewer cold", true, 4, 1, func() error {
+			_, err := f.search.Suggest(ctx, f.viewerID, "show", 12)
+			return err
+		}},
+		{"Suggest viewer warm", false, 0, 0, func() error {
 			_, err := f.search.Suggest(ctx, f.viewerID, "show", 12)
 			return err
 		}},

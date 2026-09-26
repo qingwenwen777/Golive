@@ -94,6 +94,10 @@ func (r *RoomRepo) SearchCreators(ctx context.Context, phrase SearchPhrase, limi
 			return nil, err
 		}
 	}
+	phrase, limit, ok := boundFallbackSearch(phrase, limit)
+	if !ok {
+		return []CreatorSearchRow{}, nil
+	}
 	userWhere, userArgs := fuzzyWhere([]string{"u.username", "u.display_name", "u.id"}, phrase)
 	roomWhere, roomArgs := fuzzyWhere([]string{"cr.channel", "cr.channel_id", "cr.title", "cr.title_ja", "cr.category", "cr.category_ja"}, phrase)
 	where := "(" + userWhere + " OR EXISTS (SELECT 1 FROM rooms cr WHERE cr.owner_id = u.id AND cr.owner_id <> '' AND " + roomWhere + "))"
@@ -177,6 +181,10 @@ func (r *RoomRepo) SearchLiveRooms(ctx context.Context, phrase SearchPhrase, lim
 			return nil, err
 		}
 	}
+	phrase, limit, ok := boundFallbackSearch(phrase, limit)
+	if !ok {
+		return []model.Room{}, nil
+	}
 	where, args := fuzzyWhere([]string{
 		"rooms.title",
 		"rooms.title_ja",
@@ -227,6 +235,10 @@ func (r *RoomRepo) SearchReplayRooms(ctx context.Context, phrase SearchPhrase, l
 		if !shouldFallbackFromFullText(err) {
 			return nil, err
 		}
+	}
+	phrase, limit, ok := boundFallbackSearch(phrase, limit)
+	if !ok {
+		return []model.Room{}, nil
 	}
 	where, args := fuzzyWhere([]string{
 		"rooms.title",
@@ -282,6 +294,10 @@ func (r *AppointmentRepo) SearchPublicUpcoming(ctx context.Context, phrase Searc
 			return nil, err
 		}
 	}
+	phrase, limit, ok := boundFallbackSearch(phrase, limit)
+	if !ok {
+		return []model.LiveAppointment{}, nil
+	}
 	where, args := fuzzyWhere([]string{
 		"live_appointments.title",
 		"live_appointments.description",
@@ -331,6 +347,10 @@ func (r *PostRepo) SearchVisible(ctx context.Context, phrase SearchPhrase, limit
 		if !shouldFallbackFromFullText(err) {
 			return nil, err
 		}
+	}
+	phrase, limit, ok := boundFallbackSearch(phrase, limit)
+	if !ok {
+		return []model.ChannelPost{}, nil
 	}
 	where, args := fuzzyWhere([]string{
 		"channel_posts.content",
@@ -483,6 +503,32 @@ func trimRunes(value string, max int) string {
 	}
 	runes := []rune(value)
 	return string(runes[:max])
+}
+
+// The %LIKE% fallback (non-ASCII queries, or words shorter than the
+// full-text minimum) can't use an index, so it is bounded: a query of fewer
+// than minFallbackSearchRunes characters matches nearly every row and is
+// skipped, only the first maxFallbackSearchTokens words are matched, and at
+// most maxFallbackSearchLimit candidates are read.
+const (
+	minFallbackSearchRunes  = 2
+	maxFallbackSearchTokens = 4
+	maxFallbackSearchLimit  = 50
+)
+
+// boundFallbackSearch applies the fallback bounds to phrase and limit, and
+// reports false when the query is too short to search this way.
+func boundFallbackSearch(phrase SearchPhrase, limit int) (SearchPhrase, int, bool) {
+	if utf8.RuneCountInString(phrase.Compact) < minFallbackSearchRunes {
+		return phrase, 0, false
+	}
+	if len(phrase.Tokens) > maxFallbackSearchTokens {
+		phrase.Tokens = phrase.Tokens[:maxFallbackSearchTokens]
+	}
+	if limit > maxFallbackSearchLimit {
+		limit = maxFallbackSearchLimit
+	}
+	return phrase, limit, true
 }
 
 func normalizeSearchLimit(limit int) int {
