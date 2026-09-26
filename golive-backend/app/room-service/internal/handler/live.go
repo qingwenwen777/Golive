@@ -20,7 +20,7 @@ func NewLiveHandler(svc *service.LiveService, permission service.LivePermissionC
 
 // GoLive: POST /rooms/live (auth required).
 // Frontend sends { title, description, category, cover, channelName }; we return the Stream including
-// streamKey (which the publisher uses as the RTMP path on `rtmp://srs/live/<streamKey>`).
+// streamKey, the OBS stream key `<roomID>?key=<secret>` published to `rtmp://srs/live/<streamKey>`.
 func (h *LiveHandler) GoLive(c *gin.Context) {
 	uid := UserIDFromCtx(c)
 	if uid == "" {

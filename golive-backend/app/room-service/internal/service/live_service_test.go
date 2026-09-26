@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,17 +58,35 @@ func startTestLive(t *testing.T, svc *LiveService, ownerID string) *model.Stream
 	return st
 }
 
+// srsReq builds the hook body SRS sends when OBS publishes with obsKey
+// ("<roomID>?key=<secret>"): SRS splits the query string into Param, and a
+// transcoded variant appends its suffix to the stream name.
+func srsReq(obsKey, variant string) SRSPublishReq {
+	return srsClientReq(obsKey, variant, "")
+}
+
+func srsClientReq(obsKey, variant, clientID string) SRSPublishReq {
+	stream, query, _ := strings.Cut(obsKey, "?")
+	param := ""
+	if query != "" {
+		param = "?" + query
+	}
+	return SRSPublishReq{App: "live", Stream: stream + variant, Param: param, ClientID: clientID}
+}
+
+// publishSecret returns the secret half of an OBS stream key.
+func publishSecret(obsKey string) string {
+	return publishKeyFromParam(srsReq(obsKey, "").Param)
+}
+
 func publishTestLive(t *testing.T, svc *LiveService, streamKey string) {
 	t.Helper()
-	require.NoError(t, svc.OnPublish(context.Background(), SRSPublishReq{Stream: streamKey}))
+	require.NoError(t, svc.OnPublish(context.Background(), srsReq(streamKey, "")))
 }
 
 func publishTestLiveClient(t *testing.T, svc *LiveService, streamKey, clientID string) {
 	t.Helper()
-	require.NoError(t, svc.OnPublish(context.Background(), SRSPublishReq{
-		Stream:   streamKey,
-		ClientID: clientID,
-	}))
+	require.NoError(t, svc.OnPublish(context.Background(), srsClientReq(streamKey, "", clientID)))
 }
 
 func TestGoLiveCreatesPublishingSessionOnly(t *testing.T) {
@@ -114,7 +133,7 @@ func TestRoomServiceListUsesRealtimeViewerMetrics(t *testing.T) {
 	require.Len(t, resp.Items, 1)
 	require.Equal(t, int64(7), resp.Items[0].Viewers)
 	require.Equal(t, int64(9), resp.Items[0].PeakViewers)
-	require.Equal(t, "http://srs/live/lk_metrics.flv", resp.Items[0].PlaybackURL)
+	require.Equal(t, "http://srs/live/live-metrics.flv", resp.Items[0].PlaybackURL)
 }
 
 func TestUpdateLiveMetadataEditsActiveRoomAndBroadcasts(t *testing.T) {
@@ -162,11 +181,11 @@ func TestOnPublishIsIdempotentAndDoesNotResetStartedAt(t *testing.T) {
 
 	firstPublish := base.Add(time.Minute)
 	svc.now = func() time.Time { return firstPublish }
-	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey}))
+	require.NoError(t, svc.OnPublish(ctx, srsReq(st.StreamKey, "")))
 
 	secondPublish := firstPublish.Add(time.Hour)
 	svc.now = func() time.Time { return secondPublish }
-	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey}))
+	require.NoError(t, svc.OnPublish(ctx, srsReq(st.StreamKey, "")))
 
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -183,9 +202,9 @@ func TestOnPublishAcceptsTranscodedVariants(t *testing.T) {
 
 	firstPublish := base.Add(time.Minute)
 	svc.now = func() time.Time { return firstPublish }
-	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey}))
-	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q720"}))
-	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q480"}))
+	require.NoError(t, svc.OnPublish(ctx, srsReq(st.StreamKey, "")))
+	require.NoError(t, svc.OnPublish(ctx, srsReq(st.StreamKey, "_q720")))
+	require.NoError(t, svc.OnPublish(ctx, srsReq(st.StreamKey, "_q480")))
 
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -199,7 +218,7 @@ func TestOnPublishRejectsUnknownTranscodedVariant(t *testing.T) {
 	st := startTestLive(t, svc, "owner-bad-variant")
 	publishTestLive(t, svc, st.StreamKey)
 
-	err := svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q360"})
+	err := svc.OnPublish(ctx, srsReq(st.StreamKey, "_q360"))
 	require.Error(t, err)
 }
 
@@ -209,12 +228,12 @@ func TestStopLiveDeletesStreamKeyAndEndsRoom(t *testing.T) {
 	st := startTestLive(t, svc, "owner-1")
 	publishTestLive(t, svc, st.StreamKey)
 
-	_, err := live.Resolve(ctx, st.StreamKey)
+	_, err := live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.NoError(t, err)
 
 	require.NoError(t, svc.StopLive(ctx, "owner-1"))
 
-	_, err = live.Resolve(ctx, st.StreamKey)
+	_, err = live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
 
 	room, err := rooms.GetByID(ctx, st.ID)
@@ -270,9 +289,9 @@ func TestOnPublishRejectsEndedRoomEvenWithStaleKey(t *testing.T) {
 	st := startTestLive(t, svc, "owner-2")
 
 	require.NoError(t, svc.StopLive(ctx, "owner-2"))
-	require.NoError(t, live.Save(ctx, st.StreamKey, st.ID, time.Hour))
+	require.NoError(t, live.Save(ctx, publishSecret(st.StreamKey), st.ID, time.Hour))
 
-	err := svc.OnPublish(ctx, SRSPublishReq{Stream: st.StreamKey})
+	err := svc.OnPublish(ctx, srsReq(st.StreamKey, ""))
 	require.Error(t, err)
 
 	room, err := rooms.GetByID(ctx, st.ID)
@@ -289,12 +308,12 @@ func TestOnUnpublishIsIdempotent(t *testing.T) {
 	publishTestLive(t, svc, st.StreamKey)
 
 	svc.now = func() time.Time { return firstEnd }
-	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{Stream: st.StreamKey}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsReq(st.StreamKey, "")))
 	svc.now = func() time.Time { return secondEnd }
-	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{Stream: st.StreamKey}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsReq(st.StreamKey, "")))
 	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{Stream: ""}))
 
-	_, err := live.Resolve(ctx, st.StreamKey)
+	_, err := live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -309,12 +328,9 @@ func TestOnUnpublishGraceAllowsPublisherReconnect(t *testing.T) {
 	st := startTestLive(t, svc, "owner-reconnect-grace")
 	publishTestLiveClient(t, svc, st.StreamKey, "old-client")
 
-	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{
-		Stream:   st.StreamKey,
-		ClientID: "old-client",
-	}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsClientReq(st.StreamKey, "", "old-client")))
 
-	_, err := live.Resolve(ctx, st.StreamKey)
+	_, err := live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.NoError(t, err)
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -323,7 +339,7 @@ func TestOnUnpublishGraceAllowsPublisherReconnect(t *testing.T) {
 	publishTestLiveClient(t, svc, st.StreamKey, "new-client")
 	time.Sleep(60 * time.Millisecond)
 
-	_, err = live.Resolve(ctx, st.StreamKey)
+	_, err = live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.NoError(t, err)
 	room, err = rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -338,13 +354,10 @@ func TestOnUnpublishGraceEndsWhenPublisherDoesNotReconnect(t *testing.T) {
 	st := startTestLive(t, svc, "owner-no-reconnect")
 	publishTestLiveClient(t, svc, st.StreamKey, "gone-client")
 
-	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{
-		Stream:   st.StreamKey,
-		ClientID: "gone-client",
-	}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsClientReq(st.StreamKey, "", "gone-client")))
 	time.Sleep(60 * time.Millisecond)
 
-	_, err := live.Resolve(ctx, st.StreamKey)
+	_, err := live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -358,9 +371,9 @@ func TestOnUnpublishVariantDoesNotEndRoom(t *testing.T) {
 	st := startTestLive(t, svc, "owner-unpublish-variant")
 	publishTestLive(t, svc, st.StreamKey)
 
-	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{Stream: st.StreamKey + "_q720"}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsReq(st.StreamKey, "_q720")))
 
-	_, err := live.Resolve(ctx, st.StreamKey)
+	_, err := live.Resolve(ctx, publishSecret(st.StreamKey))
 	require.NoError(t, err)
 	room, err := rooms.GetByID(ctx, st.ID)
 	require.NoError(t, err)
@@ -377,14 +390,14 @@ func TestStaleUnpublishDoesNotEndNewSession(t *testing.T) {
 	next := startTestLive(t, svc, "owner-restart")
 	require.NotEqual(t, old.StreamKey, next.StreamKey)
 	publishTestLive(t, svc, next.StreamKey)
-	require.NoError(t, live.Save(ctx, old.StreamKey, old.ID, time.Hour))
+	require.NoError(t, live.Save(ctx, publishSecret(old.StreamKey), old.ID, time.Hour))
 
-	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{Stream: old.StreamKey}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsReq(old.StreamKey, "")))
 
 	room, err := rooms.GetByID(ctx, next.ID)
 	require.NoError(t, err)
 	require.Equal(t, model.StatusLive, room.Status)
-	require.Equal(t, next.StreamKey, room.StreamKey)
+	require.Equal(t, publishSecret(next.StreamKey), room.StreamKey)
 }
 
 func TestRoomGetDoesNotExposePublishingOrEndedToViewers(t *testing.T) {
@@ -432,4 +445,65 @@ func TestRoomGetExposesStartingAppointmentToViewers(t *testing.T) {
 	require.Equal(t, model.StatusPublishing, viewerView.Status)
 	require.Empty(t, viewerView.StreamKey)
 	require.Empty(t, viewerView.PlaybackURL)
+}
+
+func TestPlaybackURLDoesNotExposePublishKey(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _ := newLiveServiceTestDeps(t)
+	st := startTestLive(t, svc, "owner-secret")
+	publishTestLive(t, svc, st.StreamKey)
+	secret := publishSecret(st.StreamKey)
+	require.NotEmpty(t, secret)
+	require.Equal(t, st.ID+"?key="+secret, st.StreamKey)
+
+	roomSvc := NewRoomService(rooms, "http://srs/live")
+	viewerView, err := roomSvc.Get(ctx, st.ID, "")
+	require.NoError(t, err)
+	require.Equal(t, "http://srs/live/"+st.ID+".flv", viewerView.PlaybackURL)
+	require.NotContains(t, viewerView.PlaybackURL, secret)
+	require.Empty(t, viewerView.StreamKey)
+
+	list, err := roomSvc.List(ctx, "", "", 1, 10)
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	require.NotContains(t, list.Items[0].PlaybackURL, secret)
+}
+
+func TestOnPublishRequiresMatchingKey(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _ := newLiveServiceTestDeps(t)
+	victim := startTestLive(t, svc, "owner-victim")
+	other := startTestLive(t, svc, "owner-other")
+
+	cases := map[string]SRSPublishReq{
+		"no key":            {App: "live", Stream: victim.ID},
+		"wrong key":         {App: "live", Stream: victim.ID, Param: "?key=lk_guess"},
+		"other room's key":  srsReq(victim.ID+"?key="+publishSecret(other.StreamKey), ""),
+		"key as stream":     {App: "live", Stream: publishSecret(victim.StreamKey)},
+		"variant, no key":   {App: "live", Stream: victim.ID + "_q720"},
+		"empty stream name": {App: "live", Param: "?key=" + publishSecret(victim.StreamKey)},
+	}
+	for name, req := range cases {
+		require.Error(t, svc.OnPublish(ctx, req), name)
+	}
+
+	room, err := rooms.GetByID(ctx, victim.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusPublishing, room.Status)
+}
+
+func TestOnUnpublishIgnoresMissingOrMismatchedKey(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, _ := newLiveServiceTestDeps(t)
+	victim := startTestLive(t, svc, "owner-victim-unpub")
+	other := startTestLive(t, svc, "owner-other-unpub")
+	publishTestLive(t, svc, victim.StreamKey)
+
+	require.NoError(t, svc.OnUnpublish(ctx, SRSPublishReq{App: "live", Stream: victim.ID}))
+	require.NoError(t, svc.OnUnpublish(ctx, srsReq(victim.ID+"?key="+publishSecret(other.StreamKey), "")))
+
+	room, err := rooms.GetByID(ctx, victim.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.StatusLive, room.Status)
+	require.Nil(t, room.EndedAt)
 }

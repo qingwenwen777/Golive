@@ -284,7 +284,7 @@ func (s *ReplayService) uploadRoomReplay(room model.Room) {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "bunny stream library or api key is not configured")
 		return
 	}
-	recordPath, err := s.waitForUploadableRecording(ctx, room.StreamKey)
+	recordPath, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
 	if err != nil {
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
 		return
@@ -317,7 +317,7 @@ func (s *ReplayService) cleanupRoomRecording(room model.Room) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	recordPath, err := s.waitForUploadableRecording(ctx, room.StreamKey)
+	recordPath, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
 	if err != nil {
 		return
 	}
@@ -336,12 +336,11 @@ func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
 		return
 	}
 	for _, room := range rooms {
-		recordPath, err := s.findRecording(room.StreamKey)
+		recordPath, err := s.findRecording(s.recordingStreamName(room))
 		if err != nil {
 			logger.L().Info(
 				"skip replay recovery without final recording",
 				zap.String("room_id", room.ID),
-				zap.String("stream_key", room.StreamKey),
 				zap.Error(err),
 			)
 			continue
@@ -349,12 +348,24 @@ func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
 		logger.L().Info(
 			"recover interrupted replay upload",
 			zap.String("room_id", room.ID),
-			zap.String("stream_key", room.StreamKey),
 			zap.String("path", recordPath),
 		)
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
 		go s.uploadRoomReplay(room)
 	}
+}
+
+// recordingStreamName is the SRS stream name a room's DVR file is named after.
+// Rooms publish as <roomID>?key=<secret>, so recordings use the room id; rooms
+// that went live before that change published under the raw key, so use it
+// when such a recording is still on disk.
+func (s *ReplayService) recordingStreamName(room model.Room) string {
+	if room.StreamKey != "" && s.recordDir != "" {
+		if matches, _ := filepath.Glob(filepath.Join(s.recordDir, room.StreamKey+"*")); len(matches) > 0 {
+			return room.StreamKey
+		}
+	}
+	return room.ID
 }
 
 func (s *ReplayService) findRecording(streamKey string) (string, error) {

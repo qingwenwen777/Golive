@@ -54,7 +54,8 @@ the frontend `useRoomRealtime.ts` resolves it using the current page protocol to
 
 ### HTTP-FLV paths
 
-The frontend requests `/live/<streamKey>.flv`. The nginx `location /live/` forwards requests
+The frontend requests the room's public `playbackUrl`, `/live/<roomId>.flv`. The secret
+publish key travels only in the RTMP `?key=` parameter and is never part of this path. The nginx `location /live/` forwards requests
 to `http://srs:8080/live/` in the SRS container. Keep the trailing slash on both paths
 to avoid accidentally producing `/live/live/...`.
 

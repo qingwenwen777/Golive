@@ -53,12 +53,12 @@ func (s *RoomService) SetBlockChecker(blocks ChannelBlockChecker) {
 }
 
 // playbackURL builds the public HTTP-FLV URL for a live room. Viewers receive
-// this; the raw streamKey stays server-side.
+// this; it names the stream by room id so the publish key stays server-side.
 func (s *RoomService) playbackURL(r *model.Room) string {
 	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
 		return ""
 	}
-	return s.flvBase + "/" + r.StreamKey + ".flv"
+	return s.flvBase + "/" + r.ID + ".flv"
 }
 
 // NormalizeCategory accepts empty / "all" / "すべて" as no filter; else trimmed input.
@@ -209,7 +209,7 @@ func (s *RoomService) Get(ctx context.Context, id, viewerID string) (*model.Stre
 		return nil, err
 	}
 	if isOwner {
-		st.StreamKey = r.StreamKey
+		st.StreamKey = obsStreamKey(r.ID, r.StreamKey)
 	}
 	return &st, nil
 }

@@ -177,7 +177,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 	}
 
 	st := room.ToStream(now)
-	st.StreamKey = streamKey
+	st.StreamKey = obsStreamKey(roomID, streamKey)
 	return &st, nil
 }
 
@@ -185,7 +185,30 @@ func (s *LiveService) playbackURL(r *model.Room) string {
 	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
 		return ""
 	}
-	return s.flvBase + "/" + r.StreamKey + ".flv"
+	return s.flvBase + "/" + r.ID + ".flv"
+}
+
+// publishKeyParam is the RTMP query parameter carrying the publish secret.
+// Creators publish to live/<roomID>?key=<secret> and viewers play
+// live/<roomID>.flv, so the public playback URL never contains the secret.
+const publishKeyParam = "key"
+
+// obsStreamKey is the value the owner pastes into OBS's "Stream key" field.
+func obsStreamKey(roomID, secret string) string {
+	if roomID == "" || secret == "" {
+		return ""
+	}
+	return roomID + "?" + publishKeyParam + "=" + secret
+}
+
+// publishKeyFromParam extracts the publish secret from the query string SRS
+// reports in its hooks (e.g. "?key=lk_...").
+func publishKeyFromParam(param string) string {
+	values, err := url.ParseQuery(strings.TrimPrefix(strings.TrimSpace(param), "?"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(values.Get(publishKeyParam))
 }
 
 // UpdateLiveMetadata changes the active live room's public metadata without
@@ -220,7 +243,7 @@ func (s *LiveService) UpdateLiveMetadata(ctx context.Context, ownerID string, re
 	now := s.now()
 	st := room.ToStream(now)
 	st.PlaybackURL = s.playbackURL(room)
-	st.StreamKey = room.StreamKey
+	st.StreamKey = obsStreamKey(room.ID, room.StreamKey)
 	_ = s.broadcastRoomUpdated(ctx, room, now)
 	return &st, nil
 }
@@ -375,7 +398,7 @@ var streamVariantSuffixes = map[string]struct{}{
 	"_q480": {},
 }
 
-func canonicalStreamKey(stream string) (base string, isVariant bool) {
+func canonicalStreamName(stream string) (base string, isVariant bool) {
 	for suffix := range streamVariantSuffixes {
 		if strings.HasSuffix(stream, suffix) {
 			return strings.TrimSuffix(stream, suffix), true
@@ -390,18 +413,27 @@ func canonicalStreamKey(stream string) (base string, isVariant bool) {
 const micLinkStreamPrefix = "miclink-"
 
 // OnPublish authorizes the incoming RTMP publish. Returns nil on accept.
+// The stream name is the room id; the secret stream key arrives in the
+// "key" query parameter and must be bound to that same room.
 func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if req.Stream == "" {
-		return errors.New("missing stream key")
+		return errors.New("missing stream name")
 	}
 	if strings.HasPrefix(req.Stream, micLinkStreamPrefix) {
 		// Mic-link guest WebRTC audio: accept without room bookkeeping.
 		return nil
 	}
-	streamKey, isVariant := canonicalStreamKey(req.Stream)
+	streamName, isVariant := canonicalStreamName(req.Stream)
+	streamKey := publishKeyFromParam(req.Param)
+	if streamKey == "" {
+		return errors.New("missing stream key")
+	}
 	roomID, err := s.live.Resolve(ctx, streamKey)
 	if err != nil {
 		return fmt.Errorf("resolve stream key: %w", err)
+	}
+	if roomID != streamName {
+		return errors.New("stream key does not belong to this stream")
 	}
 	room, err := s.rooms.GetByID(ctx, roomID)
 	if err != nil {
@@ -449,10 +481,14 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		// Mic-link guest WebRTC audio teardown: nothing to update.
 		return nil
 	}
-	streamKey, isVariant := canonicalStreamKey(req.Stream)
+	streamName, isVariant := canonicalStreamName(req.Stream)
+	streamKey := publishKeyFromParam(req.Param)
+	if streamKey == "" {
+		return nil
+	}
 	roomID, err := s.live.Resolve(ctx, streamKey)
-	if err != nil {
-		// Unknown key: ignore — nothing to update.
+	if err != nil || roomID != streamName {
+		// Unknown key, or a key for a different stream: nothing to update.
 		return nil
 	}
 	room, err := s.rooms.GetByID(ctx, roomID)

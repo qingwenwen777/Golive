@@ -476,7 +476,7 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 		logger.L().Warn("notify appointment start", zap.Error(err), zap.String("appointment", appt.ID))
 	}
 	st := room.ToStream(now)
-	st.StreamKey = streamKey
+	st.StreamKey = obsStreamKey(room.ID, streamKey)
 	st.FanClubMember = true
 	return &st, nil
 }

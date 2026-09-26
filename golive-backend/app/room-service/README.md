@@ -126,5 +126,7 @@ vhost __defaultVhost__ {
 }
 ```
 
-Creator flow: after `POST /api/rooms/live` returns `streamKey="lk_xxxx"`, publish from OBS to
-`rtmp://localhost:1935/live/<streamKey>`; SRS calls `/srs/on_publish` for validation.
+Creator flow: `POST /api/rooms/live` returns `streamKey="<roomId>?key=lk_xxxx"`. In OBS, set the
+server to `rtmp://localhost:1935/live` and paste that value as the stream key. SRS calls
+`/srs/on_publish`, which checks that the `key` parameter belongs to the `<roomId>` stream.
+Viewers play `/live/<roomId>.flv`, so the secret never appears in public URLs.
