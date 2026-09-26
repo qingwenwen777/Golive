@@ -179,7 +179,7 @@ func TestReconcilePlatformVerificationMatchesCertificationStatus(t *testing.T) {
 	legacy := &model.User{
 		ID:                   "legacy-google-id",
 		Username:             "legacygoogle",
-		Email:                "legacy-google@example.com",
+		Email:                stringPtr("legacy-google@example.com"),
 		DisplayName:          "Legacy",
 		PasswordHash:         hash,
 		Avatar:               "https://example.com/avatar.png",
@@ -193,7 +193,7 @@ func TestReconcilePlatformVerificationMatchesCertificationStatus(t *testing.T) {
 	certified := &model.User{
 		ID:                         "certified-id",
 		Username:                   "certified",
-		Email:                      "certified@example.com",
+		Email:                      stringPtr("certified@example.com"),
 		DisplayName:                "Certified",
 		PasswordHash:               hash,
 		Avatar:                     "https://example.com/certified.png",

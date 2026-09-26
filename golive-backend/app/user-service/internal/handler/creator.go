@@ -691,7 +691,6 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 	u := &model.User{
 		ID:                   uuid.NewString(),
 		Username:             username,
-		Email:                strings.ToLower(username) + "@gmail.com",
 		DisplayName:          displayName,
 		PasswordHash:         hash,
 		Avatar:               service.DefaultAvatarURL(displayName),

@@ -116,7 +116,7 @@ func TestAdminCanUpdateUserEmailAndPassword(t *testing.T) {
 
 	updated, err := users.FindByID(ctx, target.User.ID)
 	require.NoError(t, err)
-	require.Equal(t, "target-new@example.com", updated.Email)
+	require.Equal(t, "target-new@example.com", updated.EmailAddress())
 
 	passwordReq := httptest.NewRequest(http.MethodPatch, "/admin/users/"+target.User.ID+"/password", bytes.NewBufferString(`{"password":"newpass123"}`))
 	passwordReq.Header.Set("Authorization", "Bearer "+admin.Token)

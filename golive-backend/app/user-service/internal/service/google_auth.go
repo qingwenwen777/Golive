@@ -307,7 +307,8 @@ func newGoogleUser(username, email, displayName, hash string, profile *GooglePro
 	return &model.User{
 		ID:                   uuid.NewString(),
 		Username:             username,
-		Email:                email,
+		Email:                &email,
+		EmailVerified:        true, // verifyGoogleProfile requires email_verified
 		GoogleSub:            &sub,
 		GoogleLinkedAt:       &now,
 		DisplayName:          displayName,

@@ -9,7 +9,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -64,8 +63,8 @@ func main() {
 	if err := userRepo.AutoMigrate(); err != nil {
 		log.Fatal("auto migrate", zap.Error(err))
 	}
-	if err := userRepo.BackfillMissingEmails(context.Background()); err != nil {
-		log.Warn("backfill user emails", zap.Error(err))
+	if err := userRepo.MigrateEmailVerification(context.Background()); err != nil {
+		log.Warn("migrate email verification", zap.Error(err))
 	}
 	if err := userRepo.ReconcilePlatformVerification(context.Background()); err != nil {
 		log.Warn("reconcile platform verification", zap.Error(err))
@@ -222,7 +221,6 @@ func seedDemoUser(ctx context.Context, ur *repo.UserRepo, c config.DemoUserCfg) 
 	return ur.Create(ctx, &model.User{
 		ID:                   uuid.NewString(),
 		Username:             c.Username,
-		Email:                strings.ToLower(c.Username) + "@gmail.com",
 		DisplayName:          c.Username,
 		PasswordHash:         hash,
 		Avatar:               service.DefaultAvatarURL("demo"),
@@ -253,7 +251,6 @@ func seedAdminUser(ctx context.Context, ur *repo.UserRepo, c config.AdminCfg) er
 	return ur.Create(ctx, &model.User{
 		ID:                   uuid.NewString(),
 		Username:             c.Username,
-		Email:                strings.ToLower(c.Username) + "@gmail.com",
 		DisplayName:          displayName,
 		PasswordHash:         hash,
 		Avatar:               service.DefaultAvatarURL("admin"),
