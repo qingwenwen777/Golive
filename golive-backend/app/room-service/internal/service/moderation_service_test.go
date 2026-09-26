@@ -987,6 +987,38 @@ func TestReportDeleteSuperChatHidesViaGiftService(t *testing.T) {
 	require.NotNil(t, row.ModeratedAt)
 }
 
+// The web client reports replay comments as post_comment too, so deleting
+// the reported content must remove the replay comment and its replies, not
+// only resolve the report. Post comments are still deleted as before.
+func TestReportDeleteRemovesReportedComments(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+	require.NoError(t, db.Create(&model.ReplayComment{ID: "rc-1", RoomID: "room-1", UserID: "bad-user", Content: "abusive replay comment", ReplyCount: 1}).Error)
+	require.NoError(t, db.Create(&model.ReplayComment{ID: "rc-2", RoomID: "room-1", UserID: "user-2", ParentID: "rc-1", RootID: "rc-1", Depth: 1, Content: "reply"}).Error)
+	require.NoError(t, db.Create(&model.ReplayComment{ID: "rc-3", RoomID: "room-1", UserID: "user-2", Content: "unrelated"}).Error)
+	seedReportPost(t, db, "post-1", "creator-1", "post")
+	require.NoError(t, db.Create(&model.PostComment{ID: "pc-1", PostID: "post-1", UserID: "bad-user", Content: "abusive post comment"}).Error)
+
+	for _, targetID := range []string{"rc-1", "pc-1"} {
+		report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post_comment", TargetID: targetID, Reason: "harassment"})
+		require.NoError(t, err)
+		resolved, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content"}})
+		require.NoError(t, err)
+		require.Equal(t, "resolved", resolved.Status)
+	}
+
+	var replays []string
+	require.NoError(t, db.Model(&model.ReplayComment{}).Order("id").Pluck("id", &replays).Error)
+	require.Equal(t, []string{"rc-3"}, replays)
+	var postComments int64
+	require.NoError(t, db.Model(&model.PostComment{}).Where("id = ?", "pc-1").Count(&postComments).Error)
+	require.Zero(t, postComments)
+	var notes int64
+	require.NoError(t, db.Model(&model.Notification{}).Where("user_id = ? AND type = ?", "bad-user", "moderation_content_deleted").Count(&notes).Error)
+	require.EqualValues(t, 2, notes)
+}
+
 // Danmu deletion and site mutes go to chat-service / user-service.
 func TestReportDanmuDeleteAndMuteGoThroughOwners(t *testing.T) {
 	ctx := context.Background()

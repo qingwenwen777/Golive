@@ -603,8 +603,8 @@ OR LOWER(COALESCE(target_id, '')) LIKE ?
 }
 
 // DeleteReportedContent deletes reported content stored by room-service
-// (posts and post comments). Chat messages and super chats belong to
-// chat-service / gift-service and are removed through their APIs.
+// (posts, post comments and replay comments). Chat messages and super chats
+// belong to chat-service / gift-service and are removed through their APIs.
 func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, targetID string) error {
 	targetID = strings.TrimSpace(targetID)
 	if targetID == "" {
@@ -614,7 +614,13 @@ func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, 
 	case model.ReportTargetPost:
 		return r.deletePostAny(ctx, targetID)
 	case model.ReportTargetPostComment:
-		return r.deletePostCommentAny(ctx, targetID)
+		// Replay comments are reported with this type too (see
+		// resolveCommentTarget).
+		found, err := r.deletePostCommentAny(ctx, targetID)
+		if err != nil || found {
+			return err
+		}
+		return r.deleteReplayCommentAny(ctx, targetID)
 	default:
 		return nil
 	}
@@ -648,8 +654,10 @@ func (r *ModerationRepo) deletePostAny(ctx context.Context, postID string) error
 	})
 }
 
-func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+// deletePostCommentAny deletes a post comment and its replies; found is
+// false when no post comment has that id.
+func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID string) (found bool, err error) {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var target model.PostComment
 		if err := tx.Where("id = ?", commentID).Take(&target).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -657,6 +665,7 @@ func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID str
 			}
 			return err
 		}
+		found = true
 		var comments []model.PostComment
 		if err := tx.Where("post_id = ?", target.PostID).Find(&comments).Error; err != nil {
 			return err
@@ -699,6 +708,24 @@ func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID str
 		}
 		return nil
 	})
+	return found, err
+}
+
+// deleteReplayCommentAny deletes a replay comment and its replies the way
+// its author or the room owner would.
+func (r *ModerationRepo) deleteReplayCommentAny(ctx context.Context, commentID string) error {
+	var comment model.ReplayComment
+	if err := r.db.WithContext(ctx).Where("id = ?", commentID).Take(&comment).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	_, err := NewReplayCommentRepo(r.db).DeleteTree(ctx, comment.RoomID, comment.ID)
+	if errors.Is(err, ErrReplayCommentNotFound) {
+		return nil
+	}
+	return err
 }
 
 func setReportGroupTarget(group *ReportGroupRow, row model.ContentReport) {
