@@ -73,6 +73,7 @@ func (h *UserHandler) PublicProfile(c *gin.Context) {
 	}
 	pu := u.Public()
 	pu.Email = ""
+	pu.EmailVerified = false
 	c.JSON(http.StatusOK, pu)
 }
 
@@ -187,7 +188,7 @@ func (h *UserHandler) SendEmailChangeCode(c *gin.Context) {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	oldEmail, ok := service.NormalizeEmail(u.Email)
+	oldEmail, ok := service.NormalizeEmail(u.EmailAddress())
 	if !ok {
 		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
 		return
@@ -230,7 +231,7 @@ func (h *UserHandler) UpdateEmail(c *gin.Context) {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	oldEmail, ok := service.NormalizeEmail(current.Email)
+	oldEmail, ok := service.NormalizeEmail(current.EmailAddress())
 	if !ok {
 		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
 		return
@@ -334,7 +335,7 @@ func (h *UserHandler) TopupCoins(c *gin.Context) {
 	checkout, err := h.stripe.CreateTopupCheckout(
 		c.Request.Context(),
 		uid,
-		u.Email,
+		u.EmailAddress(),
 		req.Amount,
 		origin+"/coins?stripe_topup=success&session_id={CHECKOUT_SESSION_ID}",
 		origin+"/coins?stripe_topup=cancelled",

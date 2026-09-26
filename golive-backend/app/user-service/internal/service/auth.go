@@ -32,6 +32,7 @@ var (
 	ErrEmailTaken              = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
 	ErrEmailNotFound           = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
 	ErrEmailUserMismatch       = errcode.New(http.StatusNotFound, "Username and email do not match").WithReason("email_user_mismatch")
+	ErrEmailNotVerified        = errcode.New(http.StatusForbidden, "This email address has not been verified and cannot be used to reset the password").WithReason("email_not_verified")
 	ErrInvalidInvite           = errcode.New(http.StatusBadRequest, "Invalid invite code").WithReason("invalid_invite")
 	ErrInviteUsed              = errcode.New(http.StatusConflict, "Invite code already used").WithReason("invite_used")
 	ErrInvalidPassword         = errcode.New(http.StatusBadRequest, "Password must be at least 8 characters and include letters and numbers").WithReason("invalid_password")
@@ -93,6 +94,10 @@ type TokenStore interface {
 	LookupRefresh(ctx context.Context, token string) (string, error)
 	DeleteRefresh(ctx context.Context, token string) error
 	Rotate(ctx context.Context, oldToken, newToken, userID string, ttl time.Duration) error
+}
+
+type userRefreshRevoker interface {
+	RevokeUserRefresh(ctx context.Context, userID string) error
 }
 
 type LoginAttemptStore interface {
@@ -245,7 +250,7 @@ func (s *AuthService) Register(ctx context.Context, username, password, displayN
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	u := newLocalUser(username, strings.ToLower(username)+"@gmail.com", displayName, hash)
+	u := newLocalUser(username, "", displayName, hash)
 	creator, ok := s.users.(userCreator)
 	if !ok {
 		return nil, errors.New("user store cannot create users")
@@ -269,6 +274,8 @@ func (s *AuthService) Register(ctx context.Context, username, password, displayN
 	}, nil
 }
 
+// RegisterWithInvite stores email as verified: callers must have checked the
+// register email code sent to it first.
 func (s *AuthService) RegisterWithInvite(ctx context.Context, username, password, displayName, email, inviteCode string) (*LoginResp, error) {
 	username = strings.TrimSpace(username)
 	displayName = strings.TrimSpace(displayName)
@@ -294,6 +301,7 @@ func (s *AuthService) RegisterWithInvite(ctx context.Context, username, password
 	}
 
 	u := newLocalUser(username, cleanEmail, displayName, hash)
+	u.EmailVerified = true
 	registrar, ok := s.users.(inviteRegistrar)
 	if !ok {
 		return nil, errors.New("user store cannot register with invites")
@@ -366,8 +374,11 @@ func (s *AuthService) EnsureUsernameEmailMatch(ctx context.Context, username, em
 		}
 		return fmt.Errorf("find user: %w", err)
 	}
-	if !strings.EqualFold(strings.TrimSpace(u.Email), cleanEmail) {
+	if !strings.EqualFold(strings.TrimSpace(u.EmailAddress()), cleanEmail) {
 		return ErrEmailUserMismatch
+	}
+	if !u.EmailVerified {
+		return ErrEmailNotVerified
 	}
 	return nil
 }
@@ -439,6 +450,17 @@ func (s *AuthService) Logout(ctx context.Context, refresh string) error {
 	return s.tokens.DeleteRefresh(ctx, refresh)
 }
 
+// RevokeUserSessions revokes every refresh token issued to userID, forcing
+// each of their sessions to log in again once its access token expires.
+// Access tokens are verified statelessly and stay valid until then.
+func (s *AuthService) RevokeUserSessions(ctx context.Context, userID string) error {
+	revoker, ok := s.tokens.(userRefreshRevoker)
+	if !ok {
+		return errors.New("token store cannot revoke user sessions")
+	}
+	return revoker.RevokeUserRefresh(ctx, userID)
+}
+
 // Me returns the user identified by an access token. Returns ErrUnauthorized
 // for any signature/expiry/lookup failure.
 func (s *AuthService) Me(ctx context.Context, accessToken string) (*model.PublicUser, error) {
@@ -507,11 +529,16 @@ func ValidatePasswordPolicy(password string) error {
 	return nil
 }
 
+// newLocalUser builds an account with no email on file when email is "".
 func newLocalUser(username, email, displayName, hash string) *model.User {
+	var emailPtr *string
+	if email != "" {
+		emailPtr = &email
+	}
 	return &model.User{
 		ID:                   uuid.NewString(),
 		Username:             username,
-		Email:                email,
+		Email:                emailPtr,
 		DisplayName:          displayName,
 		PasswordHash:         hash,
 		Avatar:               DefaultAvatarURL(displayName),

@@ -24,10 +24,18 @@ const (
 
 // User is the GORM table model. JSON tags match the frontend `User` type
 // (camelCase). PasswordHash is intentionally json:"-" so it never leaks.
+//
+// Email is NULL when no address is on file; it is unique, so it must never be
+// set to a placeholder or to "". EmailVerified is true only when ownership of
+// Email was proven by an emailed code or by Google, and password reset by
+// email requires it. Its column is deliberately nullable: NULL marks rows
+// created before it existed, which UserRepo.MigrateEmailVerification
+// classifies at startup.
 type User struct {
 	ID                               string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	Username                         string     `gorm:"uniqueIndex;type:varchar(64);not null" json:"username"`
-	Email                            string     `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
+	Email                            *string    `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
+	EmailVerified                    bool       `gorm:"column:email_verified" json:"-"`
 	GoogleSub                        *string    `gorm:"uniqueIndex;type:varchar(255)" json:"-"`
 	GoogleLinkedAt                   *time.Time `gorm:"index" json:"-"`
 	DisplayName                      string     `gorm:"type:varchar(64)" json:"displayName,omitempty"`
@@ -99,6 +107,7 @@ type PublicUser struct {
 	ID                               string             `json:"id"`
 	Username                         string             `json:"username"`
 	Email                            string             `json:"email,omitempty"`
+	EmailVerified                    bool               `json:"emailVerified,omitempty"`
 	DisplayName                      string             `json:"displayName,omitempty"`
 	UsernameUpdatedAt                string             `json:"usernameUpdatedAt,omitempty"`
 	UsernameChangeAvailableAt        string             `json:"usernameChangeAvailableAt,omitempty"`
@@ -118,6 +127,14 @@ type PublicUser struct {
 	GoogleLinked                     bool               `json:"googleLinked,omitempty"`
 }
 
+// EmailAddress returns the bound email, or "" when none is on file.
+func (u *User) EmailAddress() string {
+	if u.Email == nil {
+		return ""
+	}
+	return *u.Email
+}
+
 func (u *User) Public() PublicUser {
 	role := u.Role
 	if role == "" {
@@ -134,7 +151,8 @@ func (u *User) Public() PublicUser {
 	pu := PublicUser{
 		ID:                               u.ID,
 		Username:                         u.Username,
-		Email:                            u.Email,
+		Email:                            u.EmailAddress(),
+		EmailVerified:                    u.EmailVerified,
 		DisplayName:                      u.DisplayName,
 		Avatar:                           u.Avatar,
 		Cover:                            u.Cover,
