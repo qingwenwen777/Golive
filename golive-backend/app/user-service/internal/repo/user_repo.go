@@ -648,7 +648,6 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 		default:
 			return errors.New("invalid live permission status")
 		}
-		return nil
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, false, ErrUserNotFound
@@ -844,7 +843,6 @@ func (r *UserRepo) SubmitPlatformApplication(ctx context.Context, userID, reason
 		default:
 			return errors.New("invalid platform verification status")
 		}
-		return nil
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, false, ErrUserNotFound
