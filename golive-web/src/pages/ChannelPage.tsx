@@ -271,11 +271,29 @@ export default function ChannelPage() {
         creatorId,
       },
       {
-        onSuccess: () => {
+        onSuccess: (order) => {
+          // A retried join can replay an earlier attempt that lacked coins.
+          if (order.status !== 'success') {
+            toast.error(
+              t('channel.fanBadge.insufficient', {
+                defaultValue: 'coins 不足，无法购买粉丝灯牌。',
+              }),
+            );
+            return;
+          }
           toast.success(t('channel.fanBadge.success', { defaultValue: '粉丝灯牌已点亮。' }));
           setFanBadgeDialogOpen(false);
         },
         onError: (err) => {
+          if (err.reason === 'already_fan_club_member') {
+            toast.info(
+              t('channel.fanBadge.alreadyMember', {
+                defaultValue: '你已经在这个粉丝团里了，本次未扣除 coins。',
+              }),
+            );
+            setFanBadgeDialogOpen(false);
+            return;
+          }
           if (err.reason === 'insufficient_coin') {
             toast.error(
               t('channel.fanBadge.insufficient', {
@@ -460,6 +478,7 @@ export default function ChannelPage() {
             memberCount={fanClubMembers.data?.total ?? 0}
             pending={Boolean(creatorId) && fanClubMembers.isPending}
             hasFanBadge={Boolean(currentFanBadge)}
+            checkingFanBadge={isAuthed && fanBadges.isPending}
             isOwner={isOwner}
             onJoin={handleJoinFanClub}
           />
@@ -955,6 +974,7 @@ function FanClubBanner({
   memberCount,
   pending,
   hasFanBadge,
+  checkingFanBadge,
   isOwner,
   onJoin,
 }: {
@@ -963,6 +983,7 @@ function FanClubBanner({
   memberCount: number;
   pending: boolean;
   hasFanBadge: boolean;
+  checkingFanBadge: boolean;
   isOwner: boolean;
   onJoin: () => void;
 }) {
@@ -1030,7 +1051,7 @@ function FanClubBanner({
           <button
             className={['gl-fan-club-join', hasFanBadge ? 'is-lit' : ''].filter(Boolean).join(' ')}
             type="button"
-            disabled={hasFanBadge}
+            disabled={hasFanBadge || checkingFanBadge}
             onClick={onJoin}
           >
             <BadgeCheck size={17} />

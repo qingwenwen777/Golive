@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "ティア1以上でメッセージを追加できます",
       "insufficientCoins": "coins が不足しています",
       "failed": "SuperChatの送信に失敗しました",
+      "textTooLong": "このティアのメッセージ上限（最大 {{count}} 文字）を超えています。",
       "insufficientBalance": "残高不足です（あと {{coins}} 必要）。",
       "cancel": "キャンセル",
       "topUp": "チャージ",
@@ -283,6 +284,8 @@
       "join": "ファンクラブに参加",
       "joining": "参加中...",
       "joined": "ファンクラブに参加しました。ルームが解放されました。",
+      "alreadyMember": "すでにこのファンクラブに参加しています。coins は消費されていません。",
+      "unlocking": "参加済みです。ルームを解放しています...",
       "signIn": "ログインして参加"
     }
   },
@@ -416,6 +419,7 @@
       "pending": "購入中...",
       "success": "ファンバッジを点灯しました。",
       "insufficient": "coins が不足しているため、ファンバッジを購入できません。",
+      "alreadyMember": "すでにこのファンクラブに参加しています。coins は消費されていません。",
       "failed": "ファンバッジを購入できませんでした。"
     },
     "message": "メッセージ"

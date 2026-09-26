@@ -920,6 +920,14 @@ func (r *OrderRepo) PlaceGiftOrder(
 	return o, false, nil
 }
 
+// ErrAlreadyFanClubMember means the user already holds a fan badge for the
+// creator, i.e. is in their fan club. Badges do not expire.
+var ErrAlreadyFanClubMember = errors.New("already a fan club member")
+
+// PlaceFanClubJoinOrder charges o.TotalCoin to join creatorID's fan club and
+// creates the user's badge for that creator. A user who already holds the
+// badge gets ErrAlreadyFanClubMember and is not charged, unless o.RequestID
+// is the join that created it: that retry replays the existing order.
 func (r *OrderRepo) PlaceFanClubJoinOrder(
 	ctx context.Context,
 	o *model.GiftOrder,
@@ -927,6 +935,25 @@ func (r *OrderRepo) PlaceFanClubJoinOrder(
 ) (placed *model.GiftOrder, replayed bool, err error) {
 	creatorID = strings.TrimSpace(creatorID)
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Lock the fan's users row before reading anything. Every write that
+		// creates a badge debits the fan and so holds this lock until commit,
+		// so a second join (the client sends a new requestId per click) waits
+		// here for the first. Locking first also makes the membership check
+		// this transaction's first consistent read: under REPEATABLE READ its
+		// snapshot is taken after the lock and sees the other join's badge.
+		// (A locking read of the missing badge would take a gap lock instead,
+		// which deadlocks concurrent joins by other fans inserting into it.)
+		if err := lockUser(tx, o.UserID); err != nil {
+			return err
+		}
+		member, err := hasFanBadge(tx, o.UserID, creatorID)
+		if err != nil {
+			return err
+		}
+		if member {
+			return ErrAlreadyFanClubMember
+		}
+
 		creatorName, _, err := creatorProfile(tx, creatorID)
 		if err != nil {
 			return err
@@ -969,10 +996,14 @@ func (r *OrderRepo) PlaceFanClubJoinOrder(
 		}
 		return applyFanBadgeContribution(tx, o.UserID, o.RoomID, creatorID, o.TotalCoin, FanBadgeCreate)
 	})
-	if errors.Is(err, ErrDuplicateRequest) {
+	if errors.Is(err, ErrDuplicateRequest) || errors.Is(err, ErrAlreadyFanClubMember) {
+		// A member may be retrying the very join that made them one.
 		existing, ferr := r.FindGiftByRequestID(ctx, o.UserID, o.RequestID)
 		if ferr != nil {
 			return nil, false, ferr
+		}
+		if existing == nil && errors.Is(err, ErrAlreadyFanClubMember) {
+			return nil, false, err
 		}
 		return existing, true, nil
 	}
@@ -980,6 +1011,23 @@ func (r *OrderRepo) PlaceFanClubJoinOrder(
 		return nil, false, err
 	}
 	return o, false, nil
+}
+
+// lockUser locks userID's users row (SELECT ... FOR UPDATE) until the
+// transaction ends. A missing user is left for wallet.Debit to report. SQLite
+// (tests) drops the clause, as for lockBetRound.
+func lockUser(tx *gorm.DB, userID string) error {
+	var ids []string
+	return tx.Table("users").Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", userID).Pluck("id", &ids).Error
+}
+
+func hasFanBadge(tx *gorm.DB, userID, creatorID string) (bool, error) {
+	var n int64
+	err := tx.Model(&model.FanBadge{}).
+		Where("user_id = ? AND creator_id = ?", userID, creatorID).
+		Count(&n).Error
+	return n > 0, err
 }
 
 // PersistGiftFailure records a failed order WITHOUT touching balance or

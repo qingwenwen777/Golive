@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "升级到档位 1+ 后可附带留言",
       "insufficientCoins": "coins 不足",
       "failed": "SuperChat 发送失败",
+      "textTooLong": "留言超出当前档位的字数上限（最多 {{count}} 字）。",
       "insufficientBalance": "余额不足（还差 {{coins}}）。",
       "cancel": "取消",
       "topUp": "去充值",
@@ -283,6 +284,8 @@
       "join": "一键加入粉丝团",
       "joining": "加入中...",
       "joined": "已加入粉丝团，直播间已解锁。",
+      "alreadyMember": "你已经在这个粉丝团里了，本次未扣除 coins。",
+      "unlocking": "已加入粉丝团，正在解锁直播间...",
       "signIn": "登录后加入"
     }
   },
@@ -416,6 +419,7 @@
       "pending": "购买中...",
       "success": "粉丝灯牌已点亮。",
       "insufficient": "coins 不足，无法购买粉丝灯牌。",
+      "alreadyMember": "你已经在这个粉丝团里了，本次未扣除 coins。",
       "failed": "粉丝灯牌购买失败。"
     },
     "message": "私信"

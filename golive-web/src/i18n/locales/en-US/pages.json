@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "Upgrade to tier 1+ to include a message",
       "insufficientCoins": "Insufficient coins",
       "failed": "Failed to send SuperChat",
+      "textTooLong": "Message is too long for this tier (max {{count}} characters).",
       "insufficientBalance": "Insufficient balance (need {{coins}} more).",
       "cancel": "Cancel",
       "topUp": "Top up",
@@ -283,6 +284,8 @@
       "join": "Join fan club",
       "joining": "Joining...",
       "joined": "Fan club joined. The room is unlocked.",
+      "alreadyMember": "You are already in this fan club. No coins were charged.",
+      "unlocking": "Joined. Unlocking the room...",
       "signIn": "Sign in to join"
     }
   },
@@ -416,6 +419,7 @@
       "pending": "Purchasing...",
       "success": "Fan badge lit.",
       "insufficient": "Not enough coins to buy this fan badge.",
+      "alreadyMember": "You are already in this fan club. No coins were charged.",
       "failed": "Could not purchase the fan badge."
     },
     "message": "Message"
