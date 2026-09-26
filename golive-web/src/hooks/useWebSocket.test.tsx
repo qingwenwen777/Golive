@@ -63,17 +63,20 @@ describe('useWebSocket', () => {
     vi.unstubAllGlobals();
   });
 
-  it('connects with an encoded token, receives messages, and serializes outgoing payloads', () => {
+  it('offers the token as a subprotocol, receives messages, and serializes outgoing payloads', () => {
+    const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1LTEifQ.c2lnbmF0dXJl';
     const onMessage = vi.fn();
     const { result } = renderHook(() =>
       useWebSocket('ws://example.test/ws?room=1', {
         heartbeatMs: 0,
         onMessage,
-        token: 'user token',
+        token,
       }),
     );
 
-    expect(sockets[0].url).toBe('ws://example.test/ws?room=1&token=user%20token');
+    // Never in the URL: that ends up in access logs.
+    expect(sockets[0].url).toBe('ws://example.test/ws?room=1');
+    expect(sockets[0].protocols).toEqual(['golive.v1', `auth.${token}`]);
     act(() => {
       sockets[0].open();
     });
@@ -88,6 +91,13 @@ describe('useWebSocket', () => {
     expect(result.current.sendMessage({ type: 'chat', text: 'hi' })).toBe(true);
     expect(result.current.sendMessage('raw')).toBe(true);
     expect(sockets[0].sent).toEqual([JSON.stringify({ type: 'chat', text: 'hi' }), 'raw']);
+  });
+
+  it('offers only the gateway protocol without a token', () => {
+    renderHook(() => useWebSocket('ws://example.test/ws?room=1', { heartbeatMs: 0, token: null }));
+
+    expect(sockets[0].url).toBe('ws://example.test/ws?room=1');
+    expect(sockets[0].protocols).toEqual(['golive.v1']);
   });
 
   it('reconnects unexpected closes with backoff and resets retries after a successful open', () => {
@@ -159,7 +169,8 @@ describe('useWebSocket', () => {
 
     expect(first.closeCalls[0]).toEqual({ code: 1000, reason: 'unmount' });
     expect(sockets).toHaveLength(2);
-    expect(sockets[1].url).toBe('ws://example.test/ws?token=new-token');
+    expect(sockets[1].url).toBe('ws://example.test/ws');
+    expect(sockets[1].protocols).toEqual(['golive.v1', 'auth.new-token']);
     expect(result.current.readyState).toBe('connecting');
   });
 });

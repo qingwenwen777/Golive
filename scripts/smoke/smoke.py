@@ -264,9 +264,17 @@ def main():
 async def chat_checks(sender, other, room_id):
     import websockets
     out = []
-    hdr = {"Origin": ORIGIN}
-    async with websockets.connect(f"{WS}?roomId={room_id}&token={other.token}", additional_headers=hdr) as watch, \
-               websockets.connect(f"{WS}?roomId={room_id}&token={sender.token}", additional_headers=hdr) as ws:
+    url = f"{WS}?roomId={room_id}"
+
+    def connect(token, target=url):
+        # Like the web client: the access token rides in Sec-WebSocket-Protocol
+        # next to golive.v1, never in the URL (URLs end up in access logs).
+        return websockets.connect(target, subprotocols=["golive.v1", f"auth.{token}"],
+                                  additional_headers={"Origin": ORIGIN})
+
+    async with connect(other.token) as watch, connect(sender.token) as ws:
+        out.append(("im-gateway answers with golive.v1, never echoing the token", ws.subprotocol == "golive.v1",
+                    f"subprotocol={(ws.subprotocol or '')[:16]!r}"))
         await asyncio.sleep(0.5)
         await ws.send(json.dumps({"type": "chat", "text": "hello from smoke", "clientId": "smoke-client-1",
                                   "username": "Smoke Creator", "userLevel": 99, "fanBadge": {"name": "fake"}}))
@@ -288,11 +296,19 @@ async def chat_checks(sender, other, room_id):
             out.append(("chat ignores a client-supplied level 99", '"userLevel": 99' not in blob, detail))
             out.append(("chat message id is server-assigned, not the client id",
                         got.get("id") and got.get("id") != "smoke-client-1", detail))
+    # A token in the URL is refused even next to a valid one in the header.
+    status = None
+    try:
+        async with connect(sender.token, target=f"{url}&token=smoke-in-url"):
+            pass
+    except websockets.exceptions.InvalidStatus as e:
+        status = e.response.status_code
+    out.append(("a token in the WebSocket URL is refused (400)", status == 400, f"status={status}"))
     # Per-user connection cap: the 9th socket for one user is refused.
     same_user, capped = [], None
     try:
         for _ in range(9):
-            same_user.append(await websockets.connect(f"{WS}?roomId={room_id}&token={other.token}", additional_headers=hdr))
+            same_user.append(await connect(other.token))
     except websockets.exceptions.InvalidStatus as e:
         capped = e.response.status_code
     for c in same_user:
@@ -302,8 +318,8 @@ async def chat_checks(sender, other, room_id):
     conns = []
     for tok in TOKENS:
         for _ in range(6):
-            conns.append(await websockets.connect(f"{WS}?roomId={room_id}&token={tok}", additional_headers=hdr))
-    async with websockets.connect(f"{WS}?roomId={room_id}&token={sender.token}", additional_headers=hdr) as ws:
+            conns.append(await connect(tok))
+    async with connect(sender.token) as ws:
         for i in range(20):
             await ws.send(json.dumps({"type": "chat", "text": f"burst {i}", "clientId": f"b{i}"}))
             if i == 5:

@@ -155,6 +155,7 @@ balance change and stays in user-service.
   `Idempotent-Replayed: true`.
 - Insufficient balance returns HTTP 402 with `reason=insufficient_coin`.
 - Stream information returned to viewers must not expose `streamKey`.
-- WebSocket handshake: `/ws?roomId=<id>&token=<jwt>`.
+- WebSocket handshake: `/ws?roomId=<id>`, with the JWT offered as the subprotocol `auth.<jwt>` next to
+  `golive.v1` (never in the URL, which ends up in access logs).
 
 See `../docs/integration.md` for integration details and `../docs/deploy-git-bare.md` for deployment instructions.

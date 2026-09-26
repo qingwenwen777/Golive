@@ -10,6 +10,7 @@ export interface UseWebSocketOptions {
   heartbeatMs?: number;
   reconnect?: boolean;
   maxRetries?: number;
+  // Defaults to the gateway's protocol; the token is offered after these.
   protocols?: string | string[];
   getToken?: () => string | null | undefined;
   // When provided, a change in token triggers a reconnect with the new token.
@@ -33,10 +34,19 @@ function backoffFor(attempt: number): number {
   return BACKOFF_STEPS_MS[idx]!;
 }
 
-function appendToken(url: string, token: string | null | undefined): string {
-  if (!token) return url;
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}token=${encodeURIComponent(token)}`;
+// The gateway's protocol. The access token is offered next to it as the
+// subprotocol `auth.<token>`: the WebSocket API can't set request headers, and
+// a token in the URL ends up in access logs. The gateway only ever selects
+// GATEWAY_PROTOCOL, so the token is never echoed back.
+const GATEWAY_PROTOCOL = 'golive.v1';
+const AUTH_PROTOCOL_PREFIX = 'auth.';
+
+function handshakeProtocols(
+  protocols: string | string[],
+  token: string | null | undefined,
+): string[] {
+  const offered = typeof protocols === 'string' ? [protocols] : protocols;
+  return token ? [...offered, `${AUTH_PROTOCOL_PREFIX}${token}`] : offered;
 }
 
 export function useWebSocket(
@@ -51,7 +61,7 @@ export function useWebSocket(
     heartbeatMs = 20000,
     reconnect = true,
     maxRetries = 10,
-    protocols,
+    protocols = GATEWAY_PROTOCOL,
     getToken,
     token,
   } = opts;
@@ -126,10 +136,9 @@ export function useWebSocket(
     manualCloseRef.current = false;
 
     const tok = token !== undefined ? token : getToken ? getToken() : null;
-    const finalUrl = appendToken(url, tok);
 
     try {
-      const ws = protocols ? new WebSocket(finalUrl, protocols) : new WebSocket(finalUrl);
+      const ws = new WebSocket(url, handshakeProtocols(protocols, tok));
       wsRef.current = ws;
       setReadyState('connecting');
 
