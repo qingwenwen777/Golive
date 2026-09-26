@@ -1080,3 +1080,37 @@ func TestReportActionFailsVisiblyWhenOwnerServiceFails(t *testing.T) {
 	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content"}})
 	require.ErrorContains(t, err, "chat-service client is not configured")
 }
+
+// The official ban / mute notice goes out only once user-service has applied
+// the sanction. A failed call leaves the report open for a retry and must
+// not tell the user they were banned or muted.
+func TestSanctionNoticeWaitsForUserService(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _, owners := newModerationFixtureWithOwners(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportDanmu(t, db, "room-1", "danmu-down", "bad-user", "abuse")
+	restriction := "/internal/users/bad-user/restriction"
+	owners.fail(restriction, http.StatusServiceUnavailable)
+	notices := func(kind string) int64 {
+		t.Helper()
+		var n int64
+		require.NoError(t, db.Model(&model.Notification{}).Where("user_id = ? AND type = ?", "bad-user", kind).Count(&n).Error)
+		return n
+	}
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-down", RoomID: "room-1", Reason: "harassment"})
+	require.NoError(t, err)
+	for _, action := range []string{"ban_user", "site_mute", "ban_user", "site_mute"} {
+		_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{action}, DurationMinutes: 120})
+		require.Error(t, err, action)
+	}
+	require.Zero(t, notices("moderation_ban"))
+	require.Zero(t, notices("moderation_site_mute"))
+
+	owners.fail(restriction, 0)
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"site_mute", "ban_user"}, DurationMinutes: 120})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, notices("moderation_ban"))
+	require.EqualValues(t, 1, notices("moderation_site_mute"))
+}

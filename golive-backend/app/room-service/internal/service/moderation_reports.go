@@ -585,7 +585,6 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 		}
 	case model.ReportActionSiteMute:
 		if targetUserID != "" {
-			_ = s.notifyModeration(ctx, targetUserID, "moderation_site_mute", "你已被全站禁言", moderationMuteBody(durationMinutes, note), targetLink, adminID, now)
 			if durationMinutes <= 0 {
 				return errcode.New(http.StatusBadRequest, "invalid mute duration").WithReason("invalid_mute_duration")
 			}
@@ -598,11 +597,12 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 			}); err != nil {
 				return err
 			}
+			// Notify only once user-service has applied the mute.
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_site_mute", "你已被全站禁言", moderationMuteBody(durationMinutes, note), targetLink, adminID, now)
 			return s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionSiteMute, report.ID, note, durationMinutes, now)
 		}
 	case model.ReportActionBanUser:
 		if targetUserID != "" {
-			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
 			// user-service owns the ban; its ban path also revokes the
 			// user's refresh tokens.
 			if err := s.setUserRestriction(ctx, targetUserID, UserRestrictionUpdate{
@@ -612,6 +612,8 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 			}); err != nil {
 				return err
 			}
+			// Notify only once user-service has applied the ban.
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
 			if err := s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now); err != nil {
 				return err
 			}
