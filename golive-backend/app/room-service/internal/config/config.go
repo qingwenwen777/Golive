@@ -73,6 +73,10 @@ type ReplayCfg struct {
 	BunnyAPIBase    string        `mapstructure:"bunny_api_base"`
 	BunnyPlayerBase string        `mapstructure:"bunny_player_base"`
 	UploadTimeout   time.Duration `mapstructure:"upload_timeout"`
+	// StaleRecordingAge is how long a DVR file in RecordDir must be untouched
+	// before it is removed, unless an active room or pending replay upload
+	// still needs it (default 24h).
+	StaleRecordingAge time.Duration `mapstructure:"stale_recording_age"`
 }
 
 type UploadCfg struct {

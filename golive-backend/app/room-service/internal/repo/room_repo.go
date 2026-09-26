@@ -435,6 +435,9 @@ func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID stri
 	return rooms, err
 }
 
+// ReplayRecoverableUploads returns ended rooms whose replay upload was
+// interrupted. Failed uploads are not retried: each attempt creates a new
+// Bunny video, so retrying on every restart would pile up orphaned videos.
 func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]model.Room, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -442,13 +445,27 @@ func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]m
 	statuses := []string{
 		model.ReplayStatusPending,
 		model.ReplayStatusUploading,
-		model.ReplayStatusFailed,
 	}
 	var rooms []model.Room
 	err := r.db.WithContext(ctx).Model(&model.Room{}).
 		Where("status = ? AND replay_upload_enabled = ? AND replay_status IN ?", model.StatusEnded, true, statuses).
 		Order("COALESCE(ended_at, updated_at) ASC").
 		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+// RecordingRooms returns the id and stream key of rooms whose DVR recording
+// may still be needed: active rooms, and ended rooms whose replay upload is
+// pending or in progress.
+func (r *RoomRepo) RecordingRooms(ctx context.Context) ([]model.Room, error) {
+	var rooms []model.Room
+	err := r.db.WithContext(ctx).Model(&model.Room{}).
+		Select("id", "stream_key").
+		Where("status IN ? OR (status = ? AND replay_upload_enabled = ? AND replay_status IN ?)",
+			[]string{model.StatusPublishing, model.StatusLive, model.StatusEnding},
+			model.StatusEnded, true,
+			[]string{model.ReplayStatusPending, model.ReplayStatusUploading}).
 		Find(&rooms).Error
 	return rooms, err
 }

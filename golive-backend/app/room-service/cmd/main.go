@@ -88,12 +88,13 @@ func main() {
 	socialSvc := service.NewSocialService(socialRepo, roomRepo)
 	liveSvc := service.NewLiveService(roomRepo, liveRepo, cfg.Live.StreamKeySecret, cfg.Live.StreamKeyTTL, cfg.Live.FlvBase)
 	replaySvc := service.NewReplayService(roomRepo, socialRepo, service.ReplayConfig{
-		RecordDir:       cfg.Replay.RecordDir,
-		BunnyLibraryID:  cfg.Replay.BunnyLibraryID,
-		BunnyAPIKey:     cfg.Replay.BunnyAPIKey,
-		BunnyAPIBase:    cfg.Replay.BunnyAPIBase,
-		BunnyPlayerBase: cfg.Replay.BunnyPlayerBase,
-		UploadTimeout:   cfg.Replay.UploadTimeout,
+		RecordDir:         cfg.Replay.RecordDir,
+		BunnyLibraryID:    cfg.Replay.BunnyLibraryID,
+		BunnyAPIKey:       cfg.Replay.BunnyAPIKey,
+		BunnyAPIBase:      cfg.Replay.BunnyAPIBase,
+		BunnyPlayerBase:   cfg.Replay.BunnyPlayerBase,
+		UploadTimeout:     cfg.Replay.UploadTimeout,
+		StaleRecordingAge: cfg.Replay.StaleRecordingAge,
 	})
 	roomSvc.SetReplayService(replaySvc)
 	roomSvc.SetLiveRepo(liveRepo)

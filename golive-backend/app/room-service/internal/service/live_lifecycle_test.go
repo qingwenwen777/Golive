@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -153,4 +156,77 @@ func TestConcurrentGoLiveKeepsOneActiveRoom(t *testing.T) {
 	active, err := env.rooms.ActiveRoomsByOwner(ctx, "owner-race-golive")
 	require.NoError(t, err)
 	require.Len(t, active, 1)
+}
+
+// withReplay gives env.svc a replay service over a fake Bunny library and a
+// temporary record dir, with the recording waits shortened.
+func (e *lifecycleTestEnv) withReplay(t *testing.T) (*ReplayService, *fakeBunny) {
+	t.Helper()
+	bunny := &fakeBunny{}
+	srv := httptest.NewServer(bunny)
+	t.Cleanup(srv.Close)
+	replay := NewReplayService(e.rooms, nil, ReplayConfig{
+		RecordDir:      t.TempDir(),
+		BunnyLibraryID: "lib",
+		BunnyAPIKey:    "key",
+		BunnyAPIBase:   srv.URL,
+	})
+	fastRecordingWaits(replay)
+	e.svc.SetReplayService(replay)
+	return replay, bunny
+}
+
+func TestGoLiveUploadsReplayOfReplacedRoom(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	replay, bunny := env.withReplay(t)
+	old := startTestLive(t, env.svc, "owner-replaced-replay")
+	_, err := replay.UpdateActiveSettings(ctx, "owner-replaced-replay", UpdateLiveReplaySettingsReq{UploadAfterEnd: true})
+	require.NoError(t, err)
+	publishTestLive(t, env.svc, old.StreamKey)
+	recordPath := filepath.Join(replay.recordDir, old.ID+".flv")
+	require.NoError(t, os.WriteFile(recordPath, []byte("flv"), 0o644))
+
+	startTestLive(t, env.svc, "owner-replaced-replay")
+
+	require.Eventually(t, func() bool {
+		room, err := env.rooms.GetByID(ctx, old.ID)
+		return err == nil && room.ReplayStatus == model.ReplayStatusReady
+	}, 2*time.Second, 10*time.Millisecond)
+	require.Equal(t, 1, bunny.createdCount())
+	require.NoFileExists(t, recordPath)
+}
+
+func TestGoLiveRemovesRecordingOfReplacedRoomWithoutReplay(t *testing.T) {
+	env := newLifecycleTestEnv(t)
+	replay, _ := env.withReplay(t)
+	old := startTestLive(t, env.svc, "owner-replaced-no-replay")
+	publishTestLive(t, env.svc, old.StreamKey)
+	recordPath := filepath.Join(replay.recordDir, old.ID+".flv")
+	require.NoError(t, os.WriteFile(recordPath, []byte("flv"), 0o644))
+
+	startTestLive(t, env.svc, "owner-replaced-no-replay")
+
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(recordPath)
+		return os.IsNotExist(err)
+	}, 2*time.Second, 10*time.Millisecond)
+}
+
+func TestRunReconcilerRemovesStaleRecordings(t *testing.T) {
+	env := newLifecycleTestEnv(t)
+	replay, _ := env.withReplay(t)
+	stale := filepath.Join(replay.recordDir, "miclink-live-room-guest.flv")
+	require.NoError(t, os.WriteFile(stale, []byte("flv"), 0o644))
+	old := time.Now().Add(-48 * time.Hour)
+	require.NoError(t, os.Chtimes(stale, old, old))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go env.svc.RunReconciler(ctx, time.Hour)
+
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(stale)
+		return os.IsNotExist(err)
+	}, 2*time.Second, 10*time.Millisecond)
 }

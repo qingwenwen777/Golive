@@ -14,7 +14,8 @@ import (
 const defaultReconcileInterval = time.Minute
 
 // RunReconciler periodically repairs live rooms that the SRS hooks alone
-// leave inconsistent, until ctx is done. See Reconcile.
+// leave inconsistent and removes stale recordings, until ctx is done. See
+// Reconcile and ReplayService.CleanupStaleRecordings.
 func (s *LiveService) RunReconciler(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = defaultReconcileInterval
@@ -23,6 +24,9 @@ func (s *LiveService) RunReconciler(ctx context.Context, interval time.Duration)
 	defer ticker.Stop()
 	for {
 		s.Reconcile(ctx)
+		if s.replay != nil {
+			s.replay.CleanupStaleRecordings(ctx)
+		}
 		select {
 		case <-ctx.Done():
 			return

@@ -40,6 +40,9 @@ replay:
   bunny_api_base: "https://video.bunnycdn.com"
   bunny_player_base: "https://player.mediadelivery.net/embed"
   upload_timeout: 30m
+  # Recordings untouched this long that no live room or pending replay
+  # upload needs are removed (failed uploads, mic-link streams, leftovers).
+  stale_recording_age: 24h
 
 upload:
   cover_dir: "./uploads/covers"

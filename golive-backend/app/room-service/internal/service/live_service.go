@@ -174,17 +174,8 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		}
 	}
 	if active, err := s.rooms.ActiveByOwner(ctx, ownerID); err == nil {
-		ended, err := s.endRoom(ctx, active, now)
-		if err != nil {
+		if _, err := s.stopRoom(ctx, active, now, true); err != nil {
 			return nil, err
-		}
-		if ended {
-			s.disconnectPublisher(ctx, active.ID, active.StreamKey)
-			if active.StreamKey != "" {
-				_ = s.live.Delete(ctx, active.StreamKey)
-				_ = s.live.DeletePublishSession(ctx, active.StreamKey)
-			}
-			_ = s.broadcastEnded(ctx, active.ID, now)
 		}
 	} else if !errors.Is(err, repo.ErrRoomNotFound) {
 		return nil, err
