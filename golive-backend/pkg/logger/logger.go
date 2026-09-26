@@ -11,6 +11,7 @@ import (
 	"context"
 	"os"
 	"sync"
+	"sync/atomic"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -19,8 +20,13 @@ import (
 type ctxKey struct{}
 
 var (
-	global *zap.Logger
+	global atomic.Pointer[zap.Logger]
 	once   sync.Once
+
+	fallback = sync.OnceValue(func() *zap.Logger {
+		lg, _ := zap.NewDevelopment()
+		return lg
+	})
 )
 
 // Init initializes the global logger. Safe to call once per process.
@@ -38,16 +44,16 @@ func Init(service, level string) {
 			zapcore.AddSync(os.Stdout),
 			lvl,
 		)
-		global = zap.New(core, zap.AddCaller()).With(zap.String("svc", service))
+		global.Store(zap.New(core, zap.AddCaller()).With(zap.String("svc", service)))
 	})
 }
 
 // L returns the global logger. If Init was never called, a no-op dev logger is used.
 func L() *zap.Logger {
-	if global == nil {
-		global, _ = zap.NewDevelopment()
+	if lg := global.Load(); lg != nil {
+		return lg
 	}
-	return global
+	return fallback()
 }
 
 // WithCtx returns a new context carrying the given logger.
@@ -65,7 +71,7 @@ func FromCtx(ctx context.Context) *zap.Logger {
 
 // Sync flushes any buffered log entries. Call before process exit.
 func Sync() {
-	if global != nil {
-		_ = global.Sync()
+	if lg := global.Load(); lg != nil {
+		_ = lg.Sync()
 	}
 }

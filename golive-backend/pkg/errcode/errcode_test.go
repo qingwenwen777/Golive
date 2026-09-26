@@ -29,17 +29,17 @@ func TestRespond_WritesAppErrorStatusMessageAndReason(t *testing.T) {
 	require.JSONEq(t, `{"message":"insufficient coin balance","reason":"insufficient_coin"}`, rec.Body.String())
 }
 
-func TestRespond_FallsBackToInternalErrorForPlainErrors(t *testing.T) {
+func TestRespond_HidesPlainErrorDetails(t *testing.T) {
 	router := gin.New()
 	router.GET("/boom", func(c *gin.Context) {
-		errcode.Respond(c, errors.New("boom"))
+		errcode.Respond(c, errors.New("Error 1406: Data too long for column 'reason' at row 1"))
 	})
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/boom", nil))
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
-	require.JSONEq(t, `{"message":"boom"}`, rec.Body.String())
+	require.JSONEq(t, `{"message":"internal error"}`, rec.Body.String())
 }
 
 func TestRespondWith_MergesReasonAndPayload(t *testing.T) {
