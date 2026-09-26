@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ import (
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/miclink"
 )
 
 type LiveService struct {
@@ -408,9 +410,33 @@ func canonicalStreamName(stream string) (base string, isVariant bool) {
 }
 
 // micLinkStreamPrefix marks WebRTC audio streams published by mic-link guests.
-// These are not room RTMP streams, so the publish/unpublish hooks accept them
+// These are not room RTMP streams, so the publish/unpublish hooks handle them
 // without touching room state.
-const micLinkStreamPrefix = "miclink-"
+const micLinkStreamPrefix = miclink.StreamPrefix
+
+// authorizeMicLinkPublish accepts a mic-link stream only with the token
+// gift-service issued for that exact stream when the owner approved the guest.
+//
+// Guests publish via WHIP to /rtc/v1/whip/?app=live&stream=<name>&key=<token>.
+// SRS 5 (SrsGoApiRtcWhip::do_serve_http) takes app and stream from that query
+// and sets the request param to the raw query string, which on_publish reports
+// as "param" without a leading "?" ("app=live&stream=...&key=..."). An RTMP
+// publish to live/<name>?key=<token> reports "?key=<token>". publishKeyFromParam
+// parses both.
+func (s *LiveService) authorizeMicLinkPublish(ctx context.Context, req SRSPublishReq) error {
+	token := publishKeyFromParam(req.Param)
+	if token == "" {
+		return errors.New("missing mic-link token")
+	}
+	expected, err := s.live.MicLinkPublishToken(ctx, req.Stream)
+	if err != nil {
+		return fmt.Errorf("resolve mic-link token: %w", err)
+	}
+	if subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {
+		return errors.New("mic-link token does not match stream")
+	}
+	return nil
+}
 
 // OnPublish authorizes the incoming RTMP publish. Returns nil on accept.
 // The stream name is the room id; the secret stream key arrives in the
@@ -420,8 +446,8 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 		return errors.New("missing stream name")
 	}
 	if strings.HasPrefix(req.Stream, micLinkStreamPrefix) {
-		// Mic-link guest WebRTC audio: accept without room bookkeeping.
-		return nil
+		// Mic-link guest WebRTC audio: token check, no room bookkeeping.
+		return s.authorizeMicLinkPublish(ctx, req)
 	}
 	streamName, isVariant := canonicalStreamName(req.Stream)
 	streamKey := publishKeyFromParam(req.Param)
@@ -478,7 +504,11 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		return nil
 	}
 	if strings.HasPrefix(req.Stream, micLinkStreamPrefix) {
-		// Mic-link guest WebRTC audio teardown: nothing to update.
+		// Mic-link guest teardown: no room state, but drop any DVR file an
+		// RTMP publish under this name left behind.
+		if s.replay != nil {
+			go s.replay.cleanupStreamRecording(req.Stream)
+		}
 		return nil
 	}
 	streamName, isVariant := canonicalStreamName(req.Stream)

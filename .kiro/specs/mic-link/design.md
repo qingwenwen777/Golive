@@ -20,7 +20,7 @@ Guest browser ──WHIP(audio)──> SRS rtc_server ──WHEP(audio)──> M
 Host OBS microphone ─────────────────────────────────────────┴── Mix ──RTMP──> SRS ──FLV/HLS──> All viewers
 ```
 
-- Guest stream name: `miclink-<roomId>-<userId>`. The room-service SRS `on_publish` / `on_unpublish` hooks allow streams with the `miclink-` prefix directly, without room accounting.
+- Guest stream name: `miclink-<roomId>-<userId>`. On approval gift-service stores a random publish token in Redis `miclink:token:<stream>` (10-minute TTL, re-issued to the on-air guest through `/mic-link/latest` as `myPublishToken`, deleted on leave/remove/disable). The guest adds it to the WHIP URL as `key=<token>`; the room-service SRS `on_publish` hook rejects `miclink-` streams whose `key` does not match, without room accounting.
 - Signaling (SDP offer/answer) uses HTTPS: nginx adds `location ^~ /rtc/` to proxy to `srs:1985`.
 - Media uses UDP 8000 (the SRS container adds `8000:8000/udp`, with `CANDIDATE` set to the public IP `154.36.185.85`).
 

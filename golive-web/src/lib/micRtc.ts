@@ -29,9 +29,12 @@ export class MicSetupError extends Error {
 }
 
 // All mic-link streams live under SRS app "live". SRS parses app+stream from
-// the query string (proven against SRS 5.0.213).
-function signalUrl(path: string, streamName: string): string {
+// the query string (proven against SRS 5.0.213). SRS forwards the whole query
+// string to the on_publish hook, so the guest's publish token rides along as
+// `key` for room-service to verify.
+function signalUrl(path: string, streamName: string, publishToken?: string): string {
   const params = new URLSearchParams({ app: 'live', stream: streamName });
+  if (publishToken) params.set('key', publishToken);
   return `${path}?${params.toString()}`;
 }
 
@@ -56,9 +59,13 @@ export interface MicPublishHandle {
 }
 
 // publishMic captures the microphone and publishes it (audio-only) to SRS via
-// WHIP under the given stream name. Exactly one sendonly audio m-line is
+// WHIP under the given stream name, authorized by the publish token the
+// mic-link API hands the on-air guest. Exactly one sendonly audio m-line is
 // offered — SRS only negotiates BUNDLE, so a duplicate transceiver breaks it.
-export async function publishMic(streamName: string): Promise<MicPublishHandle> {
+export async function publishMic(
+  streamName: string,
+  publishToken: string,
+): Promise<MicPublishHandle> {
   // getUserMedia only exists in a secure context (https or localhost). If it is
   // missing the browser blocked it for an insecure origin — surface a clear,
   // non-permission error so the UI does not mislead the user.
@@ -94,7 +101,7 @@ export async function publishMic(streamName: string): Promise<MicPublishHandle> 
   try {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    const answer = await signal(signalUrl(WHIP_PATH, streamName), offer.sdp ?? '');
+    const answer = await signal(signalUrl(WHIP_PATH, streamName, publishToken), offer.sdp ?? '');
     await pc.setRemoteDescription({ type: 'answer', sdp: answer });
   } catch (err) {
     for (const t of stream.getTracks()) t.stop();
@@ -153,8 +160,9 @@ export async function playMic(streamName: string): Promise<MicPlayHandle> {
 }
 
 // micStreamName builds the per-guest stream name used on both ends. The
-// `miclink-` prefix lets room-service's SRS on_publish hook accept it without
-// room bookkeeping.
+// `miclink-` prefix tells room-service's SRS on_publish hook to check the
+// guest's publish token instead of room bookkeeping. Must match
+// miclink.StreamName in golive-backend/pkg/miclink.
 export function micStreamName(roomId: string, userId: string): string {
   return `miclink-${roomId}-${userId}`;
 }

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v9"
+
+	"github.com/qingwenwen777/golive/pkg/miclink"
 )
 
 var ErrStreamKeyNotFound = errors.New("stream key not found")
@@ -63,6 +65,19 @@ func (r *LiveRepo) PublishSession(ctx context.Context, key string) (string, erro
 
 func (r *LiveRepo) DeletePublishSession(ctx context.Context, key string) error {
 	return r.rdb.Del(ctx, streamSessionPrefix+key).Err()
+}
+
+// MicLinkPublishToken returns the token gift-service issued for a mic-link
+// guest stream, or ErrStreamKeyNotFound when none is active.
+func (r *LiveRepo) MicLinkPublishToken(ctx context.Context, stream string) (string, error) {
+	v, err := r.rdb.Get(ctx, miclink.TokenKey(stream)).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", ErrStreamKeyNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return v, nil
 }
 
 func (r *LiveRepo) PublishRoomEvent(ctx context.Context, roomID string, payload []byte) error {

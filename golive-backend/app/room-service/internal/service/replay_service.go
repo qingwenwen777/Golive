@@ -326,6 +326,24 @@ func (s *ReplayService) cleanupRoomRecording(room model.Room) {
 	}
 }
 
+// cleanupStreamRecording removes the DVR file of a stream that never becomes
+// a replay, such as a mic-link guest stream published over RTMP.
+func (s *ReplayService) cleanupStreamRecording(stream string) {
+	if s.recordDir == "" || stream == "" || strings.ContainsAny(stream, `/\*?[`) {
+		return
+	}
+	time.Sleep(5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	recordPath, err := s.waitForUploadableRecording(ctx, stream)
+	if err != nil {
+		return
+	}
+	if err := removeRecording(recordPath); err != nil {
+		logger.L().Warn("remove stream recording", zap.Error(err), zap.String("stream", stream), zap.String("path", recordPath))
+	}
+}
+
 func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
 	if s == nil || s.rooms == nil || s.recordDir == "" || s.libraryID == "" || !s.bunny.Configured() {
 		return

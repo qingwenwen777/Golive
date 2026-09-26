@@ -14,6 +14,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/miclink"
 )
 
 func newLiveServiceTestDeps(t *testing.T) (*LiveService, *repo.RoomRepo, *repo.LiveRepo) {
@@ -506,4 +507,33 @@ func TestOnUnpublishIgnoresMissingOrMismatchedKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.StatusLive, room.Status)
 	require.Nil(t, room.EndedAt)
+}
+
+func TestOnPublishMicLinkRequiresIssuedToken(t *testing.T) {
+	ctx := context.Background()
+	svc, _, _, rdb := newLiveServiceTestDepsWithRedis(t)
+	stream := miclink.StreamName("live-room", "guest-1")
+	other := miclink.StreamName("live-room", "guest-2")
+	require.NoError(t, rdb.Set(ctx, miclink.TokenKey(stream), "tok-guest-1", time.Minute).Err())
+	require.NoError(t, rdb.Set(ctx, miclink.TokenKey(other), "tok-guest-2", time.Minute).Err())
+
+	// SRS 5 WHIP reports the raw query string as param; RTMP prefixes "?".
+	whipParam := "app=live&stream=" + stream + "&key=tok-guest-1"
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: whipParam}))
+	require.NoError(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: "?key=tok-guest-1"}))
+
+	cases := map[string]SRSPublishReq{
+		"no token":             {App: "live", Stream: stream, Param: "app=live&stream=" + stream},
+		"wrong token":          {App: "live", Stream: stream, Param: "?key=tok-guess"},
+		"other guest's token":  {App: "live", Stream: stream, Param: "?key=tok-guest-2"},
+		"never issued stream":  {App: "live", Stream: "miclink-anything", Param: "?key=tok-guest-1"},
+		"guessable name alone": {App: "live", Stream: stream},
+	}
+	for name, req := range cases {
+		require.Error(t, svc.OnPublish(ctx, req), name)
+	}
+
+	// Revoked (guest removed) or expired tokens stop authorizing publishes.
+	require.NoError(t, rdb.Del(ctx, miclink.TokenKey(stream)).Err())
+	require.Error(t, svc.OnPublish(ctx, SRSPublishReq{App: "live", Stream: stream, Param: whipParam}))
 }
