@@ -215,23 +215,34 @@ func (r *UserRepo) UnlinkGoogleAccount(ctx context.Context, id string) (*model.U
 // let whoever owns that mailbox reset the password.
 //
 //   - Accounts registered with an invite (email code or Google) or linked to
-//     Google proved their address: verified.
+//     Google proved their address: verified, unless an admin has changed
+//     the address since (user_email_update in admin_audit_logs), which
+//     proves nothing about the new one.
 //   - Placeholder or empty addresses are cleared to NULL: unverified.
 //   - Anything else (e.g. set by an admin) is kept but unverified.
+//
+// A change through PATCH /users/me/email (which proved only the previous
+// address) left no record, so such an account is still taken as verified.
+// That is accepted: only the signed-in owner, after a code sent to the
+// proven address, could make it, and excluding it would mean leaving every
+// invited or Google-linked account without email password reset.
 //
 // It only touches NULL rows, so it is safe to run on every startup.
 func (r *UserRepo) MigrateEmailVerification(ctx context.Context) error {
 	var rows []struct {
-		ID        string
-		Username  string
-		Email     *string
-		GoogleSub *string
-		Invited   bool
+		ID                  string
+		Username            string
+		Email               *string
+		GoogleSub           *string
+		Invited             bool
+		EmailChangedByAdmin bool
 	}
 	if err := r.db.WithContext(ctx).
 		Table("users").
 		Select(`users.id, users.username, users.email, users.google_sub,
-			EXISTS (SELECT 1 FROM invite_codes ic WHERE ic.used_by = users.id) AS invited`).
+			EXISTS (SELECT 1 FROM invite_codes ic WHERE ic.used_by = users.id) AS invited,
+			EXISTS (SELECT 1 FROM admin_audit_logs al
+				WHERE al.action = 'user_email_update' AND al.target_user_id = users.id) AS email_changed_by_admin`).
 		Where("users.email_verified IS NULL").
 		Scan(&rows).Error; err != nil {
 		return err
@@ -247,7 +258,7 @@ func (r *UserRepo) MigrateEmailVerification(ctx context.Context) error {
 			switch {
 			case email == "":
 				updates["email"] = nil
-			case row.Invited || (row.GoogleSub != nil && strings.TrimSpace(*row.GoogleSub) != ""):
+			case !row.EmailChangedByAdmin && (row.Invited || (row.GoogleSub != nil && strings.TrimSpace(*row.GoogleSub) != "")):
 				updates["email_verified"] = true
 			case email == placeholder:
 				updates["email"] = nil

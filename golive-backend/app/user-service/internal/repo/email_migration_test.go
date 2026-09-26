@@ -38,8 +38,22 @@ func testMigrateEmailVerification(t *testing.T, db *gorm.DB) {
 	insert("google", "carol", "carol@gmail.com", "google-sub") // Google-linked
 	insert("manual", "dave", "dave@company.example", nil)      // set by an admin
 	insert("empty", "erin", "", nil)
+	// Proven at signup / Google linking, then changed by an admin, which
+	// proves nothing about the new address.
+	insert("invited-admin", "gina", "gina@typo.example", nil)
+	insert("google-admin", "hank", "hank@typo.example", "google-sub-2")
 	require.NoError(t, db.Exec(`INSERT INTO invite_codes (id, code, created_by, used_by, created_at, updated_at)
-		VALUES ('inv-1', 'CODE1', 'admin', 'invited', ?, ?)`, time.Now(), time.Now()).Error)
+		VALUES ('inv-1', 'CODE1', 'admin', 'invited', ?, ?), ('inv-2', 'CODE2', 'admin', 'invited-admin', ?, ?)`,
+		time.Now(), time.Now(), time.Now(), time.Now()).Error)
+	audit := func(id, action, userID string) {
+		require.NoError(t, db.Exec(`INSERT INTO admin_audit_logs
+			(id, category, action, actor_id, target_type, target_id, target_user_id, created_at)
+			VALUES (?, 'permission', ?, 'admin', 'user', ?, ?, ?)`,
+			id, action, userID, userID, time.Now()).Error)
+	}
+	audit("audit-1", "user_email_update", "invited-admin")
+	audit("audit-2", "user_email_update", "google-admin")
+	audit("audit-3", "user_profile_update", "invited") // not an email change
 	require.NoError(t, users.AutoMigrate())
 	// A row written after the upgrade is already classified and left alone.
 	require.NoError(t, db.Exec(`INSERT INTO users
@@ -60,6 +74,9 @@ func testMigrateEmailVerification(t *testing.T, db *gorm.DB) {
 		"manual":  {"dave@company.example", false},
 		"empty":   {"", false},
 		"current": {"frank@gmail.com", false},
+
+		"invited-admin": {"gina@typo.example", false},
+		"google-admin":  {"hank@typo.example", false},
 	}
 	for id, want := range expect {
 		u, err := users.FindByID(ctx, id)
@@ -76,5 +93,7 @@ func testMigrateEmailVerification(t *testing.T, db *gorm.DB) {
 
 	require.ErrorIs(t, users.ResetPasswordByUsernameEmail(ctx, "Admin", "admin@gmail.com", "x"), ErrUserNotFound)
 	require.ErrorIs(t, users.ResetPasswordByUsernameEmail(ctx, "dave", "dave@company.example", "x"), ErrUserNotFound)
+	require.ErrorIs(t, users.ResetPasswordByUsernameEmail(ctx, "gina", "gina@typo.example", "x"), ErrUserNotFound)
+	require.ErrorIs(t, users.ResetPasswordByUsernameEmail(ctx, "hank", "hank@typo.example", "x"), ErrUserNotFound)
 	require.NoError(t, users.ResetPasswordByUsernameEmail(ctx, "bob", "bob@gmail.com", "x"))
 }
