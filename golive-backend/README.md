@@ -43,7 +43,7 @@ Cross-service reads remain (direct SQL on the shared database):
 | Table | Owner | Also read by |
 | ---- | ---- | ---- |
 | `users` | user-service | room-service, gift-service, chat-service |
-| `user_moderation_states` | user-service | room-service (ban/mute checks) |
+| `user_moderation_states` | user-service | room-service (ban/mute checks), gift-service (banned-admin check) |
 | `coin_transactions` | user-service + gift-service (wallet) | room-service (admin overview), chat-service (user level) |
 | `rooms` | room-service | user-service, gift-service, chat-service |
 | `room_watch_events` | room-service | user-service (daily tasks) |

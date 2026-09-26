@@ -108,7 +108,8 @@ func moderationUser(row repo.ModerationUser) ModerationUserDTO {
 }
 
 // requireAdmin guards platform administration (dashboard, audit logs, system
-// settings). Platform moderators are not admins.
+// settings). Platform moderators are not admins. A banned admin keeps the
+// role (banned users can still sign in to appeal) but loses its powers.
 func (s *ModerationService) requireAdmin(ctx context.Context, userID string) error {
 	if userID == "" {
 		return errcode.ErrUnauthorized
@@ -120,11 +121,12 @@ func (s *ModerationService) requireAdmin(ctx context.Context, userID string) err
 	if !ok {
 		return errcode.New(http.StatusForbidden, "admin access required")
 	}
-	return nil
+	return s.EnsureUserNotBanned(ctx, userID)
 }
 
 // requireContentModerator guards content review (reports, blocked words),
-// which admins and platform moderators share. Returns the caller's role.
+// which admins and platform moderators share; banned staff lose it like
+// requireAdmin. Returns the caller's role.
 func (s *ModerationService) requireContentModerator(ctx context.Context, userID string) (string, error) {
 	if userID == "" {
 		return "", errcode.ErrUnauthorized
@@ -135,6 +137,9 @@ func (s *ModerationService) requireContentModerator(ctx context.Context, userID 
 	}
 	if role != repo.RoleAdmin && role != repo.RoleModerator {
 		return "", errcode.New(http.StatusForbidden, "content moderator access required")
+	}
+	if err := s.EnsureUserNotBanned(ctx, userID); err != nil {
+		return "", err
 	}
 	return role, nil
 }

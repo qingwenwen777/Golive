@@ -730,6 +730,58 @@ func TestPlatformModeratorIsLimitedToContentReview(t *testing.T) {
 	require.Equal(t, "resolved", resolved.Status)
 }
 
+// Banned staff keep their role and can still sign in (to appeal), so the
+// staff guards must check the ban themselves. user-service records a ban in
+// users.banned and user_moderation_states; either one counts.
+func TestBannedStaffLoseModerationAndAdminAccess(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportPost(t, db, "post-x", "user-2", "harmless post")
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post", TargetID: "post-x", Reason: "spam"})
+	require.NoError(t, err)
+
+	require.NoError(t, db.Exec(`ALTER TABLE users ADD COLUMN banned boolean`).Error)
+	require.NoError(t, db.Exec(`ALTER TABLE users ADD COLUMN ban_reason text`).Error)
+	require.NoError(t, db.Exec(`UPDATE users SET banned = ?, ban_reason = ? WHERE id = ?`, true, "compromised", "admin-2").Error)
+	require.NoError(t, db.Create(&model.UserModerationState{UserID: "mod-1", Banned: true, BanReason: "rogue", UpdatedAt: now, CreatedAt: now}).Error)
+
+	for _, staff := range []string{"mod-1", "admin-2"} {
+		_, err = svc.ListReports(ctx, staff, repo.ReportListFilter{Page: 1, Size: 10})
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.ReportDetail(ctx, staff, report.ID)
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.UpdateReport(ctx, staff, report.ID, UpdateReportReq{Actions: []string{"delete_content", "ban_user"}})
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.ListBlockedWords(ctx, staff, 1, 10)
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.CreateBlockedWord(ctx, staff, CreateBlockedWordReq{Word: "scam link"})
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	}
+	_, err = svc.AdminOverview(ctx, "admin-2")
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	_, err = svc.AdminSystemSettings(ctx, "admin-2")
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	_, err = svc.UpdateAdminSystemSettings(ctx, "admin-2", UpdateAdminSystemSettingsReq{ReportReviewTimeoutMinutes: intPtr(10)})
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	_, err = svc.AdminAuditLogs(ctx, "admin-2", "review", 1, 10)
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+
+	restriction, err := svc.moderation.UserRestriction(ctx, "user-2", now)
+	require.NoError(t, err)
+	require.False(t, restriction.Banned)
+	var posts int64
+	require.NoError(t, db.Model(&model.ChannelPost{}).Where("id = ?", "post-x").Count(&posts).Error)
+	require.EqualValues(t, 1, posts)
+
+	// Staff who are not banned keep their access.
+	_, err = svc.ListReports(ctx, "mod-2", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	_, err = svc.AdminAuditLogs(ctx, "admin-1", "review", 1, 10)
+	require.NoError(t, err)
+}
+
 func TestReportsCannotSanctionStaff(t *testing.T) {
 	ctx := context.Background()
 	svc, db, _ := newModerationFixture(t)
