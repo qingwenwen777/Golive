@@ -47,7 +47,7 @@ rm.created_at AS created_at
 	}
 	var rows []ModerationUser
 	err := q.Order("moderator DESC, fb.updated_at DESC, u.updated_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Scan(&rows).Error
 	if isMissingTableName(err) {
@@ -98,7 +98,7 @@ true AS moderator,
 rm.created_at AS created_at
 `).
 		Order("rm.created_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Scan(&rows).Error
 	return rows, total, err
@@ -313,7 +313,7 @@ func (r *ModerationRepo) Logs(ctx context.Context, ownerID string, page, size in
 	}
 	var rows []ModerationLogRow
 	err := q.Order("created_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Scan(&rows).Error
 	return rows, total, err

@@ -144,7 +144,7 @@ func (r *AppointmentRepo) ListOwner(ctx context.Context, ownerID string, page, s
 	}
 	var items []model.LiveAppointment
 	err := tx.Order("scheduled_at DESC, created_at DESC").
-		Offset((page - 1) * size).Limit(size).Find(&items).Error
+		Scopes(pageWindow(page, size)).Limit(size).Find(&items).Error
 	return items, total, err
 }
 
@@ -157,7 +157,7 @@ func (r *AppointmentRepo) ListPublicByOwner(ctx context.Context, ownerID string,
 	}
 	var items []model.LiveAppointment
 	err := tx.Order("scheduled_at ASC, created_at ASC").
-		Offset((page - 1) * size).Limit(size).Find(&items).Error
+		Scopes(pageWindow(page, size)).Limit(size).Find(&items).Error
 	return items, total, err
 }
 
@@ -173,7 +173,7 @@ func (r *AppointmentRepo) ListPublicByOwners(ctx context.Context, ownerIDs []str
 	}
 	var items []model.LiveAppointment
 	err := tx.Order("scheduled_at ASC, created_at ASC").
-		Offset((page - 1) * size).Limit(size).Find(&items).Error
+		Scopes(pageWindow(page, size)).Limit(size).Find(&items).Error
 	return items, total, err
 }
 
@@ -190,7 +190,7 @@ func (r *AppointmentRepo) ListPublicUpcoming(ctx context.Context, now, until tim
 	}
 	var items []model.LiveAppointment
 	err := tx.Order("scheduled_at ASC, created_at ASC").
-		Offset((page - 1) * size).Limit(size).Find(&items).Error
+		Scopes(pageWindow(page, size)).Limit(size).Find(&items).Error
 	return items, total, err
 }
 
@@ -206,7 +206,7 @@ func (r *AppointmentRepo) ListReservedByUser(ctx context.Context, userID string,
 	}
 	var items []model.LiveAppointment
 	err := tx.Order("live_appointments.scheduled_at ASC, live_appointments.created_at ASC").
-		Offset((page - 1) * size).Limit(size).Find(&items).Error
+		Scopes(pageWindow(page, size)).Limit(size).Find(&items).Error
 	return items, total, err
 }
 
@@ -481,7 +481,7 @@ func (r *AppointmentRepo) ListNotifications(ctx context.Context, userID string, 
 		query = query.Where("type NOT IN ?", excludeTypes)
 	}
 	err := query.
-		Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&items).Error
+		Order("created_at DESC").Scopes(pageWindow(page, size)).Limit(size).Find(&items).Error
 	return items, total, unread, err
 }
 

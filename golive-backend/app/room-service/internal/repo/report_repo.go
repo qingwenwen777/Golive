@@ -230,7 +230,7 @@ OR LOWER(COALESCE(target_id, '')) LIKE ?
 	}
 	var rows []model.ContentReport
 	err := q.Order("CASE status WHEN 'pending' THEN 0 WHEN 'reviewing' THEN 1 WHEN 'resolved' THEN 2 ELSE 3 END, created_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rows).Error
 	return rows, total, err

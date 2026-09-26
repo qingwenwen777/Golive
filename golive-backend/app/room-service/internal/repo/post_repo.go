@@ -189,7 +189,7 @@ func listPosts(tx *gorm.DB, page, size int) ([]model.ChannelPost, int64, error) 
 	}
 	var posts []model.ChannelPost
 	err := tx.Order("created_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&posts).Error
 	return posts, total, err

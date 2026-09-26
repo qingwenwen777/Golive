@@ -125,7 +125,7 @@ admin_audit_logs.created_at
 `).
 		Joins("LEFT JOIN users AS u ON u.id = admin_audit_logs.actor_id").
 		Order("admin_audit_logs.created_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Scan(&rows).Error
 	if err != nil {

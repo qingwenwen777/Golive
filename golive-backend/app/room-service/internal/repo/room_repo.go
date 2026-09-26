@@ -78,12 +78,10 @@ func (r *RoomRepo) List(ctx context.Context, q ListQuery) ([]model.Room, int64, 
 	if q.Size > maxListSize {
 		q.Size = maxListSize
 	}
-	offset := (q.Page - 1) * q.Size
-
 	var rooms []model.Room
 	// Live first (already filtered), then newest start, then highest viewers.
 	if err := tx.Order("started_at DESC, viewers DESC").
-		Offset(offset).Limit(q.Size).Find(&rooms).Error; err != nil {
+		Scopes(pageWindow(q.Page, q.Size)).Limit(q.Size).Find(&rooms).Error; err != nil {
 		return nil, 0, err
 	}
 	return rooms, total, nil
@@ -500,7 +498,7 @@ func (r *RoomRepo) HistoryByOwner(ctx context.Context, ownerID string, page, siz
 	var rooms []model.Room
 	err := tx.
 		Order("COALESCE(ended_at, updated_at) DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rooms).Error
 	return rooms, total, err
@@ -522,7 +520,7 @@ func (r *RoomRepo) ReplayRoomsByOwner(ctx context.Context, ownerID string, page,
 	var rooms []model.Room
 	err := tx.
 		Order("COALESCE(replay_uploaded_at, ended_at, updated_at) DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rooms).Error
 	return rooms, total, err
