@@ -243,20 +243,49 @@ func (s *LiveService) playbackURL(r *model.Room) string {
 	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
 		return ""
 	}
-	return s.flvBase + "/" + r.ID + ".flv"
+	return s.flvBase + "/" + playStreamName(r.ID, r.StreamKey) + ".flv"
 }
 
 // publishKeyParam is the RTMP query parameter carrying the publish secret.
-// Creators publish to live/<roomID>?key=<secret> and viewers play
-// live/<roomID>.flv, so the public playback URL never contains the secret.
+// Creators publish to live/<play name>?key=<secret> and viewers play
+// live/<play name>.flv, so the public playback URL never contains the secret.
 const publishKeyParam = "key"
+
+// playTagLen is how many hex digits of its tag a play name carries (96 bits).
+const playTagLen = 24
+
+// playStreamName is the SRS stream name a room is published and played under:
+// the room id plus a tag derived from the room's publish key. The room id is
+// public (room lists, page URLs) but the tag is not, so only viewers given the
+// playback URL can play the stream; non-members of a fan-club-only room get
+// none. The tag is stable for the room's life and does not reveal the key.
+// Empty when the room has no key.
+func playStreamName(roomID, streamKey string) string {
+	if roomID == "" || streamKey == "" {
+		return ""
+	}
+	mac := hmac.New(sha256.New, []byte(streamKey))
+	mac.Write([]byte("play:" + roomID))
+	return roomID + "_" + hex.EncodeToString(mac.Sum(nil))[:playTagLen]
+}
+
+// playStreamRoomID returns the room id that stream, a play name, starts with,
+// or "" when stream is not shaped like one.
+func playStreamRoomID(stream string) string {
+	i := strings.LastIndexByte(stream, '_')
+	if i <= 0 || len(stream)-i-1 != playTagLen {
+		return ""
+	}
+	return stream[:i]
+}
 
 // obsStreamKey is the value the owner pastes into OBS's "Stream key" field.
 func obsStreamKey(roomID, secret string) string {
-	if roomID == "" || secret == "" {
+	name := playStreamName(roomID, secret)
+	if name == "" {
 		return ""
 	}
-	return roomID + "?" + publishKeyParam + "=" + secret
+	return name + "?" + publishKeyParam + "=" + secret
 }
 
 // publishKeyFromParam extracts the publish secret from the query string SRS
@@ -464,8 +493,8 @@ func (s *LiveService) authorizeMicLinkPublish(ctx context.Context, req SRSPublis
 }
 
 // OnPublish authorizes the incoming RTMP publish. Returns nil on accept.
-// The stream name is the room id; the secret stream key arrives in the
-// "key" query parameter and must be bound to that same room.
+// The stream name is the room's play name; the secret stream key arrives in
+// the "key" query parameter and must be the key that name belongs to.
 func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if req.Stream == "" {
 		return errors.New("missing stream name")
@@ -483,7 +512,7 @@ func (s *LiveService) OnPublish(ctx context.Context, req SRSPublishReq) error {
 	if err != nil {
 		return fmt.Errorf("resolve stream key: %w", err)
 	}
-	if roomID != streamName {
+	if streamName != playStreamName(roomID, streamKey) {
 		return errors.New("stream key does not belong to this stream")
 	}
 	room, err := s.rooms.GetByID(ctx, roomID)
@@ -561,7 +590,7 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		return nil
 	}
 	roomID, err := s.resolveStreamKey(ctx, streamName, streamKey)
-	if err != nil || roomID != streamName {
+	if err != nil || streamName != playStreamName(roomID, streamKey) {
 		// Unknown key, or a key for a different stream: nothing to update.
 		return nil
 	}
@@ -604,15 +633,21 @@ const disconnectRecordTTL = 24 * time.Hour
 
 // resolveStreamKey returns the room bound to a publish key. When Redis lost
 // the binding (TTL expiry after downtime, flush) the key of a room that is
-// already live is still accepted from the room row, and the binding restored,
-// so its publisher can reconnect and its unpublish still ends the room.
+// already live is still accepted from the room row when streamName is that
+// room's play name, and the binding restored, so its publisher can reconnect
+// and its unpublish still ends the room.
 func (s *LiveService) resolveStreamKey(ctx context.Context, streamName, streamKey string) (string, error) {
 	roomID, err := s.live.Resolve(ctx, streamKey)
 	if !errors.Is(err, repo.ErrStreamKeyNotFound) {
 		return roomID, err
 	}
-	room, rerr := s.rooms.GetByID(ctx, streamName)
-	if rerr != nil || room.StreamKey == "" || subtle.ConstantTimeCompare([]byte(room.StreamKey), []byte(streamKey)) != 1 {
+	candidate := playStreamRoomID(streamName)
+	if candidate == "" {
+		return "", err
+	}
+	room, rerr := s.rooms.GetByID(ctx, candidate)
+	if rerr != nil || room.StreamKey == "" || subtle.ConstantTimeCompare([]byte(room.StreamKey), []byte(streamKey)) != 1 ||
+		playStreamName(room.ID, room.StreamKey) != streamName {
 		return "", err
 	}
 	if room.Status != model.StatusLive && room.Status != model.StatusEnding {

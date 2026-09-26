@@ -49,9 +49,9 @@ type staleRoom struct {
 //     lost or its grace timer died with a restart;
 //   - rooms never published to are ended once their stream key has expired.
 //
-// A room counts as without publisher when SRS's stream list lacks it, or,
-// while SRS cannot be asked, only when on_unpublish recorded a disconnect: an
-// SRS outage alone never ends rooms.
+// A room counts as without publisher when SRS's stream list lacks its play
+// name, or, while SRS cannot be asked, only when on_unpublish recorded a
+// disconnect: an SRS outage alone never ends rooms.
 func (s *LiveService) Reconcile(ctx context.Context) {
 	rooms, err := s.rooms.ActiveRooms(ctx)
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *LiveService) Reconcile(ctx context.Context) {
 // when SRS could not be asked. It returns the room when SRS shows it has been
 // without a publisher past the grace period, for endStaleRooms to confirm.
 func (s *LiveService) reconcileRoom(ctx context.Context, room *model.Room, publishers map[string]string, now time.Time) (*staleRoom, error) {
-	clientID, publishing := publishers[room.ID]
+	clientID, publishing := publishers[playStreamName(room.ID, room.StreamKey)]
 	if room.Status == model.StatusPublishing {
 		// Never went live. Its key expires keyTTL after GoLive/Start, after
 		// which nobody can publish to it any more.
@@ -149,7 +149,7 @@ func (s *LiveService) endStaleRooms(ctx context.Context, stale []staleRoom) {
 	}
 	for i := range stale {
 		room := &stale[i].room
-		if _, ok := publishers[room.ID]; ok {
+		if _, ok := publishers[playStreamName(room.ID, room.StreamKey)]; ok {
 			continue
 		}
 		disconnect, err := s.live.Disconnect(ctx, room.ID)

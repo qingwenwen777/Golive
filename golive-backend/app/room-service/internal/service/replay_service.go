@@ -466,14 +466,23 @@ func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 }
 
 // recordingStreamName is the SRS stream name a room's DVR file is named after.
-// Rooms publish as <roomID>?key=<secret>, so recordings use the room id; rooms
-// that went live before that change published under the raw key, so use it
-// when such a recording is still on disk.
+// Rooms publish under their play name (playStreamName), so recordings use it;
+// rooms that went live before play names published under the raw key or the
+// bare room id, so use those when such a recording is still on disk.
 func (s *ReplayService) recordingStreamName(room model.Room) string {
-	if room.StreamKey != "" && s.recordDir != "" {
-		if matches, _ := filepath.Glob(filepath.Join(s.recordDir, room.StreamKey+"*")); len(matches) > 0 {
-			return room.StreamKey
+	if s.recordDir != "" {
+		if room.StreamKey != "" {
+			if matches, _ := filepath.Glob(filepath.Join(s.recordDir, room.StreamKey+"*")); len(matches) > 0 {
+				return room.StreamKey
+			}
 		}
+		// "<id>.", as "<id>*" would also match the play name "<id>_<tag>".
+		if matches, _ := filepath.Glob(filepath.Join(s.recordDir, room.ID+".*")); len(matches) > 0 {
+			return room.ID
+		}
+	}
+	if name := playStreamName(room.ID, room.StreamKey); name != "" {
+		return name
 	}
 	return room.ID
 }

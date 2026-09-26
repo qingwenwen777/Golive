@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -84,6 +86,11 @@ func publishSecret(obsKey string) string {
 	return publishKeyFromParam(srsReq(obsKey, "").Param)
 }
 
+// publishStream returns the SRS stream name OBS publishes with obsKey.
+func publishStream(obsKey string) string {
+	return srsReq(obsKey, "").Stream
+}
+
 func publishTestLive(t *testing.T, svc *LiveService, streamKey string) {
 	t.Helper()
 	require.NoError(t, svc.OnPublish(context.Background(), srsReq(streamKey, "")))
@@ -138,7 +145,7 @@ func TestRoomServiceListUsesRealtimeViewerMetrics(t *testing.T) {
 	require.Len(t, resp.Items, 1)
 	require.Equal(t, int64(7), resp.Items[0].Viewers)
 	require.Equal(t, int64(9), resp.Items[0].PeakViewers)
-	require.Equal(t, "http://srs/live/live-metrics.flv", resp.Items[0].PlaybackURL)
+	require.Equal(t, "http://srs/live/"+playStreamName("live-metrics", "lk_metrics")+".flv", resp.Items[0].PlaybackURL)
 }
 
 func TestUpdateLiveMetadataEditsActiveRoomAndBroadcasts(t *testing.T) {
@@ -548,12 +555,15 @@ func TestPlaybackURLDoesNotExposePublishKey(t *testing.T) {
 	publishTestLive(t, svc, st.StreamKey)
 	secret := publishSecret(st.StreamKey)
 	require.NotEmpty(t, secret)
-	require.Equal(t, st.ID+"?key="+secret, st.StreamKey)
+	play := playStreamName(st.ID, secret)
+	require.Equal(t, play+"?key="+secret, st.StreamKey)
+	require.NotContains(t, play, secret)
+	require.NotContains(t, play, strings.TrimPrefix(secret, "lk_"))
 
 	roomSvc := NewRoomService(rooms, "http://srs/live")
 	viewerView, err := roomSvc.Get(ctx, st.ID, "")
 	require.NoError(t, err)
-	require.Equal(t, "http://srs/live/"+st.ID+".flv", viewerView.PlaybackURL)
+	require.Equal(t, "http://srs/live/"+play+".flv", viewerView.PlaybackURL)
 	require.NotContains(t, viewerView.PlaybackURL, secret)
 	require.Empty(t, viewerView.StreamKey)
 
@@ -563,6 +573,77 @@ func TestPlaybackURLDoesNotExposePublishKey(t *testing.T) {
 	require.NotContains(t, list.Items[0].PlaybackURL, secret)
 }
 
+// A fan-club-only live's room id is public (room lists, the page URL), so its
+// stream must play under a name only members are given.
+func TestFanClubPlaybackNameIsNotDerivableFromRoomID(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	require.NoError(t, env.db.Exec("CREATE TABLE fan_badges (user_id TEXT, creator_id TEXT, total_contribution INTEGER)").Error)
+	require.NoError(t, env.db.Exec("INSERT INTO fan_badges VALUES ('member-fc', 'owner-fc', 100)").Error)
+	st, err := env.svc.GoLive(ctx, "owner-fc", GoLiveReq{Title: "Members only", Category: "Talk", ChannelName: "FC", FanClubOnly: true})
+	require.NoError(t, err)
+	publishTestLive(t, env.svc, st.StreamKey)
+	rs := NewRoomService(env.rooms, "https://golive.test/live")
+	rs.SetLiveRepo(env.live)
+
+	member, err := rs.Get(ctx, st.ID, "member-fc")
+	require.NoError(t, err)
+	name := strings.TrimSuffix(strings.TrimPrefix(member.PlaybackURL, "https://golive.test/live/"), ".flv")
+	require.Regexp(t, `^`+regexp.QuoteMeta(st.ID)+`_[0-9a-f]{24}$`, name, "play name is the room id plus a secret tag")
+	require.Equal(t, name, publishStream(st.StreamKey), "OBS publishes under the play name")
+	tag := strings.TrimPrefix(name, st.ID)
+
+	// Nothing a non-member or anonymous viewer can fetch carries the tag.
+	for _, viewerID := range []string{"", "someone-else"} {
+		detail, err := rs.Get(ctx, st.ID, viewerID)
+		require.NoError(t, err)
+		list, err := rs.List(ctx, viewerID, "", 1, 10)
+		require.NoError(t, err)
+		recommended, err := rs.RecommendedLive(ctx, viewerID, "", 12)
+		require.NoError(t, err)
+		out, err := json.Marshal([]any{detail, list, recommended})
+		require.NoError(t, err)
+		require.Contains(t, string(out), st.ID)
+		require.NotContains(t, string(out), tag, "viewer %q", viewerID)
+	}
+	require.NoError(t, rs.RecordWatch(ctx, "someone-else", st.ID))
+	library, err := rs.ListUserLibrary(ctx, "someone-else", model.LibraryTypeHistory)
+	require.NoError(t, err)
+	require.Len(t, library.Items, 1)
+	out, err := json.Marshal(library)
+	require.NoError(t, err)
+	require.NotContains(t, string(out), tag)
+}
+
+func TestOnPublishRejectsRoomIDAsStreamName(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	st := startTestLive(t, env.svc, "owner-bare-id")
+	secret := publishSecret(st.StreamKey)
+	bare := SRSPublishReq{App: "live", Stream: st.ID, Param: "?key=" + secret, ClientID: "client-bare"}
+
+	// The room id is public: the right key must not publish it where anyone
+	// could play it, and the refusal changes nothing.
+	require.Error(t, env.svc.OnPublish(ctx, bare))
+	requireRoomStatus(t, env, st.ID, model.StatusPublishing)
+	_, err := env.live.PublishSession(ctx, secret)
+	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+
+	publishTestLiveClient(t, env.svc, st.StreamKey, "client-play")
+	require.NoError(t, env.svc.OnUnpublish(ctx, bare))
+	requireRoomStatus(t, env, st.ID, model.StatusLive)
+
+	// Also when Redis lost the key: it is not restored for the room id.
+	env.mr.FastForward(2 * time.Hour)
+	require.Error(t, env.svc.OnPublish(ctx, bare))
+	_, err = env.live.Resolve(ctx, secret)
+	require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+	publishTestLiveClient(t, env.svc, st.StreamKey, "client-play-2")
+	roomID, err := env.live.Resolve(ctx, secret)
+	require.NoError(t, err)
+	require.Equal(t, st.ID, roomID)
+}
+
 func TestOnPublishRequiresMatchingKey(t *testing.T) {
 	ctx := context.Background()
 	svc, rooms, _ := newLiveServiceTestDeps(t)
@@ -570,12 +651,14 @@ func TestOnPublishRequiresMatchingKey(t *testing.T) {
 	other := startTestLive(t, svc, "owner-other")
 
 	cases := map[string]SRSPublishReq{
-		"no key":            {App: "live", Stream: victim.ID},
-		"wrong key":         {App: "live", Stream: victim.ID, Param: "?key=lk_guess"},
-		"other room's key":  srsReq(victim.ID+"?key="+publishSecret(other.StreamKey), ""),
-		"key as stream":     {App: "live", Stream: publishSecret(victim.StreamKey)},
-		"variant, no key":   {App: "live", Stream: victim.ID + "_q720"},
-		"empty stream name": {App: "live", Param: "?key=" + publishSecret(victim.StreamKey)},
+		"no key":                          {App: "live", Stream: victim.ID},
+		"wrong key":                       {App: "live", Stream: victim.ID, Param: "?key=lk_guess"},
+		"other room's key":                srsReq(victim.ID+"?key="+publishSecret(other.StreamKey), ""),
+		"other room's key, victim's name": {App: "live", Stream: publishStream(victim.StreamKey), Param: "?key=" + publishSecret(other.StreamKey)},
+		"forged play name":                {App: "live", Stream: victim.ID + "_" + strings.Repeat("0", playTagLen), Param: "?key=" + publishSecret(victim.StreamKey)},
+		"key as stream":                   {App: "live", Stream: publishSecret(victim.StreamKey)},
+		"variant, no key":                 {App: "live", Stream: victim.ID + "_q720"},
+		"empty stream name":               {App: "live", Param: "?key=" + publishSecret(victim.StreamKey)},
 	}
 	for name, req := range cases {
 		require.Error(t, svc.OnPublish(ctx, req), name)

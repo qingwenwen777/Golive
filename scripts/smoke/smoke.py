@@ -79,6 +79,12 @@ def srs_hook(action, stream, param="", client_id="", app="live"):
     return r.json().get("code")
 
 
+def play_name_and_secret(obs_key):
+    """Splits an OBS stream key, "<playName>?key=<secret>"."""
+    stream, _, query = obs_key.partition("?")
+    return stream, query[len("key="):] if query.startswith("key=") else ""
+
+
 def public_checks():
     """Anonymous, read-only checks: safe against production."""
     h = {"Origin": ORIGIN}
@@ -124,21 +130,24 @@ def main():
                                                      "channelName": "Smoke Creator"})
     room = r.json() if r.ok else {}
     room_id, obs_key = room.get("id", ""), room.get("streamKey", "")
-    secret = obs_key.split("key=", 1)[1] if "key=" in obs_key else ""
-    check("go live returns an OBS key of the form <roomId>?key=<secret>",
-          r.ok and obs_key.startswith(room_id + "?key=") and secret, f"{r.status_code} {r.text[:300]}")
-    check("SRS publish without a key is rejected", srs_hook("on_publish", room_id) != 0)
-    check("SRS publish with a wrong key is rejected", srs_hook("on_publish", room_id, "?key=lk_guess") != 0)
+    # OBS publishes to live/<obs_key>: the play name, then ?key=<secret>.
+    stream, secret = play_name_and_secret(obs_key)
+    check("go live returns an OBS key <playName>?key=<secret>, the play name not the bare room id",
+          r.ok and stream.startswith(room_id + "_") and secret, f"{r.status_code} {r.text[:300]}")
+    check("SRS publish without a key is rejected", srs_hook("on_publish", stream) != 0)
+    check("SRS publish with a wrong key is rejected", srs_hook("on_publish", stream, "?key=lk_guess") != 0)
     check("SRS publish with the leaked-style bare key as stream name is rejected",
           srs_hook("on_publish", secret) != 0)
+    check("SRS publish of the public room id, even with the correct key, is rejected",
+          srs_hook("on_publish", room_id, "?key=" + secret) != 0)
     check("SRS publish with the correct key is accepted",
-          srs_hook("on_publish", room_id, "?key=" + secret, client_id="cid-smoke-1") == 0)
+          srs_hook("on_publish", stream, "?key=" + secret, client_id="cid-smoke-1") == 0)
     r = requests.get(f"{API}/api/rooms", headers={"Origin": ORIGIN})
     items = r.json().get("items", []) if r.ok else []
     ours = [i for i in items if i.get("id") == room_id]
     pub = json.dumps(r.json()) if r.ok else ""
-    check("public room list shows the room with playback URL /live/<roomId>.flv",
-          ours and ours[0].get("playbackUrl", "").endswith(f"/{room_id}.flv"), json.dumps(ours)[:300])
+    check("public room list shows the room with playback URL /live/<playName>.flv",
+          ours and ours[0].get("playbackUrl", "").endswith(f"/{stream}.flv"), json.dumps(ours)[:300])
     check("public room list never contains the publish secret", secret and secret not in pub)
     check("miclink-* stream without a token is rejected", srs_hook("on_publish", f"miclink-{room_id}-x") != 0)
 
@@ -246,6 +255,32 @@ def main():
           r.ok and ended and "revenueCoin" not in r.text and "topFan" not in r.text, f"{r.status_code} {r.text[:300]}")
     r = creator.req("GET", f"/api/rooms/channels/ch-{creator.id}/history")
     check("the channel owner still sees their revenue", r.ok and "revenueCoin" in r.text, f"{r.status_code} {r.text[:200]}")
+
+    # ---------------- Fan-club-only playback stays with members ----------------
+    # The room id is public; the play name that plays the stream must not be.
+    r = creator.req("POST", "/api/rooms/live", json={"title": "Smoke members only", "category": "Gaming",
+                                                     "channelName": "Smoke Creator", "fanClubOnly": True})
+    fc_id = r.json().get("id", "") if r.ok else ""
+    fc_stream, fc_secret = play_name_and_secret(r.json().get("streamKey", "") if r.ok else "")
+    fc_tag = fc_stream[len(fc_id) + 1:] if fc_id and fc_stream.startswith(fc_id + "_") else ""
+    fc_live = bool(fc_tag) and srs_hook("on_publish", fc_stream, "?key=" + fc_secret, client_id="cid-smoke-fc") == 0
+    r = creator.req("GET", f"/api/rooms/{fc_id}")
+    check("the owner of a fan-club-only live gets its playback URL",
+          fc_live and r.ok and r.json().get("playbackUrl", "").endswith(f"/{fc_stream}.flv"), f"{r.status_code} {r.text[:200]}")
+    viewer.req("POST", f"/api/rooms/{fc_id}/watch")  # puts it in the viewer's watch history
+    seen = {  # the viewer never joined the creator's fan club (no fan_light gift)
+        "room detail": viewer.req("GET", f"/api/rooms/{fc_id}"),
+        "anonymous room detail": requests.get(f"{API}/api/rooms/{fc_id}", headers={"Origin": ORIGIN}),
+        "room list": viewer.req("GET", "/api/rooms?size=100"),
+        "recommendations": viewer.req("GET", "/api/rooms/recommended"),
+        "search": viewer.req("GET", "/api/rooms/search", params={"q": "Smoke members only"}),
+        "watch history": viewer.req("GET", "/api/rooms/library/history"),
+    }
+    leaks = [name for name, resp in seen.items() if fc_tag and fc_tag in resp.text]
+    check("a non-member never gets a fan-club-only live's play name",
+          fc_live and seen["room detail"].ok and fc_id in seen["room detail"].text and not leaks,
+          f"leaking: {leaks}; room detail {seen['room detail'].status_code} {seen['room detail'].text[:200]}")
+    creator.req("DELETE", "/api/rooms/live")
 
     # ---------------- Medium / boundaries ----------------
     r = requests.get(f"{API}/api/rooms?size=100000", headers={"Origin": ORIGIN})
