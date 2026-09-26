@@ -1,7 +1,7 @@
 service:
   name: im-gateway
   http_addr: ":8081"
-  pprof_addr: ":6066"
+  pprof_addr: "127.0.0.1:6066"  # loopback only; "" disables pprof
   log_level: info
 
 ws:

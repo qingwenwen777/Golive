@@ -5,9 +5,16 @@ Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endp
 Internal (service-to-service, not proxied by api-gateway): `GET /internal/rooms/:id/fan-badges/:userId` → `{"fanBadge": {"creatorId","level"} | null}`, used by im-gateway to decorate live chat.
 
 - HTTP: `:8093` (only `/rooms/:id/danmus` + `/healthz`, proxied by api-gateway)
-- pprof: `:6068`
+- pprof: `127.0.0.1:6068` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Data flow
+
+Deployed today (`kafka.enabled: false` in chat-service and im-gateway, the default): im-gateway
+moderates live chat and publishes it to Redis `room:<id>`; chat-service subscribes to the same
+channels (`internal/redissub`) and persists each message. No Kafka client is created.
+
+The Kafka pipeline below is optional. It needs a broker (Compose profile `kafka`) and
+`kafka.enabled: true` in both im-gateway and chat-service:
 
 ```
 client → ws → im-gateway →(produce)→ kafka:danmu
@@ -89,8 +96,10 @@ Cross-room statistics require UNION ALL across all shards. Online cross-room agg
 
 ## Startup
 
+MySQL and Redis must be reachable at the addresses in `configs/config.yaml`; Kafka only when
+`kafka.enabled` is true.
+
 ```bash
-docker compose -f deploy/docker-compose.yml up -d mysql redis kafka zookeeper
 go run ./app/chat-service/cmd
 ```
 
@@ -98,7 +107,9 @@ At startup, the service:
 
 1. Runs AutoMigrate on the 8 sharded tables.
 2. Loads `configs/sensitive.txt` to build the DFA.
-3. Joins Kafka consumer group `chat-consumer` and subscribes to the `danmu` topic.
+3. Subscribes to Redis `room:*` and persists live chat.
+4. Only with `kafka.enabled: true` (env `CHATSVC_KAFKA_ENABLED`): joins Kafka consumer group
+   `chat-consumer` and subscribes to the `danmu` topic.
 
 ## Tests
 

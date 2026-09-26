@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +24,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/server"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -115,13 +115,10 @@ func main() {
 	wsH := server.NewWSHandler(deps, verifier, wsCfg, cfg.Room.WelcomeText)
 	mux := server.NewMux(wsH, h)
 
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: mux}
-
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	// WebSocket connections outlive any per-request deadline: only the
+	// header and idle timeouts apply; ws.* sets the per-connection deadlines.
+	httpSrv := httpserver.NewLongLived(cfg.Service.HTTPAddr, mux)
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	go func() {
 		log.Info("im-gateway listening", zap.String("addr", cfg.Service.HTTPAddr))

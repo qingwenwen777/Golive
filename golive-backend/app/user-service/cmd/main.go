@@ -6,7 +6,6 @@ import (
 	"flag"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,6 +25,7 @@ import (
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/user-service/internal/server"
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -130,15 +130,10 @@ func main() {
 	if cfg.Internal.Token == "" {
 		log.Warn("internal.token is empty: /internal endpoints reject every call")
 	}
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
 	var grpcSrv *grpc.Server
 
-	// pprof on a side port.
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 	if cfg.Service.GRPCAddr != "" {
 		lis, err := net.Listen("tcp", cfg.Service.GRPCAddr)
 		if err != nil {

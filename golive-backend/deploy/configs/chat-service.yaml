@@ -1,7 +1,7 @@
 service:
   name: chat-service
   http_addr: ":8093"
-  pprof_addr: ":6068"
+  pprof_addr: "127.0.0.1:6068"  # loopback only; "" disables pprof
   log_level: info
 
 mysql:
@@ -16,6 +16,10 @@ redis:
   password: ""
 
 kafka:
+  # Off: live chat is persisted from Redis pub/sub (im-gateway runs with
+  # kafka.enabled: false too). Turn both on only together with the Compose
+  # "kafka" profile, which starts the broker.
+  enabled: false
   brokers: ["kafka:9092"]
   topic: "danmu"
   group: "chat-consumer"

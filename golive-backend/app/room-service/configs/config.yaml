@@ -1,7 +1,7 @@
 service:
   name: room-service
   http_addr: ":8091"
-  pprof_addr: ":6063"
+  pprof_addr: "127.0.0.1:6063"  # loopback only; "" disables pprof
   log_level: info
 
 mysql:

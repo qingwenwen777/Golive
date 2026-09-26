@@ -13,6 +13,10 @@ WORK_TREE="${WORK_TREE:-/srv/${APP_NAME}/app}"
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 FALLBACK_BRANCH="${FALLBACK_BRANCH:-master}"
 GIT_DIR="${GIT_DIR:-/srv/git/${APP_NAME}.git}"
+# `docker compose up` waits for health checks with no limit of its own, so a
+# service that keeps crashing at startup would hang the push. Give up after
+# this long (GNU timeout syntax).
+UP_TIMEOUT="${UP_TIMEOUT:-20m}"
 
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -59,6 +63,23 @@ reconcile_mounted_config() {
   fi
 }
 
+# remove_disabled_kafka removes the golive-kafka container when the "kafka"
+# Compose profile is not enabled (COMPOSE_PROFILES in deploy/.env).
+# Containers of profile-disabled services are not orphans, so
+# `--remove-orphans` leaves them running; this is what retires the old
+# ZooKeeper-based broker, whose ZooKeeper container is gone.
+remove_disabled_kafka() {
+  local services
+  services="$(docker compose config --services)"
+  if grep -qx kafka <<<"$services"; then
+    return 0
+  fi
+  if docker container inspect golive-kafka >/dev/null 2>&1; then
+    log "kafka profile is off; removing container golive-kafka"
+    docker rm -f golive-kafka >/dev/null
+  fi
+}
+
 deploy_ref() {
   local newrev="$1"
   local ref="$2"
@@ -87,9 +108,20 @@ deploy_ref() {
     node:20-alpine \
     sh -lc 'corepack enable && pnpm config set registry https://registry.npmmirror.com && pnpm install --frozen-lockfile && pnpm build'
 
-  log "rebuilding and starting services"
   cd "${WORK_TREE}/golive-backend/deploy"
-  docker compose up -d --build --remove-orphans
+  log "building service images"
+  docker compose build
+
+  remove_disabled_kafka
+
+  # init-permissions runs first; services start once their dependencies are
+  # healthy (see docker-compose.yml).
+  log "starting services (gives up after ${UP_TIMEOUT})"
+  if ! timeout "$UP_TIMEOUT" docker compose up -d --remove-orphans; then
+    log "docker compose up failed or timed out; check: docker compose ps -a; docker compose logs --tail=100 <service>"
+    docker compose ps -a || true
+    exit 1
+  fi
 
   # Heal single-file bind-mount drift for edge containers (see helper comment).
   # nginx serves whichever config its entrypoint picked; both are mounted, so
@@ -104,7 +136,7 @@ deploy_ref() {
     srs.conf /usr/local/srs/conf/srs.conf
 
   log "current service status"
-  docker compose ps
+  docker compose ps -a
 }
 
 while read -r oldrev newrev refname; do

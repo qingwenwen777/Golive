@@ -3,7 +3,7 @@
 Live-room lists / details / follows / likes and dislikes / creator go-live flow + SRS publishing authentication.
 
 - HTTP: `:8091` (unprefixed routes; api-gateway exposes them under `/api` through its reverse proxy)
-- pprof: `:6063`
+- pprof: `127.0.0.1:6063` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Endpoints
 

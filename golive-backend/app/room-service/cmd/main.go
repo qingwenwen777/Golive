@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +19,7 @@ import (
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/room-service/internal/server"
 	"github.com/qingwenwen777/golive/app/room-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -181,15 +181,11 @@ func main() {
 		PostImageDir:   cfg.Upload.PostImageDir,
 		PostPublicURL:  cfg.Upload.PostPublicURL,
 	})
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
 	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
 	defer stopScheduler()
 
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	go func() {
 		log.Info("room-service listening", zap.String("addr", cfg.Service.HTTPAddr))

@@ -14,8 +14,9 @@ Browser
 
 docker compose:
   nginx, api-gateway, user-service, room-service, chat-service,
-  gift-service, im-gateway, SRS, MySQL, Redis, Kafka, etcd, MinIO,
+  gift-service, im-gateway, SRS, MySQL, Redis,
   Prometheus, Grafana, Jaeger, OTel Collector
+  (+ Kafka only with the "kafka" profile; off by default)
 ```
 
 ## One-command startup
@@ -80,7 +81,7 @@ Gift and SuperChat requests require a stable `X-Request-Id`. For a replay, the b
 | 2 Home feed | `/` | Live cards render | `room-service` logs; MySQL/Redis status |
 | 3 Enter a live room | `/live/:id` | Room details load; WS readyState=1 | `im-gateway` logs; token; roomId |
 | 4 Play stream | Load the player | FLV request returns 200 | Check for an SRS stream and nginx `/live/` configuration |
-| 5 Send chat | Send from the input field | Own message appears; room fanout | im-gateway -> Kafka -> chat-service -> Redis |
+| 5 Send chat | Send from the input field | Own message appears; room fanout | im-gateway -> Redis `room:<id>` (fanout); chat-service persists from the same channel |
 | 6 Send a gift | Gift panel | Order succeeds; animation appears | `gift-service` logs; coin balance; requestId |
 | 7 Follow/like | Room actions | Optimistic UI update agrees with the API | `room-service` social endpoints |
 | 8 Creator goes live | `/studio/prepare` | streamKey and RTMP URL returned | room-service; SRS on_publish callback |

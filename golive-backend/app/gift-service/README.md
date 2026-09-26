@@ -3,7 +3,7 @@
 Gift catalog, tipping, SuperChat, and a transactional outbox.
 
 - HTTP: `:8092` (unprefixed routes; api-gateway exposes them under `/api`)
-- pprof: `:6067`
+- pprof: `127.0.0.1:6067` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Endpoints
 

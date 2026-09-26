@@ -4,8 +4,23 @@ x-logging: &default-logging
     max-size: "20m"
     max-file: "3"
 
+# Probe timing for the Go services' /healthz checks (busybox wget from the
+# alpine runtime image; -Y off ignores proxy variables Docker may inject).
+# start_period covers the schema migrations user/room/gift/chat-service run
+# before they open their HTTP port: probe failures during it do not count,
+# and the first success marks the container healthy immediately.
+x-go-healthcheck: &go-healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 3
+  start_period: 5m
+
 services:
   mysql:
+    # Deliberately left on the 8.0 series tag: mysqld refuses a data directory
+    # written by a newer 8.0.x, so pinning a patch older than the image the
+    # server already has would stop the database. 8.0 is end-of-life (final
+    # release 8.0.46); moving to 8.4 LTS needs its own backup-and-test window.
     image: mysql:8.0
     container_name: golive-mysql
     restart: unless-stopped
@@ -28,40 +43,109 @@ services:
       start_period: 20s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.11-alpine
     container_name: golive-redis
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    environment:
+      # redis-cli reads the password from here (healthcheck and
+      # `docker compose exec redis redis-cli`).
+      REDISCLI_AUTH: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
+    command: ["redis-server", "--requirepass", "${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}"]
+    # Follows and likes live only in Redis; on stop it writes its RDB
+    # snapshot, which must not be cut off by Docker's default 10s timeout.
+    stop_grace_period: 60s
     volumes: [redis_data:/data]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Only an authenticated PING answers PONG.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 30
 
-  zookeeper:
-    image: bitnamilegacy/zookeeper:3.9
-    container_name: golive-zookeeper
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-
+  # Optional, off by default. Live chat and gift events go through Redis
+  # (every service ships with kafka.enabled: false). To use Kafka, start the
+  # "kafka" profile (COMPOSE_PROFILES=kafka in deploy/.env) AND set
+  # kafka.enabled: true in the services that should produce/consume.
+  # Single-node KRaft: no ZooKeeper. 3.9.x is the newest line the franz-go
+  # client in go.mod (v1.18) documents support for.
   kafka:
-    image: bitnamilegacy/kafka:3.7
+    image: apache/kafka:3.9.2
     container_name: golive-kafka
+    profiles: ["kafka"]
     restart: unless-stopped
     logging: *default-logging
-    depends_on: [zookeeper]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
-      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      CLUSTER_ID: 05DhG_cgTXekmqcow-SoWA
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: [kafka_data:/var/lib/kafka/data]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
+
+  # ========== one-shot permissions job ==========
+
+  # The Go services run as UID/GID 10001 (Dockerfile.service) without any
+  # capabilities, but the upload and recording volumes were created
+  # root-owned and deploy/secrets is usually readable by root only. This job
+  # runs before them on every `docker compose up`, then exits:
+  # - the volumes become owned by 10001:10001 (SRS keeps writing recordings
+  #   as root; owning the directory is what lets room-service delete them);
+  # - deploy/secrets keeps its owner and gains group 10001 with group read
+  #   (directories: read + traverse). Nothing else on the host is touched.
+  #   Where the host filesystem refuses chgrp (e.g. Docker Desktop bind
+  #   mounts) that is only a warning; the job fails, naming the paths, only
+  #   if UID/GID 10001 still cannot read something.
+  init-permissions:
+    image: alpine:3.22
+    container_name: golive-init-permissions
+    restart: "no"
+    logging: *default-logging
+    network_mode: none
+    user: "0:0"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    volumes:
+      - ./secrets:/fix/secrets
+      - avatar_uploads:/fix/avatars
+      - cover_uploads:/fix/covers
+      - post_uploads:/fix/posts
+      - replay_records:/fix/records
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        find /fix/avatars /fix/covers /fix/posts /fix/records \( ! -user 10001 -o ! -group 10001 \) -exec chown -h 10001:10001 {} +
+        find /fix/secrets ! -type l ! -group 10001 -exec chgrp 10001 {} + || echo "init-permissions: could not change the group of deploy/secrets" >&2
+        find /fix/secrets -type d ! -perm -050 -exec chmod g+rx {} + || true
+        find /fix/secrets -type f ! -perm -040 -exec chmod g+r {} + || true
+        if find /fix/secrets \( -type d ! -perm -001 ! \( -group 10001 -perm -010 \) \) -o \( -type f ! -perm -004 ! \( -group 10001 -perm -040 \) \) | grep .; then
+          echo "init-permissions: UID/GID 10001 cannot read the deploy/secrets paths above" >&2
+          exit 1
+        fi
+        echo "init-permissions: volumes and deploy/secrets are ready for UID/GID 10001"
 
   # ========== Go application services ==========
+  # All run as UID/GID 10001 with no capabilities (they bind ports > 1024).
 
   user-service:
     build:
@@ -73,8 +157,13 @@ services:
     container_name: golive-user-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/user-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8090/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -83,6 +172,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       USERSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      USERSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       USERSVC_GOOGLE_CLIENT_ID: ${USERSVC_GOOGLE_CLIENT_ID:-}
       USERSVC_EMAIL_SMTP_PASSWORD: ${USERSVC_EMAIL_SMTP_PASSWORD:-}
       USERSVC_EMAIL_SMTP_PORT: ${USERSVC_EMAIL_SMTP_PORT:-}
@@ -92,6 +182,8 @@ services:
       USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT: ${USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT:-}
       USERSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -109,8 +201,13 @@ services:
     container_name: golive-room-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/room-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8091/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -120,11 +217,14 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       ROOMSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      ROOMSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       ROOMSVC_LIVE_STREAM_KEY_SECRET: ${ROOMSVC_LIVE_STREAM_KEY_SECRET:?set ROOMSVC_LIVE_STREAM_KEY_SECRET in deploy/.env}
       ROOMSVC_REPLAY_BUNNY_LIBRARY_ID: ${BUNNY_STREAM_LIBRARY_ID:-}
       ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
       ROOMSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -142,16 +242,24 @@ services:
     container_name: golive-gift-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/gift-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8092/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       GIFTSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      GIFTSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       GIFTSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -169,22 +277,26 @@ services:
     container_name: golive-chat-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/chat-service.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8093/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       CHATSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      CHATSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       CHATSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
       otel-collector:
         condition: service_started
 
@@ -198,8 +310,14 @@ services:
     container_name: golive-api-gateway
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/api-gateway.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      start_period: 30s   # no migrations
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8080/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
@@ -207,12 +325,17 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       GW_CSRF_SECRET: ${GW_CSRF_SECRET:?set GW_CSRF_SECRET in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
+      # Start routing only once the upstreams answer /healthz.
       user-service:
-        condition: service_started
+        condition: service_healthy
       room-service:
-        condition: service_started
+        condition: service_healthy
       gift-service:
-        condition: service_started
+        condition: service_healthy
+      chat-service:
+        condition: service_healthy
       otel-collector:
         condition: service_started
 
@@ -226,32 +349,43 @@ services:
     container_name: golive-im-gateway
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/im-gateway.yaml"]
+    healthcheck:
+      <<: *go-healthcheck
+      start_period: 30s   # no migrations
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "-Y", "off", "http://127.0.0.1:8081/healthz"]
     volumes:
       - ./configs:/app/deploy/configs:ro
       - ./secrets:/app/deploy/secrets:ro
       - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
     environment:
+      IMGW_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       IMGW_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
-
-  etcd:
-    image: bitnamilegacy/etcd:3.5
-    container_name: golive-etcd
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_ADVERTISE_CLIENT_URLS: http://0.0.0.0:2379
+      # Handshakes look rooms up in room-service; chat identity comes from
+      # user-service. Clients reconnect right after a deploy, so wait for both.
+      room-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
 
   srs:
-    image: ossrs/srs:5
+    # v5.0.213 is what ossrs/srs:5 pointed to from June 2024 until
+    # 2026-09-24 (it now points to v5.0.225, not yet evaluated here).
+    image: ossrs/srs:v5.0.213
     container_name: golive-srs
     restart: unless-stopped
     logging: *default-logging
+    # Runs as root and keeps its default capabilities: it writes recordings
+    # into replay_records, whose directory is owned by UID 10001.
+    security_opt: [no-new-privileges:true]
     ports:
       - "1935:1935"
       - "8000:8000/udp"
@@ -262,25 +396,21 @@ services:
       - replay_records:/tmp/golive/records
     command: ./objs/srs -c conf/srs.conf
 
-  minio:
-    image: minio/minio:latest
-    container_name: golive-minio
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      MINIO_ROOT_USER: ${GOLIVE_MINIO_ROOT_USER:?set GOLIVE_MINIO_ROOT_USER in deploy/.env}
-      MINIO_ROOT_PASSWORD: ${GOLIVE_MINIO_ROOT_PASSWORD:?set GOLIVE_MINIO_ROOT_PASSWORD in deploy/.env}
-    volumes: [minio_data:/data]
-    command: server /data --console-address ":9001"
-
   # ========== edge reverse proxy ==========
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.27.5-alpine
     container_name: golive-nginx
     restart: unless-stopped
     logging: *default-logging
-    depends_on: [srs, api-gateway, im-gateway]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      srs:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
+      im-gateway:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
@@ -309,6 +439,9 @@ services:
     container_name: golive-jaeger
     restart: unless-stopped
     logging: *default-logging
+    # The observability images already run as non-root users.
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
@@ -321,6 +454,8 @@ services:
     container_name: golive-otel
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
@@ -331,6 +466,8 @@ services:
     container_name: golive-prometheus
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
@@ -346,6 +483,8 @@ services:
     container_name: golive-grafana
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
       GF_SECURITY_ADMIN_USER: ${GOLIVE_GRAFANA_ADMIN_USER:?set GOLIVE_GRAFANA_ADMIN_USER in deploy/.env}
       GF_SECURITY_ADMIN_PASSWORD: ${GOLIVE_GRAFANA_ADMIN_PASSWORD:?set GOLIVE_GRAFANA_ADMIN_PASSWORD in deploy/.env}
@@ -361,7 +500,7 @@ services:
 volumes:
   mysql_data:
   redis_data:
-  minio_data:
+  kafka_data:
   prom_data:
   grafana_data:
   cover_uploads:
