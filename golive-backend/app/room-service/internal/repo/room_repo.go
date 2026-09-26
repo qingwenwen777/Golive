@@ -871,39 +871,6 @@ type FanBadgeDistributionRow struct {
 	TotalContribution int64  `gorm:"column:total_contribution"`
 }
 
-func (r *RoomRepo) RevenueRowsByRooms(ctx context.Context, roomIDs []string) ([]RevenueRow, error) {
-	if len(roomIDs) == 0 {
-		return nil, nil
-	}
-	var rows []RevenueRow
-	err := r.db.WithContext(ctx).Raw(`
-SELECT
-  o.room_id,
-  o.user_id,
-  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), o.user_id) AS user_name,
-  COALESCE(u.avatar, '') AS avatar,
-  o.total_coin AS amount,
-  o.created_at,
-  'gift' AS kind
-FROM gift_orders o
-LEFT JOIN users u ON u.id = o.user_id
-WHERE o.status = 'success' AND o.room_id IN ?
-UNION ALL
-SELECT
-  s.room_id,
-  s.user_id,
-  COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), s.user_id) AS user_name,
-  COALESCE(u.avatar, '') AS avatar,
-  s.amount AS amount,
-  s.created_at,
-  'super_chat' AS kind
-FROM super_chat_orders s
-LEFT JOIN users u ON u.id = s.user_id
-WHERE s.status = 'success' AND s.room_id IN ?
-`, roomIDs, roomIDs).Scan(&rows).Error
-	return rows, err
-}
-
 // RevenueTotals is a room's successful gift and super chat income.
 type RevenueTotals struct {
 	Gift      int64
@@ -948,6 +915,51 @@ GROUP BY room_id
 		out[row.RoomID] = totals
 	}
 	return out, nil
+}
+
+// TopFanRow is one fan's successful gift and super chat total in a room.
+type TopFanRow struct {
+	RoomID   string
+	UserID   string
+	UserName string
+	Avatar   string
+	Amount   int64
+}
+
+// TopFansByRooms returns each room's top limit fans by total spend, ranked in
+// SQL (ties broken by user id), ordered by room then rank.
+func (r *RoomRepo) TopFansByRooms(ctx context.Context, roomIDs []string, limit int) ([]TopFanRow, error) {
+	if len(roomIDs) == 0 || limit < 1 {
+		return nil, nil
+	}
+	var rows []TopFanRow
+	err := r.db.WithContext(ctx).Raw(`
+SELECT room_id, user_id, user_name, avatar, amount
+FROM (
+  SELECT
+    t.room_id,
+    t.user_id,
+    COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), t.user_id) AS user_name,
+    COALESCE(u.avatar, '') AS avatar,
+    t.amount,
+    ROW_NUMBER() OVER (PARTITION BY t.room_id ORDER BY t.amount DESC, t.user_id ASC) AS fan_rank
+  FROM (
+    SELECT room_id, user_id, SUM(amount) AS amount
+    FROM (
+      SELECT room_id, user_id, total_coin AS amount FROM gift_orders
+      WHERE status = 'success' AND room_id IN ? AND user_id <> ''
+      UNION ALL
+      SELECT room_id, user_id, amount FROM super_chat_orders
+      WHERE status = 'success' AND room_id IN ? AND user_id <> ''
+    ) x
+    GROUP BY room_id, user_id
+  ) t
+  LEFT JOIN users u ON u.id = t.user_id
+) ranked
+WHERE fan_rank <= ?
+ORDER BY room_id, fan_rank
+`, roomIDs, roomIDs, limit).Scan(&rows).Error
+	return rows, err
 }
 
 func (r *RoomRepo) FanBadgeDistribution(ctx context.Context, creatorID string) ([]FanBadgeDistributionRow, error) {

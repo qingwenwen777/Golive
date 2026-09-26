@@ -340,7 +340,11 @@ func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, view
 		}
 		return nil, err
 	}
-	rows, err := s.revenueRows(ctx, []string{room.ID})
+	revenue, err := s.revenueTotals(ctx, []string{room.ID})
+	if err != nil {
+		return nil, err
+	}
+	fans, err := s.topFansByRooms(ctx, []string{room.ID}, 8)
 	if err != nil {
 		return nil, err
 	}
@@ -349,21 +353,17 @@ func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, view
 		return nil, err
 	}
 	item := s.historyItem(*room, danmuCounts[room.ID])
-	s.addOwnerMetrics(ctx, &item, *room, rows)
-	topFans := topFans(rows, 8)
-	giftRevenue, scRevenue := int64(0), int64(0)
-	for _, row := range rows {
-		if row.Kind == "super_chat" {
-			scRevenue += row.Amount
-		} else {
-			giftRevenue += row.Amount
-		}
+	totals := revenue[room.ID]
+	s.addOwnerMetrics(ctx, &item, *room, totals.Total(), fans[room.ID])
+	topFans := fans[room.ID]
+	if topFans == nil {
+		topFans = []FanContribution{}
 	}
 	return &LiveAnalysisResp{
 		Record:           item,
 		TopFans:          topFans,
-		GiftRevenue:      giftRevenue,
-		SuperChatRevenue: scRevenue,
+		GiftRevenue:      totals.Gift,
+		SuperChatRevenue: totals.SuperChat,
 	}, nil
 }
 
@@ -435,14 +435,17 @@ func (s *RoomService) historyItemsFromRooms(ctx context.Context, rooms []model.R
 			ownedIDs = append(ownedIDs, room.ID)
 		}
 	}
-	rowsByRoom := map[string][]repo.RevenueRow{}
+	revenueByRoom := map[string]repo.RevenueTotals{}
+	topFanByRoom := map[string][]FanContribution{}
 	if len(ownedIDs) > 0 {
-		rows, err := s.revenueRows(ctx, ownedIDs)
+		var err error
+		revenueByRoom, err = s.revenueTotals(ctx, ownedIDs)
 		if err != nil {
 			return nil, err
 		}
-		for _, row := range rows {
-			rowsByRoom[row.RoomID] = append(rowsByRoom[row.RoomID], row)
+		topFanByRoom, err = s.topFansByRooms(ctx, ownedIDs, 1)
+		if err != nil {
+			return nil, err
 		}
 	}
 	danmuCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
@@ -453,7 +456,7 @@ func (s *RoomService) historyItemsFromRooms(ctx context.Context, rooms []model.R
 	for _, room := range rooms {
 		item := s.historyItem(room, danmuCounts[room.ID])
 		if viewerOwnsRoom(room, viewerID) {
-			s.addOwnerMetrics(ctx, &item, room, rowsByRoom[room.ID])
+			s.addOwnerMetrics(ctx, &item, room, revenueByRoom[room.ID].Total(), topFanByRoom[room.ID])
 		}
 		if s.replay != nil {
 			replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
@@ -501,15 +504,13 @@ func (s *RoomService) historyItem(room model.Room, danmuCount int64) LiveHistory
 }
 
 // addOwnerMetrics fills the creator-only revenue, top fan and new-subscriber
-// fields. Only call it when the viewer owns the room.
-func (s *RoomService) addOwnerMetrics(ctx context.Context, item *LiveHistoryItem, room model.Room, rows []repo.RevenueRow) {
-	revenue := int64(0)
-	for _, row := range rows {
-		revenue += row.Amount
-	}
+// fields from the room's revenue and ranked top fans. Only call it when the
+// viewer owns the room.
+func (s *RoomService) addOwnerMetrics(ctx context.Context, item *LiveHistoryItem, room model.Room, revenue int64, topFans []FanContribution) {
 	item.RevenueCoin = &revenue
-	if fans := topFans(rows, 1); len(fans) > 0 {
-		item.TopFan = &fans[0]
+	if len(topFans) > 0 {
+		topFan := topFans[0]
+		item.TopFan = &topFan
 	}
 	newSubscribers := s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
 	item.NewSubscribers = &newSubscribers
@@ -600,14 +601,6 @@ func (s *RoomService) fanBadgeDistribution(ctx context.Context, ownerID string) 
 	return buckets, nil
 }
 
-func (s *RoomService) revenueRows(ctx context.Context, roomIDs []string) ([]repo.RevenueRow, error) {
-	rows, err := s.rooms.RevenueRowsByRooms(ctx, roomIDs)
-	if err != nil && isMissingAnalyticsTable(err) {
-		return nil, nil
-	}
-	return rows, err
-}
-
 // revenueTotals returns successful gift and super chat income by room id,
 // treating missing order tables as no income.
 func (s *RoomService) revenueTotals(ctx context.Context, roomIDs []string) (map[string]repo.RevenueTotals, error) {
@@ -616,6 +609,29 @@ func (s *RoomService) revenueTotals(ctx context.Context, roomIDs []string) (map[
 		return map[string]repo.RevenueTotals{}, nil
 	}
 	return totals, err
+}
+
+// topFansByRooms returns each room's top limit fans, highest spend first. The
+// aggregation and ranking run in SQL, so the cost doesn't grow with the number
+// of orders loaded into the service.
+func (s *RoomService) topFansByRooms(ctx context.Context, roomIDs []string, limit int) (map[string][]FanContribution, error) {
+	out := map[string][]FanContribution{}
+	rows, err := s.rooms.TopFansByRooms(ctx, roomIDs, limit)
+	if err != nil {
+		if isMissingAnalyticsTable(err) {
+			return out, nil
+		}
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.RoomID] = append(out[row.RoomID], FanContribution{
+			UserID: row.UserID,
+			Name:   row.UserName,
+			Avatar: row.Avatar,
+			Amount: row.Amount,
+		})
+	}
+	return out, nil
 }
 
 func (s *RoomService) subscribersBetween(ctx context.Context, channelID string, start, end time.Time) int64 {
@@ -627,51 +643,6 @@ func (s *RoomService) subscribersBetween(ctx context.Context, channelID string, 
 		return 0
 	}
 	return count
-}
-
-func topFans(rows []repo.RevenueRow, limit int) []FanContribution {
-	type agg struct {
-		userID string
-		name   string
-		avatar string
-		amount int64
-	}
-	byUser := map[string]*agg{}
-	for _, row := range rows {
-		key := row.UserID
-		if key == "" {
-			key = row.UserName
-		}
-		if key == "" {
-			continue
-		}
-		item := byUser[key]
-		if item == nil {
-			item = &agg{userID: row.UserID, name: row.UserName, avatar: row.Avatar}
-			byUser[key] = item
-		}
-		item.amount += row.Amount
-	}
-	out := make([]FanContribution, 0, len(byUser))
-	for _, item := range byUser {
-		out = append(out, FanContribution{
-			UserID: item.userID,
-			Name:   item.name,
-			Avatar: item.avatar,
-			Amount: item.amount,
-		})
-	}
-	for i := 0; i < len(out); i++ {
-		for j := i + 1; j < len(out); j++ {
-			if out[j].Amount > out[i].Amount {
-				out[i], out[j] = out[j], out[i]
-			}
-		}
-	}
-	if limit > 0 && len(out) > limit {
-		return out[:limit]
-	}
-	return out
 }
 
 func endedAtOf(room model.Room) time.Time {
