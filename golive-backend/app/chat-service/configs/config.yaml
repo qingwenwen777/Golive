@@ -16,6 +16,7 @@ redis:
   password: ""
 
 kafka:
+  enabled: false       # true only with a broker at brokers[] and im-gateway producing to it
   brokers: ["127.0.0.1:9092"]
   topic: "danmu"
   group: "chat-consumer"
