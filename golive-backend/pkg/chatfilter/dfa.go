@@ -27,8 +27,11 @@
 //   - word boundaries for alphabetic scripts: short words (≤ 3 letters, e.g.
 //     "sb") only match as whole words so "usb" stays intact, and a match that
 //     skipped separator characters must start at a word boundary so it cannot
-//     straddle two words ("this bad" is not "s b"). CJK has no word
-//     boundaries and always matches as a substring.
+//     straddle two words ("this bad" is not "s b"). One that skipped
+//     whitespace spans words, so it must end at a boundary too ("an
+//     alternative" is not "anal"). An apostrophe between letters belongs to
+//     the word ("let's hit" is not "s hit"). CJK has no word boundaries and
+//     always matches as a substring.
 package chatfilter
 
 import (
@@ -51,6 +54,7 @@ type node struct {
 	children map[rune]*node
 	end      bool
 	wordLen  int  // rune length of the matched word ending here
+	alpha    bool // word is all word runes, so word boundaries apply
 	strict   bool // word must stand alone (short alphabetic word)
 }
 
@@ -119,6 +123,7 @@ func (f *Filter) addWord(w string) {
 	}
 	cur.end = true
 	cur.wordLen = len(runes)
+	cur.alpha = alphabetic
 	cur.strict = alphabetic && len(runes) <= strictWordLen
 }
 
@@ -175,7 +180,7 @@ func (f *Filter) Replace(text string) string {
 func (f *Filter) longestMatchAt(t []rune, start int) int {
 	cur := f.root
 	best := 0
-	skipped := false
+	skipped, spaced := false, false
 	for i := start; i < len(t); i++ {
 		r := t[i]
 		if f.skip != nil && cur != f.root {
@@ -183,6 +188,7 @@ func (f *Filter) longestMatchAt(t []rune, start int) int {
 			// has started — otherwise "..." would always "match" empty.
 			if _, sk := f.skip[r]; sk {
 				skipped = true
+				spaced = spaced || unicode.IsSpace(r)
 				continue
 			}
 		}
@@ -191,7 +197,7 @@ func (f *Filter) longestMatchAt(t []rune, start int) int {
 			break
 		}
 		cur = next
-		if cur.end && acceptable(t, start, i, cur.strict, skipped) {
+		if cur.end && acceptable(t, start, i, cur, skipped, spaced) {
 			best = i + 1
 			// keep going — there might be a longer word continuing past here
 		}
@@ -199,12 +205,16 @@ func (f *Filter) longestMatchAt(t []rune, start int) int {
 	return best
 }
 
-// acceptable applies the word-boundary rules to a candidate match t[start..last].
-func acceptable(t []rune, start, last int, strict, skipped bool) bool {
-	leftOK := start == 0 || !isWordRune(t[start-1])
-	if strict {
-		rightOK := last+1 >= len(t) || !isWordRune(t[last+1])
-		return leftOK && rightOK
+// acceptable applies the word-boundary rules to a candidate match
+// t[start..last] of the word ending at n. skipped reports whether the match
+// skipped separators, spaced whether any of them was whitespace.
+func acceptable(t []rune, start, last int, n *node, skipped, spaced bool) bool {
+	if !n.alpha {
+		return true
+	}
+	leftOK := !wordAt(t, start-1)
+	if n.strict || spaced {
+		return leftOK && !wordAt(t, last+1)
 	}
 	if skipped {
 		return leftOK
@@ -223,6 +233,27 @@ func isWordRune(r rune) bool {
 		return true
 	}
 	return unicode.IsLetter(r) && unicode.In(r, unicode.Latin, unicode.Greek, unicode.Cyrillic)
+}
+
+// wordAt reports whether t[i] is part of a word: a word rune, or an
+// apostrophe between two of them ("let's", "It’s"). Out of range is not.
+func wordAt(t []rune, i int) bool {
+	if i < 0 || i >= len(t) {
+		return false
+	}
+	if isWordRune(t[i]) {
+		return true
+	}
+	return isApostrophe(t[i]) && i > 0 && i+1 < len(t) && isWordRune(t[i-1]) && isWordRune(t[i+1])
+}
+
+// isApostrophe reports the runes typed as an apostrophe inside words.
+func isApostrophe(r rune) bool {
+	switch r {
+	case '\'', '’', '‘', 'ʼ', '`':
+		return true
+	}
+	return false
 }
 
 // normalized is the folded form of a text used for matching.

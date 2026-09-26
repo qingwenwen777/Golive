@@ -89,6 +89,44 @@ func TestFilter_WordBoundaries(t *testing.T) {
 	require.Equal(t, "badge", f.Replace("badge"))
 }
 
+// Reviewer-found false positives: an apostrophe counted as a word boundary,
+// so the "s" of "let's" started a word and "s hit" read as "shit".
+func TestFilter_ApostrophesStayInsideWords(t *testing.T) {
+	f := filter.New([]string{"shit", "sb"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	for _, in := range []string{
+		"let's hit the road",
+		"that's hit or miss",
+		"Chris's hit song",
+		"It’s hit the top 10",
+		"what's hit points",
+		"it's b",
+	} {
+		require.Equal(t, in, f.Replace(in))
+		require.False(t, f.HasMatch(in), "%q", in)
+	}
+	// Quote marks around a word are not apostrophes.
+	require.Equal(t, "'***'", f.Replace("'sb'"))
+	require.Equal(t, "‘***’", f.Replace("‘s b’"))
+}
+
+// A match that skips whitespace spans words, so it must end at a word
+// boundary as well as start at one: "an alternative" is not "an al" + "ternative".
+func TestFilter_MatchAcrossWordsMustEndAtBoundary(t *testing.T) {
+	f := filter.New([]string{"anal", "shit", "傻逼"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	require.Equal(t, "an alternative", f.Replace("an alternative"))
+	require.Equal(t, "in an algorithm", f.Replace("in an algorithm"))
+	require.False(t, f.HasMatch("an alarm"))
+
+	// Spaced-out words still hit, with or without trailing text.
+	require.Equal(t, "***", f.Replace("a n a l"))
+	require.Equal(t, "*** happens", f.Replace("s h i t happens"))
+	require.Equal(t, "***.s", f.Replace("s h i t.s"))
+	// Inside one token the match may still run into a suffix.
+	require.Equal(t, "***s", f.Replace("s.h.i.ts"))
+	// CJK has no word boundaries, next to Latin text or not.
+	require.Equal(t, "ok***lol", f.Replace("ok傻 逼lol"))
+}
+
 func TestFilter_Normalisation(t *testing.T) {
 	f := filter.New([]string{"fuck", "傻逼"}, filter.WithSkipChars(filter.DefaultSkipChars))
 
