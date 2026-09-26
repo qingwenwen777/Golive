@@ -31,6 +31,7 @@ func init() {
 type giftHTTPFixture struct {
 	router *gin.Engine
 	db     *gorm.DB
+	redis  *miniredis.Miniredis
 }
 
 func newGiftHTTPFixture(t *testing.T, viewerBalance int64) giftHTTPFixture {
@@ -100,7 +101,7 @@ func newGiftHTTPFixture(t *testing.T, viewerBalance int64) giftHTTPFixture {
 		Bet:       handler.NewBetHandler(service.NewBetService(orders)),
 	})
 
-	return giftHTTPFixture{router: router, db: db}
+	return giftHTTPFixture{router: router, db: db, redis: redisSrv}
 }
 
 func postJSON(router *gin.Engine, path, userID, body string) *httptest.ResponseRecorder {
@@ -175,6 +176,32 @@ func TestGiftSendHTTP_InsufficientCoinCachesReplayShape(t *testing.T) {
 	require.Equal(t, "true", replay.Header().Get("Idempotent-Replayed"))
 	require.JSONEq(t, first.Body.String(), replay.Body.String())
 	require.EqualValues(t, 50, coinBalance(t, fx.db, "u-demo"))
+}
+
+func TestJoinFanClubHTTP_ExistingMemberGetsConflictWithoutCharge(t *testing.T) {
+	fx := newGiftHTTPFixture(t, 5000)
+	seedGift(t, fx.db, "fan_light", 1000)
+
+	first := postJSON(fx.router, "/gifts/fan-clubs/join", "u-demo", `{"creatorId":"u-owner","requestId":"join-1"}`)
+	require.Equal(t, http.StatusOK, first.Code)
+	require.EqualValues(t, 4000, coinBalance(t, fx.db, "u-demo"))
+
+	again := postJSON(fx.router, "/gifts/fan-clubs/join", "u-demo", `{"creatorId":"u-owner","requestId":"join-2"}`)
+	require.Equal(t, http.StatusConflict, again.Code)
+	require.JSONEq(t, `{"message":"Already a fan club member","reason":"already_fan_club_member"}`, again.Body.String())
+	require.EqualValues(t, 4000, coinBalance(t, fx.db, "u-demo"), "a member must not be charged again")
+
+	// A retry of the first join still replays it once its Redis entry is gone.
+	fx.redis.FlushAll()
+	retry := postJSON(fx.router, "/gifts/fan-clubs/join", "u-demo", `{"creatorId":"u-owner","requestId":"join-1"}`)
+	require.Equal(t, http.StatusOK, retry.Code)
+	require.Equal(t, "true", retry.Header().Get("Idempotent-Replayed"))
+	var firstOrder, replayedOrder model.GiftOrder
+	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &firstOrder))
+	require.NoError(t, json.Unmarshal(retry.Body.Bytes(), &replayedOrder))
+	require.Equal(t, firstOrder.OrderID, replayedOrder.OrderID)
+	require.EqualValues(t, 4000, coinBalance(t, fx.db, "u-demo"))
+	require.EqualValues(t, 1000, coinBalance(t, fx.db, "u-owner"))
 }
 
 func TestBetHTTP_OpenWagerDuplicateAndLatestViewerState(t *testing.T) {

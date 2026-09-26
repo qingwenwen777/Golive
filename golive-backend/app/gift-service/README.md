@@ -11,6 +11,7 @@ Gift catalog, tipping, SuperChat, and a transactional outbox.
 | ---- | ---------------- | ---- | ------------------------------------------------------------------- |
 | GET | `/gifts` | No | Gift catalog |
 | POST | `/gifts/send` | JWT | Send a gift; idempotent via X-Request-Id; 402 for insufficient balance |
+| POST | `/gifts/fan-clubs/join` | JWT | Join a creator's fan club (Fan Light price); 409 `already_fan_club_member` for an existing member, without charging |
 | POST | `/super-chats` | JWT | SuperChat; map amount→tier; reject tier 0; otherwise follow gifts/send rules |
 
 ## Response shapes (matching src/mocks/handlers/gift.ts)
@@ -141,7 +142,7 @@ Coverage:
 - **\*_mysql_test.go** (run only when `GOLIVE_TEST_MYSQL_DSN` is set, e.g.
   `root:root@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC`; each test creates
   and drops its own database): bet settle/cancel races, concurrent fan-badge
-  contributions, and concurrent outbox claims/drains.
+  contributions and fan club joins, and concurrent outbox claims/drains.
 
 ## Verify against the frontend mock
 

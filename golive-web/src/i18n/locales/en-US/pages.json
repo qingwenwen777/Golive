@@ -283,6 +283,8 @@
       "join": "Join fan club",
       "joining": "Joining...",
       "joined": "Fan club joined. The room is unlocked.",
+      "alreadyMember": "You are already in this fan club. No coins were charged.",
+      "unlocking": "Joined. Unlocking the room...",
       "signIn": "Sign in to join"
     }
   },
@@ -416,6 +418,7 @@
       "pending": "Purchasing...",
       "success": "Fan badge lit.",
       "insufficient": "Not enough coins to buy this fan badge.",
+      "alreadyMember": "You are already in this fan club. No coins were charged.",
       "failed": "Could not purchase the fan badge."
     },
     "message": "Message"

@@ -470,6 +470,65 @@ func TestJoinFanClubWithoutLiveCreatesBadgeAndIncomeLedger(t *testing.T) {
 	require.Equal(t, "加入粉丝团收入", title)
 }
 
+// Joining again (the client sends a new requestId per click) used to charge
+// the Fan Light price a second time and add it to the badge.
+func TestJoinFanClub_ExistingMemberIsRefusedWithoutCharge(t *testing.T) {
+	db := newTestDB(t, 5000)
+	seedGift(t, db, "fan_light", 1000)
+	svc := service.NewGiftService(repo.NewGiftRepo(db), repo.NewOrderRepo(db))
+	ctx := context.Background()
+	join := func(requestID string) (*model.GiftOrder, bool, error) {
+		return svc.JoinFanClub(ctx, service.JoinFanClubReq{
+			UserID: "u-demo", CreatorID: "u-owner", RequestID: requestID,
+		})
+	}
+
+	first, _, err := join("join-1")
+	require.NoError(t, err)
+
+	order, replayed, err := join("join-2")
+	require.ErrorIs(t, err, service.ErrAlreadyFanClubMember)
+	require.Nil(t, order)
+	require.False(t, replayed)
+
+	// A retry of the join that succeeded replays it instead of being refused.
+	order, replayed, err = join("join-1")
+	require.NoError(t, err)
+	require.True(t, replayed)
+	require.Equal(t, first.OrderID, order.OrderID)
+
+	require.EqualValues(t, 4000, balanceOf(t, db, "u-demo"))
+	require.EqualValues(t, 1000, balanceOf(t, db, "u-owner"))
+	var badge model.FanBadge
+	require.NoError(t, db.Where("user_id = ? AND creator_id = ?", "u-demo", "u-owner").Take(&badge).Error)
+	require.EqualValues(t, 1000, badge.TotalContribution)
+	var orders, ledger int64
+	require.NoError(t, db.Model(&model.GiftOrder{}).Count(&orders).Error)
+	require.EqualValues(t, 1, orders)
+	require.NoError(t, db.Model(&model.CoinTransaction{}).Where("user_id = ?", "u-demo").Count(&ledger).Error)
+	require.EqualValues(t, 1, ledger)
+}
+
+// A badge from the Fan Light gift is the same membership.
+func TestJoinFanClub_FanLightGiftMemberIsRefused(t *testing.T) {
+	db := newTestDB(t, 5000)
+	seedGift(t, db, "fan_light", 1000)
+	svc := service.NewGiftService(repo.NewGiftRepo(db), repo.NewOrderRepo(db))
+	ctx := context.Background()
+
+	_, _, err := svc.Send(ctx, service.SendGiftReq{
+		UserID: "u-demo", RoomID: "r", GiftID: "fan_light", Count: 1, RequestID: "gift-1",
+	})
+	require.NoError(t, err)
+
+	_, _, err = svc.JoinFanClub(ctx, service.JoinFanClubReq{
+		UserID: "u-demo", CreatorID: "u-owner", RequestID: "join-1",
+	})
+	require.ErrorIs(t, err, service.ErrAlreadyFanClubMember)
+	require.EqualValues(t, 4000, balanceOf(t, db, "u-demo"))
+	require.EqualValues(t, 1000, balanceOf(t, db, "u-owner"))
+}
+
 // Repeat Fan Light gifts take the upsert's conflict path and other gifts only
 // add to an existing badge; both keep the stored level in step with the total.
 func TestFanBadgeContributionAccumulates(t *testing.T) {

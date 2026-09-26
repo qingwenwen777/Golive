@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { http } from '@/lib/axios';
@@ -76,6 +77,7 @@ export interface GiftError {
     | 'gift_level_locked'
     | 'blocked_word'
     | 'user_restricted'
+    | 'already_fan_club_member'
     | 'network'
     | 'unknown';
   message: string;
@@ -103,6 +105,12 @@ function toGiftError(err: unknown): GiftError {
     }
     if (data?.reason === 'user_restricted') {
       return { reason: 'user_restricted', message: data.message ?? 'User is restricted' };
+    }
+    if (data?.reason === 'already_fan_club_member') {
+      return {
+        reason: 'already_fan_club_member',
+        message: data.message ?? 'Already a fan club member',
+      };
     }
     if (!err.response) return { reason: 'network', message: 'Network error' };
     return { reason: 'unknown', message: data?.message ?? err.message };
@@ -144,13 +152,18 @@ export function useSendGift() {
 
 export function useJoinFanClub() {
   const qc = useQueryClient();
+  // A join keeps its request id until the server answers it, so a double
+  // click or a retry after a timeout replays that join instead of paying again.
+  const pendingRequestIds = useRef(new Map<string, string>());
   return useMutation<
     GiftOrder,
     GiftError,
     Omit<JoinFanClubPayload, 'requestId'> & { requestId?: string }
   >({
     mutationFn: async (input) => {
-      const requestId = input.requestId ?? newRequestId();
+      const pending = pendingRequestIds.current;
+      const requestId = input.requestId ?? pending.get(input.creatorId) ?? newRequestId();
+      pending.set(input.creatorId, requestId);
       const body: JoinFanClubPayload = {
         creatorId: input.creatorId,
         requestId,
@@ -159,8 +172,12 @@ export function useJoinFanClub() {
         const { data } = await http.post<GiftOrder>('/gifts/fan-clubs/join', body, {
           headers: { 'X-Request-Id': requestId },
         });
+        pending.delete(input.creatorId);
         return data;
       } catch (err) {
+        // No answer or a 5xx: the join may have gone through, so keep the id.
+        const status = err instanceof AxiosError ? err.response?.status : undefined;
+        if (status !== undefined && status < 500) pending.delete(input.creatorId);
         throw toGiftError(err);
       }
     },
@@ -168,6 +185,13 @@ export function useJoinFanClub() {
       void qc.invalidateQueries({ queryKey: ['me'] });
       void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
       void qc.invalidateQueries({ queryKey: ['fan-club-members'] });
+    },
+    onError: (err) => {
+      // The join was offered from stale state; refresh what shows membership.
+      if (err.reason === 'already_fan_club_member') {
+        void qc.invalidateQueries({ queryKey: ['fan-badges', 'me'] });
+        void qc.invalidateQueries({ queryKey: ['fan-club-members'] });
+      }
     },
   });
 }
