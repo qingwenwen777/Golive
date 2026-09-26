@@ -139,7 +139,7 @@ func (s *LiveService) reconcileRoom(ctx context.Context, room *model.Room, publi
 		// Only SRS saw it missing: wait until SRS can confirm.
 		return nil, nil
 	}
-	return nil, s.finalizeUnpublish(ctx, room.StreamKey, room.ID)
+	return nil, s.finalizeUnpublish(ctx, room.StreamKey, room.ID, disconnect.At)
 }
 
 // endStaleRooms ends rooms SRS showed without a publisher, after checking a

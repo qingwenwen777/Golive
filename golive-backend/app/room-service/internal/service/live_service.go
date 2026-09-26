@@ -653,10 +653,10 @@ func (s *LiveService) OnUnpublish(ctx context.Context, req SRSPublishReq) error 
 		return err
 	}
 	if s.unpublishGrace > 0 {
-		go s.finalizeUnpublishAfterGrace(streamKey, roomID)
+		go s.finalizeUnpublishAfterGrace(streamKey, roomID, disconnect.At)
 		return nil
 	}
-	return s.finalizeUnpublish(ctx, streamKey, roomID)
+	return s.finalizeUnpublish(ctx, streamKey, roomID, disconnect.At)
 }
 
 // disconnectRecordTTL bounds how long a recorded disconnect lingers if
@@ -691,24 +691,28 @@ func (s *LiveService) resolveStreamKey(ctx context.Context, streamName, streamKe
 	return room.ID, nil
 }
 
-func (s *LiveService) finalizeUnpublishAfterGrace(streamKey, roomID string) {
+func (s *LiveService) finalizeUnpublishAfterGrace(streamKey, roomID string, at time.Time) {
 	time.Sleep(s.unpublishGrace)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_ = s.finalizeUnpublish(ctx, streamKey, roomID)
+	_ = s.finalizeUnpublish(ctx, streamKey, roomID, at)
 }
 
-// finalizeUnpublish ends roomID when the disconnect recorded for it is still
-// pending: the publisher did not reconnect (which clears the record), no
+// finalizeUnpublish ends roomID when the disconnect recorded for it at at is
+// still pending: the publisher did not reconnect (which clears the record), no
 // newer publisher took over the stream key, and SRS, when it can be asked,
 // lists no publisher for the stream. The room ends at the disconnect.
-func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID string) error {
+func (s *LiveService) finalizeUnpublish(ctx context.Context, streamKey, roomID string, at time.Time) error {
 	disconnect, err := s.live.Disconnect(ctx, roomID)
 	if errors.Is(err, repo.ErrStreamKeyNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
+	}
+	if !disconnect.At.Equal(at) && s.now().Sub(disconnect.At) < s.unpublishGrace {
+		// A newer disconnect replaced this one; its grace period runs on.
+		return nil
 	}
 	if disconnect.ClientID != "" {
 		activeClient, err := s.live.PublishSession(ctx, streamKey)

@@ -466,6 +466,35 @@ func TestOnUnpublishGraceEndsWhenPublisherDoesNotReconnect(t *testing.T) {
 	require.NotNil(t, room.EndedAt)
 }
 
+// A publisher that drops, reconnects and drops again gets the whole grace
+// period for its last disconnect: the first disconnect's timer, firing
+// meanwhile, must not end the room on the second one's record.
+func TestEarlierGraceTimerDoesNotCutNewerDisconnectShort(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	env.svc.unpublishGrace = time.Hour // its timers never fire: they are fired by hand below
+	t0 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	env.svc.now = func() time.Time { return t0 }
+	st := startTestLive(t, env.svc, "owner-flap")
+	publishTestLiveClient(t, env.svc, st.StreamKey, "client-A")
+	key := publishSecret(st.StreamKey)
+
+	require.NoError(t, env.svc.OnUnpublish(ctx, srsClientReq(st.StreamKey, "", "client-A")))
+	env.svc.now = func() time.Time { return t0.Add(5 * time.Second) }
+	publishTestLiveClient(t, env.svc, st.StreamKey, "client-B")
+	env.svc.now = func() time.Time { return t0.Add(15 * time.Second) }
+	require.NoError(t, env.svc.OnUnpublish(ctx, srsClientReq(st.StreamKey, "", "client-B")))
+
+	// t=20s: A's timer fires, 5s into B's disconnect.
+	require.NoError(t, env.restarted(20*time.Second, t0.Add(20*time.Second), "").finalizeUnpublish(ctx, key, st.ID, t0))
+	requireRoomStatus(t, env, st.ID, model.StatusLive)
+
+	// t=35s: B's timer ends the room at B's disconnect.
+	require.NoError(t, env.restarted(20*time.Second, t0.Add(35*time.Second), "").finalizeUnpublish(ctx, key, st.ID, t0.Add(15*time.Second)))
+	room := requireRoomStatus(t, env, st.ID, model.StatusEnded)
+	require.True(t, t0.Add(15*time.Second).Equal(*room.EndedAt))
+}
+
 func TestOnUnpublishVariantDoesNotEndRoom(t *testing.T) {
 	ctx := context.Background()
 	svc, rooms, live := newLiveServiceTestDeps(t)
