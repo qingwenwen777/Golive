@@ -41,8 +41,9 @@ powershell -File scripts/dev.ps1
 bash scripts/dev.sh
 ```
 
-The scripts first build `golive-web/dist`, then start nginx, SRS, MySQL, Redis, Kafka,
-Go services, and observability components from `golive-backend/deploy/docker-compose.yml`.
+The scripts first build `golive-web/dist`, then start nginx, SRS, MySQL, Redis,
+Go services, and observability components from `golive-backend/deploy/docker-compose.yml`
+(copy `golive-backend/deploy/.env.example` to `.env` and fill it in first).
 
 ## Validation
 

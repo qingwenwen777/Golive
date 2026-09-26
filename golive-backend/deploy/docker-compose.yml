@@ -6,6 +6,10 @@ x-logging: &default-logging
 
 services:
   mysql:
+    # Deliberately left on the 8.0 series tag: mysqld refuses a data directory
+    # written by a newer 8.0.x, so pinning a patch older than the image the
+    # server already has would stop the database. 8.0 is end-of-life (final
+    # release 8.0.46); moving to 8.4 LTS needs its own backup-and-test window.
     image: mysql:8.0
     container_name: golive-mysql
     restart: unless-stopped
@@ -28,7 +32,7 @@ services:
       start_period: 20s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.11-alpine
     container_name: golive-redis
     restart: unless-stopped
     logging: *default-logging
@@ -46,27 +50,42 @@ services:
       timeout: 3s
       retries: 30
 
-  zookeeper:
-    image: bitnamilegacy/zookeeper:3.9
-    container_name: golive-zookeeper
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-
+  # Optional, off by default. Live chat and gift events go through Redis
+  # (every service ships with kafka.enabled: false). To use Kafka, start the
+  # "kafka" profile (COMPOSE_PROFILES=kafka in deploy/.env) AND set
+  # kafka.enabled: true in the services that should produce/consume.
+  # Single-node KRaft: no ZooKeeper. 3.9.x is the newest line the franz-go
+  # client in go.mod (v1.18) documents support for.
   kafka:
-    image: bitnamilegacy/kafka:3.7
+    image: apache/kafka:3.9.2
     container_name: golive-kafka
+    profiles: ["kafka"]
     restart: unless-stopped
     logging: *default-logging
-    depends_on: [zookeeper]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
-      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      CLUSTER_ID: 05DhG_cgTXekmqcow-SoWA
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes: [kafka_data:/var/lib/kafka/data]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
 
   # ========== one-shot permissions job ==========
 
@@ -245,8 +264,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      kafka:
-        condition: service_started
       otel-collector:
         condition: service_started
 
@@ -309,17 +326,10 @@ services:
       redis:
         condition: service_healthy
 
-  etcd:
-    image: bitnamilegacy/etcd:3.5
-    container_name: golive-etcd
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_ADVERTISE_CLIENT_URLS: http://0.0.0.0:2379
-
   srs:
-    image: ossrs/srs:5
+    # v5.0.213 is what ossrs/srs:5 pointed to from June 2024 until
+    # 2026-09-24 (it now points to v5.0.225, not yet evaluated here).
+    image: ossrs/srs:v5.0.213
     container_name: golive-srs
     restart: unless-stopped
     logging: *default-logging
@@ -336,21 +346,10 @@ services:
       - replay_records:/tmp/golive/records
     command: ./objs/srs -c conf/srs.conf
 
-  minio:
-    image: minio/minio:latest
-    container_name: golive-minio
-    restart: unless-stopped
-    logging: *default-logging
-    environment:
-      MINIO_ROOT_USER: ${GOLIVE_MINIO_ROOT_USER:?set GOLIVE_MINIO_ROOT_USER in deploy/.env}
-      MINIO_ROOT_PASSWORD: ${GOLIVE_MINIO_ROOT_PASSWORD:?set GOLIVE_MINIO_ROOT_PASSWORD in deploy/.env}
-    volumes: [minio_data:/data]
-    command: server /data --console-address ":9001"
-
   # ========== edge reverse proxy ==========
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.27.5-alpine
     container_name: golive-nginx
     restart: unless-stopped
     logging: *default-logging
@@ -445,7 +444,7 @@ services:
 volumes:
   mysql_data:
   redis_data:
-  minio_data:
+  kafka_data:
   prom_data:
   grafana_data:
   cover_uploads:

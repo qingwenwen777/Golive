@@ -6,7 +6,7 @@ WebSockets, stream callbacks, gift orders, chat processing, uploads, and admin c
 ## Technology stack
 
 - Go 1.25+, Gin, gorilla/websocket, gRPC + Protobuf
-- MySQL 8 + GORM, Redis 7, Kafka, etcd, MinIO
+- MySQL 8 + GORM, Redis 7, optional Kafka (Compose profile `kafka`; off by default)
 - Viper, zap, OpenTelemetry, Jaeger, Prometheus, Grafana
 - SRS 5(RTMP → HTTP-FLV/HLS), Docker Compose, nginx
 
@@ -73,7 +73,7 @@ Cross-service writes that remain, by design or pending a decision:
 | im-gateway | 8081 | WebSocket at `/ws` |
 | SRS RTMP | 1935 | OBS publishing |
 | SRS HTTP | 8080 inside the container | Proxied by nginx as `/live` |
-| MySQL / Redis / Kafka / etcd / MinIO | Compose internal network | Must not be publicly exposed |
+| MySQL / Redis / Kafka (optional) | Compose internal network | Must not be publicly exposed |
 | Grafana / Prometheus / Jaeger | Bound to 127.0.0.1 | Access through an SSH tunnel |
 
 ## Directory structure
