@@ -226,3 +226,56 @@ func TestAppointmentTextPolicyAppliesToCreateUpdateAndStart(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.AppointmentScheduled, appt.Status)
 }
+
+func newAppointmentTestPayload(scheduledAt time.Time) AppointmentPayload {
+	return AppointmentPayload{
+		ScheduledAt: scheduledAt,
+		Title:       "Big show",
+		Description: "A scheduled live",
+		Category:    "Gaming",
+		Cover:       "/uploads/gaming.jpg",
+		ChannelName: "Creator Channel",
+	}
+}
+
+func appointmentNotificationUsers(t *testing.T, db *gorm.DB, kind string) []string {
+	t.Helper()
+	var users []string
+	require.NoError(t, db.Model(&model.Notification{}).Where("type = ?", kind).Order("user_id").Pluck("user_id", &users).Error)
+	return users
+}
+
+func requireReason(t *testing.T, err error, reason string) {
+	t.Helper()
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr), "expected %s error, got %v", reason, err)
+	require.Equal(t, reason, appErr.Reason)
+}
+
+// Blocked users can neither reserve a creator's appointment nor keep getting
+// reminders through a reservation made before the block.
+func TestAppointmentBlocksStopReservationsAndReminders(t *testing.T) {
+	ctx := context.Background()
+	svc, db := newAppointmentServiceTestDeps(t)
+	messages := repo.NewMessageRepo(db)
+	require.NoError(t, messages.AutoMigrate())
+	svc.SetBlockChecker(NewMessageService(messages, svc.rooms, nil))
+	now := time.Date(2026, 5, 5, 8, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	created, err := svc.Create(ctx, "owner-block", newAppointmentTestPayload(now.Add(2*time.Hour)))
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-1", created.ID)
+	require.NoError(t, err)
+	_, err = svc.Reserve(ctx, "fan-2", created.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, messages.UpsertBlock(ctx, "owner-block", "fan-1", "user", "", now))
+	require.NoError(t, messages.UpsertBlock(ctx, "fan-3", "owner-block", "creator", "", now))
+	_, err = svc.Reserve(ctx, "fan-3", created.ID)
+	requireReason(t, err, "channel_blocked")
+
+	now = now.Add(2*time.Hour - 5*time.Minute)
+	require.NoError(t, svc.ProcessDue(ctx))
+	require.Equal(t, []string{"fan-2"}, appointmentNotificationUsers(t, db, "appointment_reminder"))
+}

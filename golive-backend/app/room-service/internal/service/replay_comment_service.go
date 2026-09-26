@@ -135,6 +135,13 @@ func (s *ReplayCommentService) Create(ctx context.Context, userID, roomID string
 		if parent.Depth >= maxCommentTreeDepth {
 			return nil, errcode.New(http.StatusConflict, "reply depth limit reached").WithReason("reply_depth_limit")
 		}
+		blocked, err := blocksBetween(ctx, s.blocks, userID, parent.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, userBlockedError()
+		}
 		depth = parent.Depth + 1
 		rootID = parent.RootID
 		if rootID == "" {
@@ -197,6 +204,15 @@ func (s *ReplayCommentService) Like(ctx context.Context, userID, roomID, comment
 	comment, err := s.comments.Get(ctx, room.ID, commentID)
 	if err != nil {
 		return nil, replayCommentError(err)
+	}
+	for _, otherID := range []string{room.OwnerID, comment.UserID} {
+		blocked, err := blocksBetween(ctx, s.blocks, userID, otherID)
+		if err != nil {
+			return nil, err
+		}
+		if blocked {
+			return nil, userBlockedError()
+		}
 	}
 	alreadyLiked, err := s.comments.LikedIDs(ctx, userID, []string{commentID})
 	if err != nil {
@@ -291,6 +307,9 @@ func (s *ReplayCommentService) notifyComment(ctx context.Context, room model.Roo
 	if targetID == "" || targetID == comment.UserID {
 		return nil
 	}
+	if blocked, err := blocksBetween(ctx, s.blocks, comment.UserID, targetID); err != nil || blocked {
+		return err
+	}
 	actor := s.authorForUser(ctx, comment.UserID)
 	return s.notify.CreateNotifications(ctx, []model.Notification{{
 		ID:            kind + "-" + notificationHash(room.ID, comment.ID, targetID),
@@ -311,6 +330,9 @@ func (s *ReplayCommentService) notifyComment(ctx context.Context, room model.Roo
 func (s *ReplayCommentService) notifyCommentLiked(ctx context.Context, room model.Room, comment model.ReplayComment, actorID string) error {
 	if s.notify == nil || comment.UserID == "" || comment.UserID == actorID {
 		return nil
+	}
+	if blocked, err := blocksBetween(ctx, s.blocks, actorID, comment.UserID); err != nil || blocked {
+		return err
 	}
 	actor := s.authorForUser(ctx, actorID)
 	return s.notify.CreateNotifications(ctx, []model.Notification{{

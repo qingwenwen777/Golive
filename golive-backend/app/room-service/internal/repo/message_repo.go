@@ -411,6 +411,29 @@ func (r *MessageRepo) BlocksEitherWay(ctx context.Context, userA, userB string) 
 	return count > 0, err
 }
 
+// BlockedPeerIDs returns every user that userID blocks or is blocked by.
+func (r *MessageRepo) BlockedPeerIDs(ctx context.Context, userID string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if userID == "" {
+		return out, nil
+	}
+	var rows []model.UserBlock
+	if err := r.db.WithContext(ctx).
+		Select("blocker_id", "target_user_id").
+		Where("blocker_id = ? OR target_user_id = ?", userID, userID).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if row.BlockerID == userID {
+			out[row.TargetUserID] = true
+		} else {
+			out[row.BlockerID] = true
+		}
+	}
+	return out, nil
+}
+
 func (r *MessageRepo) ListBlocks(ctx context.Context, blockerID string, page, size int) ([]model.UserBlock, int64, error) {
 	page, size = normalizeMessagePage(page, size)
 	tx := r.db.WithContext(ctx).Model(&model.UserBlock{}).Where("blocker_id = ?", blockerID)

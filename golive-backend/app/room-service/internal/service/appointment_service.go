@@ -408,6 +408,13 @@ func (s *AppointmentService) Reserve(ctx context.Context, viewerID, id string) (
 	if !s.isPubliclyActive(*appt) {
 		return nil, errcode.New(409, "appointment is no longer available")
 	}
+	blocked, err := blocksBetween(ctx, s.blocks, viewerID, appt.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, errcode.New(403, "blocked from this channel").WithReason("channel_blocked")
+	}
 	if err := s.appointments.Reserve(ctx, id, viewerID); err != nil {
 		return nil, err
 	}
@@ -827,6 +834,21 @@ func (s *AppointmentService) notifyWatchers(ctx context.Context, appt model.Live
 	watchers, err := s.appointments.WatcherIDs(ctx, appt.ID)
 	if err != nil {
 		return err
+	}
+	// Reservations made before a block must not keep delivering the blocked
+	// side reminders about the creator.
+	blocked, err := blockedPeerSet(ctx, s.blocks, appt.OwnerID, watchers)
+	if err != nil {
+		return err
+	}
+	if len(blocked) > 0 {
+		visible := watchers[:0]
+		for _, userID := range watchers {
+			if !blocked[userID] {
+				visible = append(visible, userID)
+			}
+		}
+		watchers = visible
 	}
 	if len(watchers) == 0 {
 		return nil
