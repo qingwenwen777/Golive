@@ -3,6 +3,8 @@ package repo
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -1265,8 +1267,13 @@ func (r *UserRepo) ClaimDailyCoinReward(
 	var u model.User
 	var coinTx model.CoinTransaction
 	created := false
+	txID := dailyTaskTxID(id, taskSourceID)
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+		// Lock the user row first so concurrent claims serialize here and the
+		// check below sees any claim committed by the previous holder.
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).
+			Take(&u).Error; err != nil {
 			return err
 		}
 		err := tx.Where("user_id = ? AND type = ? AND source_id = ?", id, model.CoinTxDailyTask, taskSourceID).
@@ -1284,7 +1291,7 @@ func (r *UserRepo) ClaimDailyCoinReward(
 			return err
 		}
 		coinTx = model.CoinTransaction{
-			ID:           newID(),
+			ID:           txID,
 			UserID:       id,
 			Type:         model.CoinTxDailyTask,
 			Amount:       reward,
@@ -1300,6 +1307,16 @@ func (r *UserRepo) ClaimDailyCoinReward(
 		created = true
 		return nil
 	})
+	if isDuplicateKey(err) {
+		// Another claim for this task and day won the primary key; the
+		// rollback undid our credit, so report the existing claim.
+		created = false
+		u, coinTx = model.User{}, model.CoinTransaction{}
+		err = r.db.WithContext(ctx).Where("id = ?", id).Take(&u).Error
+		if err == nil {
+			err = r.db.WithContext(ctx).Where("id = ?", txID).Take(&coinTx).Error
+		}
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, false, ErrUserNotFound
 	}
@@ -1310,6 +1327,14 @@ func (r *UserRepo) ClaimDailyCoinReward(
 		return nil, nil, false, err
 	}
 	return &u, &coinTx, created, nil
+}
+
+// dailyTaskTxID derives the ledger row ID from the user and the task's daily
+// source ID, so the primary key allows at most one daily-task row per user,
+// task and day regardless of how claims interleave.
+func dailyTaskTxID(userID, taskSourceID string) string {
+	sum := sha256.Sum256([]byte(userID + "\x00" + taskSourceID))
+	return "daily_" + hex.EncodeToString(sum[:24])
 }
 
 func (r *UserRepo) ListCoinTransactions(ctx context.Context, id string, limit int) ([]model.CoinTransaction, error) {
@@ -1968,6 +1993,18 @@ func isMissingRelation(err error) bool {
 		strings.Contains(msg, "doesn't exist") ||
 		strings.Contains(msg, "unknown column") ||
 		strings.Contains(msg, "no such column")
+}
+
+func isDuplicateKey(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate entry") ||
+		strings.Contains(msg, "unique constraint failed")
 }
 
 func newID() string {
