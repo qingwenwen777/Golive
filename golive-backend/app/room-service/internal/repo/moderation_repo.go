@@ -1633,9 +1633,18 @@ func compactAdminHealthError(err error) string {
 	return msg
 }
 
-func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {
-	if userID == "" {
-		return false, nil
+// Platform roles, owned by user-service. A platform moderator only reviews
+// content (reports, blocked words); everything else needs RoleAdmin.
+const (
+	RoleUser      = "user"
+	RoleAdmin     = "admin"
+	RoleModerator = "moderator"
+)
+
+// UserRole returns the user's platform role, or "" for unknown users.
+func (r *ModerationRepo) UserRole(ctx context.Context, userID string) (string, error) {
+	if strings.TrimSpace(userID) == "" {
+		return "", nil
 	}
 	var role string
 	err := r.db.WithContext(ctx).
@@ -1644,9 +1653,14 @@ func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, erro
 		Where("id = ?", userID).
 		Take(&role).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
+		return "", nil
 	}
-	return role == "admin" || role == "moderator", err
+	return role, err
+}
+
+func (r *ModerationRepo) IsAdmin(ctx context.Context, userID string) (bool, error) {
+	role, err := r.UserRole(ctx, userID)
+	return role == RoleAdmin, err
 }
 
 func (r *ModerationRepo) UserProfile(ctx context.Context, userID string) (ModerationUser, error) {

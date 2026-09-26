@@ -223,7 +223,6 @@ export default function AdminPage() {
   const canAccessAdmin = isAdmin || isModerator;
   const onAdminRoute = isAdminPath(location.pathname);
   const canUseAdminOnlyApis = isAdmin && onAdminRoute;
-  const canUseAdminApis = canAccessAdmin && onAdminRoute;
   const currentModule = getModuleFromPath(location.pathname);
   const currentText = moduleText(t, currentModule ?? 'dashboard');
   const summaryParams = useMemo(() => ({ page: 1, size: 1 }), []);
@@ -239,7 +238,9 @@ export default function AdminPage() {
   const updatePermission = useUpdateLivePermission();
   const createInvite = useCreateInviteCode();
   const deleteInvite = useDeleteInviteCode();
-  const overview = useAdminOverview(canUseAdminApis);
+  // The dashboard/system overview is admin-only on the backend; moderators only
+  // get the content module.
+  const overview = useAdminOverview(canUseAdminOnlyApis);
 
   const metrics = useMemo<AdminMetrics>(
     () => ({
@@ -294,8 +295,8 @@ export default function AdminPage() {
 
   const refresh = () => {
     void queryClient.invalidateQueries();
-    void overview.refetch();
     if (isAdmin) {
+      void overview.refetch();
       void apps.refetch();
       void platformApps.refetch();
       void creators.refetch();

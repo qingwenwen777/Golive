@@ -72,6 +72,14 @@ CREATE TABLE fan_badges (
 		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		"creator-1", "creator", "Creator One", "", true, "user", now,
 	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"mod-1", "mod", "Moderator One", "", false, "moderator", now,
+	).Error)
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, role, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"mod-2", "mod2", "Moderator Two", "", false, "moderator", now,
+	).Error)
 
 	// Reported content lives in tables owned by other repos/services.
 	require.NoError(t, repo.NewPostRepo(db).AutoMigrate())
@@ -665,6 +673,89 @@ func TestLegacyUnverifiedReportCannotDriveSanctions(t *testing.T) {
 
 	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-1", UpdateReportReq{Action: "dismiss"})
 	require.NoError(t, err)
+}
+
+// Platform moderators only get the content-review surface (reports, blocked
+// words); dashboard, audit logs and system settings stay admin-only.
+func TestPlatformModeratorIsLimitedToContentReview(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+
+	_, err := svc.AdminOverview(ctx, "mod-1")
+	requireAppErrStatus(t, err, http.StatusForbidden)
+	_, err = svc.AdminSystemSettings(ctx, "mod-1")
+	requireAppErrStatus(t, err, http.StatusForbidden)
+	_, err = svc.UpdateAdminSystemSettings(ctx, "mod-1", UpdateAdminSystemSettingsReq{ReportReviewTimeoutMinutes: intPtr(10)})
+	requireAppErrStatus(t, err, http.StatusForbidden)
+	_, err = svc.AdminAuditLogs(ctx, "mod-1", "review", 1, 10)
+	requireAppErrStatus(t, err, http.StatusForbidden)
+
+	_, err = svc.ListReports(ctx, "user-1", repo.ReportListFilter{Page: 1, Size: 10})
+	requireAppErrStatus(t, err, http.StatusForbidden)
+	_, err = svc.ListBlockedWords(ctx, "user-1", 1, 10)
+	requireAppErrStatus(t, err, http.StatusForbidden)
+
+	word, err := svc.CreateBlockedWord(ctx, "mod-1", CreateBlockedWordReq{Word: "scam link"})
+	require.NoError(t, err)
+	_, err = svc.ListBlockedWords(ctx, "mod-1", 1, 10)
+	require.NoError(t, err)
+	require.NoError(t, svc.DeleteBlockedWord(ctx, "mod-1", word.ID))
+
+	seedReportPost(t, db, "post-mod", "bad-user", "spam post")
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post", TargetID: "post-mod", Reason: "spam"})
+	require.NoError(t, err)
+	_, err = svc.ListReports(ctx, "mod-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	_, err = svc.ReportDetail(ctx, "mod-1", report.ID)
+	require.NoError(t, err)
+	resolved, err := svc.UpdateReport(ctx, "mod-1", report.ID, UpdateReportReq{Actions: []string{"ban_user"}})
+	require.NoError(t, err)
+	require.Equal(t, "resolved", resolved.Status)
+}
+
+func TestReportsCannotSanctionStaff(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportPost(t, db, "post-by-admin", "admin-2", "admin post")
+	seedReportPost(t, db, "post-by-mod", "mod-2", "moderator post")
+	seedReportRoom(t, db, "room-admin", "admin-2")
+
+	adminPost, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post", TargetID: "post-by-admin", Reason: "spam"})
+	require.NoError(t, err)
+	for _, actor := range []string{"mod-1", "admin-1"} {
+		for _, action := range []string{"ban_user", "site_mute", "warn_user"} {
+			_, err = svc.UpdateReport(ctx, actor, adminPost.ID, UpdateReportReq{Actions: []string{action}})
+			requireAppErrReason(t, err, http.StatusForbidden, "target_is_admin")
+		}
+	}
+	adminRoom, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "room", TargetID: "room-admin", Reason: "spam"})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "admin-1", adminRoom.ID, UpdateReportReq{Actions: []string{"force_end_live"}})
+	requireAppErrReason(t, err, http.StatusForbidden, "target_is_admin")
+	restriction, err := svc.moderation.UserRestriction(ctx, "admin-2", now)
+	require.NoError(t, err)
+	require.False(t, restriction.Banned)
+	require.False(t, restriction.Muted)
+
+	modPost, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post", TargetID: "post-by-mod", Reason: "spam"})
+	require.NoError(t, err)
+	_, err = svc.UpdateReport(ctx, "mod-1", modPost.ID, UpdateReportReq{Actions: []string{"ban_user"}})
+	requireAppErrReason(t, err, http.StatusForbidden, "target_is_moderator")
+	_, err = svc.UpdateReport(ctx, "admin-1", modPost.ID, UpdateReportReq{Actions: []string{"ban_user"}})
+	require.NoError(t, err)
+	restriction, err = svc.moderation.UserRestriction(ctx, "mod-2", now)
+	require.NoError(t, err)
+	require.True(t, restriction.Banned)
+}
+
+func requireAppErrStatus(t *testing.T, err error, status int) {
+	t.Helper()
+	var appErr *errcode.AppError
+	require.True(t, errors.As(err, &appErr), "expected HTTP %d, got %v", status, err)
+	require.Equal(t, status, appErr.HTTPStatus)
 }
 
 func boolPtr(v bool) *bool { return &v }

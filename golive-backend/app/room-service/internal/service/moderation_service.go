@@ -694,7 +694,7 @@ func (s *ModerationService) CreateReport(ctx context.Context, reporterID string,
 }
 
 func (s *ModerationService) ListReports(ctx context.Context, adminID string, filter repo.ReportListFilter) (*ContentReportListResp, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -722,7 +722,7 @@ func (s *ModerationService) ListReports(ctx context.Context, adminID string, fil
 }
 
 func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string) (*ContentReportDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -748,7 +748,8 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 }
 
 func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string, req UpdateReportReq) (*ContentReportDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	actorRole, err := s.requireContentModerator(ctx, adminID)
+	if err != nil {
 		return nil, err
 	}
 	now := s.now()
@@ -797,6 +798,9 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 			return nil, err
 		}
 		if actionTarget, err = s.verifiedReportTarget(ctx, base); err != nil {
+			return nil, err
+		}
+		if err := s.ensureCanSanctionReportTarget(ctx, actorRole, actionTarget, actions); err != nil {
 			return nil, err
 		}
 	}
@@ -977,6 +981,37 @@ func (s *ModerationService) verifiedReportTarget(ctx context.Context, report *mo
 	return nil, errcode.New(http.StatusConflict, "report target can no longer be verified").WithReason("target_unverified")
 }
 
+// ensureCanSanctionReportTarget stops reports from being used against staff:
+// admins are never sanctioned through reports, and only an admin may act on a
+// platform moderator.
+func (s *ModerationService) ensureCanSanctionReportTarget(ctx context.Context, actorRole string, report *model.ContentReport, actions []string) error {
+	targets := make([]string, 0, 2)
+	for _, action := range actions {
+		switch action {
+		case model.ReportActionWarnUser, model.ReportActionSiteMute, model.ReportActionBanUser:
+			targets = append(targets, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID))
+		case model.ReportActionWarnRoom, model.ReportActionForceEndLive:
+			targets = append(targets, report.TargetOwnerID)
+		}
+	}
+	for _, userID := range targets {
+		if userID == "" {
+			continue
+		}
+		role, err := s.moderation.UserRole(ctx, userID)
+		if err != nil {
+			return err
+		}
+		switch {
+		case role == repo.RoleAdmin:
+			return errcode.New(http.StatusForbidden, "admins cannot be sanctioned through reports").WithReason("target_is_admin")
+		case role == repo.RoleModerator && actorRole != repo.RoleAdmin:
+			return errcode.New(http.StatusForbidden, "only admins can sanction moderators").WithReason("target_is_moderator")
+		}
+	}
+	return nil
+}
+
 func copyReportTarget(dst, src *model.ContentReport) {
 	dst.RoomID = src.RoomID
 	dst.ChannelID = src.ChannelID
@@ -1051,7 +1086,7 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 }
 
 func (s *ModerationService) ListBlockedWords(ctx context.Context, adminID string, page, size int) (*BlockedWordListResp, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	rows, total, err := s.moderation.ListBlockedWords(ctx, page, size)
@@ -1067,7 +1102,7 @@ func (s *ModerationService) ListBlockedWords(ctx context.Context, adminID string
 }
 
 func (s *ModerationService) CreateBlockedWord(ctx context.Context, adminID string, req CreateBlockedWordReq) (*BlockedWordDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	word := trimRunes(strings.TrimSpace(req.Word), 60)
@@ -1103,7 +1138,7 @@ func (s *ModerationService) CreateBlockedWord(ctx context.Context, adminID strin
 }
 
 func (s *ModerationService) UpdateBlockedWord(ctx context.Context, adminID, id string, req UpdateBlockedWordReq) (*BlockedWordDTO, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	updates := map[string]any{
@@ -1141,7 +1176,7 @@ func (s *ModerationService) UpdateBlockedWord(ctx context.Context, adminID, id s
 }
 
 func (s *ModerationService) DeleteBlockedWord(ctx context.Context, adminID, id string) error {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return err
 	}
 	if err := s.moderation.DeleteBlockedWord(ctx, strings.TrimSpace(id)); err != nil {
@@ -1155,7 +1190,7 @@ func (s *ModerationService) DeleteBlockedWord(ctx context.Context, adminID, id s
 }
 
 func (s *ModerationService) BulkImportBlockedWords(ctx context.Context, adminID string, req BulkImportBlockedWordsReq) (*BulkImportBlockedWordsResp, error) {
-	if err := s.requireAdmin(ctx, adminID); err != nil {
+	if _, err := s.requireContentModerator(ctx, adminID); err != nil {
 		return nil, err
 	}
 	if len(req.Items) == 0 {
@@ -1490,6 +1525,8 @@ func moderationUser(row repo.ModerationUser) ModerationUserDTO {
 	return dto
 }
 
+// requireAdmin guards platform administration (dashboard, audit logs, system
+// settings). Platform moderators are not admins.
 func (s *ModerationService) requireAdmin(ctx context.Context, userID string) error {
 	if userID == "" {
 		return errcode.ErrUnauthorized
@@ -1502,6 +1539,22 @@ func (s *ModerationService) requireAdmin(ctx context.Context, userID string) err
 		return errcode.New(http.StatusForbidden, "admin access required")
 	}
 	return nil
+}
+
+// requireContentModerator guards content review (reports, blocked words),
+// which admins and platform moderators share. Returns the caller's role.
+func (s *ModerationService) requireContentModerator(ctx context.Context, userID string) (string, error) {
+	if userID == "" {
+		return "", errcode.ErrUnauthorized
+	}
+	role, err := s.moderation.UserRole(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if role != repo.RoleAdmin && role != repo.RoleModerator {
+		return "", errcode.New(http.StatusForbidden, "content moderator access required")
+	}
+	return role, nil
 }
 
 type adminSystemPolicy struct {
