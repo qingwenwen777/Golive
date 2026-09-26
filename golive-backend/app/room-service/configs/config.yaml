@@ -27,6 +27,8 @@ live:
   stream_key_secret: "dev-stream-key-secret-change-me"
   stream_key_ttl: 4h
   flv_base: "http://localhost:8082/live"
+  # SRS http_api; used to disconnect the publisher when a live is stopped.
+  srs_api_base: "http://127.0.0.1:1985"
 
 replay:
   record_dir: "./records"

@@ -58,6 +58,9 @@ type LiveCfg struct {
 	// FlvBase is the public HTTP-FLV URL prefix (e.g.
 	// "http://localhost:8082/live"). Stream IDs/keys are appended with ".flv".
 	FlvBase string `mapstructure:"flv_base"`
+	// SRSAPIBase is the SRS HTTP API (e.g. "http://srs:1985"), used to kick
+	// the publisher when a room is stopped. Empty disables kicking.
+	SRSAPIBase string `mapstructure:"srs_api_base"`
 }
 
 type ReplayCfg struct {

@@ -20,7 +20,9 @@ import (
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/miclink"
+	"go.uber.org/zap"
 )
 
 type LiveService struct {
@@ -30,6 +32,7 @@ type LiveService struct {
 	moderation     *repo.ModerationRepo
 	textPolicy     TextPolicy
 	replay         *ReplayService
+	srs            *srsAPI
 	keySecret      []byte
 	keyTTL         time.Duration
 	flvBase        string
@@ -83,6 +86,31 @@ func (s *LiveService) SetReplayService(replay *ReplayService) {
 	s.replay = replay
 }
 
+// SetSRSAPIBase sets the SRS HTTP API base URL (e.g. "http://srs:1985") used
+// to disconnect the publisher when a room is stopped. Empty disables it.
+func (s *LiveService) SetSRSAPIBase(base string) {
+	s.srs = newSRSAPI(base)
+}
+
+// disconnectPublisher kicks the SRS client publishing with streamKey, so a
+// stopped room stops streaming and recording instead of only changing state.
+// Best effort: failures are logged and never fail the stop.
+func (s *LiveService) disconnectPublisher(ctx context.Context, roomID, streamKey string) {
+	if s.srs == nil || streamKey == "" {
+		return
+	}
+	clientID, err := s.live.PublishSession(ctx, streamKey)
+	if err != nil {
+		if !errors.Is(err, repo.ErrStreamKeyNotFound) {
+			logger.L().Warn("load srs publish session", zap.Error(err), zap.String("room_id", roomID))
+		}
+		return
+	}
+	if err := s.srs.kickClient(ctx, clientID); err != nil {
+		logger.L().Warn("kick srs publisher", zap.Error(err), zap.String("room_id", roomID), zap.String("client_id", clientID))
+	}
+}
+
 // GoLiveReq is the body of POST /rooms/live.
 type GoLiveReq struct {
 	Title       string `json:"title" binding:"required"`
@@ -116,6 +144,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		if err := s.endRoom(ctx, active, now); err != nil {
 			return nil, err
 		}
+		s.disconnectPublisher(ctx, active.ID, active.StreamKey)
 		if active.StreamKey != "" {
 			_ = s.live.Delete(ctx, active.StreamKey)
 			_ = s.live.DeletePublishSession(ctx, active.StreamKey)
@@ -308,6 +337,7 @@ func (s *LiveService) StopLive(ctx context.Context, ownerID string) error {
 		if err := s.endRoom(ctx, &room, endedAt); err != nil {
 			return err
 		}
+		s.disconnectPublisher(ctx, room.ID, room.StreamKey)
 		if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
 			return err
 		}
@@ -345,6 +375,7 @@ func (s *LiveService) ForceStopRoom(ctx context.Context, roomID string) error {
 	if err := s.endRoom(ctx, room, endedAt); err != nil {
 		return err
 	}
+	s.disconnectPublisher(ctx, room.ID, room.StreamKey)
 	if err := s.broadcastEnded(ctx, room.ID, endedAt); err != nil {
 		return err
 	}

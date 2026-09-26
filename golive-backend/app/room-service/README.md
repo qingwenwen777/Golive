@@ -130,3 +130,7 @@ Creator flow: `POST /api/rooms/live` returns `streamKey="<roomId>?key=lk_xxxx"`.
 server to `rtmp://localhost:1935/live` and paste that value as the stream key. SRS calls
 `/srs/on_publish`, which checks that the `key` parameter belongs to the `<roomId>` stream.
 Viewers play `/live/<roomId>.flv`, so the secret never appears in public URLs.
+
+When a live is stopped (stop, force-end/ban, or a new go-live replacing it), room-service
+disconnects the publisher through the SRS HTTP API (`DELETE /api/v1/clients/{client_id}`) at
+`live.srs_api_base` (`http://srs:1985` in deploy). Failures are logged and do not fail the stop.
