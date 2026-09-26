@@ -8,10 +8,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+
+	"github.com/qingwenwen777/golive/app/room-service/internal/model"
+	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 )
 
 func TestWaitForStableFileWaitsThroughGrowth(t *testing.T) {
@@ -134,4 +141,125 @@ func TestUploadVideoUsesStableContentLengthWhenFileGrows(t *testing.T) {
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	require.Equal(t, int64(6), info.Size())
+}
+
+// fakeBunny serves Bunny Stream's create, upload and delete video calls.
+// onUpload runs while the upload request is in flight.
+type fakeBunny struct {
+	mu       sync.Mutex
+	onUpload func() error
+	errs     []error
+	deleted  []string
+}
+
+func (b *fakeBunny) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodPost && r.URL.Path == "/library/lib/videos":
+		fmt.Fprint(w, `{"guid":"video-1"}`)
+	case r.Method == http.MethodPut && r.URL.Path == "/library/lib/videos/video-1":
+		_, _ = io.Copy(io.Discard, r.Body)
+		b.mu.Lock()
+		onUpload := b.onUpload
+		b.mu.Unlock()
+		if onUpload != nil {
+			if err := onUpload(); err != nil {
+				b.mu.Lock()
+				b.errs = append(b.errs, err)
+				b.mu.Unlock()
+			}
+		}
+	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/library/lib/videos/"):
+		b.mu.Lock()
+		b.deleted = append(b.deleted, strings.TrimPrefix(r.URL.Path, "/library/lib/videos/"))
+		b.mu.Unlock()
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func newReplayUploadTest(t *testing.T) (*ReplayService, *repo.RoomRepo, *fakeBunny, model.Room, string) {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	// Keep one connection so the in-memory database is shared with the fake
+	// Bunny handler, which deletes the replay mid-upload.
+	sqlDB.SetMaxOpenConns(1)
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+
+	bunny := &fakeBunny{}
+	server := httptest.NewServer(bunny)
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	svc := NewReplayService(rooms, nil, ReplayConfig{
+		RecordDir:      dir,
+		BunnyLibraryID: "lib",
+		BunnyAPIKey:    "key",
+		BunnyAPIBase:   server.URL,
+	})
+
+	startedAt := time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)
+	endedAt := startedAt.Add(time.Hour)
+	room := model.Room{
+		ID:                  "room-replay",
+		Title:               "Replay",
+		Channel:             "Creator",
+		ChannelID:           "ch-owner-replay",
+		OwnerID:             "owner-replay",
+		Status:              model.StatusEnded,
+		StartedAt:           startedAt,
+		EndedAt:             &endedAt,
+		ReplayUploadEnabled: true,
+		ReplayStatus:        model.ReplayStatusPending,
+		ReplayVisibility:    model.PostVisibilityPublic,
+	}
+	require.NoError(t, rooms.Upsert(context.Background(), &room))
+
+	recordPath := filepath.Join(dir, room.ID+".flv")
+	require.NoError(t, os.WriteFile(recordPath, []byte("flv"), 0o644))
+	return svc, rooms, bunny, room, recordPath
+}
+
+func TestUploadRecordingPublishesReplay(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+
+	svc.uploadRecording(ctx, room, recordPath)
+
+	got, err := rooms.GetByID(ctx, room.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.ReplayStatusReady, got.ReplayStatus)
+	require.Equal(t, "video-1", got.ReplayBunnyVideoID)
+	canView, err := svc.CanView(ctx, *got, "")
+	require.NoError(t, err)
+	require.True(t, canView)
+	require.Empty(t, bunny.deleted)
+	require.NoFileExists(t, recordPath)
+}
+
+func TestUploadRecordingDoesNotPublishReplayDeletedMidUpload(t *testing.T) {
+	ctx := context.Background()
+	svc, rooms, bunny, room, recordPath := newReplayUploadTest(t)
+	bunny.onUpload = func() error {
+		return svc.DeleteReplay(ctx, room.OwnerID, room.ID)
+	}
+
+	svc.uploadRecording(ctx, room, recordPath)
+
+	bunny.mu.Lock()
+	defer bunny.mu.Unlock()
+	require.Empty(t, bunny.errs)
+	got, err := rooms.GetByID(ctx, room.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.ReplayStatusDeleted, got.ReplayStatus)
+	require.Empty(t, got.ReplayBunnyVideoID)
+	require.NotNil(t, got.ReplayDeletedAt)
+	canView, err := svc.CanView(ctx, *got, "")
+	require.NoError(t, err)
+	require.False(t, canView)
+	require.Equal(t, []string{"video-1"}, bunny.deleted)
+	require.NoFileExists(t, recordPath)
 }
