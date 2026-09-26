@@ -291,6 +291,38 @@ func (r *AdminRepo) UpdateGift(ctx context.Context, id string, patch AdminGiftPa
 	return &out, nil
 }
 
+var ErrSuperChatNotFound = errors.New("super chat not found")
+
+// ModerateSuperChat hides a super chat from public history by setting
+// moderated_at. It never touches status, amount or the coin ledger: a paid
+// super chat stays "success", so the payer is not refunded and the
+// creator's income and revenue reports are unchanged. Refunds are a
+// separate policy decision. Repeat calls keep the first moderation.
+func (r *AdminRepo) ModerateSuperChat(ctx context.Context, orderID, operatorID string, now time.Time) (*model.SuperChatOrder, error) {
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, ErrSuperChatNotFound
+	}
+	err := r.db.WithContext(ctx).Model(&model.SuperChatOrder{}).
+		Where("order_id = ? AND moderated_at IS NULL", orderID).
+		Updates(map[string]any{
+			"moderated_at": now,
+			"moderated_by": strings.TrimSpace(operatorID),
+		}).Error
+	if err != nil {
+		return nil, err
+	}
+	var out model.SuperChatOrder
+	err = r.db.WithContext(ctx).Where("order_id = ?", orderID).Take(&out).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrSuperChatNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (r *AdminRepo) ListOrders(ctx context.Context, f AdminOrderFilter) ([]AdminOrderRecord, int64, int, int, error) {
 	page, size := normalizeAdminPage(f.Page, f.Size)
 	parts := adminOrderParts(f.Type)

@@ -248,6 +248,7 @@ func fanBadgeLevel(totalContribution int64) int {
 
 // SuperChatHistory returns successful SuperChats for the same room so the
 // public history endpoint can restore paid messages when a viewer enters.
+// Moderated ones (moderated_at set by gift-service) stay paid but hidden.
 func (r *DanmuRepo) SuperChatHistory(ctx context.Context, roomID string, before int64, limit int) ([]SuperChatHistoryRow, error) {
 	if limit <= 0 {
 		limit = 50
@@ -263,7 +264,7 @@ sc.text AS text,
 CAST(UNIX_TIMESTAMP(sc.created_at) * 1000 AS SIGNED) AS ts
 `).
 		Joins("LEFT JOIN users AS u ON u.id = sc.user_id").
-		Where("sc.room_id = ? AND sc.status = ?", roomID, "success")
+		Where("sc.room_id = ? AND sc.status = ? AND sc.moderated_at IS NULL", roomID, "success")
 	if before > 0 {
 		q = q.Where("sc.created_at < FROM_UNIXTIME(?)", float64(before)/1000)
 	}

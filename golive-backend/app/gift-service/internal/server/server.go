@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/handler"
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 	"github.com/qingwenwen777/golive/pkg/jwtauth"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -17,6 +18,8 @@ type Deps struct {
 	LuckyBag  *handler.LuckyBagHandler
 	MicLink   *handler.MicLinkHandler
 	Admin     *handler.AdminHandler
+	// InternalToken guards /internal/*; empty rejects every internal call.
+	InternalToken string
 }
 
 // NewRouter mounts gift-service routes. /api prefix stripped by api-gateway.
@@ -28,6 +31,7 @@ type Deps struct {
 //	POST /super-chats    auth required
 //	GET  /bets/latest    public current/latest room bet
 //	POST /bets           auth required, host only
+//	POST /internal/super-chats/:id/moderation  internal token required
 func NewRouter(d Deps) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -83,6 +87,11 @@ func NewRouter(d Deps) *gin.Engine {
 	admin.POST("/bets/:id/settle", d.Admin.SettleBet)
 	admin.POST("/bets/:id/cancel", d.Admin.CancelBet)
 	admin.GET("/reports", d.Admin.Reports)
+
+	// Service-to-service only: api-gateway proxies /api/<prefix>/* and never
+	// maps onto /internal, and every call must carry the internal token.
+	internal := r.Group("/internal", internalauth.Middleware(d.InternalToken))
+	internal.POST("/super-chats/:id/moderation", d.Admin.ModerateSuperChat)
 
 	return r
 }
