@@ -52,6 +52,8 @@ func (f *fakeStripeAPI) CreateCheckoutSession(_ context.Context, req service.Str
 		URL:               "https://checkout.stripe.test/" + id,
 		PaymentStatus:     "paid",
 		ClientReferenceID: req.UserID,
+		AmountTotal:       req.AmountMinor,
+		Currency:          req.Currency,
 		Metadata:          req.Metadata,
 	}
 	f.sessions[id] = sess
@@ -194,6 +196,23 @@ func TestTopupCoinsRejectsInvalidAmount(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestTopupCoinsRejectsAmountAboveCap(t *testing.T) {
+	router, _, auth := newCoinsTestRouter(t)
+	login, err := auth.Register(context.Background(), "demo", "demo", "Demo")
+	require.NoError(t, err)
+
+	// 10+2^62 used to wrap coins*100 to a $1 charge while crediting ~4.6e18 coins.
+	for _, amount := range []int64{service.MaxTopupCoins + 1, 4611686018427387914} {
+		req := httptest.NewRequest(http.MethodPost, "/users/me/coins/topup", bytes.NewBufferString(fmt.Sprintf(`{"amount":%d}`, amount)))
+		req.Header.Set("Authorization", "Bearer "+login.Token)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code, "amount %d", amount)
+	}
 }
 
 func TestWithdrawCoinsIsNotImplemented(t *testing.T) {

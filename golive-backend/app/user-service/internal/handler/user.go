@@ -317,6 +317,10 @@ func (h *UserHandler) TopupCoins(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 10 coins"})
 		return
 	}
+	if req.Amount > service.MaxTopupCoins {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("maximum top-up is %d coins", service.MaxTopupCoins)})
+		return
+	}
 	if h.stripe == nil || !h.stripe.Configured() {
 		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
 		return
@@ -389,7 +393,7 @@ func (h *UserHandler) ConfirmTopupCoins(c *gin.Context) {
 		})
 		return
 	}
-	amount, err := strconv.ParseInt(sess.Metadata["coins"], 10, 64)
+	amount, err := h.stripe.TopupCoinsFromSession(sess)
 	if err != nil || amount < minTopupCoins {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid stripe checkout metadata").WithReason("stripe_invalid_metadata"))
 		return
