@@ -17,6 +17,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
 	"github.com/qingwenwen777/golive/pkg/contentpolicy"
+	"github.com/qingwenwen777/golive/pkg/wallet"
 )
 
 var ErrUserNotFound = errors.New("user not found")
@@ -1148,80 +1149,6 @@ func (r *UserRepo) SetLivePermissionStatus(ctx context.Context, userID, status s
 	return &user, nil
 }
 
-func (r *UserRepo) IncrementCoins(ctx context.Context, id string, delta int64) (*model.User, error) {
-	var u model.User
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", delta)).Error; err != nil {
-			return err
-		}
-		return tx.Where("id = ?", id).Take(&u).Error
-	})
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrUserNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := r.hydrateUserLevel(ctx, &u); err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
-func (r *UserRepo) IncrementCoinsWithTransaction(
-	ctx context.Context,
-	id string,
-	delta int64,
-	txType string,
-	title string,
-	description string,
-	sourceType string,
-	sourceID string,
-	roomID string,
-	counterpartyID string,
-) (*model.User, *model.CoinTransaction, error) {
-	var u model.User
-	var coinTx *model.CoinTransaction
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", delta)).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
-			return err
-		}
-		coinTx = &model.CoinTransaction{
-			ID:             newID(),
-			UserID:         id,
-			Type:           txType,
-			Amount:         delta,
-			BalanceAfter:   u.CoinBalance,
-			Title:          title,
-			Description:    description,
-			SourceType:     sourceType,
-			SourceID:       sourceID,
-			RoomID:         roomID,
-			CounterpartyID: counterpartyID,
-		}
-		return tx.Create(coinTx).Error
-	})
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil, ErrUserNotFound
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := r.hydrateUserLevel(ctx, &u); err != nil {
-		return nil, nil, err
-	}
-	return &u, coinTx, nil
-}
-
 func (r *UserRepo) CreditStripeTopupIfNeeded(
 	ctx context.Context,
 	id string,
@@ -1249,26 +1176,20 @@ func (r *UserRepo) CreditStripeTopupIfNeeded(
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", amount)).Error; err != nil {
+		row, err := wallet.Credit(tx, id, amount, wallet.Entry{
+			Type:        model.CoinTxTopup,
+			Title:       "Stripe top-up",
+			Description: fmt.Sprintf("Paid through Stripe Checkout (%s)", strings.ToUpper(currency)),
+			SourceType:  "stripe_checkout",
+			SourceID:    sessionID,
+		})
+		if err != nil {
 			return err
 		}
 		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
 			return err
 		}
-		coinTx = model.CoinTransaction{
-			ID:           newID(),
-			UserID:       id,
-			Type:         model.CoinTxTopup,
-			Amount:       amount,
-			BalanceAfter: u.CoinBalance,
-			Title:        "Stripe top-up",
-			Description:  fmt.Sprintf("Paid through Stripe Checkout (%s)", strings.ToUpper(currency)),
-			SourceType:   "stripe_checkout",
-			SourceID:     sessionID,
-		}
-		if err := tx.Create(&coinTx).Error; err != nil {
-			return err
-		}
+		coinTx = *row
 		created = true
 		return nil
 	})
@@ -1333,26 +1254,21 @@ func (r *UserRepo) ClaimDailyCoinReward(
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", reward)).Error; err != nil {
+		row, err := wallet.Credit(tx, id, reward, wallet.Entry{
+			ID:          txID,
+			Type:        model.CoinTxDailyTask,
+			Title:       title,
+			Description: description,
+			SourceType:  "daily_task",
+			SourceID:    taskSourceID,
+		})
+		if err != nil {
 			return err
 		}
 		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
 			return err
 		}
-		coinTx = model.CoinTransaction{
-			ID:           txID,
-			UserID:       id,
-			Type:         model.CoinTxDailyTask,
-			Amount:       reward,
-			BalanceAfter: u.CoinBalance,
-			Title:        title,
-			Description:  description,
-			SourceType:   "daily_task",
-			SourceID:     taskSourceID,
-		}
-		if err := tx.Create(&coinTx).Error; err != nil {
-			return err
-		}
+		coinTx = *row
 		created = true
 		return nil
 	})
@@ -1814,65 +1730,37 @@ func (r *UserRepo) AdminAdjustCoins(ctx context.Context, userID, action string, 
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", userID).Take(&u).Error; err != nil {
 			return err
 		}
-		txType := model.CoinTxAdminAdjust
-		txAmount := int64(0)
-		title := "Admin coin adjustment"
-		switch action {
-		case "add":
-			txAmount = amount
-			if err := tx.Model(&u).UpdateColumn("coin_balance", gorm.Expr("coin_balance + ?", amount)).Error; err != nil {
-				return err
-			}
-		case "deduct":
-			txAmount = -amount
-			res := tx.Model(&model.User{}).
-				Where("id = ? AND coin_balance >= ?", userID, amount).
-				UpdateColumn("coin_balance", gorm.Expr("coin_balance - ?", amount))
-			if res.Error != nil {
-				return res.Error
-			}
-			if res.RowsAffected == 0 {
-				return ErrInsufficientCoins
-			}
-		case "freeze":
-			txType = model.CoinTxAdminFreeze
-			title = "Admin coin freeze"
-			res := tx.Model(&model.User{}).
-				Where("id = ? AND coin_balance - COALESCE(frozen_coins, 0) >= ?", userID, amount).
-				UpdateColumn("frozen_coins", gorm.Expr("COALESCE(frozen_coins, 0) + ?", amount))
-			if res.Error != nil {
-				return res.Error
-			}
-			if res.RowsAffected == 0 {
-				return ErrInsufficientCoins
-			}
-		case "unfreeze":
-			txType = model.CoinTxAdminUnfreeze
-			title = "Admin coin unfreeze"
-			if err := tx.Model(&model.User{}).
-				Where("id = ?", userID).
-				UpdateColumn("frozen_coins", gorm.Expr("CASE WHEN COALESCE(frozen_coins, 0) >= ? THEN COALESCE(frozen_coins, 0) - ? ELSE 0 END", amount, amount)).Error; err != nil {
-				return err
-			}
-		default:
-			return errors.New("invalid coin action")
-		}
-		if err := tx.Where("id = ?", userID).Take(&u).Error; err != nil {
-			return err
-		}
-		coinTx = &model.CoinTransaction{
-			ID:             newID(),
-			UserID:         userID,
-			Type:           txType,
-			Amount:         txAmount,
-			BalanceAfter:   u.CoinBalance,
-			Title:          title,
+		entry := wallet.Entry{
+			Type:           model.CoinTxAdminAdjust,
+			Title:          "Admin coin adjustment",
 			Description:    strings.TrimSpace(note),
 			SourceType:     "admin",
 			SourceID:       operatorID,
 			CounterpartyID: operatorID,
 		}
-		return tx.Create(coinTx).Error
+		var err error
+		switch action {
+		case "add":
+			coinTx, err = wallet.Credit(tx, userID, amount, entry)
+		case "deduct":
+			// Operator corrections may take banned users' and frozen coins.
+			coinTx, err = wallet.AdminDebit(tx, userID, amount, entry)
+		case "freeze":
+			entry.Type, entry.Title = model.CoinTxAdminFreeze, "Admin coin freeze"
+			coinTx, err = wallet.Freeze(tx, userID, amount, entry)
+		case "unfreeze":
+			entry.Type, entry.Title = model.CoinTxAdminUnfreeze, "Admin coin unfreeze"
+			coinTx, err = wallet.Unfreeze(tx, userID, amount, entry)
+		default:
+			return errors.New("invalid coin action")
+		}
+		if errors.Is(err, wallet.ErrInsufficientFunds) {
+			return ErrInsufficientCoins
+		}
+		if err != nil {
+			return err
+		}
+		return tx.Where("id = ?", userID).Take(&u).Error
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, ErrUserNotFound
