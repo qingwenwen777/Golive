@@ -40,6 +40,10 @@ type Room struct {
 	viewerProfiles  map[string]ViewerProfile
 	contributions   map[string]int64
 	contributionDay string
+	// appliedEvents holds the most recent gift-service outbox event ids
+	// counted into contributions. The outbox publishes at least once, so a
+	// redelivered gift must not be counted twice.
+	appliedEvents recentEventIDs
 	// closed is set (under mu) when the hub reaps the empty room; add then
 	// refuses so a joiner retries with a fresh room instead of being
 	// orphaned in one without a subscription.
@@ -222,6 +226,7 @@ func (r *Room) applyContribution(payload []byte) {
 		Amount    string `json:"amount"`
 		TotalCoin int64  `json:"totalCoin"`
 		Coins     int64  `json:"coins"`
+		EventID   uint64 `json:"eventId"`
 	}
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return
@@ -245,6 +250,10 @@ func (r *Room) applyContribution(payload []byte) {
 	}
 
 	r.mu.Lock()
+	if ev.EventID != 0 && !r.appliedEvents.add(ev.EventID) {
+		r.mu.Unlock()
+		return
+	}
 	r.resetContributionIfNeededLocked()
 	r.contributions[key] += coins
 	for connID, profile := range r.viewerProfiles {
@@ -264,6 +273,37 @@ func (r *Room) applyContribution(payload []byte) {
 	}
 	r.mu.Unlock()
 	r.markViewersDirty()
+}
+
+// maxRecentEventIDs bounds recentEventIDs. A redelivery follows the original
+// by about one outbox claim hold (30s), far fewer events than this per room.
+const maxRecentEventIDs = 1024
+
+// recentEventIDs is a FIFO-bounded set of event ids. The zero value is ready
+// to use; it is not safe for concurrent use.
+type recentEventIDs struct {
+	seen map[uint64]struct{}
+	ring []uint64
+	next int
+}
+
+// add records id and reports whether it was new.
+func (s *recentEventIDs) add(id uint64) bool {
+	if _, ok := s.seen[id]; ok {
+		return false
+	}
+	if s.seen == nil {
+		s.seen = make(map[uint64]struct{})
+	}
+	if len(s.ring) < maxRecentEventIDs {
+		s.ring = append(s.ring, id)
+	} else {
+		delete(s.seen, s.ring[s.next])
+		s.ring[s.next] = id
+		s.next = (s.next + 1) % maxRecentEventIDs
+	}
+	s.seen[id] = struct{}{}
+	return true
 }
 
 // markViewersDirty schedules a viewer_count + viewer_list push. Pushes are

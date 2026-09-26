@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -200,4 +201,29 @@ func TestHub_SubscribeFailureIsReturnedAndRetried(t *testing.T) {
 	_, err = h.Join("R1", &sink{id: "b"}, ViewerProfile{})
 	require.NoError(t, err)
 	require.Equal(t, 1, h.RoomCount())
+}
+
+// The gift-service outbox publishes at least once; a redelivered event (same
+// eventId) must not be counted into the leaderboard again.
+func TestRoom_ContributionIgnoresRedeliveredEvent(t *testing.T) {
+	r := newRoom(context.Background(), nil, "R1")
+	gift := func(eventID int) []byte {
+		return []byte(fmt.Sprintf(`{"type":"gift","userId":"u1","user":"A","totalCoin":500,"eventId":%d}`, eventID))
+	}
+	r.applyContribution(gift(1))
+	r.applyContribution(gift(1))
+	r.applyContribution(gift(2))
+	r.applyContribution([]byte(`{"type":"super_chat","userId":"u1","amount":"¥30","eventId":2}`))
+	// Events without an id (older publishers) are always counted.
+	r.applyContribution([]byte(`{"type":"gift","userId":"u1","totalCoin":100}`))
+	r.applyContribution([]byte(`{"type":"gift","userId":"u1","totalCoin":100}`))
+	require.Equal(t, int64(1200), r.contributions["id:u1"])
+
+	// Only the most recent ids are remembered.
+	for id := 3; id < 3+maxRecentEventIDs; id++ {
+		require.True(t, r.appliedEvents.add(uint64(id)))
+	}
+	require.Len(t, r.appliedEvents.seen, maxRecentEventIDs)
+	require.True(t, r.appliedEvents.add(1), "evicted id is new again")
+	require.False(t, r.appliedEvents.add(uint64(2+maxRecentEventIDs)))
 }

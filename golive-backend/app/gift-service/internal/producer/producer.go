@@ -4,7 +4,9 @@ package producer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v9"
@@ -16,6 +18,23 @@ import (
 type Producer interface {
 	Publish(ctx context.Context, msg *model.LocalMessage) error
 	Close() error
+}
+
+// EventPayload returns msg's payload with its outbox row id added as
+// "eventId". Publishing is at-least-once (a publish can succeed and the
+// MarkSent after it fail), so consumers use the id to drop redeliveries.
+// A payload that is not a JSON object is returned unchanged.
+func EventPayload(msg *model.LocalMessage) []byte {
+	var fields map[string]json.RawMessage
+	if msg.ID == 0 || json.Unmarshal([]byte(msg.Payload), &fields) != nil || fields == nil {
+		return []byte(msg.Payload)
+	}
+	fields["eventId"] = json.RawMessage(strconv.FormatUint(msg.ID, 10))
+	b, err := json.Marshal(fields)
+	if err != nil {
+		return []byte(msg.Payload)
+	}
+	return b
 }
 
 // noop just succeeds — useful for local dev when kafka isn't running.
@@ -38,7 +57,7 @@ func (p *redisFanout) Publish(ctx context.Context, msg *model.LocalMessage) erro
 	if msg.RoomID == "" {
 		return errors.New("room id missing")
 	}
-	return p.rdb.Publish(ctx, "room:"+msg.RoomID, msg.Payload).Err()
+	return p.rdb.Publish(ctx, "room:"+msg.RoomID, EventPayload(msg)).Err()
 }
 
 func (p *redisFanout) Close() error { return nil }
@@ -65,9 +84,10 @@ func (f *franzProducer) Publish(ctx context.Context, msg *model.LocalMessage) er
 	return f.cl.ProduceSync(ctx, &kgo.Record{
 		Topic: f.topic,
 		Key:   []byte(msg.BizID),
-		Value: []byte(msg.Payload),
+		Value: EventPayload(msg),
 		Headers: []kgo.RecordHeader{
 			{Key: "topic", Value: []byte(msg.Topic)},
+			{Key: "event-id", Value: []byte(strconv.FormatUint(msg.ID, 10))},
 		},
 	}).FirstErr()
 }

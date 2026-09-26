@@ -2,26 +2,39 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 )
+
+// ErrClaimRace means a claim's UPDATE did not hold every row its SELECT
+// picked. The claim is rolled back, so nothing is handed out twice.
+var ErrClaimRace = errors.New("outbox claim raced another worker")
 
 type OutboxRepo struct{ db *gorm.DB }
 
 func NewOutboxRepo(db *gorm.DB) *OutboxRepo { return &OutboxRepo{db: db} }
 
-// Claim selects up-to `limit` pending rows whose NextAt is in the past, then
-// flips their status to 'sent' optimistically. We use a SELECT then UPDATE
-// guarded by version (status='pending') to avoid two workers grabbing the
-// same row. The actual Kafka send happens after this — failures roll the
-// status back to pending with incremented retry counter.
-func (r *OutboxRepo) Claim(ctx context.Context, limit int) ([]model.LocalMessage, error) {
+// Claim selects up-to `limit` pending rows whose NextAt is in the past and
+// holds them for `hold`: status stays 'pending' but next_at moves into the
+// future so other workers skip them. The caller flips a row to 'sent' after a
+// successful publish or reschedules it on failure; a crashed worker's rows
+// become claimable again once the hold lapses.
+//
+// The SELECT is FOR UPDATE SKIP LOCKED (MySQL 8.0+, MariaDB 10.6+; SQLite
+// drops the clause and serialises writers instead), so a concurrent Claim
+// skips the rows this one is claiming instead of reading them from its own
+// snapshot and returning them too.
+func (r *OutboxRepo) Claim(ctx context.Context, limit int, hold time.Duration) ([]model.LocalMessage, error) {
 	var rows []model.LocalMessage
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("status = ? AND next_at <= ?", model.OutboxStatusPending, time.Now()).
+		now := time.Now()
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("status = ? AND next_at <= ?", model.OutboxStatusPending, now).
 			Order("id ASC").
 			Limit(limit).
 			Find(&rows).Error; err != nil {
@@ -34,13 +47,16 @@ func (r *OutboxRepo) Claim(ctx context.Context, limit int) ([]model.LocalMessage
 		for i, m := range rows {
 			ids[i] = m.ID
 		}
-		// Mark "in-flight" by leaving status=pending but bumping next_at far
-		// into the future so other workers skip it. We'll either flip to
-		// 'sent' after a successful publish or reset next_at on failure.
-		hold := time.Now().Add(30 * time.Second)
-		return tx.Model(&model.LocalMessage{}).
-			Where("id IN ? AND status = ?", ids, model.OutboxStatusPending).
-			Update("next_at", hold).Error
+		res := tx.Model(&model.LocalMessage{}).
+			Where("id IN ? AND status = ? AND next_at <= ?", ids, model.OutboxStatusPending, now).
+			Update("next_at", now.Add(hold))
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != int64(len(ids)) {
+			return ErrClaimRace
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

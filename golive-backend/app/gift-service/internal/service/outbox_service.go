@@ -23,6 +23,8 @@ type OutboxConfig struct {
 	BatchSize    int
 	MaxRetries   int
 	BaseBackoff  time.Duration
+	// ClaimHold is how long a claimed batch is hidden from other workers.
+	ClaimHold time.Duration
 }
 
 type OutboxService struct {
@@ -44,6 +46,9 @@ func NewOutboxService(r *repo.OutboxRepo, p producer.Producer, cfg OutboxConfig)
 	if cfg.BaseBackoff == 0 {
 		cfg.BaseBackoff = 2 * time.Second
 	}
+	if cfg.ClaimHold == 0 {
+		cfg.ClaimHold = 30 * time.Second
+	}
 	return &OutboxService{repo: r, prod: p, cfg: cfg}
 }
 
@@ -63,12 +68,19 @@ func (s *OutboxService) Run(ctx context.Context) {
 
 // drainOnce is exported via tests via the underscore alias below.
 func (s *OutboxService) drainOnce(ctx context.Context) int {
-	rows, err := s.repo.Claim(ctx, s.cfg.BatchSize)
+	claimedAt := time.Now()
+	rows, err := s.repo.Claim(ctx, s.cfg.BatchSize, s.cfg.ClaimHold)
 	if err != nil {
 		logger.L().Warn("outbox claim", zap.Error(err))
 		return 0
 	}
 	for i := range rows {
+		// Once the hold lapses another worker may claim these rows again, so
+		// stop starting publishes with half of it left. The rest are picked
+		// up (by any worker) when their hold expires.
+		if time.Since(claimedAt) > s.cfg.ClaimHold/2 {
+			break
+		}
 		s.handleOne(ctx, &rows[i])
 	}
 	return len(rows)
