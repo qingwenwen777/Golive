@@ -1439,12 +1439,9 @@ func (r *UserRepo) updateCreatorAvatarReferences(ctx context.Context, tx *gorm.D
 		Update("avatar", avatar).Error; err != nil && !isMissingRelation(err) {
 		return err
 	}
-	if err := tx.WithContext(ctx).
-		Table("fan_badges").
-		Where("creator_id = ?", id).
-		Update("creator_avatar", avatar).Error; err != nil && !isMissingRelation(err) {
-		return err
-	}
+	// fan_badges.creator_avatar is gift-service's snapshot; gift-service
+	// replaces it with the current users.avatar when listing badges, so
+	// user-service does not write gift-service's table.
 	return nil
 }
 
