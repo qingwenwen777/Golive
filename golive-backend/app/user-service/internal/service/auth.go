@@ -95,6 +95,10 @@ type TokenStore interface {
 	Rotate(ctx context.Context, oldToken, newToken, userID string, ttl time.Duration) error
 }
 
+type userRefreshRevoker interface {
+	RevokeUserRefresh(ctx context.Context, userID string) error
+}
+
 type LoginAttemptStore interface {
 	LoginCooldown(ctx context.Context, username string) (time.Duration, bool, error)
 	RecordLoginFailure(ctx context.Context, username string, window, cooldown time.Duration, maxAttempts int) (time.Duration, bool, error)
@@ -437,6 +441,17 @@ func (s *AuthService) Logout(ctx context.Context, refresh string) error {
 		return nil
 	}
 	return s.tokens.DeleteRefresh(ctx, refresh)
+}
+
+// RevokeUserSessions revokes every refresh token issued to userID, forcing
+// each of their sessions to log in again once its access token expires.
+// Access tokens are verified statelessly and stay valid until then.
+func (s *AuthService) RevokeUserSessions(ctx context.Context, userID string) error {
+	revoker, ok := s.tokens.(userRefreshRevoker)
+	if !ok {
+		return errors.New("token store cannot revoke user sessions")
+	}
+	return revoker.RevokeUserRefresh(ctx, userID)
 }
 
 // Me returns the user identified by an access token. Returns ErrUnauthorized

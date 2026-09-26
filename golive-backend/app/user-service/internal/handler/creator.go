@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -136,12 +137,18 @@ func (h *CreatorHandler) SubmitPlatformApplication(c *gin.Context) {
 	})
 }
 
-type AdminHandler struct {
-	users *repo.UserRepo
+// SessionRevoker revokes all refresh tokens of a user.
+type SessionRevoker interface {
+	RevokeUserSessions(ctx context.Context, userID string) error
 }
 
-func NewAdminHandler(users *repo.UserRepo) *AdminHandler {
-	return &AdminHandler{users: users}
+type AdminHandler struct {
+	users    *repo.UserRepo
+	sessions SessionRevoker
+}
+
+func NewAdminHandler(users *repo.UserRepo, sessions SessionRevoker) *AdminHandler {
+	return &AdminHandler{users: users, sessions: sessions}
 }
 
 func (h *AdminHandler) CreateInviteCode(c *gin.Context) {
@@ -391,6 +398,14 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 	if err != nil {
 		errcode.Respond(c, err)
 		return
+	}
+	if req.Banned && h.sessions != nil {
+		// Existing sessions must log in again, which hands the client the
+		// banned flag and routes it to the appeal page.
+		if err := h.sessions.RevokeUserSessions(c.Request.Context(), u.ID); err != nil {
+			errcode.Respond(c, err)
+			return
+		}
 	}
 	action := "user_unban"
 	if req.Banned {

@@ -60,6 +60,33 @@ func AdminRequired(users *repo.UserRepo) gin.HandlerFunc {
 			errcode.Respond(c, forbidden)
 			return
 		}
+		if u.Banned {
+			errcode.Respond(c, service.ErrUserBanned)
+			return
+		}
+		c.Next()
+	}
+}
+
+// NotBanned rejects banned users with 403 user_banned. Banned users can still
+// sign in, read their own account and appeal, so it guards only the actions
+// they must not take while banned. Must run after AuthRequired.
+func NotBanned(users *repo.UserRepo) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uid := UserIDFromCtx(c)
+		if uid == "" {
+			errcode.Respond(c, service.ErrUnauthorized)
+			return
+		}
+		u, err := users.FindByID(c.Request.Context(), uid)
+		if err != nil {
+			errcode.Respond(c, service.ErrUnauthorized)
+			return
+		}
+		if u.Banned {
+			errcode.Respond(c, service.ErrUserBanned)
+			return
+		}
 		c.Next()
 	}
 }
