@@ -32,6 +32,7 @@ services:
     container_name: golive-redis
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
     volumes: [redis_data:/data]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -61,7 +62,44 @@ services:
       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       ALLOW_PLAINTEXT_LISTENER: "yes"
 
+  # ========== one-shot permissions job ==========
+
+  # The Go services run as UID/GID 10001 (Dockerfile.service) without any
+  # capabilities, but the upload and recording volumes were created
+  # root-owned and deploy/secrets is usually readable by root only. This job
+  # runs before them on every `docker compose up`, then exits:
+  # - the volumes become owned by 10001:10001 (SRS keeps writing recordings
+  #   as root; owning the directory is what lets room-service delete them);
+  # - deploy/secrets keeps its owner and gains group 10001 with group read
+  #   (directories: read + traverse). Nothing else on the host is touched.
+  init-permissions:
+    image: alpine:3.22
+    container_name: golive-init-permissions
+    restart: "no"
+    logging: *default-logging
+    network_mode: none
+    user: "0:0"
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    volumes:
+      - ./secrets:/fix/secrets
+      - avatar_uploads:/fix/avatars
+      - cover_uploads:/fix/covers
+      - post_uploads:/fix/posts
+      - replay_records:/fix/records
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        find /fix/avatars /fix/covers /fix/posts /fix/records \( ! -user 10001 -o ! -group 10001 \) -exec chown -h 10001:10001 {} +
+        find /fix/secrets ! -type l ! -group 10001 -exec chgrp 10001 {} +
+        find /fix/secrets -type d ! -perm -050 -exec chmod g+rx {} +
+        find /fix/secrets -type f ! -perm -040 -exec chmod g+r {} +
+        echo "init-permissions: volumes and deploy/secrets are ready for UID/GID 10001"
+
   # ========== Go application services ==========
+  # All run as UID/GID 10001 with no capabilities (they bind ports > 1024).
 
   user-service:
     build:
@@ -73,6 +111,8 @@ services:
     container_name: golive-user-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/user-service.yaml"]
     volumes:
@@ -92,6 +132,8 @@ services:
       USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT: ${USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT:-}
       USERSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -109,6 +151,8 @@ services:
     container_name: golive-room-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/room-service.yaml"]
     volumes:
@@ -125,6 +169,8 @@ services:
       ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
       ROOMSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -142,6 +188,8 @@ services:
     container_name: golive-gift-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/gift-service.yaml"]
     volumes:
@@ -152,6 +200,8 @@ services:
       GIFTSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
       GIFTSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -169,6 +219,8 @@ services:
     container_name: golive-chat-service
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/chat-service.yaml"]
     volumes:
@@ -198,6 +250,8 @@ services:
     container_name: golive-api-gateway
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/api-gateway.yaml"]
     volumes:
@@ -207,6 +261,8 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       GW_CSRF_SECRET: ${GW_CSRF_SECRET:?set GW_CSRF_SECRET in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       user-service:
         condition: service_started
       room-service:
@@ -226,6 +282,8 @@ services:
     container_name: golive-im-gateway
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     working_dir: /app
     command: ["-config", "./deploy/configs/im-gateway.yaml"]
     volumes:
@@ -235,6 +293,8 @@ services:
     environment:
       IMGW_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
+      init-permissions:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
@@ -252,6 +312,9 @@ services:
     container_name: golive-srs
     restart: unless-stopped
     logging: *default-logging
+    # Runs as root and keeps its default capabilities: it writes recordings
+    # into replay_records, whose directory is owned by UID 10001.
+    security_opt: [no-new-privileges:true]
     ports:
       - "1935:1935"
       - "8000:8000/udp"
@@ -280,6 +343,7 @@ services:
     container_name: golive-nginx
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
     depends_on: [srs, api-gateway, im-gateway]
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -309,6 +373,9 @@ services:
     container_name: golive-jaeger
     restart: unless-stopped
     logging: *default-logging
+    # The observability images already run as non-root users.
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
@@ -321,6 +388,8 @@ services:
     container_name: golive-otel
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
@@ -331,6 +400,8 @@ services:
     container_name: golive-prometheus
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=7d
@@ -346,6 +417,8 @@ services:
     container_name: golive-grafana
     restart: unless-stopped
     logging: *default-logging
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     environment:
       GF_SECURITY_ADMIN_USER: ${GOLIVE_GRAFANA_ADMIN_USER:?set GOLIVE_GRAFANA_ADMIN_USER in deploy/.env}
       GF_SECURITY_ADMIN_PASSWORD: ${GOLIVE_GRAFANA_ADMIN_PASSWORD:?set GOLIVE_GRAFANA_ADMIN_PASSWORD in deploy/.env}
