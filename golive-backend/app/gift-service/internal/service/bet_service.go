@@ -30,6 +30,8 @@ var (
 	ErrBetNoWinners    = errors.New("bet has no winners")
 	ErrBetBadOption    = errors.New("bad bet option")
 	ErrBetBadQuestion  = errors.New("bad bet question")
+	ErrBetOwnerWager   = errors.New("bet owner cannot wager")
+	ErrBetNotClosed    = errors.New("bet not closed yet")
 )
 
 type BetService struct {
@@ -223,6 +225,10 @@ func mapBetErr(err error) error {
 		return ErrBetUnauthorized
 	case errors.Is(err, repo.ErrBetNoWinners):
 		return ErrBetNoWinners
+	case errors.Is(err, repo.ErrBetOwnerWager):
+		return ErrBetOwnerWager
+	case errors.Is(err, repo.ErrBetStillOpen):
+		return ErrBetNotClosed
 	case errors.Is(err, repo.ErrInsufficientFunds):
 		return ErrInsufficientCoin
 	default:

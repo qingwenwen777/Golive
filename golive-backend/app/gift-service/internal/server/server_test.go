@@ -242,6 +242,39 @@ func TestBetHTTP_OpenWagerDuplicateAndLatestViewerState(t *testing.T) {
 	}, view.Summary)
 }
 
+func TestBetHTTP_HostCannotWagerOrSettleWhileOpen(t *testing.T) {
+	fx := newGiftHTTPFixture(t, 1000)
+	require.NoError(t, fx.db.Exec("UPDATE users SET coin_balance = 1000 WHERE id = ?", "u-owner").Error)
+
+	open := postJSON(fx.router, "/bets", "u-owner", `{"roomId":"room-1","amount":100,"question":"Will blue team win?"}`)
+	require.Equal(t, http.StatusOK, open.Code)
+	var opened struct {
+		Round struct {
+			ID string `json:"id"`
+		} `json:"round"`
+	}
+	require.NoError(t, json.Unmarshal(open.Body.Bytes(), &opened))
+	roundID := opened.Round.ID
+
+	selfBet := postJSON(fx.router, "/bets/"+roundID+"/wagers", "u-owner", `{"roomId":"room-1","option":"lose"}`)
+	require.Equal(t, http.StatusForbidden, selfBet.Code)
+	require.JSONEq(t, `{"message":"Hosts cannot bet on their own round","reason":"bet_owner_forbidden"}`, selfBet.Body.String())
+	require.EqualValues(t, 1000, coinBalance(t, fx.db, "u-owner"))
+
+	wager := postJSON(fx.router, "/bets/"+roundID+"/wagers", "u-demo", `{"roomId":"room-1","option":"win"}`)
+	require.Equal(t, http.StatusOK, wager.Code)
+
+	early := postJSON(fx.router, "/bets/"+roundID+"/settle", "u-owner", `{"option":"win"}`)
+	require.Equal(t, http.StatusConflict, early.Code)
+	require.JSONEq(t, `{"message":"Betting is still open","reason":"bet_not_closed"}`, early.Body.String())
+
+	require.NoError(t, fx.db.Model(&model.BetRound{}).Where("id = ?", roundID).
+		Update("close_at", time.Now().UTC().Add(-time.Second)).Error)
+	settled := postJSON(fx.router, "/bets/"+roundID+"/settle", "u-owner", `{"option":"win"}`)
+	require.Equal(t, http.StatusOK, settled.Code)
+	require.EqualValues(t, 1000, coinBalance(t, fx.db, "u-demo"))
+}
+
 func TestBetHTTP_RejectsUnauthorizedAndBadOpenPayloads(t *testing.T) {
 	fx := newGiftHTTPFixture(t, 1000)
 

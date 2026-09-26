@@ -42,6 +42,8 @@ var (
 	ErrBetAlreadyPlaced  = errors.New("bet already placed")
 	ErrBetUnauthorized   = errors.New("bet unauthorized")
 	ErrBetNoWinners      = errors.New("bet has no winners")
+	ErrBetOwnerWager     = errors.New("bet owner cannot wager")
+	ErrBetStillOpen      = errors.New("bet still open")
 )
 
 type OrderRepo struct{ db *gorm.DB }
@@ -454,6 +456,10 @@ func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, ou
 			}
 			return err
 		}
+		// The host decides the outcome, so they must not hold a stake in it.
+		if wager.UserID == round.OwnerID {
+			return ErrBetOwnerWager
+		}
 		now := time.Now().UTC()
 		if round.Status != model.BetRoundOpen || !now.Before(round.CloseAt) {
 			if round.Status == model.BetRoundOpen && !now.Before(round.CloseAt) {
@@ -540,6 +546,11 @@ func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winnin
 		}
 		if round.Status != model.BetRoundOpen && round.Status != model.BetRoundClosed {
 			return ErrBetClosed
+		}
+		// The host may only pick the result once betting has closed, so they
+		// cannot watch the pool and settle while viewers are still wagering.
+		if requireOwner && round.Status == model.BetRoundOpen && now.Before(round.CloseAt) {
+			return ErrBetStillOpen
 		}
 		var wagers []model.BetWager
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).

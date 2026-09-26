@@ -152,6 +152,10 @@ func respondBetError(c *gin.Context, err error) {
 		errcode.Respond(c, errcode.New(http.StatusConflict, "Bet is closed").WithReason("bet_closed"))
 	case errors.Is(err, service.ErrBetAlready):
 		errcode.Respond(c, errcode.New(http.StatusConflict, "Bet already placed").WithReason("bet_already_placed"))
+	case errors.Is(err, service.ErrBetOwnerWager):
+		errcode.Respond(c, errcode.New(http.StatusForbidden, "Hosts cannot bet on their own round").WithReason("bet_owner_forbidden"))
+	case errors.Is(err, service.ErrBetNotClosed):
+		errcode.Respond(c, errcode.New(http.StatusConflict, "Betting is still open").WithReason("bet_not_closed"))
 	case errors.Is(err, service.ErrBetNoWinners):
 		errcode.Respond(c, errcode.New(http.StatusConflict, "No winners for this result").WithReason("bet_no_winners"))
 	case errors.Is(err, service.ErrBetNotFound):

@@ -2297,6 +2297,7 @@
     "myWagerWon": ", returned {{payout}} coin",
     "myWagerRefunded": ", refunded",
     "noWagerHint": "No one picked this option. Cancel to refund coins.",
+    "settleAfterClose": "You can settle once betting closes.",
     "openSuccess": "Bet opened. It closes automatically in 60 seconds.",
     "wagerSuccess": "Bet placed on \"{{option}}\".",
     "settleSuccess": "Bet settled as \"{{option}}\".",
@@ -2317,6 +2318,7 @@
     "errorClosed": "Betting is closed.",
     "errorAlreadyPlaced": "You already placed a bet.",
     "errorNoWinners": "No winner for this result. Cancel to refund.",
+    "errorOwnerWager": "Streamers can't bet on their own round.",
     "errorBadQuestion": "Bet title is required and must be 80 characters or fewer.",
     "errorForbidden": "Only the streamer can manage betting.",
     "errorGeneric": "Action failed."
