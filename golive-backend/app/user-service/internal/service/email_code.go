@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
@@ -28,14 +27,89 @@ const (
 	EmailPurposeEmailChange   = "email_change"
 
 	emailCodeMaxVerifyFailures = 5
+	// DefaultEmailCodesPerHour caps the codes sent to one address for one
+	// purpose per hour. Every code allows emailCodeMaxVerifyFailures guesses,
+	// so the cap also bounds the guesses per address.
+	DefaultEmailCodesPerHour = 5
+	emailCodeSendWindow      = time.Hour
 )
 
 var (
 	ErrInvalidEmailCode   = errcode.New(http.StatusBadRequest, "Invalid email verification code").WithReason("invalid_email_code")
 	ErrEmailCodeTooSoon   = errcode.New(http.StatusTooManyRequests, "Please wait before requesting another email code").WithReason("email_code_too_soon")
+	ErrEmailCodeLimit     = errcode.New(http.StatusTooManyRequests, "Too many email codes were requested for this address. Please try again later").WithReason("email_code_limit")
 	ErrEmailNotConfigured = errcode.New(http.StatusServiceUnavailable, "Email verification is not configured").WithReason("email_not_configured")
 	ErrEmailSendFailed    = errcode.New(http.StatusBadGateway, "Could not send email verification code").WithReason("email_send_failed")
 )
+
+// emailCodeIssueScript stores a new code, replacing any earlier one and its
+// failed guesses. It returns "too_soon" while the resend interval runs,
+// "limit" once the address had all its codes for the window, else "ok".
+var emailCodeIssueScript = redis.NewScript(`
+local codeKey, resendKey, failKey, sendsKey = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
+local code, codeTTL, resendTTL = ARGV[1], ARGV[2], ARGV[3]
+local maxSends, window = tonumber(ARGV[4]), ARGV[5]
+
+if redis.call("EXISTS", resendKey) == 1 then
+	return "too_soon"
+end
+if tonumber(redis.call("GET", sendsKey) or "0") >= maxSends then
+	return "limit"
+end
+redis.call("SET", resendKey, "1", "PX", resendTTL)
+redis.call("INCR", sendsKey)
+if redis.call("PTTL", sendsKey) < 0 then
+	redis.call("PEXPIRE", sendsKey, window)
+end
+redis.call("SET", codeKey, code, "PX", codeTTL)
+redis.call("DEL", failKey)
+return "ok"
+`)
+
+// emailCodeWithdrawScript drops a code whose email could not be sent, so the
+// address can ask again right away, and takes it off the window's count.
+var emailCodeWithdrawScript = redis.NewScript(`
+local codeKey, resendKey, failKey, sendsKey = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
+
+redis.call("DEL", codeKey, resendKey, failKey)
+if tonumber(redis.call("GET", sendsKey) or "0") > 0 then
+	redis.call("DECR", sendsKey)
+end
+return 0
+`)
+
+// emailCodeVerifyScript checks a guess and records the result in one step, so
+// guesses sent in parallel cannot all be compared with the code before their
+// failures are counted. A match returns 1 and deletes the code (it is
+// single-use) with its resend and failure keys. A miss returns 0 and counts a
+// failure, deleting the code at the limit; a missing code also returns 0.
+// SHA-1 digests are compared so the comparison's timing says nothing about
+// the code.
+var emailCodeVerifyScript = redis.NewScript(`
+local codeKey, resendKey, failKey = KEYS[1], KEYS[2], KEYS[3]
+local guess, maxFailures, fallbackTTL = ARGV[1], tonumber(ARGV[2]), ARGV[3]
+
+local code = redis.call("GET", codeKey)
+if not code then
+	return 0
+end
+if redis.sha1hex(code) == redis.sha1hex(guess) then
+	redis.call("DEL", codeKey, resendKey, failKey)
+	return 1
+end
+local failures = redis.call("INCR", failKey)
+if failures == 1 then
+	local ttl = redis.call("PTTL", codeKey)
+	if ttl <= 0 then
+		ttl = fallbackTTL
+	end
+	redis.call("PEXPIRE", failKey, ttl)
+end
+if failures >= maxFailures then
+	redis.call("DEL", codeKey, failKey)
+end
+return 0
+`)
 
 type EmailCodeSendResult struct {
 	OK        bool `json:"ok"`
@@ -47,10 +121,11 @@ type EmailCodeMailer interface {
 }
 
 type EmailCodeService struct {
-	rdb            *redis.Client
-	mailer         EmailCodeMailer
-	ttl            time.Duration
-	resendInterval time.Duration
+	rdb             *redis.Client
+	mailer          EmailCodeMailer
+	ttl             time.Duration
+	resendInterval  time.Duration
+	maxCodesPerHour int
 }
 
 func NewEmailCodeService(rdb *redis.Client, mailer EmailCodeMailer, ttl, resendInterval time.Duration) *EmailCodeService {
@@ -61,10 +136,19 @@ func NewEmailCodeService(rdb *redis.Client, mailer EmailCodeMailer, ttl, resendI
 		resendInterval = time.Minute
 	}
 	return &EmailCodeService{
-		rdb:            rdb,
-		mailer:         mailer,
-		ttl:            ttl,
-		resendInterval: resendInterval,
+		rdb:             rdb,
+		mailer:          mailer,
+		ttl:             ttl,
+		resendInterval:  resendInterval,
+		maxCodesPerHour: DefaultEmailCodesPerHour,
+	}
+}
+
+// SetMaxCodesPerHour caps the codes sent to one address for one purpose per
+// hour; n <= 0 keeps DefaultEmailCodesPerHour.
+func (s *EmailCodeService) SetMaxCodesPerHour(n int) {
+	if n > 0 {
+		s.maxCodesPerHour = n
 	}
 }
 
@@ -81,25 +165,25 @@ func (s *EmailCodeService) Send(ctx context.Context, purpose, email string) (*Em
 		return nil, ErrEmailNotConfigured
 	}
 
-	target := emailCodeTarget(purpose, cleanEmail)
-	allowed, err := s.rdb.SetNX(ctx, emailCodeRateKey(target), "1", s.resendInterval).Result()
-	if err != nil {
-		return nil, err
-	}
-	if !allowed {
-		return nil, ErrEmailCodeTooSoon
-	}
-
 	code, err := randomEmailCode(6)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.rdb.Set(ctx, emailCodeKey(target), code, s.ttl).Err(); err != nil {
+	target := emailCodeTarget(purpose, cleanEmail)
+	keys := []string{emailCodeKey(target), emailCodeRateKey(target), emailCodeFailKey(target), emailCodeSendsKey(target)}
+	issued, err := emailCodeIssueScript.Run(ctx, s.rdb, keys, code, s.ttl.Milliseconds(),
+		s.resendInterval.Milliseconds(), s.maxCodesPerHour, emailCodeSendWindow.Milliseconds()).Text()
+	if err != nil {
 		return nil, err
 	}
-	_ = s.rdb.Del(ctx, emailCodeFailKey(target)).Err()
+	switch issued {
+	case "too_soon":
+		return nil, ErrEmailCodeTooSoon
+	case "limit":
+		return nil, ErrEmailCodeLimit
+	}
 	if err := s.mailer.SendVerificationCode(ctx, cleanEmail, code, s.ttl); err != nil {
-		_ = s.rdb.Del(ctx, emailCodeKey(target), emailCodeRateKey(target), emailCodeFailKey(target)).Err()
+		_ = emailCodeWithdrawScript.Run(ctx, s.rdb, keys).Err()
 		return nil, ErrEmailSendFailed
 	}
 	return &EmailCodeSendResult{OK: true, ExpiresIn: int(s.ttl.Seconds())}, nil
@@ -120,37 +204,13 @@ func (s *EmailCodeService) Verify(ctx context.Context, purpose, email, code stri
 	}
 
 	target := emailCodeTarget(purpose, cleanEmail)
-	expected, err := s.rdb.Get(ctx, emailCodeKey(target)).Result()
-	if err != nil {
-		return ErrInvalidEmailCode
-	}
-	if subtle.ConstantTimeCompare([]byte(cleanCode), []byte(expected)) != 1 {
-		if err := s.recordEmailCodeVerifyFailure(ctx, target); err != nil {
-			return err
-		}
-		return ErrInvalidEmailCode
-	}
-	_ = s.rdb.Del(ctx, emailCodeKey(target), emailCodeRateKey(target), emailCodeFailKey(target)).Err()
-	return nil
-}
-
-func (s *EmailCodeService) recordEmailCodeVerifyFailure(ctx context.Context, target string) error {
-	failKey := emailCodeFailKey(target)
-	count, err := s.rdb.Incr(ctx, failKey).Result()
+	keys := []string{emailCodeKey(target), emailCodeRateKey(target), emailCodeFailKey(target)}
+	matched, err := emailCodeVerifyScript.Run(ctx, s.rdb, keys, cleanCode, emailCodeMaxVerifyFailures, s.ttl.Milliseconds()).Int()
 	if err != nil {
 		return err
 	}
-	if count == 1 {
-		ttl := s.ttl
-		if codeTTL, err := s.rdb.TTL(ctx, emailCodeKey(target)).Result(); err == nil && codeTTL > 0 {
-			ttl = codeTTL
-		}
-		if err := s.rdb.Expire(ctx, failKey, ttl).Err(); err != nil {
-			return err
-		}
-	}
-	if count >= emailCodeMaxVerifyFailures {
-		return s.rdb.Del(ctx, emailCodeKey(target), failKey).Err()
+	if matched != 1 {
+		return ErrInvalidEmailCode
 	}
 	return nil
 }
@@ -183,6 +243,11 @@ func emailCodeRateKey(target string) string {
 
 func emailCodeFailKey(target string) string {
 	return "email_code_fail:" + target
+}
+
+// emailCodeSendsKey counts the codes sent to target in the current window.
+func emailCodeSendsKey(target string) string {
+	return "email_code_sends:" + target
 }
 
 func randomEmailCode(length int) (string, error) {

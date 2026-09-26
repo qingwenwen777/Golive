@@ -666,6 +666,7 @@
         "weakPassword": "New password must be at least 8 characters and include both letters and numbers.",
         "passwordMismatch": "The two new passwords do not match.",
         "usernameTaken": "This username is already taken.",
+        "displayNameTaken": "This display name is another user's username. Choose a different one.",
         "usernameCooldown": "Username is cooling down. You can change it again after {{date}}.",
         "usernameCooldownUnknown": "Username changes are still in cooldown.",
         "invalidCurrentPassword": "Current password is incorrect.",
@@ -676,6 +677,7 @@
         "emailTaken": "This email is already bound to another account.",
         "invalidEmailCode": "Email verification code is incorrect or expired.",
         "emailCodeTooSoon": "Please wait before requesting another email code.",
+        "emailCodeLimit": "Too many codes were requested for this email. Please try again later.",
         "emailCodeUnavailable": "Email verification is temporarily unavailable.",
         "googleLoadFailed": "Could not load Google sign-in.",
         "googleEmailExists": "That Google email is already used by another GoLive account.",
@@ -1382,6 +1384,7 @@
         "roleSaved": "Role updated.",
         "banned": "User banned.",
         "unbanned": "User unbanned.",
+        "liveEndFailed": "Their live stream could not be ended right away. It will end automatically within a few minutes.",
         "invalidAmount": "Enter a valid amount.",
         "coinsSaved": "Coin balance updated.",
         "tabs": {

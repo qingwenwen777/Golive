@@ -93,6 +93,31 @@ func (r *ModerationRepo) UserRestriction(ctx context.Context, userID string, now
 	return restriction, nil
 }
 
+// BannedUserIDs returns which of userIDs are banned, by the same rule as
+// UserRestriction: user_moderation_states.banned or users.banned.
+func (r *ModerationRepo) BannedUserIDs(ctx context.Context, userIDs []string) (map[string]bool, error) {
+	banned := make(map[string]bool)
+	if len(userIDs) == 0 {
+		return banned, nil
+	}
+	var stateIDs, userRowIDs []string
+	if err := r.db.WithContext(ctx).Model(&model.UserModerationState{}).
+		Where("banned = ? AND user_id IN ?", true, userIDs).
+		Pluck("user_id", &stateIDs).Error; err != nil {
+		return nil, err
+	}
+	err := r.db.WithContext(ctx).Table("users").
+		Where("banned = ? AND id IN ?", true, userIDs).
+		Pluck("id", &userRowIDs).Error
+	if err != nil && !isMissingTableName(err) && !isMissingColumn(err) {
+		return nil, err
+	}
+	for _, id := range append(stateIDs, userRowIDs...) {
+		banned[id] = true
+	}
+	return banned, nil
+}
+
 func (r *ModerationRepo) SyncUserRestrictions(ctx context.Context, now time.Time) error {
 	if r.rdb == nil {
 		return nil

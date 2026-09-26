@@ -80,23 +80,26 @@ func (r *ModerationRepo) resolveRoomTarget(ctx context.Context, roomID string) (
 
 func (r *ModerationRepo) resolveChannelTarget(ctx context.Context, key string) (*ReportTarget, error) {
 	key = strings.TrimPrefix(key, "ch-")
-	var ownerID string
-	for _, column := range []string{"id", "username", "display_name"} {
-		var ids []string
-		err := r.db.WithContext(ctx).Table("users").
-			Where(column+" = ?", key).
-			Limit(1).
-			Pluck("id", &ids).Error
+	var ids []string
+	if err := r.db.WithContext(ctx).Table("users").
+		Where("id = ?", key).Limit(1).
+		Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	ownerID := ""
+	if len(ids) == 1 {
+		ownerID = ids[0]
+	} else {
+		// Same rule as channel links: a username, or a display name only
+		// one user has.
+		var err error
+		ownerID, err = userIDByName(ctx, r.db, key)
+		if errors.Is(err, ErrRoomNotFound) || errors.Is(err, errUserNameAmbiguous) {
+			return nil, ErrReportTargetNotFound
+		}
 		if err != nil {
 			return nil, err
 		}
-		if len(ids) > 0 && strings.TrimSpace(ids[0]) != "" {
-			ownerID = ids[0]
-			break
-		}
-	}
-	if ownerID == "" {
-		return nil, ErrReportTargetNotFound
 	}
 	name := r.reportUserName(ctx, ownerID, "")
 	return &ReportTarget{

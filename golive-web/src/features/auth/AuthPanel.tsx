@@ -69,6 +69,11 @@ function authErrorMessage(
         defaultValue: 'Please wait before requesting another email code.',
       });
     }
+    if (reason === 'email_code_limit') {
+      return t('auth.errors.emailCodeLimit', {
+        defaultValue: 'Too many codes were requested for this email. Please try again later.',
+      });
+    }
     if (reason === 'email_not_configured' || reason === 'email_send_failed') {
       return t('auth.errors.emailCodeUnavailable', {
         defaultValue: 'Email verification is temporarily unavailable.',
@@ -77,6 +82,11 @@ function authErrorMessage(
     if (reason === 'email_user_mismatch') {
       return t('auth.errors.emailUserMismatch', {
         defaultValue: 'Username and email do not match.',
+      });
+    }
+    if (reason === 'display_name_taken') {
+      return t('auth.errors.displayNameTaken', {
+        defaultValue: "That display name is another user's username. Choose a different one.",
       });
     }
     if (reason === 'invalid_invite') {

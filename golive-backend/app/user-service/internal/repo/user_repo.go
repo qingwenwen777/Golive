@@ -15,6 +15,11 @@ import (
 
 var ErrUserNotFound = errors.New("user not found")
 var ErrUsernameTaken = errors.New("username already exists")
+var (
+	// A new name must not pass for another user's; see checkNewNames.
+	ErrUsernameIsDisplayName = errors.New("username is another user's display name")
+	ErrDisplayNameTaken      = errors.New("display name is another user's username")
+)
 var ErrEmailTaken = errors.New("email already exists")
 var (
 	ErrGoogleAlreadyLinked = errors.New("google account already linked")
@@ -162,8 +167,56 @@ func (r *UserRepo) FindByID(ctx context.Context, id string) (*model.User, error)
 	return &u, nil
 }
 
+// Create inserts u, refusing names that pass for another user's (see
+// checkNewNames).
 func (r *UserRepo) Create(ctx context.Context, u *model.User) error {
-	return r.db.WithContext(ctx).Create(u).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := checkNewNames(tx, u.ID, u.Username, u.DisplayName); err != nil {
+			return err
+		}
+		return tx.Create(u).Error
+	})
+}
+
+// checkNewNames keeps one user's name from passing for another's. Channel
+// links and follow-by-name resolve a name to the user with that username (or
+// the only user with that display name), so a username being set must not be
+// another user's display name (ErrUsernameIsDisplayName) and a display name
+// being set must not be another user's username (ErrDisplayNameTaken), both
+// ignoring case. Pass "" for a name that is not changing: stored names are
+// never re-checked, so an older clash does not stop its owners from saving
+// their profile, and nobody's username or login changes.
+func checkNewNames(tx *gorm.DB, userID, username, displayName string) error {
+	if username != "" {
+		taken, err := otherUserHasName(tx, "display_name", userID, username)
+		if err != nil {
+			return err
+		}
+		if taken {
+			return ErrUsernameIsDisplayName
+		}
+	}
+	if displayName != "" {
+		taken, err := otherUserHasName(tx, "username", userID, displayName)
+		if err != nil {
+			return err
+		}
+		if taken {
+			return ErrDisplayNameTaken
+		}
+	}
+	return nil
+}
+
+// otherUserHasName reports whether a user other than userID has name, ignoring
+// case, in column (username or display_name).
+func otherUserHasName(tx *gorm.DB, column, userID, name string) (bool, error) {
+	var ids []string
+	err := tx.Model(&model.User{}).
+		Where("LOWER("+column+") = ? AND id <> ?", strings.ToLower(name), userID).
+		Limit(1).
+		Pluck("id", &ids).Error
+	return len(ids) > 0, err
 }
 
 func (r *UserRepo) UpdateProfile(
@@ -181,8 +234,13 @@ func (r *UserRepo) UpdateProfile(
 		}
 
 		updates := map[string]any{}
+		newUsername, newDisplayName := "", ""
 		if displayName != nil {
-			updates["display_name"] = strings.TrimSpace(*displayName)
+			next := strings.TrimSpace(*displayName)
+			if next != u.DisplayName {
+				newDisplayName = next
+			}
+			updates["display_name"] = next
 		}
 		if username != nil {
 			next := strings.TrimSpace(*username)
@@ -201,9 +259,13 @@ func (r *UserRepo) UpdateProfile(
 				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return err
 				}
+				newUsername = next
 				updates["username"] = next
 				updates["username_updated_at"] = now
 			}
+		}
+		if err := checkNewNames(tx, id, newUsername, newDisplayName); err != nil {
+			return err
 		}
 		if len(updates) > 0 {
 			if err := tx.Model(&u).Updates(updates).Error; err != nil {

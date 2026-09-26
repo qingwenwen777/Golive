@@ -666,6 +666,7 @@
         "weakPassword": "新しいパスワードは 8 文字以上で、英字と数字の両方を含めてください。",
         "passwordMismatch": "新しいパスワードが一致しません。",
         "usernameTaken": "このユーザー名はすでに使われています。",
+        "displayNameTaken": "この表示名は他のユーザーのユーザー名と同じです。別の名前を選んでください。",
         "usernameCooldown": "ユーザー名はクールダウン中です。{{date}} 以降に再変更できます。",
         "usernameCooldownUnknown": "ユーザー名の変更はまだクールダウン中です。",
         "invalidCurrentPassword": "現在のパスワードが正しくありません。",
@@ -676,6 +677,7 @@
         "emailTaken": "このメールは別のアカウントで使用されています。",
         "invalidEmailCode": "メール認証コードが正しくないか期限切れです。",
         "emailCodeTooSoon": "次のメール認証コードをリクエストする前に少しお待ちください。",
+        "emailCodeLimit": "このメールアドレスへの認証コードのリクエストが多すぎます。しばらくしてからもう一度お試しください。",
         "emailCodeUnavailable": "メール認証は一時的に利用できません。",
         "googleLoadFailed": "Google ログインを読み込めませんでした。",
         "googleEmailExists": "この Google メールは別の GoLive アカウントで使用されています。",
@@ -1382,6 +1384,7 @@
         "roleSaved": "ロールを更新しました。",
         "banned": "ユーザーを停止しました。",
         "unbanned": "ユーザー停止を解除しました。",
+        "liveEndFailed": "このユーザーの配信をすぐに終了できませんでした。数分以内に自動で終了します。",
         "invalidAmount": "有効な金額を入力してください。",
         "coinsSaved": "Coin 残高を更新しました。",
         "tabs": {

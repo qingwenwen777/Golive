@@ -107,7 +107,7 @@ func main() {
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
 	moderationSvc.SetOwnerServices(service.NewOwnerServices(cfg.Users.ServiceURL, cfg.Gifts.ServiceURL, cfg.Chat.ServiceURL, cfg.Internal.Token))
 	if cfg.Internal.Token == "" {
-		log.Warn("internal.token is empty: moderation calls to user/gift/chat-service will be rejected")
+		log.Warn("internal.token is empty: /internal endpoints and moderation calls to user/gift/chat-service will be rejected")
 	}
 	messageSvc := service.NewMessageService(messageRepo, roomRepo, socialRepo)
 	moderationSvc.SetLiveService(liveSvc)
@@ -176,6 +176,7 @@ func main() {
 		Moderation:     moderationSvc,
 		Messages:       messageSvc,
 		Permission:     permission,
+		InternalToken:  cfg.Internal.Token,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,
 		PostImageDir:   cfg.Upload.PostImageDir,

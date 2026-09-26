@@ -7,6 +7,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/handler"
 	"github.com/qingwenwen777/golive/app/room-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/internalauth"
 	"github.com/qingwenwen777/golive/pkg/jwtauth"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -29,6 +30,8 @@ type Deps struct {
 	CoverPublicURL string
 	PostImageDir   string
 	PostPublicURL  string
+	// InternalToken guards /internal/*; empty rejects every internal call.
+	InternalToken string
 }
 
 func NewRouter(d Deps) *gin.Engine {
@@ -55,6 +58,7 @@ func NewRouter(d Deps) *gin.Engine {
 	moderationH := handler.NewModerationHandler(d.Moderation)
 	messageH := handler.NewMessageHandler(d.Messages)
 	srsH := handler.NewSRSHandler(d.Live)
+	internalH := handler.NewInternalHandler(d.Live)
 	coverH := handler.NewCoverUploadHandler(d.CoverDir, d.CoverPublicURL)
 
 	var auth gin.HandlerFunc
@@ -206,6 +210,11 @@ func NewRouter(d Deps) *gin.Engine {
 		srs.POST("/on_publish", srsH.OnPublish)
 		srs.POST("/on_unpublish", srsH.OnUnpublish)
 	}
+
+	// Service-to-service only: api-gateway proxies /api/<prefix>/* and never
+	// maps onto /internal, and every call must carry the internal token.
+	internal := r.Group("/internal", internalauth.Middleware(d.InternalToken))
+	internal.POST("/users/:id/end-live", internalH.EndUserLive)
 
 	return r
 }

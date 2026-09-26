@@ -25,6 +25,7 @@ type fakeSRS struct {
 	mu          sync.Mutex
 	publishers  map[string]string // stream name -> publisher client id
 	idle        []string          // streams listed without a publisher
+	kicked      []string          // client ids asked to disconnect
 	down        bool
 	ignoreStart bool
 	listCalls   int
@@ -52,6 +53,12 @@ func (f *fakeSRS) setDown(down bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.down = down
+}
+
+func (f *fakeSRS) kickedClients() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.kicked...)
 }
 
 func (f *fakeSRS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +102,7 @@ func (f *fakeSRS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": 0, "server": "vid-test", "streams": page})
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/clients/"):
+		f.kicked = append(f.kicked, strings.TrimPrefix(r.URL.Path, "/api/v1/clients/"))
 		_, _ = w.Write([]byte(`{"code":0}`))
 	default:
 		http.NotFound(w, r)
@@ -313,6 +321,46 @@ func TestReconcilerDoesNotEndRoomsWhileSRSUnreachable(t *testing.T) {
 	requireRoomStatus(t, env, st.ID, model.StatusLive)
 	env.restarted(20*time.Second, t0.Add(5*time.Hour+time.Minute), base).Reconcile(ctx)
 	requireRoomStatus(t, env, st.ID, model.StatusEnded)
+}
+
+// A ban whose call to end the owner's live never got through is caught on the
+// next pass: rooms of banned owners end and their publishers are kicked.
+func TestReconcilerEndsLiveRoomsOfBannedOwners(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	srs, base := newFakeSRS(t)
+	env.svc.SetSRSAPIBase(base)
+	owners := []string{"owner-state-banned", "owner-user-banned", "owner-fine"}
+	streams := map[string]*model.Stream{}
+	for _, owner := range owners {
+		st := startTestLive(t, env.svc, owner)
+		publishTestLiveClient(t, env.svc, st.StreamKey, "client-"+owner)
+		srs.setPublisher(st.ID, "client-"+owner)
+		streams[owner] = st
+	}
+	moderation := repo.NewModerationRepo(env.db, env.rdb)
+	require.NoError(t, moderation.AutoMigrate())
+	require.NoError(t, env.db.Exec(`CREATE TABLE users (id varchar(36) primary key, banned boolean)`).Error)
+	env.svc.SetModerationRepo(moderation)
+
+	env.svc.Reconcile(ctx)
+	for _, owner := range owners {
+		requireRoomStatus(t, env, streams[owner].ID, model.StatusLive)
+	}
+
+	// user-service records a ban in both places; either one counts.
+	now := time.Now()
+	require.NoError(t, env.db.Create(&model.UserModerationState{UserID: "owner-state-banned", Banned: true, UpdatedAt: now, CreatedAt: now}).Error)
+	require.NoError(t, env.db.Exec(`INSERT INTO users (id, banned) VALUES (?, ?), (?, ?)`, "owner-user-banned", true, "owner-fine", false).Error)
+	env.svc.Reconcile(ctx)
+
+	for _, owner := range owners[:2] {
+		requireRoomStatus(t, env, streams[owner].ID, model.StatusEnded)
+		_, err := env.live.Resolve(ctx, publishSecret(streams[owner].StreamKey))
+		require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+	}
+	requireRoomStatus(t, env, streams["owner-fine"].ID, model.StatusLive)
+	require.ElementsMatch(t, []string{"client-owner-state-banned", "client-owner-user-banned"}, srs.kickedClients())
 }
 
 func TestReconcilerEndsPublishingRoomAfterKeyExpires(t *testing.T) {

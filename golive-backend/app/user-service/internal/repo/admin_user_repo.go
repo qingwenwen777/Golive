@@ -229,6 +229,7 @@ func (r *UserRepo) AdminUpdateProfile(ctx context.Context, userID string, userna
 			return err
 		}
 		updates := map[string]any{}
+		newUsername, newDisplayName := "", ""
 		if username != nil {
 			next := strings.TrimSpace(*username)
 			if next != "" && next != u.Username {
@@ -240,11 +241,19 @@ func (r *UserRepo) AdminUpdateProfile(ctx context.Context, userID string, userna
 				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return err
 				}
+				newUsername = next
 				updates["username"] = next
 			}
 		}
 		if displayName != nil {
-			updates["display_name"] = strings.TrimSpace(*displayName)
+			next := strings.TrimSpace(*displayName)
+			if next != u.DisplayName {
+				newDisplayName = next
+			}
+			updates["display_name"] = next
+		}
+		if err := checkNewNames(tx, userID, newUsername, newDisplayName); err != nil {
+			return err
 		}
 		if len(updates) > 0 {
 			if err := tx.Model(&u).Updates(updates).Error; err != nil {

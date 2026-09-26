@@ -1093,12 +1093,22 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
     setBan.mutate(
       { banned: !user.banned, reason: banReason.trim() },
       {
-        onSuccess: () =>
+        onSuccess: (data) => {
           toast.success(
             user.banned
               ? t('admin.users.detail.unbanned', { defaultValue: 'User unbanned.' })
               : t('admin.users.detail.banned', { defaultValue: 'User banned.' }),
-          ),
+          );
+          // The ban stands; room-service ends the stream on its next check.
+          if (banWarningReason(data) === 'live_end_failed') {
+            toast.warning(
+              t('admin.users.detail.liveEndFailed', {
+                defaultValue:
+                  'Their live stream could not be ended right away. It will end automatically within a few minutes.',
+              }),
+            );
+          }
+        },
         onError: (err) => toast.error(apiErrorMessage(err)),
       },
     );
@@ -2693,6 +2703,12 @@ function apiErrorMessage(err: unknown) {
   if (response?.data?.message) return response.data.message;
   if (err instanceof Error && err.message) return err.message;
   return 'Request failed';
+}
+
+// banWarningReason reads the warning a ban response carries when a follow-up
+// step (such as ending the user's live stream) failed.
+function banWarningReason(data: unknown) {
+  return (data as { warning?: { reason?: string } } | undefined)?.warning?.reason;
 }
 
 function reportStatusLabel(value: string, t: Translate) {
