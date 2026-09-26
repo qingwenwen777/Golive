@@ -64,11 +64,11 @@ func main() {
 	defer ps.Close()
 
 	var (
-		mu       sync.Mutex
-		sentAt   = make(map[string]time.Time, *qps**rooms)
+		mu        sync.Mutex
+		sentAt    = make(map[string]time.Time, *qps**rooms)
 		latencies []time.Duration
-		dropped  atomic.Int64
-		received atomic.Int64
+		dropped   atomic.Int64
+		received  atomic.Int64
 	)
 
 	go func() {

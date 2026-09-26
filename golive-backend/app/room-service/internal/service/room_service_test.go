@@ -12,15 +12,15 @@ import (
 
 func TestNormalizeCategory(t *testing.T) {
 	cases := map[string]string{
-		"":              "",
-		"   ":           "",
-		"all":           "",
-		"All":           "",
-		"ALL":           "",
-		"すべて":         "",
-		"Music":         "Music",
-		"Apex Legends":  "Apex Legends",
-		"音楽":            "音楽",
+		"":             "",
+		"   ":          "",
+		"all":          "",
+		"All":          "",
+		"ALL":          "",
+		"すべて":          "",
+		"Music":        "Music",
+		"Apex Legends": "Apex Legends",
+		"音楽":           "音楽",
 	}
 	for in, want := range cases {
 		require.Equalf(t, want, service.NormalizeCategory(in), "input=%q", in)

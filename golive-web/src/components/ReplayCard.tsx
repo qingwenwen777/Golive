@@ -9,7 +9,7 @@ import { isPlaceholderChannelName, streamChannelName } from '@/types/stream';
 
 /**
  * Minimal shape needed to render a replay (VOD) card. Both `HotReplayItem`
- * (home page) and `LiveHistoryItem` (channel page) satisfy this structurally.
+ * (home page) and `ChannelHistoryItem` (channel page) satisfy this structurally.
  */
 export interface ReplayCardData {
   id: string;

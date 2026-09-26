@@ -17,14 +17,14 @@ import (
 )
 
 const (
-	MaxLuckyBagMessageRunes  = 60
-	MinLuckyBagDurationSecs  = 30
-	MaxLuckyBagDurationSecs  = 600
-	DefaultLuckyBagDuration  = 60
-	MaxLuckyBagCount         = 500
-	luckyBagPresenceTTL      = 6 * time.Hour
-	luckyBagSchedulerTick    = time.Second
-	luckyBagSchedulerBatch   = 20
+	MaxLuckyBagMessageRunes = 60
+	MinLuckyBagDurationSecs = 30
+	MaxLuckyBagDurationSecs = 600
+	DefaultLuckyBagDuration = 60
+	MaxLuckyBagCount        = 500
+	luckyBagPresenceTTL     = 6 * time.Hour
+	luckyBagSchedulerTick   = time.Second
+	luckyBagSchedulerBatch  = 20
 )
 
 var (
@@ -47,9 +47,9 @@ func NewLuckyBagService(o *repo.OrderRepo, rdb *redis.Client) *LuckyBagService {
 }
 
 type LuckyBagView struct {
-	Bag              *model.LuckyBag      `json:"bag"`
-	MyEntry          *model.LuckyBagEntry `json:"myEntry,omitempty"`
-	ParticipantCount int64                `json:"participantCount"`
+	Bag              *model.LuckyBag       `json:"bag"`
+	MyEntry          *model.LuckyBagEntry  `json:"myEntry,omitempty"`
+	ParticipantCount int64                 `json:"participantCount"`
 	Winners          []repo.LuckyBagWinner `json:"winners,omitempty"`
 }
 

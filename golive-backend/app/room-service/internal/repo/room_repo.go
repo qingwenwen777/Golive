@@ -340,9 +340,7 @@ func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, erro
 	if key == "" {
 		return "", ErrRoomNotFound
 	}
-	if strings.HasPrefix(key, "ch-") {
-		key = strings.TrimPrefix(key, "ch-")
-	}
+	key = strings.TrimPrefix(key, "ch-")
 	if IsUUIDLike(key) {
 		return key, nil
 	}
@@ -757,22 +755,36 @@ func (r *RoomRepo) UpdateReplayVisibility(ctx context.Context, ownerID, roomID, 
 	return &room, nil
 }
 
+// SetReplayStatus updates the replay status. A deleted replay stays deleted,
+// so an upload still running for it cannot bring it back.
 func (r *RoomRepo) SetReplayStatus(ctx context.Context, roomID, status, message string) error {
-	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", roomID).Updates(map[string]any{
-		"replay_status": status,
-		"replay_error":  message,
-	}).Error
+	return r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND replay_status <> ?", roomID, model.ReplayStatusDeleted).
+		Updates(map[string]any{
+			"replay_status": status,
+			"replay_error":  message,
+		}).Error
 }
 
-func (r *RoomRepo) SetReplayUploaded(ctx context.Context, roomID, libraryID, videoID, status string, uploadedAt time.Time) error {
-	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", roomID).Updates(map[string]any{
-		"replay_status":           status,
-		"replay_bunny_library_id": libraryID,
-		"replay_bunny_video_id":   videoID,
-		"replay_uploaded_at":      uploadedAt,
-		"replay_deleted_at":       nil,
-		"replay_error":            "",
-	}).Error
+// SetReplayUploaded records the uploaded video, but only while the upload is
+// still wanted: the replay is pending or uploading and was not deleted. It
+// reports whether the row was updated; false means the creator deleted the
+// replay mid-upload and the video must not be published.
+func (r *RoomRepo) SetReplayUploaded(ctx context.Context, roomID, libraryID, videoID, status string, uploadedAt time.Time) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND replay_status IN ? AND replay_deleted_at IS NULL", roomID,
+			[]string{model.ReplayStatusPending, model.ReplayStatusUploading}).
+		Updates(map[string]any{
+			"replay_status":           status,
+			"replay_bunny_library_id": libraryID,
+			"replay_bunny_video_id":   videoID,
+			"replay_uploaded_at":      uploadedAt,
+			"replay_error":            "",
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 func (r *RoomRepo) MarkReplayDeleted(ctx context.Context, roomID string, deletedAt time.Time) error {

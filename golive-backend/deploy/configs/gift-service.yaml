@@ -34,3 +34,6 @@ outbox:
 
 idempotency:
   ttl: 600s
+
+bet:
+  settle_grace: 2h            # unsettled rounds are cancelled + refunded this long after betting closes

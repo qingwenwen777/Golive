@@ -25,6 +25,7 @@ live:
   stream_key_secret: ""
   stream_key_ttl: 4h
   flv_base: "https://golive.us.ci/live"
+  srs_api_base: "http://srs:1985"
 
 replay:
   record_dir: "/tmp/golive/records"

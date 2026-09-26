@@ -60,3 +60,28 @@ func TestTokenRepoRotateUserMismatchDoesNotRevokeOldToken(t *testing.T) {
 	require.Equal(t, "u-2", oldUser)
 	require.False(t, mr.Exists("refresh:new"))
 }
+
+func TestTokenRepoRevokeUserRefreshRevokesEveryTokenOfThatUser(t *testing.T) {
+	tokens, mr := newTokenRepo(t)
+	ctx := context.Background()
+	require.NoError(t, tokens.SaveRefresh(ctx, "a", "u-1", time.Hour))
+	require.NoError(t, tokens.SaveRefresh(ctx, "b", "u-1", time.Hour))
+	require.NoError(t, tokens.SaveRefresh(ctx, "other", "u-2", time.Hour))
+	require.NoError(t, tokens.Rotate(ctx, "b", "c", "u-1", time.Hour))
+	require.NoError(t, tokens.SaveRefresh(ctx, "logged-out", "u-1", time.Hour))
+	require.NoError(t, tokens.DeleteRefresh(ctx, "logged-out"))
+	members, err := mr.SMembers("refresh-user:u-1")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"a", "c"}, members)
+
+	require.NoError(t, tokens.RevokeUserRefresh(ctx, "u-1"))
+
+	for _, token := range []string{"a", "b", "c"} {
+		_, err := tokens.LookupRefresh(ctx, token)
+		require.ErrorIs(t, err, repo.ErrRefreshNotFound, token)
+	}
+	require.False(t, mr.Exists("refresh-user:u-1"))
+	got, err := tokens.LookupRefresh(ctx, "other")
+	require.NoError(t, err)
+	require.Equal(t, "u-2", got)
+}

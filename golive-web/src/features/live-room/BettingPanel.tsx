@@ -202,7 +202,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
                 option={option}
                 summary={optionMap.get(option)}
                 active={myWager?.option === option}
-                disabled={!accepting || !!myWager || placeBet.isPending}
+                disabled={!accepting || !!myWager || placeBet.isPending || ownsStream}
                 onClick={() => handleWager(option)}
               />
             ))}
@@ -233,13 +233,17 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
                     key={option}
                     type="button"
                     onClick={() => handleSettle(option)}
-                    disabled={settleBet.isPending}
+                    disabled={settleBet.isPending || accepting}
                     title={
-                      count === 0
-                        ? t('betting.noWagerHint', {
-                            defaultValue: 'No one picked this option. Cancel to refund coins.',
+                      accepting
+                        ? t('betting.settleAfterClose', {
+                            defaultValue: 'You can settle once betting closes.',
                           })
-                        : undefined
+                        : count === 0
+                          ? t('betting.noWagerHint', {
+                              defaultValue: 'No one picked this option. Cancel to refund coins.',
+                            })
+                          : undefined
                     }
                   >
                     <Trophy size={14} />
@@ -408,6 +412,14 @@ function betErrorText(
     return t('betting.errorNoWinners', {
       defaultValue: 'No winner for this result. Cancel to refund.',
     });
+  }
+  if (reason === 'bet_owner_forbidden') {
+    return t('betting.errorOwnerWager', {
+      defaultValue: "Streamers can't bet on their own round.",
+    });
+  }
+  if (reason === 'bet_not_closed') {
+    return t('betting.settleAfterClose', { defaultValue: 'You can settle once betting closes.' });
   }
   if (reason === 'bad_bet_question') {
     return t('betting.errorBadQuestion', {

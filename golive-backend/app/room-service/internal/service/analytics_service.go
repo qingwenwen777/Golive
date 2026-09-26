@@ -30,12 +30,17 @@ type HotReplayResp struct {
 
 type HotReplayItem struct {
 	model.Stream
-	Likes        int64   `json:"likes"`
-	CommentCount int64   `json:"commentCount"`
-	RevenueCoin  int64   `json:"revenueCoin"`
-	HotScore     float64 `json:"hotScore"`
+	Likes        int64 `json:"likes"`
+	CommentCount int64 `json:"commentCount"`
+	// RevenueCoin feeds the hot score only; it is creator income, so it is
+	// never serialised on this public endpoint.
+	RevenueCoin int64   `json:"-"`
+	HotScore    float64 `json:"hotScore"`
 }
 
+// LiveHistoryItem is one past live. The channel history endpoint is public,
+// so RevenueCoin, NewSubscribers and TopFan are creator-only: set by
+// addOwnerMetrics for the owner and omitted for everyone else.
 type LiveHistoryItem struct {
 	ID              string           `json:"id"`
 	Title           string           `json:"title"`
@@ -50,8 +55,8 @@ type LiveHistoryItem struct {
 	DurationSeconds int64            `json:"durationSeconds"`
 	PeakViewers     int64            `json:"peakViewers"`
 	DanmuCount      int64            `json:"danmuCount"`
-	RevenueCoin     int64            `json:"revenueCoin"`
-	NewSubscribers  int64            `json:"newSubscribers"`
+	RevenueCoin     *int64           `json:"revenueCoin,omitempty"`
+	NewSubscribers  *int64           `json:"newSubscribers,omitempty"`
 	TopFan          *FanContribution `json:"topFan,omitempty"`
 	Replay          *model.Replay    `json:"replay,omitempty"`
 }
@@ -309,8 +314,8 @@ func (s *RoomService) LiveAnalysis(ctx context.Context, channelKey, roomID, view
 	if err != nil {
 		return nil, err
 	}
-	item := s.historyItem(*room, rows, danmuCounts[room.ID])
-	item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(*room))
+	item := s.historyItem(*room, danmuCounts[room.ID])
+	s.addOwnerMetrics(ctx, &item, *room, rows)
 	topFans := topFans(rows, 8)
 	giftRevenue, scRevenue := int64(0), int64(0)
 	for _, row := range rows {
@@ -389,16 +394,22 @@ func (s *RoomService) historyItemsFromRooms(ctx context.Context, rooms []model.R
 		return items, nil
 	}
 	roomIDs := make([]string, 0, len(rooms))
+	var ownedIDs []string
 	for _, room := range rooms {
 		roomIDs = append(roomIDs, room.ID)
-	}
-	rows, err := s.revenueRows(ctx, roomIDs)
-	if err != nil {
-		return nil, err
+		if viewerOwnsRoom(room, viewerID) {
+			ownedIDs = append(ownedIDs, room.ID)
+		}
 	}
 	rowsByRoom := map[string][]repo.RevenueRow{}
-	for _, row := range rows {
-		rowsByRoom[row.RoomID] = append(rowsByRoom[row.RoomID], row)
+	if len(ownedIDs) > 0 {
+		rows, err := s.revenueRows(ctx, ownedIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			rowsByRoom[row.RoomID] = append(rowsByRoom[row.RoomID], row)
+		}
 	}
 	danmuCounts, err := s.rooms.DanmuCountsByRooms(ctx, roomIDs)
 	if err != nil {
@@ -406,8 +417,10 @@ func (s *RoomService) historyItemsFromRooms(ctx context.Context, rooms []model.R
 	}
 
 	for _, room := range rooms {
-		item := s.historyItem(room, rowsByRoom[room.ID], danmuCounts[room.ID])
-		item.NewSubscribers = s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
+		item := s.historyItem(room, danmuCounts[room.ID])
+		if viewerOwnsRoom(room, viewerID) {
+			s.addOwnerMetrics(ctx, &item, room, rowsByRoom[room.ID])
+		}
 		if s.replay != nil {
 			replay, err := s.replay.ReplayDTO(ctx, room, viewerID)
 			if err != nil {
@@ -420,20 +433,16 @@ func (s *RoomService) historyItemsFromRooms(ctx context.Context, rooms []model.R
 	return items, nil
 }
 
-func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow, danmuCount int64) LiveHistoryItem {
+func viewerOwnsRoom(room model.Room, viewerID string) bool {
+	return viewerID != "" && viewerID == room.OwnerID
+}
+
+// historyItem builds the public part of a history record.
+func (s *RoomService) historyItem(room model.Room, danmuCount int64) LiveHistoryItem {
 	endedAt := endedAtOf(room)
 	duration := endedAt.Sub(room.StartedAt)
 	if duration < 0 {
 		duration = 0
-	}
-	revenue := int64(0)
-	for _, row := range rows {
-		revenue += row.Amount
-	}
-	fans := topFans(rows, 1)
-	var topFan *FanContribution
-	if len(fans) > 0 {
-		topFan = &fans[0]
 	}
 	peak := room.PeakViewers
 	if room.Viewers > peak {
@@ -454,9 +463,22 @@ func (s *RoomService) historyItem(room model.Room, rows []repo.RevenueRow, danmu
 		DurationSeconds: int64(duration.Seconds()),
 		PeakViewers:     peak,
 		DanmuCount:      danmuCount,
-		RevenueCoin:     revenue,
-		TopFan:          topFan,
 	}
+}
+
+// addOwnerMetrics fills the creator-only revenue, top fan and new-subscriber
+// fields. Only call it when the viewer owns the room.
+func (s *RoomService) addOwnerMetrics(ctx context.Context, item *LiveHistoryItem, room model.Room, rows []repo.RevenueRow) {
+	revenue := int64(0)
+	for _, row := range rows {
+		revenue += row.Amount
+	}
+	item.RevenueCoin = &revenue
+	if fans := topFans(rows, 1); len(fans) > 0 {
+		item.TopFan = &fans[0]
+	}
+	newSubscribers := s.subscribersBetween(ctx, room.ChannelID, room.StartedAt, endedAtOf(room))
+	item.NewSubscribers = &newSubscribers
 }
 
 func (s *RoomService) monthlyMetrics(ctx context.Context, ownerID, channelID string, rooms []model.Room) ([]MonthlyMetric, CreatorAnalyticsResp) {

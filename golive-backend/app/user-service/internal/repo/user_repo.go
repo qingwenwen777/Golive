@@ -3,6 +3,8 @@ package repo
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -181,12 +183,14 @@ func (r *UserRepo) RegisterWithInvite(ctx context.Context, u *model.User, invite
 			return err
 		}
 
-		err = tx.Where("email = ?", u.Email).Take(&existing).Error
-		if err == nil {
-			return ErrEmailTaken
-		}
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
+		if u.Email != nil {
+			err = tx.Where("email = ?", *u.Email).Take(&existing).Error
+			if err == nil {
+				return ErrEmailTaken
+			}
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
 		}
 
 		var invite model.InviteCode
@@ -214,9 +218,11 @@ func (r *UserRepo) RegisterWithInvite(ctx context.Context, u *model.User, invite
 	})
 }
 
+// ResetPasswordByEmail and ResetPasswordByUsernameEmail only match verified
+// emails, so an unproven address can never be used to take over an account.
 func (r *UserRepo) ResetPasswordByEmail(ctx context.Context, email, hash string) error {
 	res := r.db.WithContext(ctx).Model(&model.User{}).
-		Where("email = ?", email).
+		Where("email = ? AND email_verified = ?", email, true).
 		Update("password_hash", hash)
 	if res.Error != nil {
 		return res.Error
@@ -229,7 +235,7 @@ func (r *UserRepo) ResetPasswordByEmail(ctx context.Context, email, hash string)
 
 func (r *UserRepo) ResetPasswordByUsernameEmail(ctx context.Context, username, email, hash string) error {
 	res := r.db.WithContext(ctx).Model(&model.User{}).
-		Where("username = ? AND email = ?", username, email).
+		Where("username = ? AND email = ? AND email_verified = ?", username, email, true).
 		Update("password_hash", hash)
 	if res.Error != nil {
 		return res.Error
@@ -240,6 +246,8 @@ func (r *UserRepo) ResetPasswordByUsernameEmail(ctx context.Context, username, e
 	return nil
 }
 
+// UpdateEmail sets an address nobody has proven ownership of yet, so it is
+// stored unverified and cannot be used for password reset.
 func (r *UserRepo) UpdateEmail(ctx context.Context, id, email string) (*model.User, error) {
 	var u model.User
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -256,7 +264,10 @@ func (r *UserRepo) UpdateEmail(ctx context.Context, id, email string) (*model.Us
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err := tx.Model(&u).Update("email", email).Error; err != nil {
+		if err := tx.Model(&u).Updates(map[string]any{
+			"email":          email,
+			"email_verified": false,
+		}).Error; err != nil {
 			return err
 		}
 		return tx.Where("id = ?", id).Take(&u).Error
@@ -295,15 +306,19 @@ func (r *UserRepo) LinkGoogleAccount(ctx context.Context, id, googleSub, googleE
 			"google_sub":       googleSub,
 			"google_linked_at": linkedAt,
 		}
-		if googleEmail != "" && googleEmail != u.Email {
-			err := tx.Where("email = ? AND id <> ?", googleEmail, id).Take(&existing).Error
-			if err == nil {
-				return ErrEmailTaken
+		if googleEmail != "" {
+			if googleEmail != u.EmailAddress() {
+				err := tx.Where("email = ? AND id <> ?", googleEmail, id).Take(&existing).Error
+				if err == nil {
+					return ErrEmailTaken
+				}
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				updates["email"] = googleEmail
 			}
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
-			}
-			updates["email"] = googleEmail
+			// Google only issues credentials with email_verified set.
+			updates["email_verified"] = true
 		}
 
 		if err := tx.Model(&u).Updates(updates).Error; err != nil {
@@ -354,22 +369,58 @@ func (r *UserRepo) UnlinkGoogleAccount(ctx context.Context, id string) (*model.U
 	return &u, nil
 }
 
-func (r *UserRepo) BackfillMissingEmails(ctx context.Context) error {
-	var users []model.User
+// MigrateEmailVerification classifies users whose email_verified is NULL,
+// i.e. rows created before the column existed. Earlier versions stored an
+// invented lower(username)+"@gmail.com" address for local signups, seeded and
+// admin-created accounts (and backfilled it for rows without an email), which
+// let whoever owns that mailbox reset the password.
+//
+//   - Accounts registered with an invite (email code or Google) or linked to
+//     Google proved their address: verified.
+//   - Placeholder or empty addresses are cleared to NULL: unverified.
+//   - Anything else (e.g. set by an admin) is kept but unverified.
+//
+// It only touches NULL rows, so it is safe to run on every startup.
+func (r *UserRepo) MigrateEmailVerification(ctx context.Context) error {
+	var rows []struct {
+		ID        string
+		Username  string
+		Email     *string
+		GoogleSub *string
+		Invited   bool
+	}
 	if err := r.db.WithContext(ctx).
-		Where("email IS NULL OR email = ?", "").
-		Find(&users).Error; err != nil {
+		Table("users").
+		Select(`users.id, users.username, users.email, users.google_sub,
+			EXISTS (SELECT 1 FROM invite_codes ic WHERE ic.used_by = users.id) AS invited`).
+		Where("users.email_verified IS NULL").
+		Scan(&rows).Error; err != nil {
 		return err
 	}
-	for _, u := range users {
-		email := strings.ToLower(strings.TrimSpace(u.Username)) + "@gmail.com"
-		if err := r.db.WithContext(ctx).Model(&model.User{}).
-			Where("id = ?", u.ID).
-			Update("email", email).Error; err != nil {
-			return err
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, row := range rows {
+			email := ""
+			if row.Email != nil {
+				email = strings.ToLower(strings.TrimSpace(*row.Email))
+			}
+			placeholder := strings.ToLower(strings.TrimSpace(row.Username)) + "@gmail.com"
+			updates := map[string]any{"email_verified": false}
+			switch {
+			case email == "":
+				updates["email"] = nil
+			case row.Invited || (row.GoogleSub != nil && strings.TrimSpace(*row.GoogleSub) != ""):
+				updates["email_verified"] = true
+			case email == placeholder:
+				updates["email"] = nil
+			}
+			if err := tx.Model(&model.User{}).
+				Where("id = ? AND email_verified IS NULL", row.ID).
+				Updates(updates).Error; err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (r *UserRepo) ReconcilePlatformVerification(ctx context.Context) error {
@@ -648,7 +699,6 @@ func (r *UserRepo) SubmitCreatorApplication(ctx context.Context, userID, reason 
 		default:
 			return errors.New("invalid live permission status")
 		}
-		return nil
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, false, ErrUserNotFound
@@ -844,7 +894,6 @@ func (r *UserRepo) SubmitPlatformApplication(ctx context.Context, userID, reason
 		default:
 			return errors.New("invalid platform verification status")
 		}
-		return nil
 	})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, false, ErrUserNotFound
@@ -1267,8 +1316,13 @@ func (r *UserRepo) ClaimDailyCoinReward(
 	var u model.User
 	var coinTx model.CoinTransaction
 	created := false
+	txID := dailyTaskTxID(id, taskSourceID)
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", id).Take(&u).Error; err != nil {
+		// Lock the user row first so concurrent claims serialize here and the
+		// check below sees any claim committed by the previous holder.
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", id).
+			Take(&u).Error; err != nil {
 			return err
 		}
 		err := tx.Where("user_id = ? AND type = ? AND source_id = ?", id, model.CoinTxDailyTask, taskSourceID).
@@ -1286,7 +1340,7 @@ func (r *UserRepo) ClaimDailyCoinReward(
 			return err
 		}
 		coinTx = model.CoinTransaction{
-			ID:           newID(),
+			ID:           txID,
 			UserID:       id,
 			Type:         model.CoinTxDailyTask,
 			Amount:       reward,
@@ -1302,6 +1356,16 @@ func (r *UserRepo) ClaimDailyCoinReward(
 		created = true
 		return nil
 	})
+	if isDuplicateKey(err) {
+		// Another claim for this task and day won the primary key; the
+		// rollback undid our credit, so report the existing claim.
+		created = false
+		u, coinTx = model.User{}, model.CoinTransaction{}
+		err = r.db.WithContext(ctx).Where("id = ?", id).Take(&u).Error
+		if err == nil {
+			err = r.db.WithContext(ctx).Where("id = ?", txID).Take(&coinTx).Error
+		}
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, false, ErrUserNotFound
 	}
@@ -1312,6 +1376,14 @@ func (r *UserRepo) ClaimDailyCoinReward(
 		return nil, nil, false, err
 	}
 	return &u, &coinTx, created, nil
+}
+
+// dailyTaskTxID derives the ledger row ID from the user and the task's daily
+// source ID, so the primary key allows at most one daily-task row per user,
+// task and day regardless of how claims interleave.
+func dailyTaskTxID(userID, taskSourceID string) string {
+	sum := sha256.Sum256([]byte(userID + "\x00" + taskSourceID))
+	return "daily_" + hex.EncodeToString(sum[:24])
 }
 
 func (r *UserRepo) ListCoinTransactions(ctx context.Context, id string, limit int) ([]model.CoinTransaction, error) {
@@ -1970,6 +2042,18 @@ func isMissingRelation(err error) bool {
 		strings.Contains(msg, "doesn't exist") ||
 		strings.Contains(msg, "unknown column") ||
 		strings.Contains(msg, "no such column")
+}
+
+func isDuplicateKey(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate entry") ||
+		strings.Contains(msg, "unique constraint failed")
 }
 
 func newID() string {

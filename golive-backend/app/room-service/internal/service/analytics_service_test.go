@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -89,6 +90,64 @@ func TestHistoryByChannelViewerModeReturnsOnlyWatchableReplays(t *testing.T) {
 	require.Equal(t, int64(3), ownerResp.Total)
 }
 
+func TestHistoryByChannelHidesCreatorMetricsFromNonOwners(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, seedHotReplayMetricTables(db))
+	// ResolveOwnerID orders users by updated_at.
+	require.NoError(t, db.Exec("ALTER TABLE users ADD COLUMN updated_at DATETIME").Error)
+
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+
+	svc := NewRoomService(rooms, "")
+	svc.SetReplayService(NewReplayService(rooms, nil, ReplayConfig{BunnyLibraryID: "lib"}))
+
+	endedAt := time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, seedHotReplayRoom(ctx, rooms, "history-public", endedAt, 50, model.PostVisibilityPublic))
+	require.NoError(t, db.Exec(
+		"INSERT INTO gift_orders (room_id, user_id, total_coin, status, created_at) VALUES (?, ?, ?, ?, ?)",
+		"history-public", "fan-1", 700, "success", endedAt.Add(-time.Minute),
+	).Error)
+
+	cases := []struct {
+		name        string
+		viewerID    string
+		replaysOnly bool
+	}{
+		{"anonymous history", "", false},
+		{"anonymous replays", "", true},
+		{"other user history", "viewer-1", false},
+		{"other user replays", "viewer-1", true},
+	}
+	for _, tc := range cases {
+		resp, err := svc.HistoryByChannel(ctx, "owner-hot", tc.viewerID, 1, 10, tc.replaysOnly)
+		require.NoError(t, err, tc.name)
+		require.Len(t, resp.Items, 1, tc.name)
+		item := resp.Items[0]
+		require.Nil(t, item.RevenueCoin, tc.name)
+		require.Nil(t, item.NewSubscribers, tc.name)
+		require.Nil(t, item.TopFan, tc.name)
+
+		raw, err := json.Marshal(resp)
+		require.NoError(t, err)
+		for _, leaked := range []string{"revenueCoin", "newSubscribers", "topFan", "fan-1"} {
+			require.NotContains(t, string(raw), leaked, tc.name)
+		}
+	}
+
+	ownerResp, err := svc.HistoryByChannel(ctx, "owner-hot", "owner-hot", 1, 10, false)
+	require.NoError(t, err)
+	require.Len(t, ownerResp.Items, 1)
+	owned := ownerResp.Items[0]
+	require.NotNil(t, owned.RevenueCoin)
+	require.Equal(t, int64(700), *owned.RevenueCoin)
+	require.NotNil(t, owned.TopFan)
+	require.Equal(t, "fan-1", owned.TopFan.UserID)
+	require.NotNil(t, owned.NewSubscribers)
+}
+
 func TestHotReplaysRanksWatchableRecentReplays(t *testing.T) {
 	ctx := context.Background()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -132,6 +191,9 @@ func TestHotReplaysRanksWatchableRecentReplays(t *testing.T) {
 		resp.Items[2].ID,
 	})
 	require.Equal(t, int64(900), resp.Items[0].RevenueCoin)
+	body, err := json.Marshal(resp.Items[0])
+	require.NoError(t, err)
+	require.NotContains(t, string(body), "revenueCoin")
 	require.Equal(t, int64(40), resp.Items[1].CommentCount)
 	require.Equal(t, int64(300), resp.Items[2].PeakViewers)
 }

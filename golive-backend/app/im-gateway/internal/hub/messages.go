@@ -84,16 +84,27 @@ type GiftMsg struct {
 
 // Inbound (client → server) -----------------------------------------------
 
+// Inbound deliberately has no identity or display fields (user, avatar,
+// userLevel, fanBadge, ...): older clients still send them, and they are
+// ignored — the server derives all of that from the authenticated user.
 type Inbound struct {
-	Type          string           `json:"type"`
-	UserID        string           `json:"userId,omitempty"`
-	User          string           `json:"user,omitempty"`
-	Avatar        string           `json:"avatar,omitempty"`
-	Text          string           `json:"text,omitempty"`
-	ClientID      string           `json:"clientId,omitempty"`
-	LastMessageID string           `json:"lastMessageId,omitempty"`
-	FanBadge      *FanBadgePayload `json:"fanBadge,omitempty"`
-	UserLevel     int              `json:"userLevel,omitempty"`
+	Type          string `json:"type"`
+	Text          string `json:"text,omitempty"`
+	ClientID      string `json:"clientId,omitempty"`
+	LastMessageID string `json:"lastMessageId,omitempty"`
+}
+
+// ChatAckMsg tells the sender which server id its chat got, keyed by the
+// clientId it sent. It is sent only to the sender, never broadcast.
+type ChatAckMsg struct {
+	Type     string `json:"type"` // "chat_ack"
+	ClientID string `json:"clientId"`
+	ID       string `json:"id"`
+}
+
+func EncodeChatAck(clientID, id string) []byte {
+	b, _ := json.Marshal(ChatAckMsg{Type: "chat_ack", ClientID: clientID, ID: id})
+	return b
 }
 
 // EncodeSystem builds a welcome / notice message.

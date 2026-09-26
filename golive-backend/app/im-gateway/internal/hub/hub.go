@@ -24,43 +24,85 @@ import (
 )
 
 type Hub struct {
-	ctx                context.Context
-	broker             pubsub.Broker
-	viewerPushInterval time.Duration
+	ctx                 context.Context
+	broker              pubsub.Broker
+	viewerPushInterval  time.Duration
+	viewerFlushInterval time.Duration
 
 	mu    sync.RWMutex
 	rooms map[string]*Room
 }
 
-func New(ctx context.Context, broker pubsub.Broker, viewerPushInterval time.Duration) *Hub {
-	return &Hub{
-		ctx:                ctx,
-		broker:             broker,
-		viewerPushInterval: viewerPushInterval,
-		rooms:              make(map[string]*Room),
-	}
+// DefaultViewerFlushInterval is the minimum gap between change-driven
+// viewer_count/viewer_list pushes to a room.
+const DefaultViewerFlushInterval = time.Second
+
+// Option configures a Hub.
+type Option func(*Hub)
+
+// WithViewerFlushInterval overrides DefaultViewerFlushInterval.
+func WithViewerFlushInterval(d time.Duration) Option {
+	return func(h *Hub) { h.viewerFlushInterval = d }
 }
+
+func New(ctx context.Context, broker pubsub.Broker, viewerPushInterval time.Duration, opts ...Option) *Hub {
+	h := &Hub{
+		ctx:                 ctx,
+		broker:              broker,
+		viewerPushInterval:  viewerPushInterval,
+		viewerFlushInterval: DefaultViewerFlushInterval,
+		rooms:               make(map[string]*Room),
+	}
+	for _, o := range opts {
+		o(h)
+	}
+	return h
+}
+
+// subscribeTimeout bounds the broker SUBSCRIBE for a new room.
+const subscribeTimeout = 3 * time.Second
 
 // Join attaches sink to roomID, creating the room (and its Redis subscription)
 // if this is the first member. Returns the live Room so callers can inspect it.
+//
+// The hub lock is never held across the broker round trip: the room is
+// published in the map first and concurrent joiners wait on its ready
+// channel, so one slow SUBSCRIBE can't stall joins/leaves of other rooms.
 func (h *Hub) Join(roomID string, c Sink, profile ViewerProfile) (*Room, error) {
-	h.mu.Lock()
-	r, ok := h.rooms[roomID]
-	if !ok {
-		var err error
-		r, err = newRoom(h.ctx, h, roomID)
-		if err != nil {
-			h.mu.Unlock()
-			return nil, err
+	for {
+		h.mu.Lock()
+		r, ok := h.rooms[roomID]
+		if !ok {
+			r = newRoom(h.ctx, h, roomID)
+			h.rooms[roomID] = r
 		}
-		h.rooms[roomID] = r
+		h.mu.Unlock()
+		if !ok {
+			r.start()
+		}
+
+		<-r.ready
+		if r.err != nil {
+			h.forget(r)
+			return nil, r.err
+		}
+		if r.add(c, profile) {
+			metrics.ConnectionsActive.Inc()
+			metrics.ConnectionsTotal.Inc()
+			return r, nil
+		}
+		// The room was torn down between lookup and add (its last member
+		// left); retry so we land in a live room.
+	}
+}
+
+// forget removes r from the map if it is still the entry for its id.
+func (h *Hub) forget(r *Room) {
+	h.mu.Lock()
+	if h.rooms[r.id] == r {
+		delete(h.rooms, r.id)
 	}
 	h.mu.Unlock()
-
-	r.add(c, profile)
-	metrics.ConnectionsActive.Inc()
-	metrics.ConnectionsTotal.Inc()
-	return r, nil
 }
 
 // Leave detaches sink from roomID. If the room becomes empty, its Redis
@@ -72,23 +114,29 @@ func (h *Hub) Leave(roomID, connID string) {
 	if !ok {
 		return
 	}
-	empty := r.remove(connID)
-	metrics.ConnectionsActive.Dec()
-	if !empty {
-		return
+	removed, empty := r.remove(connID)
+	if removed {
+		metrics.ConnectionsActive.Dec()
 	}
+	if empty {
+		h.reapIfEmpty(r)
+	}
+}
 
-	// Re-acquire under write lock and re-check size — another connection
-	// could have joined between remove() returning true and us getting here.
+// reapIfEmpty tears r down if it still has no connections. Another
+// connection could have joined between remove() and here, so the check is
+// repeated under the room lock — on the connection count, not the viewer
+// count, which excludes owners and would orphan an owner that just joined.
+// Marking the room closed makes any later add() fail and retry.
+func (h *Hub) reapIfEmpty(r *Room) {
 	h.mu.Lock()
-	r2, stillThere := h.rooms[roomID]
-	if stillThere && r2 == r && r.size() == 0 {
-		delete(h.rooms, roomID)
+	if h.rooms[r.id] != r || !r.closeIfEmpty() {
 		h.mu.Unlock()
-		r.shutdown()
 		return
 	}
+	delete(h.rooms, r.id)
 	h.mu.Unlock()
+	r.shutdown()
 }
 
 func (h *Hub) UpdateViewer(roomID, connID string, profile ViewerProfile) {

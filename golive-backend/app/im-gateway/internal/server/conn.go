@@ -3,10 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -20,6 +20,9 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/profile"
+	"github.com/qingwenwen777/golive/app/im-gateway/internal/rooms"
+	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -30,16 +33,50 @@ type Conn struct {
 	ownerID  string
 	identity auth.Identity
 
-	ws     *websocket.Conn
-	send   chan []byte
-	closed atomic.Bool
-	once   sync.Once
+	ws *websocket.Conn
+	// send is never closed: fanout goroutines may call Send concurrently with
+	// Close, and a send on a closed channel panics. done signals shutdown.
+	send chan []byte
+	done chan struct{}
+	once sync.Once
 
-	hub        *hub.Hub
-	producer   producer.Producer
-	moderation moderation.Checker
-	limiter    *rate.Limiter
-	cfg        WSConfig
+	hub         *hub.Hub
+	producer    producer.Producer
+	moderation  moderation.Checker
+	filter      *chatfilter.Filter
+	chatLimiter UserLimiter
+	profiles    profile.Resolver
+	// profile is the server-resolved public identity; set before the pumps
+	// start and afterwards only touched by the readPump goroutine.
+	profile profile.Profile
+	// limiter bounds inbound frames of every type on this connection;
+	// droppedFrames counts rejections (readPump goroutine only).
+	limiter       *rate.Limiter
+	droppedFrames int
+	cfg           WSConfig
+}
+
+// UserLimiter is the per-user chat rate limit. It is shared by all of a
+// user's connections (and gateway instances), unlike Conn.limiter.
+type UserLimiter interface {
+	Allow(ctx context.Context, userID string) (bool, error)
+}
+
+// Deps are the collaborators shared by every connection.
+type Deps struct {
+	Hub        *hub.Hub
+	Producer   producer.Producer
+	Moderation moderation.Checker
+	// Filter masks sensitive words in chat text. Nil disables masking.
+	Filter *chatfilter.Filter
+	// ChatLimiter enforces the per-user chat rate. Nil disables it.
+	ChatLimiter UserLimiter
+	// Rooms validates roomIds and supplies the trusted owner. Nil accepts
+	// any well-formed id.
+	Rooms rooms.Directory
+	// Profiles resolves display name, avatar, level and fan badge from
+	// server-side sources. Nil shows an id-derived name only.
+	Profiles profile.Resolver
 }
 
 type WSConfig struct {
@@ -48,22 +85,34 @@ type WSConfig struct {
 	WriteDeadline   time.Duration
 	SendBuffer      int
 	PongWait        time.Duration
-	MaxMessageRate  float64
+	MaxMessageRate  float64 // inbound frames/sec per connection, all types
 	AllowedOrigins  []string
+	// MaxConnsPerUser / MaxConnsPerIP cap concurrent connections on this
+	// instance (<= 0 disables). TrustedProxies are the peers whose
+	// X-Real-IP / X-Forwarded-For is believed.
+	MaxConnsPerUser int
+	MaxConnsPerIP   int
+	TrustedProxies  []*net.IPNet
+	// RequireKnownRoom rejects roomIds the room directory doesn't know.
+	RequireKnownRoom bool
 }
 
-func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, h *hub.Hub, p producer.Producer, m moderation.Checker, cfg WSConfig) *Conn {
+func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, d Deps, cfg WSConfig) *Conn {
 	c := &Conn{
-		id:         uuid.NewString(),
-		roomID:     roomID,
-		ownerID:    ownerID,
-		identity:   identity,
-		ws:         ws,
-		send:       make(chan []byte, cfg.SendBuffer),
-		hub:        h,
-		producer:   p,
-		moderation: m,
-		cfg:        cfg,
+		id:          uuid.NewString(),
+		roomID:      roomID,
+		ownerID:     ownerID,
+		identity:    identity,
+		ws:          ws,
+		send:        make(chan []byte, cfg.SendBuffer),
+		done:        make(chan struct{}),
+		hub:         d.Hub,
+		producer:    d.Producer,
+		moderation:  d.Moderation,
+		filter:      d.Filter,
+		chatLimiter: d.ChatLimiter,
+		profiles:    d.Profiles,
+		cfg:         cfg,
 	}
 	if cfg.MaxMessageRate > 0 {
 		// burst = 1 second's allowance, minimum 1.
@@ -83,8 +132,10 @@ func (c *Conn) ID() string { return c.id }
 // Send is non-blocking. Returns false when the queue is full so the caller
 // (room.fanout) can evict this connection.
 func (c *Conn) Send(payload []byte) bool {
-	if c.closed.Load() {
+	select {
+	case <-c.done:
 		return false
+	default:
 	}
 	select {
 	case c.send <- payload:
@@ -96,8 +147,7 @@ func (c *Conn) Send(payload []byte) bool {
 
 func (c *Conn) Close() {
 	c.once.Do(func() {
-		c.closed.Store(true)
-		close(c.send)
+		close(c.done)
 		_ = c.ws.Close()
 	})
 }
@@ -131,31 +181,69 @@ func (c *Conn) readPump(ctx context.Context) {
 		// Any frame bumps the idle timeout — heartbeat doubles as keep-alive.
 		_ = c.ws.SetReadDeadline(time.Now().Add(c.cfg.ReadIdleTimeout))
 
-		var in hub.Inbound
-		if err := json.Unmarshal(raw, &in); err != nil || in.Type == "" {
-			metrics.MessagesDropped.WithLabelValues("bad_json").Inc()
-			continue
+		if !c.handleFrame(ctx, raw) {
+			logger.L().Info("closing flooding connection", zap.String("conn", c.id), zap.String("user", c.identity.UserID))
+			return
 		}
-		c.dispatchInbound(ctx, in)
 	}
 }
 
-// writePump drains the send chan onto the websocket. Closes the ws on any
-// write error — readPump's Close will then no-op.
+// maxDroppedFrames is how many rate-limited frames a connection may send
+// before it is closed. Well-behaved clients stay far below the frame rate.
+const maxDroppedFrames = 50
+
+// handleFrame rate-limits, decodes and dispatches one inbound frame. Every
+// frame type counts against the per-connection limit — not just chat — so
+// cheap-looking frames (viewer_profile, resume) cannot be flooded. Returns
+// false when the connection should be closed for flooding.
+func (c *Conn) handleFrame(ctx context.Context, raw []byte) bool {
+	if c.limiter != nil && !c.limiter.Allow() {
+		metrics.MessagesDropped.WithLabelValues("rate_limited").Inc()
+		c.droppedFrames++
+		return c.droppedFrames <= maxDroppedFrames
+	}
+	var in hub.Inbound
+	if err := json.Unmarshal(raw, &in); err != nil || in.Type == "" {
+		metrics.MessagesDropped.WithLabelValues("bad_json").Inc()
+		return true
+	}
+	c.dispatchInbound(ctx, in)
+	return true
+}
+
+// writePump drains the send chan onto the websocket until Close. Closes the
+// ws on any write error — readPump's Close will then no-op.
 func (c *Conn) writePump() {
 	defer c.Close()
-	for payload := range c.send {
-		_ = c.ws.SetWriteDeadline(time.Now().Add(c.cfg.WriteDeadline))
-		if err := c.ws.WriteMessage(websocket.TextMessage, payload); err != nil {
+	for {
+		select {
+		case <-c.done:
 			return
+		case payload := <-c.send:
+			_ = c.ws.SetWriteDeadline(time.Now().Add(c.cfg.WriteDeadline))
+			if err := c.ws.WriteMessage(websocket.TextMessage, payload); err != nil {
+				return
+			}
 		}
+	}
+}
+
+// inboundTypeLabel bounds the metric label to the known frame types; the
+// type string is client-controlled and every distinct value would otherwise
+// create a new Prometheus series.
+func inboundTypeLabel(t string) string {
+	switch t {
+	case "heartbeat", "resume", "viewer_profile", "chat":
+		return t
+	default:
+		return "unknown"
 	}
 }
 
 // dispatchInbound implements the client→server protocol from
 // frontend src/mocks/ws-server.ts.
 func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
-	metrics.MessagesReceived.WithLabelValues(in.Type).Inc()
+	metrics.MessagesReceived.WithLabelValues(inboundTypeLabel(in.Type)).Inc()
 	switch in.Type {
 	case "heartbeat":
 		// already bumped read deadline above
@@ -166,45 +254,43 @@ func (c *Conn) dispatchInbound(ctx context.Context, in hub.Inbound) {
 		_ = c.Send(hub.EncodeSystem("resumed"))
 		return
 	case "viewer_profile":
-		c.handleViewerProfile(in.User, in.Avatar, in.UserLevel)
+		// The payload is ignored: identity comes from the server. The frame
+		// only asks us to pick up a profile change (cached, so cheap).
+		c.handleViewerProfile(ctx)
 		return
 	case "chat":
-		c.handleChat(ctx, in.Text, in.User, in.Avatar, in.ClientID, in.FanBadge, in.UserLevel)
+		c.handleChat(ctx, in.Text, in.ClientID)
 	default:
 		metrics.MessagesDropped.WithLabelValues("unknown_type").Inc()
 	}
 }
 
-func (c *Conn) handleViewerProfile(username, avatar string, userLevel int) {
+// loadProfile resolves the connection's public identity from server-side
+// sources, keyed by the authenticated user id.
+func (c *Conn) loadProfile(ctx context.Context) {
+	if c.profiles != nil {
+		c.profile = c.profiles.Profile(ctx, c.identity.UserID)
+	}
+	if c.profile.UserID == "" {
+		c.profile = profile.Profile{UserID: c.identity.UserID, Name: profile.FallbackName(c.identity.UserID)}
+	}
+}
+
+func (c *Conn) handleViewerProfile(ctx context.Context) {
 	if c.hub == nil {
 		return
 	}
-	username = safeUsername(username)
-	avatar = safeAvatar(avatar)
-	if username == "" {
-		username = "Guest"
-		if c.identity.UserID != "" {
-			username = c.identity.UserID
-		}
-	}
-	c.hub.UpdateViewer(c.roomID, c.id, hub.ViewerProfile{
-		UserID:    c.identity.UserID,
-		User:      username,
-		Avatar:    avatar,
-		UserLevel: safeUserLevel(userLevel),
-		IsOwner:   c.isOwner(),
-	})
+	c.loadProfile(ctx)
+	c.hub.UpdateViewer(c.roomID, c.id, c.viewerProfile())
 }
 
-func (c *Conn) initialViewerProfile() hub.ViewerProfile {
-	user := "Guest"
-	if c.identity.UserID != "" {
-		user = c.identity.UserID
-	}
+func (c *Conn) viewerProfile() hub.ViewerProfile {
 	return hub.ViewerProfile{
-		UserID:  c.identity.UserID,
-		User:    user,
-		IsOwner: c.isOwner(),
+		UserID:    c.identity.UserID,
+		User:      c.profile.Name,
+		Avatar:    c.profile.Avatar,
+		UserLevel: c.profile.Level,
+		IsOwner:   c.isOwner(),
 	}
 }
 
@@ -212,20 +298,31 @@ func (c *Conn) isOwner() bool {
 	return c.ownerID != "" && c.identity.UserID != "" && c.ownerID == c.identity.UserID
 }
 
-func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID string, fanBadge *hub.FanBadgePayload, userLevel int) {
+// handleChat moderates and publishes one chat message. Everything other
+// viewers see besides the text — id, name, avatar, level, fan badge, role —
+// is decided here from server-side data; clientID is only echoed back to
+// the sender in a chat_ack so it can match its own message.
+func (c *Conn) handleChat(ctx context.Context, text, clientID string) {
 	if !c.identity.CanChat() {
 		_ = c.Send(hub.EncodeSystem("login required to chat"))
 		metrics.MessagesDropped.WithLabelValues("anonymous_chat").Inc()
-		return
-	}
-	if c.limiter != nil && !c.limiter.Allow() {
-		metrics.MessagesDropped.WithLabelValues("rate_limited").Inc()
 		return
 	}
 	text = strings.TrimSpace(text)
 	if text == "" || utf8.RuneCountInString(text) > 200 {
 		metrics.MessagesDropped.WithLabelValues("bad_chat").Inc()
 		return
+	}
+	if c.chatLimiter != nil {
+		ok, err := c.chatLimiter.Allow(ctx, c.identity.UserID)
+		if err != nil {
+			// Fail open: the per-connection limiter still bounds each socket.
+			logger.L().Warn("per-user chat rate limit", zap.String("user", c.identity.UserID), zap.Error(err))
+		} else if !ok {
+			_ = c.Send(hub.EncodeSystem("You are sending messages too fast."))
+			metrics.MessagesDropped.WithLabelValues("user_rate_limited").Inc()
+			return
+		}
 	}
 	role := ""
 	if c.moderation != nil {
@@ -261,37 +358,44 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 			return
 		}
 	}
+	if c.filter != nil {
+		text = c.filter.Replace(text)
+	}
+	if c.profile.UserID == "" {
+		c.loadProfile(ctx)
+	}
+	p := c.profile
+	var hubBadge *hub.FanBadgePayload
+	var producerBadge *producer.FanBadgePayload
+	if c.profiles != nil && !c.isOwner() {
+		if b := c.profiles.FanBadge(ctx, c.roomID, c.identity.UserID); b != nil {
+			hubBadge = &hub.FanBadgePayload{CreatorID: b.CreatorID, Level: b.Level}
+			producerBadge = &producer.FanBadgePayload{CreatorID: b.CreatorID, Level: b.Level}
+		}
+	}
 	now := time.Now().UnixMilli()
-	id := safeClientID(clientID)
-	username = safeUsername(username)
-	avatar = safeAvatar(avatar)
-	hubFanBadge, producerFanBadge := safeFanBadge(fanBadge)
-	userLevel = safeUserLevel(userLevel)
+	id := uuid.NewString()
 	if err := c.producer.PublishChat(ctx, producer.ChatEvent{
+		ID:        id,
 		RoomID:    c.roomID,
 		UserID:    c.identity.UserID,
-		Username:  username,
-		Avatar:    avatar,
-		ClientID:  id,
+		Username:  p.Name,
+		Avatar:    p.Avatar,
 		Text:      text,
 		Role:      role,
-		FanBadge:  producerFanBadge,
-		UserLevel: userLevel,
+		FanBadge:  producerBadge,
+		UserLevel: p.Level,
 		Ts:        now,
 	}); err != nil {
 		logger.L().Warn("publish chat", zap.Error(err))
 		metrics.MessagesDropped.WithLabelValues("producer_err").Inc()
 		return
 	}
-	if id == "" {
-		id = uuid.NewString()
-	}
 	if c.producer.LocalEcho() {
-		display := username
-		if display == "" {
-			display = c.identity.UserID
-		}
-		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, display, avatar, text, now, hubFanBadge, role, userLevel))
+		_ = c.hub.Broadcast(ctx, c.roomID, hub.EncodeChat(id, c.identity.UserID, p.Name, p.Avatar, text, now, hubBadge, role, p.Level))
+	}
+	if cid := safeClientID(clientID); cid != "" {
+		_ = c.Send(hub.EncodeChatAck(cid, id))
 	}
 }
 
@@ -309,32 +413,6 @@ func formatMuteTTL(ttl time.Duration) string {
 	return strconv.Itoa(minutes) + " minutes"
 }
 
-func safeFanBadge(in *hub.FanBadgePayload) (*hub.FanBadgePayload, *producer.FanBadgePayload) {
-	if in == nil || strings.TrimSpace(in.CreatorID) == "" || in.Level < 1 {
-		return nil, nil
-	}
-	level := in.Level
-	if level > 99 {
-		level = 99
-	}
-	creatorID := strings.TrimSpace(in.CreatorID)
-	if len(creatorID) > 80 || strings.ContainsAny(creatorID, " \t\r\n") {
-		return nil, nil
-	}
-	return &hub.FanBadgePayload{CreatorID: creatorID, Level: level},
-		&producer.FanBadgePayload{CreatorID: creatorID, Level: level}
-}
-
-func safeUserLevel(level int) int {
-	if level < 1 {
-		return 0
-	}
-	if level > 99 {
-		return 99
-	}
-	return level
-}
-
 func safeClientID(id string) string {
 	id = strings.TrimSpace(id)
 	if id == "" || len(id) > 80 {
@@ -344,26 +422,4 @@ func safeClientID(id string) string {
 		return ""
 	}
 	return id
-}
-
-func safeUsername(name string) string {
-	name = strings.TrimSpace(name)
-	if name == "" || len([]rune(name)) > 64 {
-		return ""
-	}
-	if strings.ContainsAny(name, "\r\n\t") {
-		return ""
-	}
-	return name
-}
-
-func safeAvatar(avatar string) string {
-	avatar = strings.TrimSpace(avatar)
-	if avatar == "" || len([]rune(avatar)) > 500 {
-		return ""
-	}
-	if strings.ContainsAny(avatar, "\r\n\t") {
-		return ""
-	}
-	return avatar
 }

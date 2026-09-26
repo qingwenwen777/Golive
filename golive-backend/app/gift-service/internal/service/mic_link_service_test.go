@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v9"
@@ -11,15 +12,113 @@ import (
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/miclink"
 )
 
 func newMicLinkSvc(t *testing.T) (*service.MicLinkService, *gorm.DB) {
+	t.Helper()
+	svc, db, _ := newMicLinkSvcWithRedis(t)
+	return svc, db
+}
+
+func newMicLinkSvcWithRedis(t *testing.T) (*service.MicLinkService, *gorm.DB, *miniredis.Miniredis) {
 	t.Helper()
 	db := newTestDB(t, 0)
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
-	return service.NewMicLinkService(repo.NewOrderRepo(db), rdb), db
+	return service.NewMicLinkService(repo.NewOrderRepo(db), rdb), db, mr
+}
+
+// approvedMicGuest enables mic link on room "r" and puts guestID on air.
+func approvedMicGuest(t *testing.T, svc *service.MicLinkService, guestID string) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := svc.Config(ctx, "u-owner", service.MicConfigReq{RoomID: "r", Enabled: true, Eligibility: "all"})
+	require.NoError(t, err)
+	_, err = svc.Request(ctx, guestID, "r")
+	require.NoError(t, err)
+	_, err = svc.Approve(ctx, "u-owner", "r", guestID)
+	require.NoError(t, err)
+}
+
+func TestMicLink_ApproveIssuesPublishTokenOnlyToGuest(t *testing.T) {
+	ctx := context.Background()
+	svc, _, mr := newMicLinkSvcWithRedis(t)
+	approvedMicGuest(t, svc, "u-demo")
+
+	key := miclink.TokenKey(miclink.StreamName("r", "u-demo"))
+	stored, err := mr.Get(key)
+	require.NoError(t, err)
+	require.Len(t, stored, 48)
+	require.Greater(t, mr.TTL(key), time.Duration(0))
+
+	view, err := svc.Latest(ctx, "r", "u-demo")
+	require.NoError(t, err)
+	require.Equal(t, service.MicStatusOnAir, view.MyStatus)
+	require.Equal(t, stored, view.MyPublishToken)
+
+	for _, other := range []string{"u-owner", "u-other", ""} {
+		view, err := svc.Latest(ctx, "r", other)
+		require.NoError(t, err)
+		require.Empty(t, view.MyPublishToken, "viewer %q", other)
+	}
+}
+
+func TestMicLink_PublishTokenRevokedWhenGuestLeavesOrIsRemoved(t *testing.T) {
+	ctx := context.Background()
+	key := miclink.TokenKey(miclink.StreamName("r", "u-demo"))
+
+	cases := map[string]func(*service.MicLinkService) error{
+		"leave": func(svc *service.MicLinkService) error {
+			_, err := svc.Leave(ctx, "u-demo", "r")
+			return err
+		},
+		"remove": func(svc *service.MicLinkService) error {
+			_, err := svc.Remove(ctx, "u-owner", "r", "u-demo")
+			return err
+		},
+		"disable": func(svc *service.MicLinkService) error {
+			_, err := svc.Config(ctx, "u-owner", service.MicConfigReq{RoomID: "r", Enabled: false})
+			return err
+		},
+	}
+	for name, end := range cases {
+		t.Run(name, func(t *testing.T) {
+			svc, _, mr := newMicLinkSvcWithRedis(t)
+			approvedMicGuest(t, svc, "u-demo")
+			require.True(t, mr.Exists(key))
+
+			require.NoError(t, end(svc))
+			require.False(t, mr.Exists(key))
+
+			// A former guest's poll must not mint a new token.
+			view, err := svc.Latest(ctx, "r", "u-demo")
+			require.NoError(t, err)
+			require.Empty(t, view.MyPublishToken)
+			require.False(t, mr.Exists(key))
+		})
+	}
+}
+
+func TestMicLink_ExpiredPublishTokenReissuedForOnAirGuest(t *testing.T) {
+	ctx := context.Background()
+	svc, _, mr := newMicLinkSvcWithRedis(t)
+	approvedMicGuest(t, svc, "u-demo")
+	key := miclink.TokenKey(miclink.StreamName("r", "u-demo"))
+	first, err := mr.Get(key)
+	require.NoError(t, err)
+
+	mr.FastForward(time.Hour)
+	require.False(t, mr.Exists(key))
+
+	view, err := svc.Latest(ctx, "r", "u-demo")
+	require.NoError(t, err)
+	require.NotEmpty(t, view.MyPublishToken)
+	require.NotEqual(t, first, view.MyPublishToken)
+	stored, err := mr.Get(key)
+	require.NoError(t, err)
+	require.Equal(t, stored, view.MyPublishToken)
 }
 
 func TestMicLink_RequestRequiresEnabled(t *testing.T) {

@@ -155,9 +155,6 @@ func (h *MicLinkHandler) ownerAction(
 	c.JSON(http.StatusOK, view)
 }
 
-// ctx is a tiny alias so the method-value signatures above stay readable.
-type ctx = context.Context
-
 func respondMicLinkError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrMicLinkForbidden):

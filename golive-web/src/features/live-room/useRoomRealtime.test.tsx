@@ -68,13 +68,9 @@ function seedAuthedUser() {
 }
 
 function renderRealtime(queryClient = makeQueryClient()) {
-  const rendered = renderHook(
-    () =>
-      useRoomRealtime('room-1', true, {
-        activeFanBadge: { creatorId: 'creator-1', level: 3 },
-      }),
-    { wrapper: wrapperFor(queryClient) },
-  );
+  const rendered = renderHook(() => useRoomRealtime('room-1', true), {
+    wrapper: wrapperFor(queryClient),
+  });
   return { ...rendered, queryClient };
 }
 
@@ -99,7 +95,7 @@ describe('useRoomRealtime', () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
   });
 
-  it('sends chat with identity without optimistic local echo', () => {
+  it('sends only the chat text (identity is server-side) without optimistic local echo', () => {
     seedAuthedUser();
     const { result } = renderRealtime();
 
@@ -107,16 +103,12 @@ describe('useRoomRealtime', () => {
       expect(result.current.sendChat('hello room')).toBe(true);
     });
 
-    expect(wsMock.sendMessage).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        type: 'chat',
-        roomId: 'room-1',
-        text: 'hello room',
-        user: 'XHB',
-        avatar: '/avatar.png',
-        fanBadge: { creatorId: 'creator-1', level: 3 },
-      }),
-    );
+    const sent = wsMock.sendMessage.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(sent).toMatchObject({ type: 'chat', roomId: 'room-1', text: 'hello room' });
+    expect(typeof sent.clientId).toBe('string');
+    for (const field of ['user', 'avatar', 'fanBadge', 'userLevel', 'userId']) {
+      expect(sent).not.toHaveProperty(field);
+    }
 
     const slice = useRealtimeStore.getState().rooms['room-1'];
     expect(slice.messages).toHaveLength(0);

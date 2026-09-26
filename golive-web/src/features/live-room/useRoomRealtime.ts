@@ -81,6 +81,12 @@ interface ServerViewerList {
   }>;
   ts?: number;
 }
+// Sent only to the chat's sender: the server id assigned to its clientId.
+interface ServerChatAck {
+  type: 'chat_ack';
+  clientId: string;
+  id: string;
+}
 interface ServerSystem {
   type: 'system';
   text: string;
@@ -139,6 +145,7 @@ type ServerMessage =
   | ServerGift
   | ServerViewerCount
   | ServerViewerList
+  | ServerChatAck
   | ServerSystem
   | ServerLiveStatus
   | ServerRoomUpdated
@@ -174,7 +181,7 @@ export interface UseRoomRealtimeReturn {
 export function useRoomRealtime(
   roomId: string,
   enabled = true,
-  opts: { onLiveEnded?: () => void; activeFanBadge?: ChatFanBadge | null; ownerId?: string } = {},
+  opts: { onLiveEnded?: () => void; ownerId?: string } = {},
 ): UseRoomRealtimeReturn {
   const ensureRoom = useRealtimeStore((s) => s.ensureRoom);
   const appendMessage = useRealtimeStore((s) => s.appendMessage);
@@ -189,11 +196,9 @@ export function useRoomRealtime(
   const queryClient = useQueryClient();
   const danmuOnRef = useRef(danmuOn);
   const onLiveEndedRef = useRef(opts.onLiveEnded);
-  const activeFanBadgeRef = useRef<ChatFanBadge | null | undefined>(opts.activeFanBadge);
   const refreshedTokenRef = useRef<string | null>(null);
   danmuOnRef.current = danmuOn;
   onLiveEndedRef.current = opts.onLiveEnded;
-  activeFanBadgeRef.current = opts.activeFanBadge;
 
   useEffect(() => {
     ensureRoom(roomId);
@@ -241,14 +246,11 @@ export function useRoomRealtime(
     maxRetries: 10,
   });
 
+  // The gateway resolves name/avatar/level server-side from the token's user;
+  // this frame only asks it to pick up a profile change.
   useEffect(() => {
     if (readyState !== 'open') return;
-    sendMessage({
-      type: 'viewer_profile',
-      user: currentUser ? userDisplayName(currentUser) : 'Guest',
-      avatar: currentUser?.avatar,
-      userLevel: currentUser?.levelInfo?.level,
-    });
+    sendMessage({ type: 'viewer_profile' });
   }, [readyState, sendMessage, currentUser]);
 
   useEffect(() => {
@@ -377,6 +379,11 @@ export function useRoomRealtime(
           })),
           parsed.total,
         );
+        break;
+      }
+      case 'chat_ack': {
+        // No optimistic local echo to reconcile: the sender's own chat
+        // arrives through the room broadcast like everyone else's.
         break;
       }
       case 'system': {
@@ -535,21 +542,16 @@ export function useRoomRealtime(
 
   const slice = useRoomSlice(roomId);
 
+  // Only the text is ours to send: the gateway derives the message id, name,
+  // avatar, level and fan badge from the authenticated user. clientId comes
+  // back in a chat_ack (to this socket only) with the server id.
   const sendChat = (text: string) => {
     const now = Date.now();
-    const id = genId('chat');
-    const user = userDisplayName(currentUser);
-    const avatar = currentUser?.avatar;
-    const fanBadge = activeFanBadgeRef.current ?? undefined;
     const ok = sendMessage({
       type: 'chat',
       roomId,
       text,
-      user,
-      avatar,
-      fanBadge,
-      userLevel: currentUser?.levelInfo?.level,
-      clientId: id,
+      clientId: genId('chat'),
       ts: now,
     });
     if (!ok) return false;

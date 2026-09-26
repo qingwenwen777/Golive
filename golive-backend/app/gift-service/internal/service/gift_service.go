@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/errcode"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
 
@@ -67,7 +70,9 @@ func (s *GiftService) ListFanClubMembers(ctx context.Context, creatorID string, 
 //
 // Pre-conditions checked here (assumes HTTP-level validation already ran):
 //
-//	req.RoomID, req.GiftID, req.Count > 0, req.RequestID, req.UserID — non-empty
+//	req.RoomID, req.GiftID, req.RequestID, req.UserID — non-empty
+//
+// req.Count is validated here against MaxGiftCount.
 //
 // Behaviour:
 //   - gift unknown → return (nil, false, ErrGiftNotFound)
@@ -82,7 +87,21 @@ var (
 	ErrInsufficientCoin = errors.New("insufficient coin")
 	ErrGiftLevelLocked  = errors.New("gift level locked")
 	ErrSelfFanClubJoin  = errors.New("cannot join your own fan club")
+
+	ErrInvalidGiftCount = errcode.New(http.StatusBadRequest, "invalid gift count").WithReason("invalid_gift_count")
 )
+
+// MaxGiftCount bounds a single send so price*count can never overflow int64.
+const MaxGiftCount = 9999
+
+// giftTotal returns price*count, rejecting counts outside 1..MaxGiftCount and
+// any product that would not be a positive int64.
+func giftTotal(price int64, count int) (int64, error) {
+	if count <= 0 || count > MaxGiftCount || price <= 0 || int64(count) > math.MaxInt64/price {
+		return 0, ErrInvalidGiftCount
+	}
+	return price * int64(count), nil
+}
 
 type GiftLevelLockedError struct {
 	RequiredLevel int
@@ -129,7 +148,10 @@ func (s *GiftService) Send(ctx context.Context, req SendGiftReq) (*model.GiftOrd
 		}
 	}
 
-	totalCoin := gift.PriceCoin * int64(req.Count)
+	totalCoin, err := giftTotal(gift.PriceCoin, req.Count)
+	if err != nil {
+		return nil, false, err
+	}
 	now := time.Now().UTC()
 	orderID := "gift-" + uuid.NewString()
 	username := s.broadcastName(ctx, req)

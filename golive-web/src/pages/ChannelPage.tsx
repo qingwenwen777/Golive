@@ -36,7 +36,7 @@ import {
   useFollowState,
   useRooms,
   useUnfollow,
-  type LiveHistoryItem,
+  type ChannelHistoryItem,
 } from '@/api/room';
 import { useFanBadges, useFanClubMembers, useJoinFanClub } from '@/api/gift';
 import { useChannelPosts } from '@/api/posts';
@@ -863,7 +863,7 @@ function ChannelHistoryRow({
   channelKey,
   isOwner,
 }: {
-  record: LiveHistoryItem;
+  record: ChannelHistoryItem;
   channelKey: string;
   isOwner: boolean;
 }) {
@@ -892,12 +892,19 @@ function ChannelHistoryRow({
         </div>
         <div className="gl-history-sub">
           <span>{record.category || t('channel.tabs.live')}</span>
-          <span>{t('channel.history.revenue', { amount: formatCoin(record.revenueCoin) })}</span>
-          <span>
-            {record.topFan
-              ? t('channel.history.topFan', { name: record.topFan.name })
-              : t('channel.history.noFan')}
-          </span>
+          {/* Revenue and top fan are owner-only; the API omits them otherwise. */}
+          {isOwner && record.revenueCoin !== undefined && (
+            <>
+              <span>
+                {t('channel.history.revenue', { amount: formatCoin(record.revenueCoin) })}
+              </span>
+              <span>
+                {record.topFan
+                  ? t('channel.history.topFan', { name: record.topFan.name })
+                  : t('channel.history.noFan')}
+              </span>
+            </>
+          )}
         </div>
       </div>
       {isOwner && (
@@ -922,7 +929,7 @@ function ChannelHistoryRow({
   );
 }
 
-function HistoryThumb({ record }: { record: LiveHistoryItem }) {
+function HistoryThumb({ record }: { record: ChannelHistoryItem }) {
   const initials = record.title.trim().slice(0, 2).toUpperCase() || 'GL';
   return (
     <div

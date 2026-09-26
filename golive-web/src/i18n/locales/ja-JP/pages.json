@@ -2297,6 +2297,7 @@
     "myWagerWon": "、{{payout}} coin を返還",
     "myWagerRefunded": "、返金済み",
     "noWagerHint": "この選択肢にはベットがありません。返金する場合は中止してください。",
+    "settleAfterClose": "ベット受付終了後に結果を確定できます。",
     "openSuccess": "予想を開始しました。60 秒後に自動で締め切ります。",
     "wagerSuccess": "「{{option}}」にベットしました。",
     "settleSuccess": "「{{option}}」で精算しました。",
@@ -2317,6 +2318,7 @@
     "errorClosed": "予想は締め切られています。",
     "errorAlreadyPlaced": "すでにベット済みです。",
     "errorNoWinners": "この結果には勝者がいません。中止して返金してください。",
+    "errorOwnerWager": "配信者は自分の予想にベットできません。",
     "errorBadQuestion": "予想タイトルは必須で、80 文字以内です。",
     "errorForbidden": "配信者のみ予想を操作できます。",
     "errorGeneric": "操作に失敗しました。"

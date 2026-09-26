@@ -4,13 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	stripe "github.com/stripe/stripe-go/v84"
 	"github.com/stripe/stripe-go/v84/checkout/session"
 )
 
-var ErrStripeNotConfigured = errors.New("stripe is not configured")
+var (
+	ErrStripeNotConfigured = errors.New("stripe is not configured")
+	ErrTopupAmountInvalid  = errors.New("stripe checkout amount does not match its coins")
+)
+
+// MaxTopupCoins caps one checkout so the coin-to-money conversion cannot
+// overflow and a paid session can never be worth an arbitrary coin amount.
+const MaxTopupCoins int64 = 1_000_000
 
 type StripeOptions struct {
 	PublishableKey       string
@@ -49,6 +57,8 @@ type StripeCheckoutSession struct {
 	URL               string
 	PaymentStatus     string
 	ClientReferenceID string
+	AmountTotal       int64
+	Currency          string
 	Metadata          map[string]string
 }
 
@@ -103,6 +113,9 @@ func (s *StripeService) MoneyMinorForCoins(coins int64) (int64, error) {
 	if coins <= 0 {
 		return 0, errors.New("coin amount must be positive")
 	}
+	if coins > MaxTopupCoins {
+		return 0, fmt.Errorf("coin amount exceeds the %d coin limit", MaxTopupCoins)
+	}
 	minor := coins * 100 / s.CoinsPerCurrencyUnit()
 	if minor <= 0 {
 		return 0, errors.New("coin amount is too small for stripe")
@@ -136,6 +149,27 @@ func (s *StripeService) CreateTopupCheckout(ctx context.Context, userID, email s
 		ProductName: fmt.Sprintf("GoLive %d coins", amountCoins),
 		Metadata:    metadata,
 	})
+}
+
+// TopupCoinsFromSession returns the coins a paid top-up session is worth. It
+// checks that Stripe charged exactly the price recorded when the checkout was
+// created, so the credited coins always match the money received.
+func (s *StripeService) TopupCoinsFromSession(sess *StripeCheckoutSession) (int64, error) {
+	if sess == nil {
+		return 0, ErrTopupAmountInvalid
+	}
+	coins, err := strconv.ParseInt(sess.Metadata["coins"], 10, 64)
+	if err != nil || coins <= 0 || coins > MaxTopupCoins {
+		return 0, ErrTopupAmountInvalid
+	}
+	minor, err := strconv.ParseInt(sess.Metadata["amount_minor"], 10, 64)
+	if err != nil || minor <= 0 || sess.AmountTotal != minor {
+		return 0, ErrTopupAmountInvalid
+	}
+	if !strings.EqualFold(sess.Currency, sess.Metadata["currency"]) {
+		return 0, ErrTopupAmountInvalid
+	}
+	return coins, nil
 }
 
 func (s *StripeService) RetrieveCheckoutSession(ctx context.Context, id string) (*StripeCheckoutSession, error) {
@@ -215,6 +249,8 @@ func checkoutSessionFromStripe(sess *stripe.CheckoutSession) *StripeCheckoutSess
 		URL:               sess.URL,
 		PaymentStatus:     string(sess.PaymentStatus),
 		ClientReferenceID: sess.ClientReferenceID,
+		AmountTotal:       sess.AmountTotal,
+		Currency:          string(sess.Currency),
 		Metadata:          sess.Metadata,
 	}
 }

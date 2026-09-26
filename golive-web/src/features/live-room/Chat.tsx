@@ -231,7 +231,9 @@ function normalizeName(name?: string): string {
 }
 
 function isOwnerMessage(m: ChatMessage, ownerId?: string, ownerName?: string): boolean {
-  if (ownerId && m.userId) return m.userId === ownerId;
+  // Display names aren't unique, so only fall back to them when the owner's
+  // id is unknown; otherwise a message without a userId could pose as host.
+  if (ownerId) return m.userId === ownerId;
   if (ownerName) return normalizeName(m.user) === normalizeName(ownerName);
   return false;
 }

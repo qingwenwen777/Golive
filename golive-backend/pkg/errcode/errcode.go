@@ -14,6 +14,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+
+	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
 // AppError is the canonical error surfaced to the frontend.
@@ -55,17 +58,22 @@ var (
 	}
 )
 
-// Respond writes err as the unified JSON body. Non-AppError falls back to 500.
+// Respond writes err as the unified JSON body. Non-AppError falls back to a
+// generic 500; the underlying error (SQL text, internal addresses, ...) is
+// logged, never sent to the client.
 func Respond(c *gin.Context, err error) {
 	var ae *AppError
 	if errors.As(err, &ae) {
 		c.AbortWithStatusJSON(ae.HTTPStatus, ae)
 		return
 	}
-	c.AbortWithStatusJSON(http.StatusInternalServerError, &AppError{
-		HTTPStatus: http.StatusInternalServerError,
-		Message:    err.Error(),
-	})
+	logger.L().Error("internal error",
+		zap.Error(err),
+		zap.String("method", c.Request.Method),
+		zap.String("path", c.Request.URL.Path),
+		zap.String("request_id", c.GetHeader("X-Request-Id")),
+	)
+	c.AbortWithStatusJSON(http.StatusInternalServerError, ErrInternal)
 }
 
 // RespondWith writes status + AppError plus an extra payload (e.g. a failed order

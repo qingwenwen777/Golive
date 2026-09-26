@@ -350,6 +350,7 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
   const view = latest.data;
   const myStatus = view?.myStatus ?? 'none';
   const myMuted = Boolean(view?.myMuted);
+  const myPublishToken = view?.myPublishToken;
   const roster = view?.roster ?? [];
 
   // Guest WebRTC publish lifecycle: start the mic uplink while on air, tear it
@@ -363,8 +364,9 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
       publishRef.current?.close();
       publishRef.current = null;
     };
-    if (myStatus === 'on_air' && myId && !publishRef.current) {
-      void publishMic(micStreamName(roomId, myId))
+    // The publish token arrives with the on-air view; wait for it.
+    if (myStatus === 'on_air' && myId && myPublishToken && !publishRef.current) {
+      void publishMic(micStreamName(roomId, myId), myPublishToken)
         .then((handle) => {
           if (cancelled) {
             handle.close();
@@ -406,7 +408,7 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
       if (myStatus !== 'on_air') stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myStatus, myId, roomId]);
+  }, [myStatus, myId, myPublishToken, roomId]);
 
   // Reflect mute state onto the live track.
   useEffect(() => {

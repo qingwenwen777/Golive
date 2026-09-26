@@ -1,6 +1,8 @@
 # chat-service
 
-Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endpoint; the only public application endpoint serves chat history for replay.
+Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endpoint; the only public application endpoint serves chat history for replay. History renders each chat's name, avatar, level and fan badge from current server-side data looked up by user id (never by display name, never the values stored with the row).
+
+Internal (service-to-service, not proxied by api-gateway): `GET /internal/rooms/:id/fan-badges/:userId` → `{"fanBadge": {"creatorId","level"} | null}`, used by im-gateway to decorate live chat.
 
 - HTTP: `:8093` (only `/rooms/:id/danmus` + `/healthz`, proxied by api-gateway)
 - pprof: `:6068`
@@ -35,8 +37,8 @@ client → ws → im-gateway →(produce)→ kafka:danmu
 
 | Stage | Implementation |
 | ---------- | --------------------------------------------------------------------------------------------- |
-| Rate limiting | Redis fixed window + Lua (`INCR` + `PEXPIRE`), 3 msg/sec per user by default (configurable). Drop immediately when exceeded. |
-| Sensitive-word filtering | Custom DFA (rune-level trie). Longest match first; ASCII case-insensitive; optional skipped characters `". *-_"`. |
+| Rate limiting | `pkg/chatlimit`: Redis fixed window + Lua (`INCR` + `PEXPIRE`), 3 msg/sec per user by default (`ratelimit.bucket_seconds` is an integer number of seconds). Drop immediately when exceeded. |
+| Sensitive-word filtering | `pkg/chatfilter` (shared with im-gateway): custom DFA (rune-level trie) over normalised text (zero-width chars ignored, NFKD/fullwidth and case folded). Longest match first; short Latin words match whole words only; optional skipped characters `". *-_"`. |
 | Persistence | MySQL **8 sharded tables** `danmus_0..7`, selected by `fnv32(roomId) % 8`. A room always uses the same table. |
 | Broadcasting | Redis `PUBLISH room:<roomId>`; im-gateway subscribes and fans out to WebSocket clients. |
 

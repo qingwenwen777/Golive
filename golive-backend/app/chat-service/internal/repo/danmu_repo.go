@@ -15,11 +15,13 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/qingwenwen777/golive/app/chat-service/internal/model"
+	"github.com/qingwenwen777/golive/pkg/userlevel"
 )
 
 type DanmuRepo struct {
@@ -39,15 +41,15 @@ type SuperChatHistoryRow struct {
 
 type fanBadgeHistoryRow struct {
 	UserID            string
-	Username          string
-	Name              string
 	CreatorID         string
 	TotalContribution int64
 }
 
-type FanBadgeLookup struct {
-	ByUserID map[string]*model.FanBadgePayload
-	ByName   map[string]*model.FanBadgePayload
+// UserProfile is a user's current public chat identity.
+type UserProfile struct {
+	Name   string
+	Avatar string
+	Level  int
 }
 
 func NewDanmuRepo(db *gorm.DB, shards int) *DanmuRepo {
@@ -100,98 +102,134 @@ func (r *DanmuRepo) History(ctx context.Context, roomID string, before int64, li
 	return out, nil
 }
 
-// FanBadgesForRoomUsers returns each chat user's current fan badge for the
-// room owner. History rendering uses the current membership state so viewers
-// entering later still see badges earned while they were away.
-func (r *DanmuRepo) FanBadgesForRoomUsers(ctx context.Context, roomID string, userIDs []string, names []string) (FanBadgeLookup, error) {
-	empty := FanBadgeLookup{
-		ByUserID: map[string]*model.FanBadgePayload{},
-		ByName:   map[string]*model.FanBadgePayload{},
-	}
-	unique := make([]string, 0, len(userIDs))
-	seen := make(map[string]struct{}, len(userIDs))
-	for _, userID := range userIDs {
-		userID = strings.TrimSpace(userID)
-		if userID == "" {
-			continue
-		}
-		if _, ok := seen[userID]; ok {
-			continue
-		}
-		seen[userID] = struct{}{}
-		unique = append(unique, userID)
-	}
-	uniqueNames := make([]string, 0, len(names))
-	seenNames := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		key := normalizeBadgeName(name)
-		if _, ok := seenNames[key]; ok {
-			continue
-		}
-		seenNames[key] = struct{}{}
-		uniqueNames = append(uniqueNames, name)
-	}
-	if roomID == "" || (len(unique) == 0 && len(uniqueNames) == 0) {
-		return empty, nil
+// FanBadgesForRoomUsers returns each user's current fan badge for the room
+// owner, keyed by user id. History rendering uses the current membership
+// state so viewers entering later still see badges earned while they were
+// away. Badges are matched by user id only — display names are not unique
+// and a name match let anyone inherit another user's badge.
+func (r *DanmuRepo) FanBadgesForRoomUsers(ctx context.Context, roomID string, userIDs []string) (map[string]*model.FanBadgePayload, error) {
+	out := map[string]*model.FanBadgePayload{}
+	unique := uniqueIDs(userIDs)
+	if roomID == "" || len(unique) == 0 {
+		return out, nil
 	}
 
 	var rows []fanBadgeHistoryRow
-	q := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).
 		Table("fan_badges AS fb").
 		Select(`
 fb.user_id AS user_id,
-COALESCE(u.username, '') AS username,
-COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), fb.user_id) AS name,
 fb.creator_id AS creator_id,
 fb.total_contribution AS total_contribution
 `).
 		Joins("JOIN rooms AS r ON r.owner_id = fb.creator_id").
-		Joins("LEFT JOIN users AS u ON u.id = fb.user_id").
-		Where("r.id = ? AND fb.total_contribution > 0", roomID)
-	clauses := make([]string, 0, 2)
-	args := make([]any, 0, 3)
-	if len(unique) > 0 {
-		clauses = append(clauses, "fb.user_id IN ?")
-		args = append(args, unique)
-	}
-	if len(uniqueNames) > 0 {
-		clauses = append(clauses, "u.username IN ? OR u.display_name IN ?")
-		args = append(args, uniqueNames, uniqueNames)
-	}
-	err := q.Where("("+strings.Join(clauses, " OR ")+")", args...).Scan(&rows).Error
+		Where("r.id = ? AND fb.total_contribution > 0 AND fb.user_id IN ?", roomID, unique).
+		Scan(&rows).Error
 	if err != nil {
 		// Older local/dev databases may not have gift fan-badge tables yet.
 		// History should still load; it will simply omit badge decoration.
-		msg := err.Error()
-		if strings.Contains(msg, "doesn't exist") || strings.Contains(msg, "no such table") {
-			return empty, nil
+		if isMissingTable(err) {
+			return out, nil
 		}
-		return empty, err
+		return out, err
 	}
 
-	out := empty
 	for _, row := range rows {
 		level := fanBadgeLevel(row.TotalContribution)
 		if row.UserID == "" || row.CreatorID == "" || level <= 0 {
 			continue
 		}
-		badge := &model.FanBadgePayload{
+		out[row.UserID] = &model.FanBadgePayload{
 			CreatorID: row.CreatorID,
 			Level:     level,
 		}
-		out.ByUserID[row.UserID] = badge
-		if row.Username != "" {
-			out.ByName[normalizeBadgeName(row.Username)] = badge
+	}
+	return out, nil
+}
+
+// UserProfiles returns each user's current display name, avatar and user
+// level (from top-ups, as user-service computes it), keyed by user id. Chat
+// history renders these instead of the values stored with each message, so
+// rows persisted before identity was derived server-side can't keep showing
+// a client-chosen name or level.
+func (r *DanmuRepo) UserProfiles(ctx context.Context, userIDs []string) (map[string]UserProfile, error) {
+	out := map[string]UserProfile{}
+	unique := uniqueIDs(userIDs)
+	if len(unique) == 0 {
+		return out, nil
+	}
+	var rows []struct {
+		ID          string
+		Username    string
+		DisplayName string
+		Avatar      string
+		Topup       int64
+	}
+	err := r.db.WithContext(ctx).
+		Table("users AS u").
+		Select(`
+u.id AS id,
+COALESCE(u.username, '') AS username,
+COALESCE(u.display_name, '') AS display_name,
+COALESCE(u.avatar, '') AS avatar,
+COALESCE((SELECT SUM(ct.amount) FROM coin_transactions AS ct
+  WHERE ct.user_id = u.id AND ct.type = 'topup' AND ct.amount > 0), 0) AS topup
+`).
+		Where("u.id IN ?", unique).
+		Scan(&rows).Error
+	if err != nil {
+		if isMissingTable(err) {
+			return out, nil
 		}
-		if row.Name != "" {
-			out.ByName[normalizeBadgeName(row.Name)] = badge
+		return out, err
+	}
+	for _, row := range rows {
+		out[row.ID] = UserProfile{
+			Name:   displayName(row.ID, row.DisplayName, row.Username),
+			Avatar: row.Avatar,
+			Level:  userlevel.LevelForTotalTopup(row.Topup),
 		}
 	}
 	return out, nil
+}
+
+var uuidLike = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// displayName mirrors the frontend's userDisplayName and im-gateway's live
+// chat naming: display name, else a non-uuid username, else an id prefix.
+func displayName(id, display, username string) string {
+	if s := strings.TrimSpace(display); s != "" {
+		return s
+	}
+	if s := strings.TrimSpace(username); s != "" && !uuidLike.MatchString(s) {
+		return s
+	}
+	if len(id) > 8 {
+		id = id[:8]
+	}
+	return "Creator " + id
+}
+
+func uniqueIDs(ids []string) []string {
+	unique := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	return unique
+}
+
+func isMissingTable(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "doesn't exist") || strings.Contains(msg, "no such table")
 }
 
 func fanBadgeLevel(totalContribution int64) int {
@@ -206,10 +244,6 @@ func fanBadgeLevel(totalContribution int64) int {
 		return 99
 	}
 	return level
-}
-
-func normalizeBadgeName(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // SuperChatHistory returns successful SuperChats for the same room so the

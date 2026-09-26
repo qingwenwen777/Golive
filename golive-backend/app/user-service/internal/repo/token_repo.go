@@ -13,7 +13,10 @@ import (
 var ErrRefreshNotFound = errors.New("refresh token not found")
 
 const (
-	refreshKeyPrefix       = "refresh:"
+	refreshKeyPrefix = "refresh:"
+	// refreshUserKeyPrefix indexes each user's refresh tokens (a set) so all
+	// of them can be revoked at once, e.g. when the user is banned.
+	refreshUserKeyPrefix   = "refresh-user:"
 	loginFailKeyPrefix     = "login:fail:"
 	loginCooldownKeyPrefix = "login:cooldown:"
 )
@@ -21,8 +24,11 @@ const (
 var rotateRefreshScript = redis.NewScript(`
 local oldKey = KEYS[1]
 local newKey = KEYS[2]
+local userKey = KEYS[3]
 local userID = ARGV[1]
 local ttlMillis = tonumber(ARGV[2])
+local oldToken = ARGV[3]
+local newToken = ARGV[4]
 
 local current = redis.call("GET", oldKey)
 if not current then
@@ -33,12 +39,28 @@ if current ~= userID then
 end
 
 redis.call("DEL", oldKey)
+redis.call("SREM", userKey, oldToken)
+redis.call("SADD", userKey, newToken)
 if ttlMillis and ttlMillis > 0 then
 	redis.call("SET", newKey, userID, "PX", ttlMillis)
+	redis.call("PEXPIRE", userKey, ttlMillis)
 else
 	redis.call("SET", newKey, userID)
 end
 return 1
+`)
+
+// revokeUserRefreshScript deletes every refresh token in a user's index and
+// the index itself in one step, so no token recorded there survives.
+var revokeUserRefreshScript = redis.NewScript(`
+local userKey = KEYS[1]
+local prefix = ARGV[1]
+local tokens = redis.call("SMEMBERS", userKey)
+for _, token in ipairs(tokens) do
+	redis.call("DEL", prefix .. token)
+end
+redis.call("DEL", userKey)
+return #tokens
 `)
 
 type TokenRepo struct {
@@ -47,9 +69,18 @@ type TokenRepo struct {
 
 func NewTokenRepo(rdb *redis.Client) *TokenRepo { return &TokenRepo{rdb: rdb} }
 
-// SaveRefresh stores token → userId with TTL.
+// SaveRefresh stores token → userId with TTL and records the token in the
+// user's index.
 func (r *TokenRepo) SaveRefresh(ctx context.Context, token, userID string, ttl time.Duration) error {
-	return r.rdb.Set(ctx, refreshKeyPrefix+token, userID, ttl).Err()
+	pipe := r.rdb.TxPipeline()
+	pipe.Set(ctx, refreshKeyPrefix+token, userID, ttl)
+	pipe.SAdd(ctx, refreshUserKeyPrefix+userID, token)
+	if ttl > 0 {
+		// Every token gets the same TTL, so the newest one outlives the rest.
+		pipe.PExpire(ctx, refreshUserKeyPrefix+userID, ttl)
+	}
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // LookupRefresh returns the userId bound to token, or ErrRefreshNotFound.
@@ -66,7 +97,23 @@ func (r *TokenRepo) LookupRefresh(ctx context.Context, token string) (string, er
 
 // DeleteRefresh revokes a token.
 func (r *TokenRepo) DeleteRefresh(ctx context.Context, token string) error {
-	return r.rdb.Del(ctx, refreshKeyPrefix+token).Err()
+	userID, err := r.rdb.Get(ctx, refreshKeyPrefix+token).Result()
+	if errors.Is(err, redis.Nil) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	pipe := r.rdb.TxPipeline()
+	pipe.Del(ctx, refreshKeyPrefix+token)
+	pipe.SRem(ctx, refreshUserKeyPrefix+userID, token)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// RevokeUserRefresh revokes every refresh token issued to userID.
+func (r *TokenRepo) RevokeUserRefresh(ctx context.Context, userID string) error {
+	return revokeUserRefreshScript.Run(ctx, r.rdb, []string{refreshUserKeyPrefix + userID}, refreshKeyPrefix).Err()
 }
 
 // Rotate atomically revokes oldToken and stores newToken when oldToken still
@@ -76,9 +123,11 @@ func (r *TokenRepo) Rotate(ctx context.Context, oldToken, newToken, userID strin
 	result, err := rotateRefreshScript.Run(
 		ctx,
 		r.rdb,
-		[]string{refreshKeyPrefix + oldToken, refreshKeyPrefix + newToken},
+		[]string{refreshKeyPrefix + oldToken, refreshKeyPrefix + newToken, refreshUserKeyPrefix + userID},
 		userID,
 		ttl.Milliseconds(),
+		oldToken,
+		newToken,
 	).Int()
 	if err != nil {
 		return err

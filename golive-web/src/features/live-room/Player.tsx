@@ -95,10 +95,12 @@ export interface PlayerProps {
   liveEnding?: boolean;
 }
 
+// The playback name comes only from the public playbackUrl. The owner's
+// streamKey is the OBS publish credential ("<roomId>?key=<secret>"), not a
+// playable stream name.
 function streamPlaybackKey(stream: Stream): string {
   const source = stream.playbackUrl || '';
   return (
-    stream.streamKey ||
     source.match(/\/live\/([^/?#]+)\.flv(?:[?#].*)?$/)?.[1] ||
     source.match(/\/([^/?#]+)\.flv(?:[?#].*)?$/)?.[1] ||
     ''

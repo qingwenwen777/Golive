@@ -26,4 +26,6 @@ export interface MicLinkView {
   isOwner: boolean;
   myStatus: MicLinkMyStatus;
   myMuted: boolean;
+  // Present only for the caller while on air; authorizes their WHIP publish.
+  myPublishToken?: string;
 }

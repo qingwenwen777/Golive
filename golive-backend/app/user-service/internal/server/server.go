@@ -36,7 +36,7 @@ func NewRouter(d Deps) *gin.Engine {
 	authH := handler.NewAuthHandler(d.Auth, d.Captcha, d.EmailCodes)
 	userH := handler.NewUserHandler(d.Users, d.EmailCodes, d.Stripe)
 	creatorH := handler.NewCreatorHandler(d.Users)
-	adminH := handler.NewAdminHandler(d.Users)
+	adminH := handler.NewAdminHandler(d.Users, d.Auth)
 	internalH := handler.NewInternalHandler(d.Users)
 	avatarH := handler.NewAvatarUploadHandler(d.Users, d.AvatarDir, d.AvatarPublicURL)
 	coverH := handler.NewCoverUploadHandler(d.Users, d.CoverDir, d.CoverPublicURL)
@@ -58,24 +58,27 @@ func NewRouter(d Deps) *gin.Engine {
 		auth.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
 	}
 
+	// Banned users keep read access and can appeal; these writes are refused.
+	notBanned := handler.NotBanned(d.Users)
+
 	users := r.Group("/users")
 	{
 		users.GET("/profile/:id", userH.PublicProfile)
 		users.GET("/me", handler.AuthRequired(d.Auth), userH.Me)
-		users.PATCH("/me/profile", handler.AuthRequired(d.Auth), userH.UpdateProfile)
+		users.PATCH("/me/profile", handler.AuthRequired(d.Auth), notBanned, userH.UpdateProfile)
 		users.POST("/me/password", handler.AuthRequired(d.Auth), userH.ChangePassword)
 		users.POST("/me/email/code", handler.AuthRequired(d.Auth), userH.SendEmailChangeCode)
 		users.PATCH("/me/email", handler.AuthRequired(d.Auth), userH.UpdateEmail)
 		users.GET("/me/coins/transactions", handler.AuthRequired(d.Auth), userH.CoinTransactions)
-		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), userH.TopupCoins)
+		users.POST("/me/coins/topup", handler.AuthRequired(d.Auth), notBanned, userH.TopupCoins)
 		users.POST("/me/coins/topup/confirm", handler.AuthRequired(d.Auth), userH.ConfirmTopupCoins)
-		users.POST("/me/coins/withdrawals", handler.AuthRequired(d.Auth), userH.WithdrawCoins)
-		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), userH.ClaimDailyCoinTask)
-		users.POST("/me/avatar", handler.AuthRequired(d.Auth), avatarH.Upload)
-		users.POST("/me/cover", handler.AuthRequired(d.Auth), coverH.Upload)
+		users.POST("/me/coins/withdrawals", handler.AuthRequired(d.Auth), notBanned, userH.WithdrawCoins)
+		users.POST("/me/coins/daily-tasks/:taskID/claim", handler.AuthRequired(d.Auth), notBanned, userH.ClaimDailyCoinTask)
+		users.POST("/me/avatar", handler.AuthRequired(d.Auth), notBanned, avatarH.Upload)
+		users.POST("/me/cover", handler.AuthRequired(d.Auth), notBanned, coverH.Upload)
 	}
 
-	creator := r.Group("/creator", handler.AuthRequired(d.Auth))
+	creator := r.Group("/creator", handler.AuthRequired(d.Auth), notBanned)
 	{
 		creator.POST("/applications", creatorH.SubmitApplication)
 		creator.POST("/platform-applications", creatorH.SubmitPlatformApplication)

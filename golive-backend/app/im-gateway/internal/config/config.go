@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -17,6 +18,11 @@ type Config struct {
 	JWT     JWTCfg     `mapstructure:"jwt"`
 	Kafka   KafkaCfg   `mapstructure:"kafka"`
 	Room    RoomCfg    `mapstructure:"room"`
+	Filter  FilterCfg  `mapstructure:"filter"`
+	Profile ProfileCfg `mapstructure:"profile"`
+	// ChatRateLimit is the per-user (not per-connection) chat limit, shared
+	// through Redis by all of a user's connections.
+	ChatRateLimit ChatRateLimitCfg `mapstructure:"chat_ratelimit"`
 }
 
 type ServiceCfg struct {
@@ -34,6 +40,32 @@ type WSCfg struct {
 	PongWait        time.Duration `mapstructure:"pong_wait"`
 	MaxMessageRate  float64       `mapstructure:"max_message_rate"`
 	AllowedOrigins  []string      `mapstructure:"allowed_origins"`
+	MaxConnsPerUser int           `mapstructure:"max_conns_per_user"`
+	MaxConnsPerIP   int           `mapstructure:"max_conns_per_ip"`
+	// TrustedProxies are CIDRs (or bare IPs) of reverse proxies whose
+	// X-Real-IP / X-Forwarded-For headers identify the client.
+	TrustedProxies []string `mapstructure:"trusted_proxies"`
+}
+
+// TrustedProxyNets parses TrustedProxies.
+func (c WSCfg) TrustedProxyNets() ([]*net.IPNet, error) {
+	out := make([]*net.IPNet, 0, len(c.TrustedProxies))
+	for _, raw := range c.TrustedProxies {
+		raw = strings.TrimSpace(raw)
+		if !strings.Contains(raw, "/") {
+			if ip := net.ParseIP(raw); ip != nil && ip.To4() != nil {
+				raw += "/32"
+			} else {
+				raw += "/128"
+			}
+		}
+		_, n, err := net.ParseCIDR(raw)
+		if err != nil {
+			return nil, fmt.Errorf("ws.trusted_proxies: %w", err)
+		}
+		out = append(out, n)
+	}
+	return out, nil
 }
 
 type RedisCfg struct {
@@ -63,6 +95,53 @@ type KafkaCfg struct {
 type RoomCfg struct {
 	ViewerPushInterval time.Duration `mapstructure:"viewer_push_interval"`
 	WelcomeText        string        `mapstructure:"welcome_text"`
+	// RequireKnown rejects handshakes for rooms room-service doesn't know
+	// (Redis room:owner:<id>, else ServiceURL's GET /rooms/<id>).
+	RequireKnown bool `mapstructure:"require_known"`
+	// ServiceURL is room-service's base URL for the lookup fallback.
+	ServiceURL string `mapstructure:"service_url"`
+}
+
+// ProfileCfg locates the services chat identity is resolved from: display
+// name / avatar / level from user-service, fan badges from chat-service.
+type ProfileCfg struct {
+	UserServiceURL string        `mapstructure:"user_service_url"`
+	ChatServiceURL string        `mapstructure:"chat_service_url"`
+	TTL            time.Duration `mapstructure:"ttl"`
+}
+
+// FilterCfg points at the sensitive-word list (one word per line) whose
+// matches are masked in live chat.
+type FilterCfg struct {
+	SensitivePath string `mapstructure:"sensitive_path"`
+	Mask          string `mapstructure:"mask"`
+}
+
+// ChatRateLimitCfg allows PerUserPerSec chat messages per BucketSeconds
+// window. BucketSeconds is an integer number of seconds (not a duration).
+type ChatRateLimitCfg struct {
+	PerUserPerSec int `mapstructure:"per_user_per_sec"`
+	BucketSeconds int `mapstructure:"bucket_seconds"`
+}
+
+func (c ChatRateLimitCfg) Window() time.Duration {
+	return time.Duration(c.BucketSeconds) * time.Second
+}
+
+func (c *Config) validate() error {
+	if c.ChatRateLimit.PerUserPerSec <= 0 {
+		return fmt.Errorf("chat_ratelimit.per_user_per_sec must be > 0, got %d", c.ChatRateLimit.PerUserPerSec)
+	}
+	if c.ChatRateLimit.BucketSeconds <= 0 {
+		return fmt.Errorf("chat_ratelimit.bucket_seconds must be a positive number of seconds, got %d", c.ChatRateLimit.BucketSeconds)
+	}
+	if strings.TrimSpace(c.Filter.SensitivePath) == "" {
+		return fmt.Errorf("filter.sensitive_path is required")
+	}
+	if _, err := c.WS.TrustedProxyNets(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func Load(path string) (*Config, error) {
@@ -85,6 +164,9 @@ func Load(path string) (*Config, error) {
 	var c Config
 	if err := v.Unmarshal(&c); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+	if err := c.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &c, nil
 }

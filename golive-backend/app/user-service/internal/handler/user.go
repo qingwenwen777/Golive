@@ -73,6 +73,7 @@ func (h *UserHandler) PublicProfile(c *gin.Context) {
 	}
 	pu := u.Public()
 	pu.Email = ""
+	pu.EmailVerified = false
 	c.JSON(http.StatusOK, pu)
 }
 
@@ -187,7 +188,7 @@ func (h *UserHandler) SendEmailChangeCode(c *gin.Context) {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	oldEmail, ok := service.NormalizeEmail(u.Email)
+	oldEmail, ok := service.NormalizeEmail(u.EmailAddress())
 	if !ok {
 		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
 		return
@@ -230,7 +231,7 @@ func (h *UserHandler) UpdateEmail(c *gin.Context) {
 		errcode.Respond(c, service.ErrUnauthorized)
 		return
 	}
-	oldEmail, ok := service.NormalizeEmail(current.Email)
+	oldEmail, ok := service.NormalizeEmail(current.EmailAddress())
 	if !ok {
 		errcode.Respond(c, service.ErrInvalidRegister.WithReason("invalid_email"))
 		return
@@ -317,6 +318,10 @@ func (h *UserHandler) TopupCoins(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 10 coins"})
 		return
 	}
+	if req.Amount > service.MaxTopupCoins {
+		c.JSON(http.StatusBadRequest, gin.H{"message": fmt.Sprintf("maximum top-up is %d coins", service.MaxTopupCoins)})
+		return
+	}
 	if h.stripe == nil || !h.stripe.Configured() {
 		errcode.Respond(c, errcode.New(http.StatusServiceUnavailable, "stripe is not configured").WithReason("stripe_not_configured"))
 		return
@@ -330,7 +335,7 @@ func (h *UserHandler) TopupCoins(c *gin.Context) {
 	checkout, err := h.stripe.CreateTopupCheckout(
 		c.Request.Context(),
 		uid,
-		u.Email,
+		u.EmailAddress(),
 		req.Amount,
 		origin+"/coins?stripe_topup=success&session_id={CHECKOUT_SESSION_ID}",
 		origin+"/coins?stripe_topup=cancelled",
@@ -389,7 +394,7 @@ func (h *UserHandler) ConfirmTopupCoins(c *gin.Context) {
 		})
 		return
 	}
-	amount, err := strconv.ParseInt(sess.Metadata["coins"], 10, 64)
+	amount, err := h.stripe.TopupCoinsFromSession(sess)
 	if err != nil || amount < minTopupCoins {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "invalid stripe checkout metadata").WithReason("stripe_invalid_metadata"))
 		return
@@ -411,43 +416,6 @@ func (h *UserHandler) ConfirmTopupCoins(c *gin.Context) {
 		"credited":      credited,
 		"paymentStatus": sess.PaymentStatus,
 	})
-}
-
-// TopupCoins increments the authenticated user's coin balance by the given
-// amount and returns the updated public user. This is a stub for development;
-// real billing integration is out of scope.
-func (h *UserHandler) legacyTopupCoins(c *gin.Context) {
-	uid := UserIDFromCtx(c)
-	if uid == "" {
-		errcode.Respond(c, service.ErrUnauthorized)
-		return
-	}
-	var req topupReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid amount"})
-		return
-	}
-	if req.Amount < 10 {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "minimum top-up is 10 coins"})
-		return
-	}
-	u, _, err := h.users.IncrementCoinsWithTransaction(
-		c.Request.Context(),
-		uid,
-		req.Amount,
-		model.CoinTxTopup,
-		"充值获得",
-		"模拟充值成功，后续接入真实支付接口。",
-		"topup",
-		"",
-		"",
-		"",
-	)
-	if err != nil {
-		errcode.Respond(c, service.ErrUnauthorized)
-		return
-	}
-	c.JSON(http.StatusOK, u.Public())
 }
 
 func (h *UserHandler) CoinTransactions(c *gin.Context) {

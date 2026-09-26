@@ -36,14 +36,6 @@ func (f *flakyProducer) Publish(_ context.Context, m *model.LocalMessage) error 
 }
 func (f *flakyProducer) Close() error { return nil }
 
-func enqueueRow(t *testing.T, db any) uint64 {
-	t.Helper()
-	gdb := db.(interface{ Create(any) any })
-	_ = gdb
-	return 0 // placeholder; real impl below
-}
-
-// helper using gorm directly
 func TestOutbox_RetryThenSent(t *testing.T) {
 	db := newTestDB(t, 0)
 	or := repo.NewOutboxRepo(db)

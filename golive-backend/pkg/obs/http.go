@@ -1,6 +1,7 @@
 package obs
 
 import (
+	"net/http"
 	"strconv"
 	"time"
 
@@ -43,11 +44,12 @@ func HTTPMiddleware(serviceName string) gin.HandlerFunc {
 		if route == "" {
 			route = "unmatched"
 		}
-		spanName := c.Request.Method + " " + route
+		method := metricMethod(c.Request.Method)
+		spanName := method + " " + route
 		ctx, span := tracer.Start(ctx, spanName,
 			trace.WithSpanKind(trace.SpanKindServer),
 			trace.WithAttributes(
-				semconv.HTTPRequestMethodKey.String(c.Request.Method),
+				semconv.HTTPRequestMethodKey.String(method),
 				semconv.HTTPRoute(route),
 				semconv.URLPath(c.Request.URL.Path),
 				semconv.UserAgentOriginal(c.Request.UserAgent()),
@@ -66,8 +68,20 @@ func HTTPMiddleware(serviceName string) gin.HandlerFunc {
 		}
 		span.End()
 
-		httpRequests.WithLabelValues(serviceName, route, c.Request.Method, strconv.Itoa(status)).Inc()
-		httpDuration.WithLabelValues(serviceName, route, c.Request.Method).Observe(elapsed)
+		httpRequests.WithLabelValues(serviceName, route, method, strconv.Itoa(status)).Inc()
+		httpDuration.WithLabelValues(serviceName, route, method).Observe(elapsed)
+	}
+}
+
+// metricMethod maps the client-controlled HTTP method onto a fixed set so
+// arbitrary method tokens can't create unbounded metric series.
+func metricMethod(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut,
+		http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		return method
+	default:
+		return "OTHER"
 	}
 }
 

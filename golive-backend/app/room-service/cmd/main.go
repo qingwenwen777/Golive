@@ -98,6 +98,7 @@ func main() {
 	roomSvc.SetReplayService(replaySvc)
 	roomSvc.SetLiveRepo(liveRepo)
 	liveSvc.SetReplayService(replaySvc)
+	liveSvc.SetSRSAPIBase(cfg.Live.SRSAPIBase)
 	liveSvc.SetAppointmentRepo(appointmentRepo)
 	liveSvc.SetModerationRepo(moderationRepo)
 	appointmentSvc := service.NewAppointmentService(appointmentRepo, roomRepo, socialRepo, liveSvc)
@@ -116,6 +117,7 @@ func main() {
 		PostPublicURL:       cfg.Upload.PostPublicURL,
 	})
 	liveSvc.SetTextPolicy(moderationSvc)
+	appointmentSvc.SetTextPolicy(moderationSvc)
 	roomSvc.SetBlockChecker(messageSvc)
 	appointmentSvc.SetBlockChecker(messageSvc)
 	socialSvc.SetBlockChecker(messageSvc)

@@ -398,7 +398,9 @@ export interface FanContribution {
   amount: number;
 }
 
-export interface LiveHistoryItem {
+// ChannelHistoryItem is a record from the public channel history endpoint.
+// revenueCoin, newSubscribers and topFan are only sent to the channel owner.
+export interface ChannelHistoryItem {
   id: string;
   title: string;
   description?: string;
@@ -412,15 +414,21 @@ export interface LiveHistoryItem {
   durationSeconds: number;
   peakViewers: number;
   danmuCount: number;
-  revenueCoin: number;
-  newSubscribers: number;
+  revenueCoin?: number;
+  newSubscribers?: number;
   topFan?: FanContribution;
   replay?: ReplayInfo;
   fanClubOnly?: boolean;
 }
 
+// LiveHistoryItem is a record from the owner-only analytics endpoints.
+export interface LiveHistoryItem extends ChannelHistoryItem {
+  revenueCoin: number;
+  newSubscribers: number;
+}
+
 export interface LiveHistoryResp {
-  items: LiveHistoryItem[];
+  items: ChannelHistoryItem[];
   total: number;
   page: number;
   size: number;
@@ -436,7 +444,6 @@ export interface ReplayListResp {
 export interface HotReplayItem extends Stream {
   likes: number;
   commentCount: number;
-  revenueCoin: number;
   hotScore: number;
 }
 
