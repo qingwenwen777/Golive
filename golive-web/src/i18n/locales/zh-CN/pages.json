@@ -1942,7 +1942,10 @@
         "claimLockedBody": "若未完成，将于 {{time}} 自动释放。",
         "claimLockedBodyNoExpiry": "该举报已被其他审核人锁定。",
         "claimOpenTitle": "待领取审核",
-        "claimOpenBody": "领取后即可锁定并处置这条举报。"
+        "claimOpenBody": "领取后即可锁定并处置这条举报。",
+        "unverifiedTag": "未核实",
+        "unverifiedTitle": "快照未经核实",
+        "unverifiedBody": "这条举报早于服务端核验，且被举报内容已不存在，因此显示的用户和内容来自举报人的客户端，可能不实。只能驳回。"
       },
       "actions": {
         "review": "标记处理中",

@@ -63,6 +63,9 @@ export interface ContentReport {
   targetUserName?: string;
   targetTitle?: string;
   targetText?: string;
+  /** False while the target fields are still the reporter's own snapshot (a
+   * legacy report whose content is gone); such a report can only be dismissed. */
+  targetVerified?: boolean;
   reason: ReportReason | string;
   description?: string;
   status: ReportStatus | string;

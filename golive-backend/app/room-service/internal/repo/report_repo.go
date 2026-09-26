@@ -145,6 +145,61 @@ func (r *ModerationRepo) openReportGroup(ctx context.Context, tx *gorm.DB, targe
 	return &existing, nil
 }
 
+// VerifyLegacyReportTargets re-resolves open reports whose target fields are
+// still what the reporter's client sent (target_verified = false: filed
+// before targets were resolved server-side) and stores the server-side
+// snapshot on them, so the user, text and link moderators see are what a
+// sanction would hit. ids limits it to those reports. Reports whose content
+// is gone stay unverified, cannot drive enforcement and are remembered so
+// later calls skip them.
+func (r *ModerationRepo) VerifyLegacyReportTargets(ctx context.Context, ids ...string) error {
+	q := r.db.WithContext(ctx).
+		Where("target_verified = ? AND (status = ? OR status = ?)", false, model.ReportStatusPending, model.ReportStatusReviewing)
+	if len(ids) > 0 {
+		q = q.Where("id IN ?", ids)
+	}
+	var rows []model.ContentReport
+	if err := q.Find(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, gone := r.legacyTargetsGone.Load(row.ID); gone {
+			continue
+		}
+		target, err := r.ResolveReportTarget(ctx, row.TargetType, row.TargetID, row.RoomID)
+		if errors.Is(err, ErrReportTargetNotFound) {
+			r.legacyTargetsGone.Store(row.ID, struct{}{})
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+			Where("id = ? AND target_verified = ?", row.ID, false).
+			UpdateColumns(reportTargetColumns(target)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reportTargetColumns is the content_reports snapshot of a resolved target,
+// trimmed to the columns like CreateReport does.
+func reportTargetColumns(target *ReportTarget) map[string]any {
+	return map[string]any{
+		"target_url":        trimForDB(target.Link, 800),
+		"room_id":           trimForDB(target.RoomID, 64),
+		"channel_id":        trimForDB(target.ChannelID, 64),
+		"target_owner_id":   trimForDB(target.OwnerID, 36),
+		"target_owner_name": trimForDB(target.OwnerName, 128),
+		"target_user_id":    trimForDB(target.UserID, 36),
+		"target_user_name":  trimForDB(target.UserName, 128),
+		"target_title":      trimForDB(target.Title, 240),
+		"target_text":       trimForDB(target.Text, 1000),
+		"target_verified":   true,
+	}
+}
+
 func (r *ModerationRepo) ListContentReports(ctx context.Context, filter ReportListFilter) ([]model.ContentReport, int64, error) {
 	page, size := normalizeModerationPage(filter.Page, filter.Size)
 	q := r.db.WithContext(ctx).Model(&model.ContentReport{})

@@ -1942,7 +1942,10 @@
         "claimLockedBody": "Locked until {{time}} unless the reviewer finishes first.",
         "claimLockedBodyNoExpiry": "This report is locked by another reviewer.",
         "claimOpenTitle": "Ready to claim",
-        "claimOpenBody": "Claim this report to lock it while you review and act."
+        "claimOpenBody": "Claim this report to lock it while you review and act.",
+        "unverifiedTag": "Unverified",
+        "unverifiedTitle": "Unverified snapshot",
+        "unverifiedBody": "This report predates server-side checks and its content no longer exists, so the user and text shown came from the reporter's app and may be false. It can only be dismissed."
       },
       "actions": {
         "review": "Mark reviewing",

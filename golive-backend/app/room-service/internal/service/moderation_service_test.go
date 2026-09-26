@@ -680,6 +680,13 @@ func TestLegacyUnverifiedReportCannotDriveSanctions(t *testing.T) {
 	detail, err := svc.ReportDetail(ctx, "admin-1", "legacy-1")
 	require.NoError(t, err)
 	require.Empty(t, detail.TargetURL)
+	// The content is gone, so the row cannot be re-verified and says so.
+	require.False(t, detail.TargetVerified)
+	list, err := svc.ListReports(ctx, "admin-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	require.False(t, list.Items[0].TargetVerified)
+	require.Equal(t, "admin-2", list.Items[0].TargetUserID)
 
 	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-1", UpdateReportReq{Actions: []string{"ban_user"}})
 	requireAppErrReason(t, err, http.StatusConflict, "target_unverified")
@@ -689,6 +696,86 @@ func TestLegacyUnverifiedReportCannotDriveSanctions(t *testing.T) {
 
 	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-1", UpdateReportReq{Action: "dismiss"})
 	require.NoError(t, err)
+}
+
+// Legacy rows whose content still exists carry the reporter's client-side
+// snapshot. Before moderators see or act on one, it is replaced by the
+// content's real author, text and link, so the user shown is the user a
+// sanction hits and the audit log records.
+func TestLegacyReportIsReverifiedBeforeListingAndActing(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportPost(t, db, "post-victim", "user-2", "a perfectly fine post")
+	seedReportPost(t, db, "post-detail", "creator-1", "a creator post")
+	seedReportPost(t, db, "post-act", "creator-1", "another creator post")
+	legacy := func(id, postID string) {
+		t.Helper()
+		require.NoError(t, db.Create(&model.ContentReport{
+			ID: id, GroupID: "group-" + id, ReporterID: "user-1",
+			TargetType: "post", TargetID: postID, TargetURL: "https://evil.example/phish",
+			TargetOwnerID: "bad-user", TargetOwnerName: "Bad User",
+			TargetUserID: "bad-user", TargetUserName: "Bad User",
+			TargetTitle: "Bad User", TargetText: "BUY STOLEN CARDS",
+			Reason: "scam", Description: "reporter's own words",
+			Status: model.ReportStatusPending, CreatedAt: now, UpdatedAt: now,
+		}).Error)
+	}
+	requireVerified := func(dto ContentReportDTO, userID, userName, text, link string) {
+		t.Helper()
+		require.True(t, dto.TargetVerified, dto.ID)
+		require.Equal(t, userID, dto.TargetUserID, dto.ID)
+		require.Equal(t, userID, dto.TargetOwnerID, dto.ID)
+		require.Equal(t, userName, dto.TargetUserName, dto.ID)
+		require.Equal(t, userName, dto.TargetTitle, dto.ID)
+		require.Equal(t, text, dto.TargetText, dto.ID)
+		require.Equal(t, link, dto.TargetURL, dto.ID)
+		var stored model.ContentReport
+		require.NoError(t, db.Where("id = ?", dto.ID).Take(&stored).Error)
+		require.True(t, stored.TargetVerified, dto.ID)
+		require.Equal(t, userID, stored.TargetUserID, dto.ID)
+		require.Equal(t, text, stored.TargetText, dto.ID)
+		require.Equal(t, "reporter's own words", stored.Description, dto.ID)
+	}
+	requireAudited := func(action, reportID, userID, userName string) {
+		t.Helper()
+		var logs []model.AdminAuditLog
+		require.NoError(t, db.Where("action = ? AND target_id = ?", action, reportID).Find(&logs).Error)
+		require.Len(t, logs, 1)
+		require.Equal(t, userID, logs[0].TargetUserID)
+		require.Equal(t, userName, logs[0].TargetUserName)
+	}
+
+	legacy("legacy-listed", "post-victim")
+	list, err := svc.ListReports(ctx, "admin-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	requireVerified(list.Items[0], "user-2", "Reporter Two", "a perfectly fine post", "/channel/user-2#post-post-victim")
+	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-listed", UpdateReportReq{Actions: []string{"ban_user"}})
+	require.NoError(t, err)
+	for userID, banned := range map[string]bool{"user-2": true, "bad-user": false} {
+		restriction, err := svc.moderation.UserRestriction(ctx, userID, now)
+		require.NoError(t, err)
+		require.Equal(t, banned, restriction.Banned, userID)
+	}
+	requireAudited("ban_user", "legacy-listed", "user-2", "Reporter Two")
+
+	// Rows that were not listed first are re-verified by detail and update.
+	legacy("legacy-detail", "post-detail")
+	detail, err := svc.ReportDetail(ctx, "admin-1", "legacy-detail")
+	require.NoError(t, err)
+	requireVerified(*detail, "creator-1", "Creator One", "a creator post", "/channel/creator-1#post-post-detail")
+	legacy("legacy-act", "post-act")
+	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-act", UpdateReportReq{Actions: []string{"warn_user"}})
+	require.NoError(t, err)
+	acted, err := svc.ReportDetail(ctx, "admin-1", "legacy-act")
+	require.NoError(t, err)
+	requireVerified(*acted, "creator-1", "Creator One", "another creator post", "/channel/creator-1#post-post-act")
+	requireAudited("warn_user", "legacy-act", "creator-1", "Creator One")
+	var warned int64
+	require.NoError(t, db.Model(&model.Notification{}).Where("type = ? AND user_id = ?", "moderation_warning", "creator-1").Count(&warned).Error)
+	require.EqualValues(t, 1, warned)
 }
 
 // Platform moderators only get the content-review surface (reports, blocked

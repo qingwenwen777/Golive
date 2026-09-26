@@ -8718,6 +8718,14 @@ html[lang='zh'] .gl-admin-action-select-head small {
   font-weight: 750;
   line-height: 1.4;
 }
+.gl-admin-handled-note.is-warning {
+  border-color: rgba(217, 119, 6, 0.25);
+  background: rgba(217, 119, 6, 0.08);
+  color: #b45309;
+}
+.gl-admin-handled-note.is-warning span {
+  color: #92400e;
+}
 .gl-admin-report-actions-bar.is-modal {
   margin-top: auto;
 }
