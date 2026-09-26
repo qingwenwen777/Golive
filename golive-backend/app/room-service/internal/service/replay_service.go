@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/qingwenwen777/golive/app/room-service/internal/model"
@@ -32,6 +33,23 @@ const replayRecoveryLimit = 20
 const replayRecordingSettleDelay = 5 * time.Second
 const defaultStaleRecordingAge = 24 * time.Hour
 
+// replayUploadDeadline bounds one upload attempt, from waiting for the
+// recording to publishing the video.
+const replayUploadDeadline = 45 * time.Minute
+
+// Failed uploads are retried up to defaultReplayUploadAttempts attempts in
+// all, defaultReplayRetryDelay after the first failure and twice as long
+// after each further one (at most maxReplayRetryDelay). Once none is left,
+// the recording is kept defaultFailedRecordingRetention for a manual retry.
+const defaultReplayUploadAttempts = 7
+const defaultReplayRetryDelay = 15 * time.Minute
+const maxReplayRetryDelay = 24 * time.Hour
+const defaultFailedRecordingRetention = 7 * 24 * time.Hour
+
+// replayRetryCheckInterval is how often RunUploadRetries looks for failed
+// uploads whose retry is due.
+const replayRetryCheckInterval = time.Minute
+
 var errRecordingNotFound = errors.New("recording file not found")
 
 type ReplayConfig struct {
@@ -44,6 +62,16 @@ type ReplayConfig struct {
 	// StaleRecordingAge is how long a recording must be untouched before
 	// CleanupStaleRecordings may remove it (default 24h).
 	StaleRecordingAge time.Duration
+	// UploadAttempts is how many times a replay upload is tried before it
+	// gives up (default 7; 1 means no retries).
+	UploadAttempts int
+	// UploadRetryDelay is the wait before a failed upload is retried the
+	// first time; it doubles with every further failure (default 15m).
+	UploadRetryDelay time.Duration
+	// FailedRecordingRetention is how long the recording of an upload that
+	// gave up is kept, for a manual retry, before CleanupStaleRecordings may
+	// remove it (default 7 days).
+	FailedRecordingRetention time.Duration
 }
 
 type ReplayService struct {
@@ -54,9 +82,17 @@ type ReplayService struct {
 	libraryID         string
 	playerBase        string
 	staleRecordingAge time.Duration
+	uploadAttempts    int
+	retryDelay        time.Duration
+	failedRetention   time.Duration
 	settleDelay       time.Duration
 	stableInterval    time.Duration
+	retryInterval     time.Duration
 	now               func() time.Time
+
+	// uploads holds the rooms whose upload runs in this process, by id.
+	uploadsMu sync.Mutex
+	uploads   map[string]model.Room
 }
 
 type ReplayListResp struct {
@@ -92,6 +128,18 @@ func NewReplayService(rooms *repo.RoomRepo, social *repo.SocialRepo, cfg ReplayC
 	if staleAge <= 0 {
 		staleAge = defaultStaleRecordingAge
 	}
+	attempts := cfg.UploadAttempts
+	if attempts <= 0 {
+		attempts = defaultReplayUploadAttempts
+	}
+	retryDelay := cfg.UploadRetryDelay
+	if retryDelay <= 0 {
+		retryDelay = defaultReplayRetryDelay
+	}
+	failedRetention := cfg.FailedRecordingRetention
+	if failedRetention <= 0 {
+		failedRetention = defaultFailedRecordingRetention
+	}
 	return &ReplayService{
 		rooms:             rooms,
 		social:            social,
@@ -100,8 +148,12 @@ func NewReplayService(rooms *repo.RoomRepo, social *repo.SocialRepo, cfg ReplayC
 		libraryID:         strings.TrimSpace(cfg.BunnyLibraryID),
 		playerBase:        playerBase,
 		staleRecordingAge: staleAge,
+		uploadAttempts:    attempts,
+		retryDelay:        retryDelay,
+		failedRetention:   failedRetention,
 		settleDelay:       replayRecordingSettleDelay,
 		stableInterval:    replayRecordingStableInterval,
+		retryInterval:     replayRetryCheckInterval,
 		now:               time.Now,
 	}
 }
@@ -201,7 +253,52 @@ func (s *ReplayService) EnqueueUpload(ctx context.Context, room model.Room) {
 		return
 	}
 	_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
-	go s.uploadRoomReplay(room)
+	s.startUpload(room)
+}
+
+// startUpload runs room's replay upload in the background, unless one runs
+// for it already.
+func (s *ReplayService) startUpload(room model.Room) {
+	if !s.trackUpload(room) {
+		return
+	}
+	go func() {
+		defer s.untrackUpload(room.ID)
+		s.uploadRoomReplay(room)
+	}()
+}
+
+// trackUpload records that room's upload runs in this process, so no second
+// one starts and CleanupStaleRecordings keeps its recording even if the
+// replay is deleted meanwhile. It reports false when one runs already.
+func (s *ReplayService) trackUpload(room model.Room) bool {
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	if _, ok := s.uploads[room.ID]; ok {
+		return false
+	}
+	if s.uploads == nil {
+		s.uploads = map[string]model.Room{}
+	}
+	s.uploads[room.ID] = room
+	return true
+}
+
+func (s *ReplayService) untrackUpload(roomID string) {
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	delete(s.uploads, roomID)
+}
+
+// uploadingRooms returns the rooms whose upload runs in this process.
+func (s *ReplayService) uploadingRooms() []model.Room {
+	s.uploadsMu.Lock()
+	defer s.uploadsMu.Unlock()
+	rooms := make([]model.Room, 0, len(s.uploads))
+	for _, room := range s.uploads {
+		rooms = append(rooms, room)
+	}
+	return rooms
 }
 
 func (s *ReplayService) ReplayDTO(ctx context.Context, room model.Room, viewerID string) (*model.Replay, error) {
@@ -291,21 +388,29 @@ func (s *ReplayService) embedURL(room model.Room) string {
 	return fmt.Sprintf("%s/%s/%s", s.playerBase, libraryID, videoID)
 }
 
+// uploadRoomReplay waits for SRS to close the room's recording, then uploads
+// it (see runUpload).
 func (s *ReplayService) uploadRoomReplay(room model.Room) {
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
-	defer cancel()
 	time.Sleep(s.settleDelay)
+	s.runUpload(room)
+}
+
+// runUpload makes one attempt at uploading room's replay. A failed attempt
+// is retried later while attempts are left (see failUpload).
+func (s *ReplayService) runUpload(room model.Room) {
+	ctx, cancel := context.WithTimeout(context.Background(), replayUploadDeadline)
+	defer cancel()
 	if s.recordDir == "" {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "record_dir is not configured")
+		s.failUpload(ctx, room, "record_dir is not configured")
 		return
 	}
 	if s.libraryID == "" || !s.bunny.Configured() {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, "bunny stream library or api key is not configured")
+		s.failUpload(ctx, room, "bunny stream library or api key is not configured")
 		return
 	}
 	recordPath, err := s.waitForUploadableRecording(ctx, s.recordingStreamName(room))
 	if err != nil {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		s.failUpload(ctx, room, err.Error())
 		return
 	}
 	s.uploadRecording(ctx, room, recordPath)
@@ -319,16 +424,18 @@ func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, re
 	}
 	videoID, err := s.bunny.CreateVideo(ctx, s.libraryID, replayVideoTitle(room))
 	if err != nil {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		s.failUpload(ctx, room, err.Error())
 		return
 	}
 	if err := s.bunny.UploadVideo(ctx, s.libraryID, videoID, recordPath); err != nil {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		// Drop the empty video, so retries don't leave one behind each.
+		s.deleteVideo(ctx, room.ID, videoID)
+		s.failUpload(ctx, room, err.Error())
 		return
 	}
 	updated, err := s.rooms.SetReplayUploaded(ctx, room.ID, s.libraryID, videoID, model.ReplayStatusReady, s.now())
 	if err != nil {
-		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusFailed, err.Error())
+		s.failUpload(ctx, room, err.Error())
 		return
 	}
 	if !updated {
@@ -341,6 +448,70 @@ func (s *ReplayService) uploadRecording(ctx context.Context, room model.Room, re
 	if err := removeRecording(recordPath); err != nil {
 		logger.L().Warn("remove replay recording", zap.Error(err), zap.String("room_id", room.ID), zap.String("path", recordPath))
 	}
+}
+
+// deleteVideo removes the video of a failed upload, best effort. The
+// attempt's context may have run out, so it gets one of its own.
+func (s *ReplayService) deleteVideo(ctx context.Context, roomID, videoID string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	if err := s.bunny.DeleteVideo(ctx, s.libraryID, videoID); err != nil {
+		logger.L().Warn("delete video of failed replay upload", zap.Error(err), zap.String("room_id", roomID), zap.String("video_id", videoID))
+	}
+}
+
+// failUpload records a failed attempt at room's replay upload. While
+// attempts are left it schedules a retry, retryDelay after the first failure
+// and twice as long after each further one; the last attempt gives up, and
+// the recording is then kept failedRetention for a manual retry. The reason
+// the creator sees says which it is.
+func (s *ReplayService) failUpload(ctx context.Context, room model.Room, reason string) {
+	attempts := room.ReplayAttempts + 1
+	now := s.now()
+	var retryAt *time.Time
+	message := reason
+	if attempts < s.uploadAttempts {
+		at := now.Add(s.retryDelayAfter(attempts))
+		retryAt = &at
+		message = fmt.Sprintf("%s (attempt %d of %d, retrying automatically)", reason, attempts, s.uploadAttempts)
+	} else if attempts > 1 {
+		message = fmt.Sprintf("%s (gave up after %d attempts)", reason, attempts)
+	}
+	// The attempt's context may have run out (e.g. waiting for the recording).
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	updated, err := s.rooms.SetReplayFailed(ctx, room.ID, message, attempts, now, retryAt)
+	if err != nil {
+		logger.L().Warn("record failed replay upload", zap.Error(err), zap.String("room_id", room.ID), zap.String("reason", reason))
+		return
+	}
+	if !updated {
+		// Deleted meanwhile.
+		return
+	}
+	fields := []zap.Field{
+		zap.String("room_id", room.ID),
+		zap.Int("attempt", attempts),
+		zap.Int("max_attempts", s.uploadAttempts),
+		zap.String("reason", reason),
+	}
+	if retryAt != nil {
+		logger.L().Warn("replay upload failed; retry scheduled", append(fields, zap.Time("retry_at", *retryAt))...)
+		return
+	}
+	logger.L().Error("replay upload failed; giving up, recording kept for a manual retry",
+		append(fields, zap.Time("recording_kept_until", now.Add(s.failedRetention)))...)
+}
+
+// retryDelayAfter is how long after its attempts-th failure an upload is
+// retried: retryDelay, doubled for each failure before (up to
+// maxReplayRetryDelay).
+func (s *ReplayService) retryDelayAfter(attempts int) time.Duration {
+	delay := s.retryDelay
+	for i := 1; i < attempts && delay < maxReplayRetryDelay; i++ {
+		delay = min(2*delay, maxReplayRetryDelay)
+	}
+	return delay
 }
 
 func (s *ReplayService) cleanupRoomRecording(room model.Room) {
@@ -377,10 +548,102 @@ func (s *ReplayService) cleanupStreamRecording(stream string) {
 	}
 }
 
-func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
-	if s == nil || s.rooms == nil || s.recordDir == "" || s.libraryID == "" || !s.bunny.Configured() {
+// RunUploadRetries resumes interrupted replay uploads and retries failed
+// ones right away (RecoverInterruptedUploads), then retries failed uploads
+// as their retries come due, until ctx is done.
+func (s *ReplayService) RunUploadRetries(ctx context.Context) {
+	if s == nil {
 		return
 	}
+	s.RecoverInterruptedUploads(ctx)
+	interval := s.retryInterval
+	if interval <= 0 {
+		interval = replayRetryCheckInterval
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		s.retryFailedUploads(ctx, s.now())
+	}
+}
+
+// RecoverInterruptedUploads resumes the replay uploads a restart interrupted
+// and retries the failed ones with attempts left right away, as a restart
+// always did; each retry counts as an attempt.
+func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
+	if s == nil || s.rooms == nil || s.recordDir == "" {
+		return
+	}
+	if s.libraryID != "" && s.bunny.Configured() {
+		s.resumeInterruptedUploads(ctx)
+	}
+	s.retryFailedUploads(ctx, time.Time{})
+}
+
+// retryFailedUploads retries the failed replay uploads that have attempts
+// left and are due by dueBy (all of them for the zero time). They run one
+// after the other, so retries of large recordings don't compete for disk and
+// bandwidth.
+func (s *ReplayService) retryFailedUploads(ctx context.Context, dueBy time.Time) {
+	if s == nil || s.rooms == nil || s.recordDir == "" {
+		return
+	}
+	rooms, err := s.rooms.ReplayRetryableUploads(ctx, dueBy, replayRecoveryLimit)
+	if err != nil {
+		logger.L().Warn("load failed replay uploads to retry", zap.Error(err))
+		return
+	}
+	for _, room := range rooms {
+		if ctx.Err() != nil {
+			return
+		}
+		s.retryUpload(ctx, room)
+	}
+}
+
+// retryUpload makes another attempt at a failed replay upload, which moves
+// it through pending and uploading to ready or failed like the first. A
+// replay whose recording is gone stops being retried.
+func (s *ReplayService) retryUpload(ctx context.Context, room model.Room) {
+	if !s.trackUpload(room) {
+		return
+	}
+	defer s.untrackUpload(room.ID)
+	if _, err := s.findRecording(s.recordingStreamName(room)); err != nil {
+		if !errors.Is(err, errRecordingNotFound) {
+			logger.L().Warn("look for recording of failed replay upload", zap.Error(err), zap.String("room_id", room.ID))
+			return
+		}
+		// Nothing left to upload: stop retrying.
+		logger.L().Warn("failed replay upload not retried: recording is gone", zap.Error(err), zap.String("room_id", room.ID))
+		if _, err := s.rooms.SetReplayFailed(ctx, room.ID, err.Error(), room.ReplayAttempts+1, s.now(), nil); err != nil {
+			logger.L().Warn("record failed replay upload", zap.Error(err), zap.String("room_id", room.ID))
+		}
+		return
+	}
+	claimed, err := s.rooms.ClaimReplayRetry(ctx, room.ID, room.ReplayAttempts)
+	if err != nil {
+		logger.L().Warn("claim failed replay upload for retry", zap.Error(err), zap.String("room_id", room.ID))
+		return
+	}
+	if !claimed {
+		return
+	}
+	logger.L().Info("retry failed replay upload",
+		zap.String("room_id", room.ID),
+		zap.Int("attempt", room.ReplayAttempts+1),
+		zap.Int("max_attempts", s.uploadAttempts),
+		zap.String("last_error", room.ReplayError),
+	)
+	s.runUpload(room)
+}
+
+func (s *ReplayService) resumeInterruptedUploads(ctx context.Context) {
 	rooms, err := s.rooms.ReplayRecoverableUploads(ctx, replayRecoveryLimit)
 	if err != nil {
 		logger.L().Warn("load recoverable replay uploads", zap.Error(err))
@@ -402,15 +665,17 @@ func (s *ReplayService) RecoverInterruptedUploads(ctx context.Context) {
 			zap.String("path", recordPath),
 		)
 		_ = s.rooms.SetReplayStatus(ctx, room.ID, model.ReplayStatusPending, "")
-		go s.uploadRoomReplay(room)
+		s.startUpload(room)
 	}
 }
 
 // CleanupStaleRecordings removes DVR files nothing will upload or clean up
 // any more: files untouched for staleRecordingAge (SRS keeps writing a live
-// stream's file) that belong to no active room and no pending or uploading
-// replay. These are left by failed uploads, mic-link streams, and restarts
-// before a room's recording cleanup ran.
+// stream's file) that belong to no active room, no pending, uploading or
+// retryable replay upload, no failed upload within failedRetention of giving
+// up, and no upload running in this process (whose replay may have been
+// deleted meanwhile). These are left by uploads that gave up, mic-link
+// streams, and restarts before a room's recording cleanup ran.
 func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 	if s == nil || s.rooms == nil || s.recordDir == "" {
 		return
@@ -422,7 +687,8 @@ func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 		}
 		return
 	}
-	cutoff := s.now().Add(-s.staleRecordingAge)
+	now := s.now()
+	cutoff := now.Add(-s.staleRecordingAge)
 	var stale []string
 	for _, entry := range entries {
 		name := strings.ToLower(entry.Name())
@@ -438,14 +704,15 @@ func (s *ReplayService) CleanupStaleRecordings(ctx context.Context) {
 	if len(stale) == 0 {
 		return
 	}
-	rooms, err := s.rooms.RecordingRooms(ctx)
+	rooms, err := s.rooms.RecordingRooms(ctx, now.Add(-s.failedRetention))
 	if err != nil {
 		logger.L().Warn("load rooms that need recordings", zap.Error(err))
 		return
 	}
+	rooms = append(rooms, s.uploadingRooms()...)
 	var keep []string
 	for _, room := range rooms {
-		keep = append(keep, room.ID)
+		keep = append(keep, room.ID, s.recordingStreamName(room))
 		if room.StreamKey != "" {
 			keep = append(keep, room.StreamKey)
 		}

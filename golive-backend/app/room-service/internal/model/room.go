@@ -59,6 +59,12 @@ type Room struct {
 	EndedAt              *time.Time
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
+	// ReplayAttempts counts failed replay upload attempts, ReplayFailedAt is
+	// when the last one failed, and ReplayRetryAt is when a failed upload is
+	// retried next (nil once no retry is left).
+	ReplayAttempts int `gorm:"not null;default:0"`
+	ReplayFailedAt *time.Time
+	ReplayRetryAt  *time.Time
 }
 
 func (Room) TableName() string { return "rooms" }
