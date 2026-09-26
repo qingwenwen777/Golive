@@ -11,7 +11,7 @@ import (
 )
 
 func TestServeHTTP_RejectsMissingToken(t *testing.T) {
-	h := NewWSHandler(nil, auth.NewHMACVerifier("secret"), nil, nil, WSConfig{}, "")
+	h := NewWSHandler(Deps{}, auth.NewHMACVerifier("secret"), WSConfig{}, "")
 	req := httptest.NewRequest(http.MethodGet, "http://localhost:8081/ws?roomId=room-1", nil)
 	w := httptest.NewRecorder()
 

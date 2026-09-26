@@ -34,7 +34,7 @@ func newWSPair(t *testing.T) *websocket.Conn {
 // Close; that used to panic with "send on closed channel" and kill the process.
 func TestConnSendConcurrentWithCloseDoesNotPanic(t *testing.T) {
 	for i := 0; i < 200; i++ {
-		c := newConn(newWSPair(t), "R1", "", auth.Identity{}, nil, nil, nil, WSConfig{SendBuffer: 1})
+		c := newConn(newWSPair(t), "R1", "", auth.Identity{}, Deps{}, WSConfig{SendBuffer: 1})
 
 		start := make(chan struct{})
 		closed := make(chan struct{})

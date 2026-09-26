@@ -7,12 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/go-redis/redis/v9"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
+	"github.com/qingwenwen777/golive/pkg/chatfilter"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 )
 
 // fakeProducer captures PublishChat calls.
@@ -134,6 +138,47 @@ func TestDispatch_Chat_EmojiCountsAsCharacters(t *testing.T) {
 	events := p.snapshot()
 	require.Len(t, events, 1)
 	require.Equal(t, text, events[0].Text)
+}
+
+// With Kafka off, chat-service's filter never ran and live chat reached
+// viewers unmasked.
+func TestDispatch_Chat_MasksSensitiveWords(t *testing.T) {
+	p := &fakeProducer{}
+	c := newTestConn(auth.Identity{UserID: "u-7"}, p)
+	c.filter = chatfilter.New([]string{"fuck", "sb"}, chatfilter.WithSkipChars(chatfilter.DefaultSkipChars))
+	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "you ｆ\u200bｕｃｋ, plug in the usb"})
+	events := p.snapshot()
+	require.Len(t, events, 1)
+	require.Equal(t, "you ***, plug in the usb", events[0].Text)
+}
+
+// The chat limit used to be per connection, so opening more sockets raised a
+// user's budget. It is now per user, shared through Redis.
+func TestDispatch_Chat_PerUserRateLimitSpansConnections(t *testing.T) {
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+	limiter := chatlimit.New(redis.NewClient(&redis.Options{Addr: mr.Addr()}), "rl:test:", 2, time.Minute)
+
+	p := &fakeProducer{}
+	a := newTestConn(auth.Identity{UserID: "u-7"}, p)
+	b := newTestConn(auth.Identity{UserID: "u-7"}, p)
+	other := newTestConn(auth.Identity{UserID: "u-8"}, p)
+	for _, c := range []*Conn{a, b, other} {
+		c.chatLimiter = limiter
+	}
+
+	a.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "1"})
+	b.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "2"})
+	b.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "3"})
+	other.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "4"})
+
+	var texts []string
+	for _, ev := range p.snapshot() {
+		texts = append(texts, ev.Text)
+	}
+	require.Equal(t, []string{"1", "2", "4"}, texts)
+	require.Contains(t, string(<-b.send), "too fast")
 }
 
 func TestDispatch_Unknown_Type_Dropped(t *testing.T) {

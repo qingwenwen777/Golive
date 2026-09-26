@@ -21,6 +21,8 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/pubsub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/server"
+	"github.com/qingwenwen777/golive/pkg/chatfilter"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -79,7 +81,20 @@ func main() {
 		MaxMessageRate:  cfg.WS.MaxMessageRate,
 		AllowedOrigins:  cfg.WS.AllowedOrigins,
 	}
-	wsH := server.NewWSHandler(h, verifier, p, moderation.NewRedisChecker(rdb), wsCfg, cfg.Room.WelcomeText)
+	words, err := chatfilter.LoadWords(cfg.Filter.SensitivePath)
+	if err != nil {
+		// Keep chat available, but make the gap loud: without the list only
+		// the admin blocked-word set applies.
+		log.Error("load sensitive words; chat masking disabled", zap.String("path", cfg.Filter.SensitivePath), zap.Error(err))
+	}
+	deps := server.Deps{
+		Hub:         h,
+		Producer:    p,
+		Moderation:  moderation.NewRedisChecker(rdb),
+		Filter:      chatfilter.New(words, chatfilter.WithMask(cfg.Filter.Mask), chatfilter.WithSkipChars(chatfilter.DefaultSkipChars)),
+		ChatLimiter: chatlimit.New(rdb, "rl:imgw:chat:", cfg.ChatRateLimit.PerUserPerSec, cfg.ChatRateLimit.Window()),
+	}
+	wsH := server.NewWSHandler(deps, verifier, wsCfg, cfg.Room.WelcomeText)
 	mux := server.NewMux(wsH, h)
 
 	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: mux}

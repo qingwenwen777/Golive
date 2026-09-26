@@ -17,6 +17,10 @@ type Config struct {
 	JWT     JWTCfg     `mapstructure:"jwt"`
 	Kafka   KafkaCfg   `mapstructure:"kafka"`
 	Room    RoomCfg    `mapstructure:"room"`
+	Filter  FilterCfg  `mapstructure:"filter"`
+	// ChatRateLimit is the per-user (not per-connection) chat limit, shared
+	// through Redis by all of a user's connections.
+	ChatRateLimit ChatRateLimitCfg `mapstructure:"chat_ratelimit"`
 }
 
 type ServiceCfg struct {
@@ -65,6 +69,37 @@ type RoomCfg struct {
 	WelcomeText        string        `mapstructure:"welcome_text"`
 }
 
+// FilterCfg points at the sensitive-word list (one word per line) whose
+// matches are masked in live chat.
+type FilterCfg struct {
+	SensitivePath string `mapstructure:"sensitive_path"`
+	Mask          string `mapstructure:"mask"`
+}
+
+// ChatRateLimitCfg allows PerUserPerSec chat messages per BucketSeconds
+// window. BucketSeconds is an integer number of seconds (not a duration).
+type ChatRateLimitCfg struct {
+	PerUserPerSec int `mapstructure:"per_user_per_sec"`
+	BucketSeconds int `mapstructure:"bucket_seconds"`
+}
+
+func (c ChatRateLimitCfg) Window() time.Duration {
+	return time.Duration(c.BucketSeconds) * time.Second
+}
+
+func (c *Config) validate() error {
+	if c.ChatRateLimit.PerUserPerSec <= 0 {
+		return fmt.Errorf("chat_ratelimit.per_user_per_sec must be > 0, got %d", c.ChatRateLimit.PerUserPerSec)
+	}
+	if c.ChatRateLimit.BucketSeconds <= 0 {
+		return fmt.Errorf("chat_ratelimit.bucket_seconds must be a positive number of seconds, got %d", c.ChatRateLimit.BucketSeconds)
+	}
+	if strings.TrimSpace(c.Filter.SensitivePath) == "" {
+		return fmt.Errorf("filter.sensitive_path is required")
+	}
+	return nil
+}
+
 func Load(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -85,6 +120,9 @@ func Load(path string) (*Config, error) {
 	var c Config
 	if err := v.Unmarshal(&c); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
+	}
+	if err := c.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &c, nil
 }

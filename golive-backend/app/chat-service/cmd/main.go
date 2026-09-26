@@ -19,12 +19,12 @@ import (
 	"github.com/qingwenwen777/golive/app/chat-service/internal/config"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/consumer"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/handler"
-	"github.com/qingwenwen777/golive/app/chat-service/internal/ratelimit"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/redissub"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/server"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -73,7 +73,7 @@ func main() {
 	}
 	f := chatfilter.New(words, chatfilter.WithMask(cfg.Filter.Mask), chatfilter.WithSkipChars(chatfilter.DefaultSkipChars))
 
-	limiter := ratelimit.New(rdb, cfg.RateLimit.PerUserPerSec, cfg.RateLimit.Window())
+	limiter := chatlimit.New(rdb, "rl:chat:", cfg.RateLimit.PerUserPerSec, cfg.RateLimit.Window())
 	pub := repo.NewPublisher(rdb)
 	svc := service.New(f, limiter, danmuRepo, pub)
 

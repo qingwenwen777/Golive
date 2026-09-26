@@ -15,8 +15,6 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/auth"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/hub"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
-	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
-	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -33,16 +31,15 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSHandler struct {
-	hub        *hub.Hub
-	verifier   auth.Verifier
-	producer   producer.Producer
-	moderation moderation.Checker
-	cfg        WSConfig
-	welcome    string
+	hub      *hub.Hub
+	verifier auth.Verifier
+	deps     Deps
+	cfg      WSConfig
+	welcome  string
 }
 
-func NewWSHandler(h *hub.Hub, v auth.Verifier, p producer.Producer, m moderation.Checker, cfg WSConfig, welcome string) *WSHandler {
-	return &WSHandler{hub: h, verifier: v, producer: p, moderation: m, cfg: cfg, welcome: welcome}
+func NewWSHandler(d Deps, v auth.Verifier, cfg WSConfig, welcome string) *WSHandler {
+	return &WSHandler{hub: d.Hub, verifier: v, deps: d, cfg: cfg, welcome: welcome}
 }
 
 // ServeHTTP performs the handshake. Failure modes (per spec):
@@ -79,7 +76,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := newConn(ws, roomID, ownerID, identity, h.hub, h.producer, h.moderation, h.cfg)
+	c := newConn(ws, roomID, ownerID, identity, h.deps, h.cfg)
 	room, err := h.hub.Join(roomID, c, c.initialViewerProfile())
 	if err != nil {
 		logger.L().Error("hub join", zap.Error(err))

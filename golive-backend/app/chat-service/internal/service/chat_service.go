@@ -22,9 +22,9 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/qingwenwen777/golive/app/chat-service/internal/model"
-	"github.com/qingwenwen777/golive/app/chat-service/internal/ratelimit"
 	"github.com/qingwenwen777/golive/app/chat-service/internal/repo"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
+	"github.com/qingwenwen777/golive/pkg/chatlimit"
 )
 
 // Event is the Kafka payload im-gateway puts on the danmu topic.
@@ -48,12 +48,12 @@ var ErrRateLimited = errors.New("rate limited")
 
 type ChatService struct {
 	filter  *chatfilter.Filter
-	limiter *ratelimit.Limiter
+	limiter *chatlimit.Limiter
 	danmus  *repo.DanmuRepo
 	pub     *repo.Publisher
 }
 
-func New(f *chatfilter.Filter, l *ratelimit.Limiter, d *repo.DanmuRepo, p *repo.Publisher) *ChatService {
+func New(f *chatfilter.Filter, l *chatlimit.Limiter, d *repo.DanmuRepo, p *repo.Publisher) *ChatService {
 	return &ChatService{filter: f, limiter: l, danmus: d, pub: p}
 }
 

@@ -39,3 +39,13 @@ kafka:
 room:
   viewer_push_interval: 5s
   welcome_text: "Welcome to the live room!"
+
+# Sensitive words are masked in live chat (same list chat-service uses).
+filter:
+  sensitive_path: "./app/chat-service/configs/sensitive.txt"
+  mask: "***"
+
+# Per-user chat limit, shared across all of a user's connections via Redis.
+chat_ratelimit:
+  per_user_per_sec: 3
+  bucket_seconds: 1        # integer seconds

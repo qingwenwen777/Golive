@@ -46,3 +46,12 @@ kafka:
 room:
   viewer_push_interval: 5s
   welcome_text: "Welcome to the live room!"
+
+# Mounted read-only by docker-compose (same file chat-service uses).
+filter:
+  sensitive_path: "./app/chat-service/configs/sensitive.txt"
+  mask: "***"
+
+chat_ratelimit:
+  per_user_per_sec: 3
+  bucket_seconds: 1

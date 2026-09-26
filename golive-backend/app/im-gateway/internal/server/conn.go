@@ -19,6 +19,7 @@ import (
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/metrics"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/moderation"
 	"github.com/qingwenwen777/golive/app/im-gateway/internal/producer"
+	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
@@ -36,11 +37,30 @@ type Conn struct {
 	done chan struct{}
 	once sync.Once
 
-	hub        *hub.Hub
-	producer   producer.Producer
-	moderation moderation.Checker
-	limiter    *rate.Limiter
-	cfg        WSConfig
+	hub         *hub.Hub
+	producer    producer.Producer
+	moderation  moderation.Checker
+	filter      *chatfilter.Filter
+	chatLimiter UserLimiter
+	limiter     *rate.Limiter
+	cfg         WSConfig
+}
+
+// UserLimiter is the per-user chat rate limit. It is shared by all of a
+// user's connections (and gateway instances), unlike Conn.limiter.
+type UserLimiter interface {
+	Allow(ctx context.Context, userID string) (bool, error)
+}
+
+// Deps are the collaborators shared by every connection.
+type Deps struct {
+	Hub        *hub.Hub
+	Producer   producer.Producer
+	Moderation moderation.Checker
+	// Filter masks sensitive words in chat text. Nil disables masking.
+	Filter *chatfilter.Filter
+	// ChatLimiter enforces the per-user chat rate. Nil disables it.
+	ChatLimiter UserLimiter
 }
 
 type WSConfig struct {
@@ -53,19 +73,21 @@ type WSConfig struct {
 	AllowedOrigins  []string
 }
 
-func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, h *hub.Hub, p producer.Producer, m moderation.Checker, cfg WSConfig) *Conn {
+func newConn(ws *websocket.Conn, roomID, ownerID string, identity auth.Identity, d Deps, cfg WSConfig) *Conn {
 	c := &Conn{
-		id:         uuid.NewString(),
-		roomID:     roomID,
-		ownerID:    ownerID,
-		identity:   identity,
-		ws:         ws,
-		send:       make(chan []byte, cfg.SendBuffer),
-		done:       make(chan struct{}),
-		hub:        h,
-		producer:   p,
-		moderation: m,
-		cfg:        cfg,
+		id:          uuid.NewString(),
+		roomID:      roomID,
+		ownerID:     ownerID,
+		identity:    identity,
+		ws:          ws,
+		send:        make(chan []byte, cfg.SendBuffer),
+		done:        make(chan struct{}),
+		hub:         d.Hub,
+		producer:    d.Producer,
+		moderation:  d.Moderation,
+		filter:      d.Filter,
+		chatLimiter: d.ChatLimiter,
+		cfg:         cfg,
 	}
 	if cfg.MaxMessageRate > 0 {
 		// burst = 1 second's allowance, minimum 1.
@@ -235,6 +257,17 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 		metrics.MessagesDropped.WithLabelValues("bad_chat").Inc()
 		return
 	}
+	if c.chatLimiter != nil {
+		ok, err := c.chatLimiter.Allow(ctx, c.identity.UserID)
+		if err != nil {
+			// Fail open: the per-connection limiter still bounds each socket.
+			logger.L().Warn("per-user chat rate limit", zap.String("user", c.identity.UserID), zap.Error(err))
+		} else if !ok {
+			_ = c.Send(hub.EncodeSystem("You are sending messages too fast."))
+			metrics.MessagesDropped.WithLabelValues("user_rate_limited").Inc()
+			return
+		}
+	}
 	role := ""
 	if c.moderation != nil {
 		state, err := c.moderation.State(ctx, c.roomID, c.identity.UserID)
@@ -268,6 +301,9 @@ func (c *Conn) handleChat(ctx context.Context, text, username, avatar, clientID 
 			metrics.MessagesDropped.WithLabelValues("blocked_word").Inc()
 			return
 		}
+	}
+	if c.filter != nil {
+		text = c.filter.Replace(text)
 	}
 	now := time.Now().UnixMilli()
 	id := safeClientID(clientID)
