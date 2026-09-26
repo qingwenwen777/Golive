@@ -12,11 +12,12 @@ import (
 )
 
 type AppointmentHandler struct {
-	svc *service.AppointmentService
+	svc        *service.AppointmentService
+	permission service.LivePermissionChecker
 }
 
-func NewAppointmentHandler(svc *service.AppointmentService) *AppointmentHandler {
-	return &AppointmentHandler{svc: svc}
+func NewAppointmentHandler(svc *service.AppointmentService, permission service.LivePermissionChecker) *AppointmentHandler {
+	return &AppointmentHandler{svc: svc, permission: permission}
 }
 
 type appointmentReq struct {
@@ -35,6 +36,9 @@ func (h *AppointmentHandler) Create(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !requireLivePermission(c, h.permission, uid) {
+		return
+	}
 	payload, ok := bindAppointmentPayload(c)
 	if !ok {
 		return
@@ -50,6 +54,9 @@ func (h *AppointmentHandler) Create(c *gin.Context) {
 func (h *AppointmentHandler) Update(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {
+		return
+	}
+	if !requireLivePermission(c, h.permission, uid) {
 		return
 	}
 	payload, ok := bindAppointmentPayload(c)
@@ -92,6 +99,9 @@ func (h *AppointmentHandler) DeleteRecord(c *gin.Context) {
 func (h *AppointmentHandler) Start(c *gin.Context) {
 	uid, ok := requireUser(c)
 	if !ok {
+		return
+	}
+	if !requireLivePermission(c, h.permission, uid) {
 		return
 	}
 	resp, err := h.svc.Start(c.Request.Context(), uid, c.Param("id"))

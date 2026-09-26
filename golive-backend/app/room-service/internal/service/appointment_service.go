@@ -32,6 +32,7 @@ type AppointmentService struct {
 	social       *repo.SocialRepo
 	live         *LiveService
 	blocks       ChannelBlockChecker
+	textPolicy   TextPolicy
 	now          func() time.Time
 }
 
@@ -114,6 +115,20 @@ func (s *AppointmentService) SetBlockChecker(blocks ChannelBlockChecker) {
 	s.blocks = blocks
 }
 
+func (s *AppointmentService) SetTextPolicy(policy TextPolicy) {
+	s.textPolicy = policy
+}
+
+// ensureTextAllowed applies the same blocked-word policy as instant GoLive, so
+// an appointment cannot be used to publish a title/description that would be
+// rejected on POST /rooms/live.
+func (s *AppointmentService) ensureTextAllowed(ctx context.Context, title, description string) error {
+	if s.textPolicy == nil {
+		return nil
+	}
+	return s.textPolicy.EnsureTextAllowed(ctx, title, description)
+}
+
 func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload AppointmentPayload) (*AppointmentDTO, error) {
 	if err := s.cleanupExpired(ctx); err != nil {
 		return nil, err
@@ -121,6 +136,9 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 	now := s.now()
 	title, description, category, cover, err := cleanAppointmentPayload(payload)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureTextAllowed(ctx, title, description); err != nil {
 		return nil, err
 	}
 	if !payload.ScheduledAt.After(now) {
@@ -195,6 +213,9 @@ func (s *AppointmentService) Update(ctx context.Context, ownerID, id string, pay
 	}
 	title, description, category, cover, err := cleanAppointmentPayload(payload)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureTextAllowed(ctx, title, description); err != nil {
 		return nil, err
 	}
 	if !payload.ScheduledAt.After(now) {
@@ -423,6 +444,10 @@ func (s *AppointmentService) Start(ctx context.Context, ownerID, id string) (*mo
 	}
 	if appt.Status != model.AppointmentScheduled {
 		return nil, errcode.New(409, "appointment cannot be started")
+	}
+	// Blocked words may have been added after the appointment was scheduled.
+	if err := s.ensureTextAllowed(ctx, appt.Title, appt.Description); err != nil {
+		return nil, err
 	}
 	if now.Before(appt.ScheduledAt.Add(-startLead)) {
 		return nil, errcode.New(409, "appointment can be started at most 30 minutes early")

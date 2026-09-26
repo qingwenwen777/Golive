@@ -27,16 +27,8 @@ func (h *LiveHandler) GoLive(c *gin.Context) {
 		errcode.Respond(c, errcode.New(401, "Unauthorized"))
 		return
 	}
-	if h.permission != nil {
-		approved, err := h.permission.HasApprovedLivePermission(c.Request.Context(), uid)
-		if err != nil {
-			errcode.Respond(c, err)
-			return
-		}
-		if !approved {
-			errcode.Respond(c, errcode.New(http.StatusForbidden, "Live permission is not approved. Please submit a creator application and wait for admin approval."))
-			return
-		}
+	if !requireLivePermission(c, h.permission, uid) {
+		return
 	}
 	var req service.GoLiveReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -84,4 +76,24 @@ func (h *LiveHandler) StopLive(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// requireLivePermission rejects users whose creator application has not been
+// approved. Every path that ends in a stream key (instant live, appointment
+// create/update/start) must go through it. Responds and returns false when the
+// request must stop.
+func requireLivePermission(c *gin.Context, permission service.LivePermissionChecker, uid string) bool {
+	if permission == nil {
+		return true
+	}
+	approved, err := permission.HasApprovedLivePermission(c.Request.Context(), uid)
+	if err != nil {
+		errcode.Respond(c, err)
+		return false
+	}
+	if !approved {
+		errcode.Respond(c, errcode.New(http.StatusForbidden, "Live permission is not approved. Please submit a creator application and wait for admin approval."))
+		return false
+	}
+	return true
 }

@@ -46,7 +46,7 @@ func NewRouter(d Deps) *gin.Engine {
 	replayH := handler.NewReplayHandler(d.Replay)
 	replayCommentH := handler.NewReplayCommentHandler(d.ReplayComments)
 	searchH := handler.NewSearchHandler(d.Search)
-	appointmentH := handler.NewAppointmentHandler(d.Appointments)
+	appointmentH := handler.NewAppointmentHandler(d.Appointments, d.Permission)
 	moderationH := handler.NewModerationHandler(d.Moderation)
 	messageH := handler.NewMessageHandler(d.Messages)
 	srsH := handler.NewSRSHandler(d.Live)
