@@ -27,46 +27,69 @@ import (
 type Room struct {
 	id     string
 	hub    *Hub
+	ctx    context.Context
 	cancel context.CancelFunc
+
+	// ready is closed once start has finished; err is its result and is
+	// only read after ready.
+	ready chan struct{}
+	err   error
 
 	mu              sync.RWMutex
 	conns           map[string]Sink
 	viewerProfiles  map[string]ViewerProfile
 	contributions   map[string]int64
 	contributionDay string
+	// closed is set (under mu) when the hub reaps the empty room; add then
+	// refuses so a joiner retries with a fresh room instead of being
+	// orphaned in one without a subscription.
+	closed bool
 
 	viewers atomic.Int64
 
 	sub pubsub.Subscription
 }
 
-func newRoom(parent context.Context, h *Hub, id string) (*Room, error) {
+func newRoom(parent context.Context, h *Hub, id string) *Room {
 	ctx, cancel := context.WithCancel(parent)
-	sub, err := h.broker.Subscribe(ctx, pubsub.RoomChannel(id))
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	r := &Room{
+	return &Room{
 		id:              id,
 		hub:             h,
+		ctx:             ctx,
 		cancel:          cancel,
+		ready:           make(chan struct{}),
 		conns:           make(map[string]Sink),
 		viewerProfiles:  make(map[string]ViewerProfile),
 		contributions:   make(map[string]int64),
 		contributionDay: contributionBucketDay(),
-		sub:             sub,
 	}
-	go r.pumpFromBroker(ctx)
-	go r.pumpViewerCount(ctx, h.viewerPushInterval)
-	metrics.RoomsActive.Inc()
-	return r, nil
 }
 
-// add returns true if this is the first connection (caller already locked
-// the hub-level rooms mutex via Hub.Join, so the room itself is reachable).
-func (r *Room) add(c Sink, profile ViewerProfile) {
+// start subscribes to the room channel and starts the pumps. Called once,
+// without the hub lock held.
+func (r *Room) start() {
+	defer close(r.ready)
+	ctx, cancel := context.WithTimeout(r.ctx, subscribeTimeout)
+	sub, err := r.hub.broker.Subscribe(ctx, pubsub.RoomChannel(r.id))
+	cancel()
+	if err != nil {
+		r.err = err
+		r.cancel()
+		return
+	}
+	r.sub = sub
+	go r.pumpFromBroker(r.ctx)
+	go r.pumpViewerCount(r.ctx, r.hub.viewerPushInterval)
+	metrics.RoomsActive.Inc()
+}
+
+// add attaches c. It returns false if the room has already been reaped.
+func (r *Room) add(c Sink, profile ViewerProfile) bool {
 	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return false
+	}
 	r.conns[c.ID()] = c
 	r.resetContributionIfNeededLocked()
 	if profile.User == "" {
@@ -80,21 +103,23 @@ func (r *Room) add(c Sink, profile ViewerProfile) {
 	r.addPresence(profile)
 	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
+	return true
 }
 
-// remove returns true when the room is now empty and should be destroyed.
-func (r *Room) remove(connID string) bool {
+// remove detaches connID. removed reports whether it was a member; empty
+// whether the room now has no connections and should be reaped.
+func (r *Room) remove(connID string) (removed, empty bool) {
 	r.mu.Lock()
 	if _, ok := r.conns[connID]; !ok {
 		r.mu.Unlock()
-		return false
+		return false, false
 	}
 	gone := r.viewerProfiles[connID]
 	delete(r.conns, connID)
 	delete(r.viewerProfiles, connID)
 	stillPresent := r.userStillPresentLocked(gone.UserID)
 	n := r.uniqueViewerCountLocked()
-	empty := len(r.conns) == 0
+	empty = len(r.conns) == 0
 	r.mu.Unlock()
 	r.viewers.Store(n)
 	r.persistViewerCount(n)
@@ -103,7 +128,19 @@ func (r *Room) remove(connID string) bool {
 	}
 	r.fanout(encodeViewerCount(n))
 	r.broadcastViewerList()
-	return empty
+	return true, empty
+}
+
+// closeIfEmpty marks the room closed when it has no connections (owners
+// included) and reports whether it did.
+func (r *Room) closeIfEmpty() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.conns) > 0 {
+		return false
+	}
+	r.closed = true
+	return true
 }
 
 // size is used for /debug/rooms top-N.
@@ -459,6 +496,9 @@ func (r *Room) pumpViewerCount(ctx context.Context, interval time.Duration) {
 
 func (r *Room) shutdown() {
 	r.cancel()
+	if r.sub == nil {
+		return
+	}
 	_ = r.sub.Close()
 	metrics.RoomsActive.Dec()
 }

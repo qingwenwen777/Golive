@@ -54,6 +54,7 @@ func main() {
 	defer cancelHub()
 
 	broker := pubsub.NewRedis(rdb)
+	defer broker.Close()
 	h := hub.New(hubCtx, broker, cfg.Room.ViewerPushInterval)
 	jwtKeys, err := cfg.JWT.KeySet()
 	if err != nil {
