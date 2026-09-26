@@ -8,12 +8,22 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
-const MaxBetQuestionRunes = 80
+const (
+	MaxBetQuestionRunes = 80
+	// DefaultBetSettleGrace is how long after betting closes a host has to
+	// settle before the scheduler cancels the round and refunds every stake.
+	// It is generous because rounds usually bet on a match still being played.
+	DefaultBetSettleGrace = 2 * time.Hour
+	betSchedulerTick      = 5 * time.Second
+	betSchedulerBatch     = 20
+)
 
 var (
 	ErrBetActive       = errors.New("active bet round exists")
@@ -24,6 +34,8 @@ var (
 	ErrBetNoWinners    = errors.New("bet has no winners")
 	ErrBetBadOption    = errors.New("bad bet option")
 	ErrBetBadQuestion  = errors.New("bad bet question")
+	ErrBetOwnerWager   = errors.New("bet owner cannot wager")
+	ErrBetNotClosed    = errors.New("bet not closed yet")
 )
 
 type BetService struct {
@@ -168,6 +180,69 @@ func (s *BetService) Cancel(ctx context.Context, ownerID, roundID string) (*BetR
 	return latest, nil
 }
 
+// RunScheduler runs bet housekeeping on a fixed tick until ctx is cancelled:
+// rounds left unsettled for settleGrace after close are cancelled and
+// refunded, so stakes are not locked (and the room blocked) forever.
+// A non-positive settleGrace uses DefaultBetSettleGrace.
+func (s *BetService) RunScheduler(ctx context.Context, settleGrace time.Duration) {
+	if settleGrace <= 0 {
+		settleGrace = DefaultBetSettleGrace
+	}
+	t := time.NewTicker(betSchedulerTick)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			s.sweep(ctx, settleGrace)
+		}
+	}
+}
+
+// CancelStaleRounds cancels and refunds rounds whose betting closed more
+// than settleGrace ago without a result, returning how many it cancelled.
+func (s *BetService) CancelStaleRounds(ctx context.Context, settleGrace time.Duration) (int, error) {
+	now := time.Now().UTC()
+	rounds, err := s.orders.StaleBetRounds(ctx, now.Add(-settleGrace), betSchedulerBatch)
+	if err != nil {
+		return 0, err
+	}
+	cancelled := 0
+	for i := range rounds {
+		round := rounds[i]
+		round.Status = model.BetRoundCancelled
+		payload, err := repo.MarshalBetOutbox("cancelled", &round, nil, "", "", now.UnixMilli())
+		if err != nil {
+			return cancelled, err
+		}
+		if _, _, err := s.orders.AdminCancelBetRound(ctx, round.ID, payload); err != nil {
+			// The host settled or cancelled it in the meantime.
+			if errors.Is(err, repo.ErrBetClosed) {
+				continue
+			}
+			return cancelled, err
+		}
+		cancelled++
+	}
+	return cancelled, nil
+}
+
+func (s *BetService) sweep(ctx context.Context, settleGrace time.Duration) {
+	if n, err := s.CancelStaleRounds(ctx, settleGrace); err != nil {
+		logger.L().Warn("cancel stale bet rounds", zap.Error(err))
+	} else if n > 0 {
+		logger.L().Info("cancelled stale bet rounds", zap.Int("count", n))
+	}
+	n, err := s.orders.RefundOrphanedBetWagers(ctx, betSchedulerBatch)
+	if err != nil {
+		logger.L().Warn("refund orphaned bet wagers", zap.Error(err))
+	}
+	if n > 0 {
+		logger.L().Warn("refunded orphaned bet wagers", zap.Int("count", n))
+	}
+}
+
 func emptyBetSummary() []repo.BetOptionSummary {
 	return []repo.BetOptionSummary{
 		{Option: model.BetOptionWin},
@@ -193,6 +268,10 @@ func mapBetErr(err error) error {
 		return ErrBetUnauthorized
 	case errors.Is(err, repo.ErrBetNoWinners):
 		return ErrBetNoWinners
+	case errors.Is(err, repo.ErrBetOwnerWager):
+		return ErrBetOwnerWager
+	case errors.Is(err, repo.ErrBetStillOpen):
+		return ErrBetNotClosed
 	case errors.Is(err, repo.ErrInsufficientFunds):
 		return ErrInsufficientCoin
 	default:

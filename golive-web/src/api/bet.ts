@@ -15,6 +15,8 @@ export interface BetError {
     | 'bet_already_placed'
     | 'bet_no_winners'
     | 'bad_bet_question'
+    | 'bet_owner_forbidden'
+    | 'bet_not_closed'
     | 'forbidden'
     | 'unknown'
     | 'network';

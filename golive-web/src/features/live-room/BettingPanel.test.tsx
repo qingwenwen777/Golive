@@ -127,6 +127,38 @@ describe('BettingPanel', () => {
     expect(betApiMock.placeMutate).not.toHaveBeenCalled();
   });
 
+  it('keeps host settle buttons disabled and blocks host wagers while betting is open', () => {
+    betApiMock.latest = openRound();
+
+    render(<BettingPanel roomId="room-1" ownsStream />);
+
+    const settle = screen.getByRole('button', { name: 'Can win' }) as HTMLButtonElement;
+    expect(settle.disabled).toBe(true);
+    expect(settle.title).toBe('You can settle once betting closes.');
+    for (const button of screen.getAllByRole('button', { name: /Can win/ })) {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    }
+    fireEvent.click(settle);
+    expect(betApiMock.settleMutate).not.toHaveBeenCalled();
+    expect(betApiMock.placeMutate).not.toHaveBeenCalled();
+  });
+
+  it('lets the host settle once the close time has passed', () => {
+    const view = openRound();
+    view.round!.closeAt = new Date(Date.now() - 1_000).toISOString();
+    betApiMock.latest = view;
+
+    render(<BettingPanel roomId="room-1" ownsStream />);
+
+    const settle = screen.getByRole('button', { name: 'Can win' }) as HTMLButtonElement;
+    expect(settle.disabled).toBe(false);
+    fireEvent.click(settle);
+    expect(betApiMock.settleMutate).toHaveBeenCalledWith(
+      { roundId: 'bet-1', option: 'win' },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
   it('opens a host round with trimmed question text and a floored positive amount', () => {
     render(<BettingPanel roomId="room-1" ownsStream />);
 

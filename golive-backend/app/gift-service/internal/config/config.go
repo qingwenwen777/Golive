@@ -18,6 +18,7 @@ type Config struct {
 	Kafka       KafkaCfg       `mapstructure:"kafka"`
 	Outbox      OutboxCfg      `mapstructure:"outbox"`
 	Idempotency IdempotencyCfg `mapstructure:"idempotency"`
+	Bet         BetCfg         `mapstructure:"bet"`
 }
 
 type ServiceCfg struct {
@@ -61,6 +62,12 @@ type OutboxCfg struct {
 }
 type IdempotencyCfg struct {
 	TTL time.Duration `mapstructure:"ttl"`
+}
+
+// BetCfg tunes the bet scheduler. SettleGrace is how long after betting
+// closes an unsettled round is auto-cancelled and refunded (0 = default).
+type BetCfg struct {
+	SettleGrace time.Duration `mapstructure:"settle_grace"`
 }
 
 func Load(path string) (*Config, error) {

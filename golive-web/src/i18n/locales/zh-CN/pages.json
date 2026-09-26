@@ -2297,6 +2297,7 @@
     "myWagerWon": "，返还 {{payout}} coin",
     "myWagerRefunded": "，已退回",
     "noWagerHint": "该选项无人下注，若需退币请改为流盘。",
+    "settleAfterClose": "竞猜截止后才能结算。",
     "openSuccess": "竞猜已开盘，60 秒后自动封盘。",
     "wagerSuccess": "已下注“{{option}}”。",
     "settleSuccess": "竞猜已按“{{option}}”结算。",
@@ -2317,6 +2318,7 @@
     "errorClosed": "竞猜已封盘。",
     "errorAlreadyPlaced": "你已经下注了。",
     "errorNoWinners": "这个结果没有赢家，请选择流盘退回。",
+    "errorOwnerWager": "主播不能参与自己发起的竞猜。",
     "errorBadQuestion": "竞猜标题不能为空，最多 80 个字。",
     "errorForbidden": "只有主播可以操作竞猜。",
     "errorGeneric": "操作失败。"
