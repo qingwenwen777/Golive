@@ -33,9 +33,15 @@ services:
     restart: unless-stopped
     logging: *default-logging
     security_opt: [no-new-privileges:true]
+    environment:
+      # redis-cli reads the password from here (healthcheck and
+      # `docker compose exec redis redis-cli`).
+      REDISCLI_AUTH: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
+    command: ["redis-server", "--requirepass", "${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}"]
     volumes: [redis_data:/data]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Only an authenticated PING answers PONG.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -123,6 +129,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       USERSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      USERSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       USERSVC_GOOGLE_CLIENT_ID: ${USERSVC_GOOGLE_CLIENT_ID:-}
       USERSVC_EMAIL_SMTP_PASSWORD: ${USERSVC_EMAIL_SMTP_PASSWORD:-}
       USERSVC_EMAIL_SMTP_PORT: ${USERSVC_EMAIL_SMTP_PORT:-}
@@ -164,6 +171,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       ROOMSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      ROOMSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       ROOMSVC_LIVE_STREAM_KEY_SECRET: ${ROOMSVC_LIVE_STREAM_KEY_SECRET:?set ROOMSVC_LIVE_STREAM_KEY_SECRET in deploy/.env}
       ROOMSVC_REPLAY_BUNNY_LIBRARY_ID: ${BUNNY_STREAM_LIBRARY_ID:-}
       ROOMSVC_REPLAY_BUNNY_API_KEY: ${BUNNY_STREAM_API_KEY:-}
@@ -198,6 +206,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       GIFTSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      GIFTSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       GIFTSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       init-permissions:
@@ -229,6 +238,7 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       CHATSVC_MYSQL_DSN: ${GOLIVE_MYSQL_DSN:?set GOLIVE_MYSQL_DSN in deploy/.env}
+      CHATSVC_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       CHATSVC_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       mysql:
@@ -291,6 +301,7 @@ services:
       - ./secrets:/app/deploy/secrets:ro
       - ../app/chat-service/configs/sensitive.txt:/app/app/chat-service/configs/sensitive.txt:ro
     environment:
+      IMGW_REDIS_PASSWORD: ${GOLIVE_REDIS_PASSWORD:?set GOLIVE_REDIS_PASSWORD in deploy/.env}
       IMGW_INTERNAL_TOKEN: ${GOLIVE_INTERNAL_TOKEN:?set GOLIVE_INTERNAL_TOKEN in deploy/.env}
     depends_on:
       init-permissions:
