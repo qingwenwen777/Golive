@@ -50,9 +50,16 @@ type StatusError struct {
 	Method string
 	URL    string
 	Status int
+	// Reason is the reason of the errcode JSON body ({message, reason}) the
+	// response carried, or "" for any other body, such as the router's 404
+	// for a route the service does not have.
+	Reason string
 }
 
 func (e *StatusError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("%s %s returned %d (%s)", e.Method, e.URL, e.Status, e.Reason)
+	}
 	return fmt.Sprintf("%s %s returned %d", e.Method, e.URL, e.Status)
 }
 
@@ -60,6 +67,14 @@ func (e *StatusError) Error() string {
 func IsStatus(err error, status int) bool {
 	var se *StatusError
 	return errors.As(err, &se) && se.Status == status
+}
+
+// IsReason reports whether err is a StatusError with the given status and
+// (non-empty) errcode reason, i.e. the called handler itself answered that
+// way.
+func IsReason(err error, status int, reason string) bool {
+	var se *StatusError
+	return reason != "" && errors.As(err, &se) && se.Status == status && se.Reason == reason
 }
 
 // Client calls another service's /internal API with the shared secret.
@@ -111,8 +126,12 @@ func (c *Client) Do(ctx context.Context, method, path string, body, out any) err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
-		return &StatusError{Method: method, URL: endpoint, Status: resp.StatusCode}
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+		var appErr struct {
+			Reason string `json:"reason"`
+		}
+		_ = json.Unmarshal(raw, &appErr)
+		return &StatusError{Method: method, URL: endpoint, Status: resp.StatusCode, Reason: appErr.Reason}
 	}
 	if out == nil {
 		return nil

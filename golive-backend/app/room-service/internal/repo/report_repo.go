@@ -145,6 +145,61 @@ func (r *ModerationRepo) openReportGroup(ctx context.Context, tx *gorm.DB, targe
 	return &existing, nil
 }
 
+// VerifyLegacyReportTargets re-resolves open reports whose target fields are
+// still what the reporter's client sent (target_verified = false: filed
+// before targets were resolved server-side) and stores the server-side
+// snapshot on them, so the user, text and link moderators see are what a
+// sanction would hit. ids limits it to those reports. Reports whose content
+// is gone stay unverified, cannot drive enforcement and are remembered so
+// later calls skip them.
+func (r *ModerationRepo) VerifyLegacyReportTargets(ctx context.Context, ids ...string) error {
+	q := r.db.WithContext(ctx).
+		Where("target_verified = ? AND (status = ? OR status = ?)", false, model.ReportStatusPending, model.ReportStatusReviewing)
+	if len(ids) > 0 {
+		q = q.Where("id IN ?", ids)
+	}
+	var rows []model.ContentReport
+	if err := q.Find(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, gone := r.legacyTargetsGone.Load(row.ID); gone {
+			continue
+		}
+		target, err := r.ResolveReportTarget(ctx, row.TargetType, row.TargetID, row.RoomID)
+		if errors.Is(err, ErrReportTargetNotFound) {
+			r.legacyTargetsGone.Store(row.ID, struct{}{})
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := r.db.WithContext(ctx).Model(&model.ContentReport{}).
+			Where("id = ? AND target_verified = ?", row.ID, false).
+			UpdateColumns(reportTargetColumns(target)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reportTargetColumns is the content_reports snapshot of a resolved target,
+// trimmed to the columns like CreateReport does.
+func reportTargetColumns(target *ReportTarget) map[string]any {
+	return map[string]any{
+		"target_url":        trimForDB(target.Link, 800),
+		"room_id":           trimForDB(target.RoomID, 64),
+		"channel_id":        trimForDB(target.ChannelID, 64),
+		"target_owner_id":   trimForDB(target.OwnerID, 36),
+		"target_owner_name": trimForDB(target.OwnerName, 128),
+		"target_user_id":    trimForDB(target.UserID, 36),
+		"target_user_name":  trimForDB(target.UserName, 128),
+		"target_title":      trimForDB(target.Title, 240),
+		"target_text":       trimForDB(target.Text, 1000),
+		"target_verified":   true,
+	}
+}
+
 func (r *ModerationRepo) ListContentReports(ctx context.Context, filter ReportListFilter) ([]model.ContentReport, int64, error) {
 	page, size := normalizeModerationPage(filter.Page, filter.Size)
 	q := r.db.WithContext(ctx).Model(&model.ContentReport{})
@@ -548,8 +603,8 @@ OR LOWER(COALESCE(target_id, '')) LIKE ?
 }
 
 // DeleteReportedContent deletes reported content stored by room-service
-// (posts and post comments). Chat messages and super chats belong to
-// chat-service / gift-service and are removed through their APIs.
+// (posts, post comments and replay comments). Chat messages and super chats
+// belong to chat-service / gift-service and are removed through their APIs.
 func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, targetID string) error {
 	targetID = strings.TrimSpace(targetID)
 	if targetID == "" {
@@ -559,7 +614,13 @@ func (r *ModerationRepo) DeleteReportedContent(ctx context.Context, targetType, 
 	case model.ReportTargetPost:
 		return r.deletePostAny(ctx, targetID)
 	case model.ReportTargetPostComment:
-		return r.deletePostCommentAny(ctx, targetID)
+		// Replay comments are reported with this type too (see
+		// resolveCommentTarget).
+		found, err := r.deletePostCommentAny(ctx, targetID)
+		if err != nil || found {
+			return err
+		}
+		return r.deleteReplayCommentAny(ctx, targetID)
 	default:
 		return nil
 	}
@@ -593,8 +654,10 @@ func (r *ModerationRepo) deletePostAny(ctx context.Context, postID string) error
 	})
 }
 
-func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+// deletePostCommentAny deletes a post comment and its replies; found is
+// false when no post comment has that id.
+func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID string) (found bool, err error) {
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var target model.PostComment
 		if err := tx.Where("id = ?", commentID).Take(&target).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -602,6 +665,7 @@ func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID str
 			}
 			return err
 		}
+		found = true
 		var comments []model.PostComment
 		if err := tx.Where("post_id = ?", target.PostID).Find(&comments).Error; err != nil {
 			return err
@@ -644,6 +708,24 @@ func (r *ModerationRepo) deletePostCommentAny(ctx context.Context, commentID str
 		}
 		return nil
 	})
+	return found, err
+}
+
+// deleteReplayCommentAny deletes a replay comment and its replies the way
+// its author or the room owner would.
+func (r *ModerationRepo) deleteReplayCommentAny(ctx context.Context, commentID string) error {
+	var comment model.ReplayComment
+	if err := r.db.WithContext(ctx).Where("id = ?", commentID).Take(&comment).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	_, err := NewReplayCommentRepo(r.db).DeleteTree(ctx, comment.RoomID, comment.ID)
+	if errors.Is(err, ErrReplayCommentNotFound) {
+		return nil
+	}
+	return err
 }
 
 func setReportGroupTarget(group *ReportGroupRow, row model.ContentReport) {

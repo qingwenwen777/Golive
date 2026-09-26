@@ -35,16 +35,20 @@ api-gateway (which only forwards `/api/<prefix>/*` to `/<prefix>/*` and drops cl
 | `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens and ends the user's live rooms) | user-service | room-service report moderation |
 | `GET /internal/users/:id/permission` | user-service | room-service (HTTP fallback to gRPC) |
 | `POST /internal/users/:id/end-live` (ends the user's active rooms and kicks their SRS publisher; idempotent) | room-service | user-service bans (admin panel and report moderation); the live reconciler also ends banned owners' rooms if the call fails |
-| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund) | gift-service | room-service report moderation |
-| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete) | chat-service | room-service report moderation |
+| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund; unknown order: 404 `super_chat_not_found`) | gift-service | room-service report moderation |
+| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete; unknown message: 404 `message_not_found`) | chat-service | room-service report moderation |
 | `GET /internal/rooms/:id/fan-badges/:userId` | chat-service | im-gateway |
+
+Report moderation treats a 404 as "already hidden" only when it carries the owning service's
+reason above. Any other 404 (a route missing on an older build, a wrong `service_url`) fails
+the action and leaves the report open.
 
 Cross-service reads remain (direct SQL on the shared database):
 
 | Table | Owner | Also read by |
 | ---- | ---- | ---- |
 | `users` | user-service | room-service, gift-service, chat-service |
-| `user_moderation_states` | user-service | room-service (ban/mute checks) |
+| `user_moderation_states` | user-service | room-service (ban/mute checks), gift-service (banned-admin check) |
 | `coin_transactions` | user-service + gift-service (wallet) | room-service (admin overview), chat-service (user level) |
 | `rooms` | room-service | user-service, gift-service, chat-service |
 | `room_watch_events` | room-service | user-service (daily tasks) |

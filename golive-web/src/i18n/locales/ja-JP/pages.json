@@ -1949,7 +1949,10 @@
         "claimLockedBody": "完了しない場合、{{time}} に自動解除されます。",
         "claimLockedBodyNoExpiry": "この通報は別の担当者にロックされています。",
         "claimOpenTitle": "対応開始できます",
-        "claimOpenBody": "対応開始後、この通報をロックして処理できます。"
+        "claimOpenBody": "対応開始後、この通報をロックして処理できます。",
+        "unverifiedTag": "未検証",
+        "unverifiedTitle": "未検証のスナップショット",
+        "unverifiedBody": "この通報はサーバー側の検証導入前のもので、通報された内容はすでに存在しません。表示中のユーザーと内容は通報者のアプリから送られたもので、事実と異なる可能性があります。却下のみ可能です。"
       },
       "actions": {
         "review": "対応中にする",

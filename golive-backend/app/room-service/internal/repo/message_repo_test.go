@@ -106,6 +106,48 @@ CREATE TABLE fan_badges (
 	require.Nil(t, kicked.RejoinRequestedAt)
 }
 
+// A member moved on sync into a group where they already have an inactive
+// row (the pre-deploy updated_at ordering left sync-kicked rows in several
+// groups) must bring an active mute along, as a member given a new row does.
+func TestSyncFanGroupsCarriesMuteIntoExistingRow(t *testing.T) {
+	repo, db := newFanGroupTestRepo(t)
+	ctx := context.Background()
+	now := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	creatorID := "creator-1"
+	for i := 0; i < 201; i++ {
+		insertFanBadge(t, db, fanID(i), creatorID, now.Add(time.Duration(i)*time.Second))
+	}
+	groups, err := repo.SyncFanGroups(ctx, creatorID, "Creator", now)
+	require.NoError(t, err)
+	require.Len(t, groups, 2)
+	group1, group2 := groups[0].ID, groups[1].ID
+	muted, longer := fanID(200), fanID(199)
+	require.Equal(t, []string{group2}, activeFanGroups(t, db, muted))
+
+	// An old sync had put both in group 1, leaving sync-kicked rows in group 2.
+	for _, userID := range []string{muted, longer} {
+		require.NoError(t, db.Exec(`UPDATE fan_group_members SET kicked_at = ?, kick_reason = ? WHERE group_id = ? AND user_id = ?`, now, model.FanGroupKickReasonSync, group2, userID).Error)
+		require.NoError(t, db.Create(&model.FanGroupMember{GroupID: group1, UserID: userID, Role: model.FanGroupRoleMember, CreatedAt: now, UpdatedAt: now}).Error)
+	}
+	mutedUntil, longerUntil := now.Add(3*time.Hour), now.Add(5*time.Hour)
+	require.NoError(t, repo.UpdateFanGroupMember(ctx, creatorID, group1, muted, "", &mutedUntil, false, false, false, false, now.Add(time.Minute)))
+	require.NoError(t, repo.UpdateFanGroupMember(ctx, creatorID, group1, longer, "", &mutedUntil, false, false, false, false, now.Add(time.Minute)))
+	// A longer mute already on the inactive row is not shortened.
+	require.NoError(t, db.Exec(`UPDATE fan_group_members SET muted_until = ? WHERE group_id = ? AND user_id = ?`, longerUntil, group2, longer).Error)
+
+	_, err = repo.SyncFanGroups(ctx, creatorID, "Creator", now.Add(10*time.Minute))
+	require.NoError(t, err)
+	for userID, until := range map[string]time.Time{muted: mutedUntil, longer: longerUntil} {
+		require.Equal(t, []string{group2}, activeFanGroups(t, db, userID))
+		var member model.FanGroupMember
+		require.NoError(t, db.Where("group_id = ? AND user_id = ?", group2, userID).Take(&member).Error)
+		require.NotNil(t, member.MutedUntil, userID)
+		require.True(t, member.MutedUntil.Equal(until), userID)
+		_, err = repo.SendFanGroupMessage(ctx, group2, userID, "hi", now.Add(11*time.Minute))
+		require.ErrorIs(t, err, ErrFanGroupMuted, userID)
+	}
+}
+
 func newFanGroupTestRepo(t *testing.T) (*MessageRepo, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

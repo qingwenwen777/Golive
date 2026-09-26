@@ -698,13 +698,17 @@ func syncFanGroupMember(tx *gorm.DB, groupID, userID string, sanction fanGroupSa
 		// Kicked from another of the creator's groups: leave this row inactive.
 		return nil
 	}
-	// muted_until is left alone so a sync never lifts an owner/admin mute.
+	// A sync never lifts an owner/admin mute: muted_until only moves later,
+	// to a mute carried from another of the creator's groups.
 	updates := map[string]any{
 		"kicked_at":           nil,
 		"kick_reason":         "",
 		"rejoin_requested_at": nil,
 		"rejoin_rejected_at":  nil,
 		"updated_at":          now,
+	}
+	if sanction.mutedUntil != nil && (member.MutedUntil == nil || sanction.mutedUntil.After(*member.MutedUntil)) {
+		updates["muted_until"] = sanction.mutedUntil
 	}
 	if member.Role == "" {
 		updates["role"] = model.FanGroupRoleMember

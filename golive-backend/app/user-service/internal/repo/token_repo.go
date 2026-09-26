@@ -21,6 +21,9 @@ const (
 	loginCooldownKeyPrefix = "login:cooldown:"
 )
 
+// refreshIndexedMarkerKey records that IndexLegacyRefreshTokens has run.
+const refreshIndexedMarkerKey = "refresh-user-index:backfilled"
+
 var rotateRefreshScript = redis.NewScript(`
 local oldKey = KEYS[1]
 local newKey = KEYS[2]
@@ -61,6 +64,27 @@ for _, token in ipairs(tokens) do
 end
 redis.call("DEL", userKey)
 return #tokens
+`)
+
+// indexLegacyRefreshScript adds one refresh token to its user's index and
+// makes the index live at least as long as the token. It returns 1 when the
+// token was not indexed yet.
+var indexLegacyRefreshScript = redis.NewScript(`
+local tokenKey = KEYS[1]
+local userID = redis.call("GET", tokenKey)
+if not userID then
+	return 0
+end
+local userKey = ARGV[1] .. userID
+local indexTTL = redis.call("PTTL", userKey)
+local added = redis.call("SADD", userKey, ARGV[2])
+local ttl = redis.call("PTTL", tokenKey)
+if ttl < 0 then
+	redis.call("PERSIST", userKey)
+elseif indexTTL == -2 or (indexTTL >= 0 and indexTTL < ttl) then
+	redis.call("PEXPIRE", userKey, ttl)
+end
+return added
 `)
 
 type TokenRepo struct {
@@ -114,6 +138,37 @@ func (r *TokenRepo) DeleteRefresh(ctx context.Context, token string) error {
 // RevokeUserRefresh revokes every refresh token issued to userID.
 func (r *TokenRepo) RevokeUserRefresh(ctx context.Context, userID string) error {
 	return revokeUserRefreshScript.Run(ctx, r.rdb, []string{refreshUserKeyPrefix + userID}, refreshKeyPrefix).Err()
+}
+
+// IndexLegacyRefreshTokens adds refresh tokens saved before the per-user
+// index existed (they enter it only on their first rotation) to their
+// user's index, so RevokeUserRefresh reaches them too. It SCANs the
+// keyspace once and then sets a marker; later tokens are indexed by
+// SaveRefresh and Rotate. It returns how many tokens it indexed.
+func (r *TokenRepo) IndexLegacyRefreshTokens(ctx context.Context) (int, error) {
+	done, err := r.rdb.Exists(ctx, refreshIndexedMarkerKey).Result()
+	if err != nil || done > 0 {
+		return 0, err
+	}
+	indexed := 0
+	var cursor uint64
+	for {
+		keys, next, err := r.rdb.Scan(ctx, cursor, refreshKeyPrefix+"*", 1000).Result()
+		if err != nil {
+			return indexed, err
+		}
+		for _, key := range keys {
+			added, err := indexLegacyRefreshScript.Run(ctx, r.rdb, []string{key}, refreshUserKeyPrefix, strings.TrimPrefix(key, refreshKeyPrefix)).Int()
+			if err != nil {
+				return indexed, err
+			}
+			indexed += added
+		}
+		if cursor = next; cursor == 0 {
+			break
+		}
+	}
+	return indexed, r.rdb.Set(ctx, refreshIndexedMarkerKey, "1", 0).Err()
 }
 
 // Rotate atomically revokes oldToken and stores newToken when oldToken still

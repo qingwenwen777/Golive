@@ -85,6 +85,13 @@ func main() {
 	}
 
 	tokenRepo := repo.NewTokenRepo(rdb)
+	// One-off: index refresh tokens saved before the per-user index existed
+	// so that a ban revokes them too.
+	if indexed, err := tokenRepo.IndexLegacyRefreshTokens(context.Background()); err != nil {
+		log.Warn("index legacy refresh tokens", zap.Error(err))
+	} else if indexed > 0 {
+		log.Info("indexed legacy refresh tokens", zap.Int("tokens", indexed))
+	}
 	captcha := service.NewCaptchaService(rdb, 5*time.Minute)
 	var emailMailer service.EmailCodeMailer
 	if cfg.Email.Enabled {

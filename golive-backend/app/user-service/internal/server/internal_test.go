@@ -118,6 +118,30 @@ func TestInternalBanRevokesSessionsAndUnbanClears(t *testing.T) {
 	require.False(t, mr.Exists(contentpolicy.RedisSiteBanPrefix+target.User.ID))
 }
 
+// A refresh token saved by the previous release is missing from the
+// per-user index. Once the startup scan has indexed it, a ban deletes it
+// like any other.
+func TestInternalBanRevokesRefreshTokenSavedBeforeTheIndex(t *testing.T) {
+	router, _, auth, _, mr := newInternalTestRouter(t, testInternalToken)
+	ctx := context.Background()
+	target, err := auth.Register(ctx, "target", "secret123", "Target")
+	require.NoError(t, err)
+	require.NoError(t, mr.Set("refresh:pre-deploy", target.User.ID))
+	mr.SetTTL("refresh:pre-deploy", 24*time.Hour)
+
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	indexed, err := repo.NewTokenRepo(rdb).IndexLegacyRefreshTokens(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, indexed)
+
+	rec := serveInternal(router, http.MethodPost, "/internal/users/"+target.User.ID+"/restriction", testInternalToken, `{"action":"ban","reason":"spam"}`)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.False(t, mr.Exists("refresh:pre-deploy"))
+	_, err = auth.Refresh(ctx, "pre-deploy")
+	require.ErrorIs(t, err, service.ErrInvalidRefresh)
+}
+
 func TestInternalMuteSetsStateAndCache(t *testing.T) {
 	router, _, auth, db, mr := newInternalTestRouter(t, testInternalToken)
 	ctx := context.Background()

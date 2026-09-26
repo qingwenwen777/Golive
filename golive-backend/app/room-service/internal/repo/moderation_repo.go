@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v9"
@@ -29,6 +30,9 @@ var (
 type ModerationRepo struct {
 	db  *gorm.DB
 	rdb *redis.Client
+	// legacyTargetsGone holds ids of legacy reports whose content was gone
+	// when VerifyLegacyReportTargets looked; deleted content does not return.
+	legacyTargetsGone sync.Map
 }
 
 func NewModerationRepo(db *gorm.DB, rdb *redis.Client) *ModerationRepo {

@@ -448,6 +448,19 @@ func (s *AuthService) Refresh(ctx context.Context, oldRefresh string) (*RefreshR
 		}
 		return nil, fmt.Errorf("lookup refresh: %w", err)
 	}
+	// A banned user signs in again instead (login stays open so the client
+	// learns about the ban and can reach the appeal page), whatever tokens
+	// the ban's revocation missed.
+	u, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrUserNotFound) {
+			return nil, ErrInvalidRefresh
+		}
+		return nil, fmt.Errorf("find user: %w", err)
+	}
+	if u.Banned {
+		return nil, ErrUserBanned
+	}
 	access, err := s.signAccess(userID)
 	if err != nil {
 		return nil, fmt.Errorf("sign access: %w", err)

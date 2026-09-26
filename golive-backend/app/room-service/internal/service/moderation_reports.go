@@ -97,6 +97,7 @@ type ContentReportDTO struct {
 	TargetUserName   string             `json:"targetUserName,omitempty"`
 	TargetTitle      string             `json:"targetTitle,omitempty"`
 	TargetText       string             `json:"targetText,omitempty"`
+	TargetVerified   bool               `json:"targetVerified"` // false: still the reporter's client-side snapshot (legacy report, content gone)
 	Reason           string             `json:"reason"`
 	Description      string             `json:"description,omitempty"`
 	Status           string             `json:"status"`
@@ -207,6 +208,9 @@ func (s *ModerationService) ListReports(ctx context.Context, adminID string, fil
 	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
 		return nil, err
 	}
+	if err := s.moderation.VerifyLegacyReportTargets(ctx); err != nil {
+		return nil, err
+	}
 	filter.Page = normalizePage(filter.Page)
 	filter.Size = normalizeSize(filter.Size)
 	rows, total, stats, err := s.moderation.ListContentReportGroups(ctx, filter)
@@ -235,6 +239,9 @@ func (s *ModerationService) ReportDetail(ctx context.Context, adminID, id string
 	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
 		return nil, err
 	}
+	if err := s.moderation.VerifyLegacyReportTargets(ctx, strings.TrimSpace(id)); err != nil {
+		return nil, err
+	}
 	report, err := s.moderation.GetContentReport(ctx, strings.TrimSpace(id))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.New(http.StatusNotFound, "report not found")
@@ -260,6 +267,9 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	}
 	now := s.now()
 	if err := s.moderation.ReleaseExpiredContentReportReviews(ctx, now); err != nil {
+		return nil, err
+	}
+	if err := s.moderation.VerifyLegacyReportTargets(ctx, strings.TrimSpace(id)); err != nil {
 		return nil, err
 	}
 	base, err := s.moderation.GetContentReport(ctx, strings.TrimSpace(id))
@@ -387,11 +397,16 @@ func (s *ModerationService) UpdateReport(ctx context.Context, adminID, id string
 	if err != nil {
 		return nil, err
 	}
+	audited := *report
+	if actionTarget != nil {
+		// Record whom the actions hit, whatever the stored row says.
+		copyReportTarget(&audited, actionTarget)
+	}
 	if len(actions) == 0 {
-		_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, status, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
+		_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, status, adminID, audited.TargetType, audited.ID, audited.TargetTitle, firstNonEmptyString(audited.TargetUserID, audited.TargetOwnerID), firstNonEmptyString(audited.TargetUserName, audited.TargetOwnerName), note, now)
 	} else {
 		for _, action := range actions {
-			_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, action, adminID, report.TargetType, report.ID, report.TargetTitle, firstNonEmptyString(report.TargetUserID, report.TargetOwnerID), firstNonEmptyString(report.TargetUserName, report.TargetOwnerName), note, now)
+			_ = s.logAdminAudit(ctx, model.AdminAuditCategoryReview, action, adminID, audited.TargetType, audited.ID, audited.TargetTitle, firstNonEmptyString(audited.TargetUserID, audited.TargetOwnerID), firstNonEmptyString(audited.TargetUserName, audited.TargetOwnerName), note, now)
 		}
 	}
 	dto := contentReportDTO(*report)
@@ -462,8 +477,9 @@ func ensureReportActionsFitTarget(targetType string, actions []string) error {
 
 // verifiedReportTarget re-resolves the reported content so enforcement acts on
 // its real author/room. When the content is gone we fall back to the stored
-// snapshot only if it was resolved server-side at report time; legacy rows
-// carry client-supplied ids and cannot drive sanctions.
+// snapshot only if it was resolved server-side (at report time, or by
+// VerifyLegacyReportTargets for legacy rows); a legacy row that could not be
+// verified carries client-supplied ids and cannot drive sanctions.
 func (s *ModerationService) verifiedReportTarget(ctx context.Context, report *model.ContentReport) (*model.ContentReport, error) {
 	target, err := s.moderation.ResolveReportTarget(ctx, report.TargetType, report.TargetID, report.RoomID)
 	if err == nil {
@@ -569,7 +585,6 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 		}
 	case model.ReportActionSiteMute:
 		if targetUserID != "" {
-			_ = s.notifyModeration(ctx, targetUserID, "moderation_site_mute", "你已被全站禁言", moderationMuteBody(durationMinutes, note), targetLink, adminID, now)
 			if durationMinutes <= 0 {
 				return errcode.New(http.StatusBadRequest, "invalid mute duration").WithReason("invalid_mute_duration")
 			}
@@ -582,11 +597,12 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 			}); err != nil {
 				return err
 			}
+			// Notify only once user-service has applied the mute.
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_site_mute", "你已被全站禁言", moderationMuteBody(durationMinutes, note), targetLink, adminID, now)
 			return s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionSiteMute, report.ID, note, durationMinutes, now)
 		}
 	case model.ReportActionBanUser:
 		if targetUserID != "" {
-			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
 			// user-service owns the ban; its ban path also revokes the
 			// user's refresh tokens.
 			if err := s.setUserRestriction(ctx, targetUserID, UserRestrictionUpdate{
@@ -596,6 +612,8 @@ func (s *ModerationService) applyReportAction(ctx context.Context, adminID strin
 			}); err != nil {
 				return err
 			}
+			// Notify only once user-service has applied the ban.
+			_ = s.notifyModeration(ctx, targetUserID, "moderation_ban", "账号已被封禁", moderationBanBody(note), targetLink, adminID, now)
 			if err := s.moderation.RecordUserSanction(ctx, targetUserID, targetUserName, adminID, model.UserSanctionBan, report.ID, note, 0, now); err != nil {
 				return err
 			}
@@ -686,6 +704,7 @@ func contentReportGroupDTOs(rows []repo.ReportGroupRow) []ContentReportDTO {
 			TargetUserName:   row.TargetUserName,
 			TargetTitle:      row.TargetTitle,
 			TargetText:       row.TargetText,
+			TargetVerified:   row.TargetVerified,
 			Reason:           row.Reason,
 			Status:           row.Status,
 			ReviewerID:       row.ReviewerID,
@@ -729,6 +748,7 @@ func contentReportDTO(row model.ContentReport) ContentReportDTO {
 		TargetUserName:   row.TargetUserName,
 		TargetTitle:      row.TargetTitle,
 		TargetText:       row.TargetText,
+		TargetVerified:   row.TargetVerified,
 		Reason:           row.Reason,
 		Description:      row.Description,
 		Status:           row.Status,

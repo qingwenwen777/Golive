@@ -30,7 +30,9 @@ func NewModerationHandler(src MessageHider) *ModerationHandler {
 
 // DeleteDanmu serves DELETE /internal/rooms/:id/danmus/:danmuId →
 // {"hidden": true}. Deleting an already hidden message succeeds; an unknown
-// one is 404.
+// one is 404 with reason message_not_found, which room-service takes as
+// "nothing left to hide" (a 404 without it, e.g. for a missing route, is an
+// error there).
 func (h *ModerationHandler) DeleteDanmu(c *gin.Context) {
 	roomID := strings.TrimSpace(c.Param("id"))
 	danmuID := strings.TrimSpace(c.Param("danmuId"))
@@ -40,7 +42,7 @@ func (h *ModerationHandler) DeleteDanmu(c *gin.Context) {
 	}
 	err := h.src.HideMessage(c.Request.Context(), roomID, danmuID)
 	if errors.Is(err, service.ErrMessageNotFound) {
-		errcode.Respond(c, errcode.New(http.StatusNotFound, "message not found"))
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "message not found").WithReason("message_not_found"))
 		return
 	}
 	if err != nil {

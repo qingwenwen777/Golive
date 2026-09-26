@@ -145,6 +145,8 @@ func TestInternalSuperChatModerationKeepsLedgerAndRevenue(t *testing.T) {
 	require.True(t, again.ModeratedAt.Equal(*stored.ModeratedAt))
 	require.Equal(t, before, snapshotLedger(t, fx.db))
 
+	// room-service treats only this reason as "nothing left to hide".
 	rec = postInternal(router, "/internal/super-chats/sc-missing/moderation", testInternalToken)
 	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.JSONEq(t, `{"message":"Super chat not found","reason":"super_chat_not_found"}`, rec.Body.String())
 }
