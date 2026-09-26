@@ -8,12 +8,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/app/gift-service/internal/repo"
+	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
-const MaxBetQuestionRunes = 80
+const (
+	MaxBetQuestionRunes = 80
+	betSchedulerTick    = 5 * time.Second
+	betSchedulerBatch   = 20
+)
 
 var (
 	ErrBetActive       = errors.New("active bet round exists")
@@ -166,6 +172,30 @@ func (s *BetService) Cancel(ctx context.Context, ownerID, roundID string) (*BetR
 		return nil, err
 	}
 	return latest, nil
+}
+
+// RunScheduler runs bet housekeeping on a fixed tick until ctx is cancelled.
+func (s *BetService) RunScheduler(ctx context.Context) {
+	t := time.NewTicker(betSchedulerTick)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			s.sweep(ctx)
+		}
+	}
+}
+
+func (s *BetService) sweep(ctx context.Context) {
+	n, err := s.orders.RefundOrphanedBetWagers(ctx, betSchedulerBatch)
+	if err != nil {
+		logger.L().Warn("refund orphaned bet wagers", zap.Error(err))
+	}
+	if n > 0 {
+		logger.L().Warn("refunded orphaned bet wagers", zap.Int("count", n))
+	}
 }
 
 func emptyBetSummary() []repo.BetOptionSummary {

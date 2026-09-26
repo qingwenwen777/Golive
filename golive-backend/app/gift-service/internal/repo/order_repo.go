@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/qingwenwen777/golive/app/gift-service/internal/model"
 	"github.com/qingwenwen777/golive/pkg/userlevel"
@@ -443,8 +444,11 @@ func (r *OrderRepo) CreateBetRound(ctx context.Context, round *model.BetRound, o
 
 func (r *OrderRepo) PlaceBetWager(ctx context.Context, wager *model.BetWager, outboxPayload []byte) (*model.BetWager, error) {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Lock the round until commit: settle/cancel lock it too, so they
+		// either see this wager or this wager sees the terminal status. A
+		// plain read let a wager commit after settle and stay locked forever.
 		var round model.BetRound
-		if err := tx.Where("id = ?", wager.RoundID).Take(&round).Error; err != nil {
+		if err := lockBetRound(tx, wager.RoundID, &round); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrBetRoundNotFound
 			}
@@ -525,7 +529,7 @@ func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winnin
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
 		var round model.BetRound
-		if err := tx.Where("id = ?", roundID).Take(&round).Error; err != nil {
+		if err := lockBetRound(tx, roundID, &round); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrBetRoundNotFound
 			}
@@ -538,7 +542,8 @@ func (r *OrderRepo) settleBetRound(ctx context.Context, roundID, ownerID, winnin
 			return ErrBetClosed
 		}
 		var wagers []model.BetWager
-		if err := tx.Where("round_id = ? AND status = ?", roundID, model.StatusLocked).
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("round_id = ? AND status = ?", roundID, model.StatusLocked).
 			Order("created_at ASC, id ASC").
 			Find(&wagers).Error; err != nil {
 			return err
@@ -656,7 +661,7 @@ func (r *OrderRepo) cancelBetRound(ctx context.Context, roundID, ownerID string,
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
 		var round model.BetRound
-		if err := tx.Where("id = ?", roundID).Take(&round).Error; err != nil {
+		if err := lockBetRound(tx, roundID, &round); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrBetRoundNotFound
 			}
@@ -676,7 +681,8 @@ func (r *OrderRepo) cancelBetRound(ctx context.Context, roundID, ownerID string,
 		if res.RowsAffected == 0 {
 			return ErrBetClosed
 		}
-		if err := tx.Where("round_id = ? AND status = ?", roundID, model.StatusLocked).
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("round_id = ? AND status = ?", roundID, model.StatusLocked).
 			Find(&refunded).Error; err != nil {
 			return err
 		}
@@ -725,6 +731,84 @@ func (r *OrderRepo) cancelBetRound(ctx context.Context, roundID, ownerID string,
 		return nil, nil, err
 	}
 	return &cancelledRound, refunded, nil
+}
+
+// RefundOrphanedBetWagers refunds up to limit wagers still `locked` on a
+// settled or cancelled round. Such wagers were never part of the payout or
+// refund (they could slip in before rounds were locked), so without this the
+// stake is lost. Each refund is its own transaction and is idempotent.
+func (r *OrderRepo) RefundOrphanedBetWagers(ctx context.Context, limit int) (int, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	var orphans []model.BetWager
+	if err := r.db.WithContext(ctx).
+		Select("bet_wagers.*").
+		Joins("JOIN bet_rounds ON bet_rounds.id = bet_wagers.round_id").
+		Where("bet_wagers.status = ? AND bet_rounds.status IN ?", model.StatusLocked,
+			[]string{model.BetRoundSettled, model.BetRoundCancelled}).
+		Order("bet_wagers.created_at ASC").
+		Limit(limit).
+		Find(&orphans).Error; err != nil {
+		return 0, err
+	}
+	refunded := 0
+	var firstErr error
+	for i := range orphans {
+		w := orphans[i]
+		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			// Same lock order as wager/settle/cancel: round, then wager, then user.
+			var round model.BetRound
+			if err := lockBetRound(tx, w.RoundID, &round); err != nil {
+				return err
+			}
+			if round.Status != model.BetRoundSettled && round.Status != model.BetRoundCancelled {
+				return ErrBetClosed
+			}
+			res := tx.Model(&model.BetWager{}).
+				Where("id = ? AND status = ?", w.ID, model.StatusLocked).
+				Updates(map[string]any{"status": model.StatusRefunded, "payout": w.Amount})
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return ErrBetClosed
+			}
+			if err := tx.Exec("UPDATE users SET coin_balance = coin_balance + ? WHERE id = ?", w.Amount, w.UserID).Error; err != nil {
+				return err
+			}
+			return createCoinTransaction(
+				tx,
+				w.UserID,
+				w.Amount,
+				model.CoinTxBetRefund,
+				"竞猜返还",
+				round.Question,
+				"bet_wager",
+				w.ID,
+				w.RoomID,
+				round.OwnerID,
+			)
+		})
+		if errors.Is(err, ErrBetClosed) {
+			continue
+		}
+		// Keep going so one bad row cannot hold up every later refund.
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		refunded++
+	}
+	return refunded, firstErr
+}
+
+// lockBetRound loads a round with SELECT ... FOR UPDATE. SQLite (tests) has
+// no row locks and its dialect drops the clause; it serialises writers anyway.
+func lockBetRound(tx *gorm.DB, roundID string, round *model.BetRound) error {
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", roundID).Take(round).Error
 }
 
 func (r *OrderRepo) closeExpiredBetRound(ctx context.Context, round *model.BetRound) error {
