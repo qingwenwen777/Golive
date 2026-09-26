@@ -34,9 +34,13 @@ api-gateway (which only forwards `/api/<prefix>/*` to `/<prefix>/*` and drops cl
 | ---- | ---- | ---- |
 | `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens) | user-service | room-service report moderation |
 | `GET /internal/users/:id/permission` | user-service | room-service (HTTP fallback to gRPC) |
-| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund) | gift-service | room-service report moderation |
-| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete) | chat-service | room-service report moderation |
+| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund; unknown order: 404 `super_chat_not_found`) | gift-service | room-service report moderation |
+| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete; unknown message: 404 `message_not_found`) | chat-service | room-service report moderation |
 | `GET /internal/rooms/:id/fan-badges/:userId` | chat-service | im-gateway |
+
+Report moderation treats a 404 as "already hidden" only when it carries the owning service's
+reason above. Any other 404 (a route missing on an older build, a wrong `service_url`) fails
+the action and leaves the report open.
 
 Cross-service reads remain (direct SQL on the shared database):
 

@@ -24,6 +24,16 @@ const (
 	RestrictionMute = "mute"
 )
 
+// Reasons the owning services answer a 404 with when the item itself does
+// not exist. Only these mean "nothing left to hide": a bare 404 also comes
+// from a route the service lacks (an older build during a rolling deploy, a
+// wrong service_url), and taking it as done would resolve the report while
+// the content stays up.
+const (
+	superChatNotFoundReason   = "super_chat_not_found" // gift-service
+	chatMessageNotFoundReason = "message_not_found"    // chat-service
+)
+
 // UserRestrictionUpdate is the body of user-service's
 // POST /internal/users/:id/restriction.
 type UserRestrictionUpdate struct {
@@ -79,11 +89,12 @@ func (u *UserServiceClient) SetUserRestriction(ctx context.Context, userID strin
 
 type GiftServiceClient struct{ c *internalauth.Client }
 
-// ModerateSuperChat treats 404 as done: there is nothing left to hide.
+// ModerateSuperChat treats gift-service's own "super chat not found" as
+// done: there is nothing left to hide.
 func (g *GiftServiceClient) ModerateSuperChat(ctx context.Context, orderID, operatorID string) error {
 	path := "/internal/super-chats/" + url.PathEscape(orderID) + "/moderation"
 	err := g.c.Do(ctx, http.MethodPost, path, map[string]string{"operatorId": operatorID}, nil)
-	if err != nil && !internalauth.IsStatus(err, http.StatusNotFound) {
+	if err != nil && !internalauth.IsReason(err, http.StatusNotFound, superChatNotFoundReason) {
 		return fmt.Errorf("gift-service moderate super chat %s: %w", orderID, err)
 	}
 	return nil
@@ -91,11 +102,12 @@ func (g *GiftServiceClient) ModerateSuperChat(ctx context.Context, orderID, oper
 
 type ChatServiceClient struct{ c *internalauth.Client }
 
-// HideChatMessage treats 404 as done: there is nothing left to hide.
+// HideChatMessage treats chat-service's own "message not found" as done:
+// there is nothing left to hide.
 func (ch *ChatServiceClient) HideChatMessage(ctx context.Context, roomID, messageID string) error {
 	path := "/internal/rooms/" + url.PathEscape(roomID) + "/danmus/" + url.PathEscape(messageID)
 	err := ch.c.Do(ctx, http.MethodDelete, path, nil, nil)
-	if err != nil && !internalauth.IsStatus(err, http.StatusNotFound) {
+	if err != nil && !internalauth.IsReason(err, http.StatusNotFound, chatMessageNotFoundReason) {
 		return fmt.Errorf("chat-service hide message %s in room %s: %w", messageID, roomID, err)
 	}
 	return nil

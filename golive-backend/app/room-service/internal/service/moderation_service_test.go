@@ -1081,6 +1081,53 @@ func TestReportActionFailsVisiblyWhenOwnerServiceFails(t *testing.T) {
 	require.ErrorContains(t, err, "chat-service client is not configured")
 }
 
+// Only the owning service's own "not found" means there is nothing left to
+// hide. A bare 404 (the route is missing on an older build during a rolling
+// deploy, or service_url points elsewhere) must fail the action instead of
+// resolving the report while the content stays up.
+func TestRouting404DoesNotResolveReport(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _, owners := newModerationFixtureWithOwners(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+	seedReportDanmu(t, db, "room-1", "danmu-x", "bad-user", "abuse")
+	require.NoError(t, db.Exec(
+		`INSERT INTO super_chat_orders (order_id, user_id, room_id, text, status) VALUES (?, ?, ?, ?, ?)`,
+		"sc-x", "bad-user", "room-1", "paid abuse", "success",
+	).Error)
+	danmuPath, superChatPath := "/internal/rooms/room-1/danmus/danmu-x", "/internal/super-chats/sc-x/moderation"
+	owners.fail(danmuPath, http.StatusNotFound)
+	owners.fail(superChatPath, http.StatusNotFound)
+
+	danmuReport, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-x", RoomID: "room-1", Reason: "harassment"})
+	require.NoError(t, err)
+	superChatReport, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "super_chat", TargetID: "sc-x", Reason: "harassment"})
+	require.NoError(t, err)
+	for _, id := range []string{danmuReport.ID, superChatReport.ID} {
+		_, err = svc.UpdateReport(ctx, "admin-1", id, UpdateReportReq{Actions: []string{"delete_content"}})
+		require.Error(t, err)
+		detail, err := svc.ReportDetail(ctx, "admin-1", id)
+		require.NoError(t, err)
+		require.NotEqual(t, "resolved", detail.Status)
+	}
+	var visible int64
+	require.NoError(t, db.Raw(`SELECT COUNT(*) FROM danmus_0 WHERE id = ? AND deleted_at IS NULL`, "danmu-x").Scan(&visible).Error)
+	require.EqualValues(t, 1, visible)
+	var notices int64
+	require.NoError(t, db.Model(&model.Notification{}).Where("type = ?", "moderation_content_deleted").Count(&notices).Error)
+	require.Zero(t, notices)
+
+	// Once the owning services answer, the actions go through.
+	owners.fail(danmuPath, 0)
+	owners.fail(superChatPath, 0)
+	for _, id := range []string{danmuReport.ID, superChatReport.ID} {
+		resolved, err := svc.UpdateReport(ctx, "admin-1", id, UpdateReportReq{Actions: []string{"delete_content"}})
+		require.NoError(t, err)
+		require.Equal(t, "resolved", resolved.Status)
+	}
+	require.NoError(t, db.Raw(`SELECT COUNT(*) FROM danmus_0 WHERE id = ? AND deleted_at IS NULL`, "danmu-x").Scan(&visible).Error)
+	require.Zero(t, visible)
+}
+
 // The official ban / mute notice goes out only once user-service has applied
 // the sanction. A failed call leaves the report open for a retry and must
 // not tell the user they were banned or muted.

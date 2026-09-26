@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
+	"github.com/qingwenwen777/golive/pkg/errcode"
 	"github.com/qingwenwen777/golive/pkg/internalauth"
 )
 
@@ -86,6 +87,29 @@ func TestClientReturnsStatusErrors(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, internalauth.IsStatus(err, http.StatusServiceUnavailable))
 	require.False(t, internalauth.IsStatus(err, http.StatusNotFound))
+}
+
+// Only the handler's errcode body carries a reason; the router's own 404 for
+// a route the service does not have carries none, so callers can tell "the
+// item does not exist" from "this endpoint does not exist".
+func TestClientReportsErrcodeReason(t *testing.T) {
+	r := gin.New()
+	r.DELETE("/internal/items/:id", func(c *gin.Context) {
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "item not found").WithReason("item_not_found"))
+	})
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	c := internalauth.NewClient(srv.URL, "t", time.Second)
+
+	err := c.Do(context.Background(), http.MethodDelete, "/internal/items/1", nil, nil)
+	require.True(t, internalauth.IsReason(err, http.StatusNotFound, "item_not_found"))
+	require.False(t, internalauth.IsReason(err, http.StatusNotFound, "other_reason"))
+	require.ErrorContains(t, err, "item_not_found")
+
+	err = c.Do(context.Background(), http.MethodDelete, "/internal/old-route/1", nil, nil)
+	require.True(t, internalauth.IsStatus(err, http.StatusNotFound))
+	require.False(t, internalauth.IsReason(err, http.StatusNotFound, "item_not_found"))
+	require.False(t, internalauth.IsReason(err, http.StatusNotFound, ""))
 }
 
 func TestClientTimesOutAndRejectsMissingBaseURL(t *testing.T) {

@@ -119,7 +119,10 @@ type moderateSuperChatReq struct {
 
 // ModerateSuperChat serves POST /internal/super-chats/:id/moderation for
 // room-service's report moderation: it hides the super chat but keeps its
-// status and the coin ledger untouched (no automatic refund).
+// status and the coin ledger untouched (no automatic refund). An unknown
+// order is 404 with reason super_chat_not_found, which room-service takes as
+// "nothing left to hide" (a 404 without it, e.g. for a missing route, is an
+// error there).
 func (h *AdminHandler) ModerateSuperChat(c *gin.Context) {
 	var req moderateSuperChatReq
 	if c.Request.ContentLength != 0 {
@@ -137,7 +140,7 @@ func (h *AdminHandler) ModerateSuperChat(c *gin.Context) {
 			"moderatedAt": order.ModeratedAt,
 		})
 	case errors.Is(err, repo.ErrSuperChatNotFound):
-		errcode.Respond(c, errcode.New(http.StatusNotFound, "Super chat not found"))
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "Super chat not found").WithReason("super_chat_not_found"))
 	default:
 		errcode.Respond(c, err)
 	}
