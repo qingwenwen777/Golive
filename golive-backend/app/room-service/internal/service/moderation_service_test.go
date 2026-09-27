@@ -680,6 +680,13 @@ func TestLegacyUnverifiedReportCannotDriveSanctions(t *testing.T) {
 	detail, err := svc.ReportDetail(ctx, "admin-1", "legacy-1")
 	require.NoError(t, err)
 	require.Empty(t, detail.TargetURL)
+	// The content is gone, so the row cannot be re-verified and says so.
+	require.False(t, detail.TargetVerified)
+	list, err := svc.ListReports(ctx, "admin-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	require.False(t, list.Items[0].TargetVerified)
+	require.Equal(t, "admin-2", list.Items[0].TargetUserID)
 
 	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-1", UpdateReportReq{Actions: []string{"ban_user"}})
 	requireAppErrReason(t, err, http.StatusConflict, "target_unverified")
@@ -689,6 +696,86 @@ func TestLegacyUnverifiedReportCannotDriveSanctions(t *testing.T) {
 
 	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-1", UpdateReportReq{Action: "dismiss"})
 	require.NoError(t, err)
+}
+
+// Legacy rows whose content still exists carry the reporter's client-side
+// snapshot. Before moderators see or act on one, it is replaced by the
+// content's real author, text and link, so the user shown is the user a
+// sanction hits and the audit log records.
+func TestLegacyReportIsReverifiedBeforeListingAndActing(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportPost(t, db, "post-victim", "user-2", "a perfectly fine post")
+	seedReportPost(t, db, "post-detail", "creator-1", "a creator post")
+	seedReportPost(t, db, "post-act", "creator-1", "another creator post")
+	legacy := func(id, postID string) {
+		t.Helper()
+		require.NoError(t, db.Create(&model.ContentReport{
+			ID: id, GroupID: "group-" + id, ReporterID: "user-1",
+			TargetType: "post", TargetID: postID, TargetURL: "https://evil.example/phish",
+			TargetOwnerID: "bad-user", TargetOwnerName: "Bad User",
+			TargetUserID: "bad-user", TargetUserName: "Bad User",
+			TargetTitle: "Bad User", TargetText: "BUY STOLEN CARDS",
+			Reason: "scam", Description: "reporter's own words",
+			Status: model.ReportStatusPending, CreatedAt: now, UpdatedAt: now,
+		}).Error)
+	}
+	requireVerified := func(dto ContentReportDTO, userID, userName, text, link string) {
+		t.Helper()
+		require.True(t, dto.TargetVerified, dto.ID)
+		require.Equal(t, userID, dto.TargetUserID, dto.ID)
+		require.Equal(t, userID, dto.TargetOwnerID, dto.ID)
+		require.Equal(t, userName, dto.TargetUserName, dto.ID)
+		require.Equal(t, userName, dto.TargetTitle, dto.ID)
+		require.Equal(t, text, dto.TargetText, dto.ID)
+		require.Equal(t, link, dto.TargetURL, dto.ID)
+		var stored model.ContentReport
+		require.NoError(t, db.Where("id = ?", dto.ID).Take(&stored).Error)
+		require.True(t, stored.TargetVerified, dto.ID)
+		require.Equal(t, userID, stored.TargetUserID, dto.ID)
+		require.Equal(t, text, stored.TargetText, dto.ID)
+		require.Equal(t, "reporter's own words", stored.Description, dto.ID)
+	}
+	requireAudited := func(action, reportID, userID, userName string) {
+		t.Helper()
+		var logs []model.AdminAuditLog
+		require.NoError(t, db.Where("action = ? AND target_id = ?", action, reportID).Find(&logs).Error)
+		require.Len(t, logs, 1)
+		require.Equal(t, userID, logs[0].TargetUserID)
+		require.Equal(t, userName, logs[0].TargetUserName)
+	}
+
+	legacy("legacy-listed", "post-victim")
+	list, err := svc.ListReports(ctx, "admin-1", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1)
+	requireVerified(list.Items[0], "user-2", "Reporter Two", "a perfectly fine post", "/channel/user-2#post-post-victim")
+	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-listed", UpdateReportReq{Actions: []string{"ban_user"}})
+	require.NoError(t, err)
+	for userID, banned := range map[string]bool{"user-2": true, "bad-user": false} {
+		restriction, err := svc.moderation.UserRestriction(ctx, userID, now)
+		require.NoError(t, err)
+		require.Equal(t, banned, restriction.Banned, userID)
+	}
+	requireAudited("ban_user", "legacy-listed", "user-2", "Reporter Two")
+
+	// Rows that were not listed first are re-verified by detail and update.
+	legacy("legacy-detail", "post-detail")
+	detail, err := svc.ReportDetail(ctx, "admin-1", "legacy-detail")
+	require.NoError(t, err)
+	requireVerified(*detail, "creator-1", "Creator One", "a creator post", "/channel/creator-1#post-post-detail")
+	legacy("legacy-act", "post-act")
+	_, err = svc.UpdateReport(ctx, "admin-1", "legacy-act", UpdateReportReq{Actions: []string{"warn_user"}})
+	require.NoError(t, err)
+	acted, err := svc.ReportDetail(ctx, "admin-1", "legacy-act")
+	require.NoError(t, err)
+	requireVerified(*acted, "creator-1", "Creator One", "another creator post", "/channel/creator-1#post-post-act")
+	requireAudited("warn_user", "legacy-act", "creator-1", "Creator One")
+	var warned int64
+	require.NoError(t, db.Model(&model.Notification{}).Where("type = ? AND user_id = ?", "moderation_warning", "creator-1").Count(&warned).Error)
+	require.EqualValues(t, 1, warned)
 }
 
 // Platform moderators only get the content-review surface (reports, blocked
@@ -728,6 +815,58 @@ func TestPlatformModeratorIsLimitedToContentReview(t *testing.T) {
 	resolved, err := svc.UpdateReport(ctx, "mod-1", report.ID, UpdateReportReq{Actions: []string{"ban_user"}})
 	require.NoError(t, err)
 	require.Equal(t, "resolved", resolved.Status)
+}
+
+// Banned staff keep their role and can still sign in (to appeal), so the
+// staff guards must check the ban themselves. user-service records a ban in
+// users.banned and user_moderation_states; either one counts.
+func TestBannedStaffLoseModerationAndAdminAccess(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportPost(t, db, "post-x", "user-2", "harmless post")
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post", TargetID: "post-x", Reason: "spam"})
+	require.NoError(t, err)
+
+	require.NoError(t, db.Exec(`ALTER TABLE users ADD COLUMN banned boolean`).Error)
+	require.NoError(t, db.Exec(`ALTER TABLE users ADD COLUMN ban_reason text`).Error)
+	require.NoError(t, db.Exec(`UPDATE users SET banned = ?, ban_reason = ? WHERE id = ?`, true, "compromised", "admin-2").Error)
+	require.NoError(t, db.Create(&model.UserModerationState{UserID: "mod-1", Banned: true, BanReason: "rogue", UpdatedAt: now, CreatedAt: now}).Error)
+
+	for _, staff := range []string{"mod-1", "admin-2"} {
+		_, err = svc.ListReports(ctx, staff, repo.ReportListFilter{Page: 1, Size: 10})
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.ReportDetail(ctx, staff, report.ID)
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.UpdateReport(ctx, staff, report.ID, UpdateReportReq{Actions: []string{"delete_content", "ban_user"}})
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.ListBlockedWords(ctx, staff, 1, 10)
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+		_, err = svc.CreateBlockedWord(ctx, staff, CreateBlockedWordReq{Word: "scam link"})
+		requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	}
+	_, err = svc.AdminOverview(ctx, "admin-2")
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	_, err = svc.AdminSystemSettings(ctx, "admin-2")
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	_, err = svc.UpdateAdminSystemSettings(ctx, "admin-2", UpdateAdminSystemSettingsReq{ReportReviewTimeoutMinutes: intPtr(10)})
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+	_, err = svc.AdminAuditLogs(ctx, "admin-2", "review", 1, 10)
+	requireAppErrReason(t, err, http.StatusForbidden, "user_banned")
+
+	restriction, err := svc.moderation.UserRestriction(ctx, "user-2", now)
+	require.NoError(t, err)
+	require.False(t, restriction.Banned)
+	var posts int64
+	require.NoError(t, db.Model(&model.ChannelPost{}).Where("id = ?", "post-x").Count(&posts).Error)
+	require.EqualValues(t, 1, posts)
+
+	// Staff who are not banned keep their access.
+	_, err = svc.ListReports(ctx, "mod-2", repo.ReportListFilter{Page: 1, Size: 10})
+	require.NoError(t, err)
+	_, err = svc.AdminAuditLogs(ctx, "admin-1", "review", 1, 10)
+	require.NoError(t, err)
 }
 
 func TestReportsCannotSanctionStaff(t *testing.T) {
@@ -848,6 +987,38 @@ func TestReportDeleteSuperChatHidesViaGiftService(t *testing.T) {
 	require.NotNil(t, row.ModeratedAt)
 }
 
+// The web client reports replay comments as post_comment too, so deleting
+// the reported content must remove the replay comment and its replies, not
+// only resolve the report. Post comments are still deleted as before.
+func TestReportDeleteRemovesReportedComments(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _ := newModerationFixture(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+	require.NoError(t, db.Create(&model.ReplayComment{ID: "rc-1", RoomID: "room-1", UserID: "bad-user", Content: "abusive replay comment", ReplyCount: 1}).Error)
+	require.NoError(t, db.Create(&model.ReplayComment{ID: "rc-2", RoomID: "room-1", UserID: "user-2", ParentID: "rc-1", RootID: "rc-1", Depth: 1, Content: "reply"}).Error)
+	require.NoError(t, db.Create(&model.ReplayComment{ID: "rc-3", RoomID: "room-1", UserID: "user-2", Content: "unrelated"}).Error)
+	seedReportPost(t, db, "post-1", "creator-1", "post")
+	require.NoError(t, db.Create(&model.PostComment{ID: "pc-1", PostID: "post-1", UserID: "bad-user", Content: "abusive post comment"}).Error)
+
+	for _, targetID := range []string{"rc-1", "pc-1"} {
+		report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "post_comment", TargetID: targetID, Reason: "harassment"})
+		require.NoError(t, err)
+		resolved, err := svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content"}})
+		require.NoError(t, err)
+		require.Equal(t, "resolved", resolved.Status)
+	}
+
+	var replays []string
+	require.NoError(t, db.Model(&model.ReplayComment{}).Order("id").Pluck("id", &replays).Error)
+	require.Equal(t, []string{"rc-3"}, replays)
+	var postComments int64
+	require.NoError(t, db.Model(&model.PostComment{}).Where("id = ?", "pc-1").Count(&postComments).Error)
+	require.Zero(t, postComments)
+	var notes int64
+	require.NoError(t, db.Model(&model.Notification{}).Where("user_id = ? AND type = ?", "bad-user", "moderation_content_deleted").Count(&notes).Error)
+	require.EqualValues(t, 2, notes)
+}
+
 // Danmu deletion and site mutes go to chat-service / user-service.
 func TestReportDanmuDeleteAndMuteGoThroughOwners(t *testing.T) {
 	ctx := context.Background()
@@ -908,4 +1079,85 @@ func TestReportActionFailsVisiblyWhenOwnerServiceFails(t *testing.T) {
 	svc.SetOwnerServices(OwnerServices{})
 	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"delete_content"}})
 	require.ErrorContains(t, err, "chat-service client is not configured")
+}
+
+// Only the owning service's own "not found" means there is nothing left to
+// hide. A bare 404 (the route is missing on an older build during a rolling
+// deploy, or service_url points elsewhere) must fail the action instead of
+// resolving the report while the content stays up.
+func TestRouting404DoesNotResolveReport(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _, owners := newModerationFixtureWithOwners(t)
+	svc.now = func() time.Time { return time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC) }
+	seedReportDanmu(t, db, "room-1", "danmu-x", "bad-user", "abuse")
+	require.NoError(t, db.Exec(
+		`INSERT INTO super_chat_orders (order_id, user_id, room_id, text, status) VALUES (?, ?, ?, ?, ?)`,
+		"sc-x", "bad-user", "room-1", "paid abuse", "success",
+	).Error)
+	danmuPath, superChatPath := "/internal/rooms/room-1/danmus/danmu-x", "/internal/super-chats/sc-x/moderation"
+	owners.fail(danmuPath, http.StatusNotFound)
+	owners.fail(superChatPath, http.StatusNotFound)
+
+	danmuReport, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-x", RoomID: "room-1", Reason: "harassment"})
+	require.NoError(t, err)
+	superChatReport, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "super_chat", TargetID: "sc-x", Reason: "harassment"})
+	require.NoError(t, err)
+	for _, id := range []string{danmuReport.ID, superChatReport.ID} {
+		_, err = svc.UpdateReport(ctx, "admin-1", id, UpdateReportReq{Actions: []string{"delete_content"}})
+		require.Error(t, err)
+		detail, err := svc.ReportDetail(ctx, "admin-1", id)
+		require.NoError(t, err)
+		require.NotEqual(t, "resolved", detail.Status)
+	}
+	var visible int64
+	require.NoError(t, db.Raw(`SELECT COUNT(*) FROM danmus_0 WHERE id = ? AND deleted_at IS NULL`, "danmu-x").Scan(&visible).Error)
+	require.EqualValues(t, 1, visible)
+	var notices int64
+	require.NoError(t, db.Model(&model.Notification{}).Where("type = ?", "moderation_content_deleted").Count(&notices).Error)
+	require.Zero(t, notices)
+
+	// Once the owning services answer, the actions go through.
+	owners.fail(danmuPath, 0)
+	owners.fail(superChatPath, 0)
+	for _, id := range []string{danmuReport.ID, superChatReport.ID} {
+		resolved, err := svc.UpdateReport(ctx, "admin-1", id, UpdateReportReq{Actions: []string{"delete_content"}})
+		require.NoError(t, err)
+		require.Equal(t, "resolved", resolved.Status)
+	}
+	require.NoError(t, db.Raw(`SELECT COUNT(*) FROM danmus_0 WHERE id = ? AND deleted_at IS NULL`, "danmu-x").Scan(&visible).Error)
+	require.Zero(t, visible)
+}
+
+// The official ban / mute notice goes out only once user-service has applied
+// the sanction. A failed call leaves the report open for a retry and must
+// not tell the user they were banned or muted.
+func TestSanctionNoticeWaitsForUserService(t *testing.T) {
+	ctx := context.Background()
+	svc, db, _, owners := newModerationFixtureWithOwners(t)
+	now := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+	seedReportDanmu(t, db, "room-1", "danmu-down", "bad-user", "abuse")
+	restriction := "/internal/users/bad-user/restriction"
+	owners.fail(restriction, http.StatusServiceUnavailable)
+	notices := func(kind string) int64 {
+		t.Helper()
+		var n int64
+		require.NoError(t, db.Model(&model.Notification{}).Where("user_id = ? AND type = ?", "bad-user", kind).Count(&n).Error)
+		return n
+	}
+
+	report, err := svc.CreateReport(ctx, "user-1", CreateReportReq{TargetType: "danmu", TargetID: "danmu-down", RoomID: "room-1", Reason: "harassment"})
+	require.NoError(t, err)
+	for _, action := range []string{"ban_user", "site_mute", "ban_user", "site_mute"} {
+		_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{action}, DurationMinutes: 120})
+		require.Error(t, err, action)
+	}
+	require.Zero(t, notices("moderation_ban"))
+	require.Zero(t, notices("moderation_site_mute"))
+
+	owners.fail(restriction, 0)
+	_, err = svc.UpdateReport(ctx, "admin-1", report.ID, UpdateReportReq{Actions: []string{"site_mute", "ban_user"}, DurationMinutes: 120})
+	require.NoError(t, err)
+	require.EqualValues(t, 1, notices("moderation_ban"))
+	require.EqualValues(t, 1, notices("moderation_site_mute"))
 }

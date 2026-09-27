@@ -81,6 +81,17 @@ func (c *ttlCache[V]) get(key string, load func() (V, error)) (V, error) {
 	return entry.value, entry.err
 }
 
+// clear drops every entry, so the next get loads afresh. A load already
+// running still answers its own callers.
+func (c *ttlCache[V]) clear() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	clear(c.entries)
+	c.mu.Unlock()
+}
+
 // evictLocked drops expired entries, then arbitrary finished ones, until
 // there is room for one more. In-flight loads are kept.
 func (c *ttlCache[V]) evictLocked() {

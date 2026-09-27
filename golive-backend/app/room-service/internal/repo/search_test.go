@@ -19,8 +19,14 @@ func TestBoundFallbackSearch(t *testing.T) {
 	_, _, ok = boundFallbackSearch(NewSearchPhrase(" - "), 10)
 	require.False(t, ok, "separators alone are not a query")
 
-	_, _, ok = boundFallbackSearch(NewSearchPhrase("猫"), 10)
-	require.False(t, ok)
+	// One Chinese, Japanese or Korean character is a word on its own.
+	for _, word := range []string{"猫", "歌", "ね", "ネ", "한"} {
+		_, limit, ok := boundFallbackSearch(NewSearchPhrase(word), 100)
+		require.True(t, ok, word)
+		require.Equal(t, maxFallbackSearchLimit, limit, word)
+	}
+	_, _, ok = boundFallbackSearch(NewSearchPhrase("é"), 10)
+	require.False(t, ok, "a single Latin letter is still too broad")
 	phrase, limit, ok := boundFallbackSearch(NewSearchPhrase("ab"), 10)
 	require.True(t, ok)
 	require.Equal(t, 10, limit)
@@ -58,6 +64,10 @@ func TestSearchLiveRoomsFallbackIsBounded(t *testing.T) {
 	require.Equal(t, "live-79", found[0].ID, "newest first")
 
 	found, err = rooms.SearchLiveRooms(ctx, NewSearchPhrase("歌"), 100)
+	require.NoError(t, err)
+	require.Len(t, found, maxFallbackSearchLimit, "one CJK character searches, still bounded")
+
+	found, err = rooms.SearchLiveRooms(ctx, NewSearchPhrase("a"), 100)
 	require.NoError(t, err)
 	require.Empty(t, found)
 }

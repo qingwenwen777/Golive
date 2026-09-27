@@ -10,11 +10,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/qingwenwen777/golive/app/user-service/internal/model"
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/errcode"
+	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
 type CreatorHandler struct {
@@ -142,13 +144,20 @@ type SessionRevoker interface {
 	RevokeUserSessions(ctx context.Context, userID string) error
 }
 
+// LiveEnder ends a user's live rooms. Rooms belong to room-service, which a
+// ban asks through POST /internal/users/:id/end-live.
+type LiveEnder interface {
+	EndUserLive(ctx context.Context, userID string) (int, error)
+}
+
 type AdminHandler struct {
 	users    *repo.UserRepo
 	sessions SessionRevoker
+	lives    LiveEnder
 }
 
-func NewAdminHandler(users *repo.UserRepo, sessions SessionRevoker) *AdminHandler {
-	return &AdminHandler{users: users, sessions: sessions}
+func NewAdminHandler(users *repo.UserRepo, sessions SessionRevoker, lives LiveEnder) *AdminHandler {
+	return &AdminHandler{users: users, sessions: sessions, lives: lives}
 }
 
 func (h *AdminHandler) CreateInviteCode(c *gin.Context) {
@@ -261,6 +270,10 @@ func (h *AdminHandler) UpdateUserProfile(c *gin.Context) {
 	u, err := h.users.AdminUpdateProfile(c.Request.Context(), c.Param("id"), username, displayName)
 	if errors.Is(err, repo.ErrUsernameTaken) {
 		errcode.Respond(c, service.ErrUsernameTaken.WithReason("username_taken"))
+		return
+	}
+	if conflict := service.NameConflict(err); conflict != nil {
+		errcode.Respond(c, conflict)
 		return
 	}
 	if errors.Is(err, repo.ErrUserNotFound) {
@@ -390,7 +403,7 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 		errcode.Respond(c, errcode.New(http.StatusBadRequest, "cannot ban your own account"))
 		return
 	}
-	u, err := setUserBan(c.Request.Context(), h.users, h.sessions, c.Param("id"), req.Banned, req.Reason, UserIDFromCtx(c))
+	u, warning, err := setUserBan(c.Request.Context(), h.users, h.sessions, h.lives, c.Param("id"), req.Banned, req.Reason, UserIDFromCtx(c))
 	if errors.Is(err, repo.ErrUserNotFound) {
 		errcode.Respond(c, errcode.New(http.StatusNotFound, "user not found"))
 		return
@@ -404,24 +417,61 @@ func (h *AdminHandler) SetUserBan(c *gin.Context) {
 		action = "user_ban"
 	}
 	h.logAdminAudit(c, model.AdminAuditCategoryPermission, action, "user", u.ID, u.DisplayName, u.ID, u.DisplayName, strings.TrimSpace(req.Reason))
-	c.JSON(http.StatusOK, gin.H{"user": u.Public()})
+	resp := gin.H{"user": u.Public()}
+	if warning != nil {
+		resp["warning"] = warning
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// banWarning is added to a successful ban response when a follow-up step
+// failed; the ban itself stands.
+type banWarning struct {
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
+}
+
+var liveNotEndedWarning = banWarning{
+	Reason:  "live_end_failed",
+	Message: "User banned, but their live stream could not be ended right away. It will be ended automatically within a few minutes.",
 }
 
 // setUserBan is the single ban path for the admin API and the internal API
-// other services call: it updates the ban state and, on a ban, revokes every
-// refresh token so existing sessions must log in again, which hands the
-// client the banned flag and routes it to the appeal page.
-func setUserBan(ctx context.Context, users *repo.UserRepo, sessions SessionRevoker, userID string, banned bool, reason, operatorID string) (*model.User, error) {
+// other services call: it updates the ban state and, on a ban, ends the
+// user's live rooms and revokes every refresh token so existing sessions
+// must log in again, which hands the client the banned flag and routes it to
+// the appeal page. The warning is set when the ban stands but the live rooms
+// could not be ended right away.
+func setUserBan(ctx context.Context, users *repo.UserRepo, sessions SessionRevoker, lives LiveEnder, userID string, banned bool, reason, operatorID string) (*model.User, *banWarning, error) {
 	u, err := users.AdminSetUserBan(ctx, userID, banned, reason, operatorID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if banned && sessions != nil {
+	if !banned {
+		return u, nil, nil
+	}
+	warning := endBannedUserLive(ctx, lives, u.ID)
+	if sessions != nil {
 		if err := sessions.RevokeUserSessions(ctx, u.ID); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return u, nil
+	return u, warning, nil
+}
+
+// endBannedUserLive asks room-service to end a banned user's live rooms. It
+// never fails the ban: an error is logged and returned as a warning, and
+// room-service's live reconciler ends the rooms of banned owners anyway.
+func endBannedUserLive(ctx context.Context, lives LiveEnder, userID string) *banWarning {
+	if lives == nil {
+		return nil
+	}
+	if _, err := lives.EndUserLive(ctx, userID); err != nil {
+		logger.L().Warn("end live rooms of banned user", zap.String("user_id", userID), zap.Error(err))
+		warning := liveNotEndedWarning
+		return &warning
+	}
+	return nil
 }
 
 type adminReviewUnbanAppealReq struct {
@@ -709,6 +759,10 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 		LivePermissionStatus: model.LivePermissionApproved,
 	}
 	if err := h.users.Create(c.Request.Context(), u); err != nil {
+		if conflict := service.NameConflict(err); conflict != nil {
+			errcode.Respond(c, conflict)
+			return
+		}
 		errcode.Respond(c, err)
 		return
 	}
@@ -760,10 +814,11 @@ func timeNowUTC() time.Time {
 type InternalHandler struct {
 	users    *repo.UserRepo
 	sessions SessionRevoker
+	lives    LiveEnder
 }
 
-func NewInternalHandler(users *repo.UserRepo, sessions SessionRevoker) *InternalHandler {
-	return &InternalHandler{users: users, sessions: sessions}
+func NewInternalHandler(users *repo.UserRepo, sessions SessionRevoker, lives LiveEnder) *InternalHandler {
+	return &InternalHandler{users: users, sessions: sessions, lives: lives}
 }
 
 const (
@@ -783,7 +838,7 @@ type internalRestrictionReq struct {
 // SetRestriction serves POST /internal/users/:id/restriction. room-service's
 // report moderation calls it instead of writing users /
 // user_moderation_states itself; a ban goes through the same path as the
-// admin ban and revokes the user's refresh tokens.
+// admin ban, ending the user's live rooms and revoking their refresh tokens.
 func (h *InternalHandler) SetRestriction(c *gin.Context) {
 	var req internalRestrictionReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -792,10 +847,11 @@ func (h *InternalHandler) SetRestriction(c *gin.Context) {
 	}
 	ctx := c.Request.Context()
 	userID := strings.TrimSpace(c.Param("id"))
+	var warning *banWarning
 	var err error
 	switch req.Action {
 	case RestrictionBan, RestrictionUnban:
-		_, err = setUserBan(ctx, h.users, h.sessions, userID, req.Action == RestrictionBan, req.Reason, req.OperatorID)
+		_, warning, err = setUserBan(ctx, h.users, h.sessions, h.lives, userID, req.Action == RestrictionBan, req.Reason, req.OperatorID)
 	case RestrictionMute:
 		if req.MutedUntil == nil || !req.MutedUntil.After(time.Now()) {
 			errcode.Respond(c, errcode.New(http.StatusBadRequest, "mutedUntil must be in the future"))
@@ -816,7 +872,11 @@ func (h *InternalHandler) SetRestriction(c *gin.Context) {
 		errcode.Respond(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"userId": userID, "action": req.Action})
+	resp := gin.H{"userId": userID, "action": req.Action}
+	if warning != nil {
+		resp["warning"] = warning
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *InternalHandler) UserPermission(c *gin.Context) {

@@ -16,6 +16,8 @@ interface ChatHistoryBase {
   avatar?: string;
   text: string;
   ts: number;
+  // The sender's current level, as chat-service computes it for history.
+  userLevel?: number;
 }
 
 interface DanmuHistoryItem extends ChatHistoryBase {
@@ -29,7 +31,6 @@ interface SuperChatHistoryItem extends ChatHistoryBase {
   type: 'super_chat';
   amount: string;
   tier?: SuperChatTier;
-  userLevel?: number;
 }
 
 type ChatHistoryItem = DanmuHistoryItem | SuperChatHistoryItem;
@@ -49,6 +50,7 @@ function toChatMessage(item: DanmuHistoryItem): ChatMessage {
     color: item.color,
     role: item.role,
     fanBadge: item.fanBadge,
+    userLevel: item.userLevel,
     ts: item.ts,
   };
 }

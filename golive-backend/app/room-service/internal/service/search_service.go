@@ -40,13 +40,17 @@ type SearchSuggestionResp struct {
 }
 
 func NewSearchService(rooms *RoomService, social *SocialService, posts *PostService, appointments *AppointmentService) *SearchService {
-	return &SearchService{
+	s := &SearchService{
 		rooms:        rooms,
 		social:       social,
 		posts:        posts,
 		appointments: appointments,
 		suggestions:  newTTLCache[*suggestionPool](suggestCacheTTL, suggestCacheEntries),
 	}
+	if rooms != nil && rooms.replay != nil {
+		rooms.replay.OnReplayChanged(s.suggestions.clear)
+	}
+	return s
 }
 
 func (s *SearchService) Search(ctx context.Context, viewerID, query string, size int) (*SearchResp, error) {

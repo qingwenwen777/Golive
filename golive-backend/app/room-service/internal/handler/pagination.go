@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 )
 
 const (
@@ -11,19 +13,22 @@ const (
 	// costs follow-up lookups, so an unbounded size is an easy way to make one
 	// request do thousands of queries.
 	maxPageSize = 100
-	// maxPage bounds ?page= so a request can't force a deep OFFSET scan.
-	maxPage = 1000
+	// maxPage is the deepest page a list serves, so a request can't force a
+	// deep OFFSET scan: the repos answer deeper pages with no rows.
+	maxPage = repo.MaxPage
 )
 
 // pageQuery reads ?page= and ?size=, falling back to the defaults for missing
-// or invalid values and clamping both to maxPage / maxPageSize.
+// or invalid values and capping size at maxPageSize. A page past maxPage
+// becomes maxPage+1: an empty page, not maxPage's items again, with the
+// offset arithmetic kept small.
 func pageQuery(c *gin.Context, defaultPage, defaultSize int) (int, int) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(defaultPage)))
 	if page < 1 {
 		page = defaultPage
 	}
 	if page > maxPage {
-		page = maxPage
+		page = maxPage + 1
 	}
 	return page, sizeQuery(c, defaultSize, maxPageSize)
 }

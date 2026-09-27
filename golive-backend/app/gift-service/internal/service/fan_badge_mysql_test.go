@@ -48,6 +48,40 @@ func placeMySQLGift(ctx context.Context, orders *repo.OrderRepo, userID, giftID 
 	return err
 }
 
+// pauseBeforeGiftOrderInsert parks the next transaction that inserts a
+// gift_orders row, i.e. after it has debited the buyer, and so while it holds
+// the buyer's users row lock. It returns a channel closed once a transaction
+// is parked and a release func.
+func pauseBeforeGiftOrderInsert(t *testing.T, db *gorm.DB) (<-chan struct{}, func()) {
+	t.Helper()
+	var armed atomic.Bool
+	armed.Store(true)
+	reached := make(chan struct{})
+	release := make(chan struct{})
+	unblock := closeOnce(release)
+	t.Cleanup(unblock)
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register("test:pause_gift_order", func(tx *gorm.DB) {
+		if tx.Statement.Table == "gift_orders" && armed.CompareAndSwap(true, false) {
+			close(reached)
+			<-release
+		}
+	}))
+	return reached, unblock
+}
+
+func joinMySQLFanClub(ctx context.Context, orders *repo.OrderRepo, userID, creatorID string) error {
+	_, _, err := orders.PlaceFanClubJoinOrder(ctx, &model.GiftOrder{
+		OrderID:   "gift-" + uuid.NewString(),
+		RequestID: uuid.NewString(),
+		UserID:    userID,
+		GiftID:    "fan_light",
+		Count:     1,
+		TotalCoin: 1000,
+		Status:    model.StatusSuccess,
+	}, creatorID)
+	return err
+}
+
 func fanBadgeOf(t *testing.T, db *gorm.DB, userID, creatorID string) model.FanBadge {
 	t.Helper()
 	var badge model.FanBadge
@@ -104,4 +138,74 @@ func TestMySQLFanBadge_ConcurrentFirstFanLightBothSucceed(t *testing.T) {
 	require.Equal(t, int64(2000), badge.TotalContribution)
 	require.Equal(t, 2, badge.Level)
 	require.Equal(t, "u-owner", badge.CreatorName)
+}
+
+// Two joins by the same fan (a double click sends two requestIds) used to
+// both debit the Fan Light price. The second must wait for the first and
+// then be refused.
+func TestMySQLFanClub_ConcurrentJoinsChargeOnce(t *testing.T) {
+	db, dbName := newMySQLTestDB(t)
+	insertMySQLUser(t, db, "u-owner", 0)
+	insertMySQLUser(t, db, "u-fan", 5000)
+	orders := repo.NewOrderRepo(db)
+	ctx := context.Background()
+
+	reached, unblock := pauseBeforeGiftOrderInsert(t, db)
+	firstErr := make(chan error, 1)
+	go func() { firstErr <- joinMySQLFanClub(ctx, orders, "u-fan", "u-owner") }()
+	<-reached
+
+	secondDone := make(chan struct{})
+	var secondErr error
+	go func() {
+		defer close(secondDone)
+		secondErr = joinMySQLFanClub(ctx, orders, "u-fan", "u-owner")
+	}()
+	waitDoneOrLockWait(t, db, dbName, secondDone)
+	unblock()
+	require.NoError(t, <-firstErr)
+	<-secondDone
+	require.ErrorIs(t, secondErr, repo.ErrAlreadyFanClubMember)
+
+	require.Equal(t, int64(4000), balanceOf(t, db, "u-fan"))
+	require.Equal(t, int64(1000), balanceOf(t, db, "u-owner"))
+	require.Equal(t, int64(1000), fanBadgeOf(t, db, "u-fan", "u-owner").TotalContribution)
+	var joins int64
+	require.NoError(t, db.Model(&model.GiftOrder{}).Where("user_id = ?", "u-fan").Count(&joins).Error)
+	require.Equal(t, int64(1), joins)
+}
+
+// Joins by different fans must not wait on each other's membership check: a
+// locking read of the missing badge would take a gap lock that deadlocks
+// their badge inserts.
+func TestMySQLFanClub_ConcurrentJoinsByDifferentFansSucceed(t *testing.T) {
+	db, dbName := newMySQLTestDB(t)
+	insertMySQLUser(t, db, "u-owner", 0)
+	insertMySQLUser(t, db, "u-fan-a", 5000)
+	insertMySQLUser(t, db, "u-fan-b", 5000)
+	orders := repo.NewOrderRepo(db)
+	ctx := context.Background()
+
+	reached, unblock := pauseBeforeGiftOrderInsert(t, db)
+	firstErr := make(chan error, 1)
+	go func() { firstErr <- joinMySQLFanClub(ctx, orders, "u-fan-a", "u-owner") }()
+	<-reached
+
+	secondDone := make(chan struct{})
+	var secondErr error
+	go func() {
+		defer close(secondDone)
+		secondErr = joinMySQLFanClub(ctx, orders, "u-fan-b", "u-owner")
+	}()
+	waitDoneOrLockWait(t, db, dbName, secondDone)
+	unblock()
+	require.NoError(t, <-firstErr)
+	<-secondDone
+	require.NoError(t, secondErr)
+
+	require.Equal(t, int64(4000), balanceOf(t, db, "u-fan-a"))
+	require.Equal(t, int64(4000), balanceOf(t, db, "u-fan-b"))
+	require.Equal(t, int64(2000), balanceOf(t, db, "u-owner"))
+	require.Equal(t, int64(1000), fanBadgeOf(t, db, "u-fan-a", "u-owner").TotalContribution)
+	require.Equal(t, int64(1000), fanBadgeOf(t, db, "u-fan-b", "u-owner").TotalContribution)
 }

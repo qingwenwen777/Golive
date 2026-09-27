@@ -18,16 +18,22 @@ import (
 	"hash/fnv"
 	"regexp"
 	"strings"
+	"sync"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/qingwenwen777/golive/app/chat-service/internal/model"
+	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/userlevel"
 )
 
 type DanmuRepo struct {
 	db     *gorm.DB
 	shards int
+	// warnNoModeratedAt logs once that super_chat_orders.moderated_at is
+	// missing (see SuperChatHistory).
+	warnNoModeratedAt sync.Once
 }
 
 type SuperChatHistoryRow struct {
@@ -275,9 +281,30 @@ func fanBadgeLevel(totalContribution int64) int {
 // SuperChatHistory returns successful SuperChats for the same room so the
 // public history endpoint can restore paid messages when a viewer enters.
 // Moderated ones (moderated_at set by gift-service) stay paid but hidden.
+//
+// gift-service owns super_chat_orders and adds moderated_at when it migrates.
+// Until it has (the first deploy, or gift-service failing to start), the
+// history is served without that filter instead of failing for every room:
+// super chats moderated before the column existed are status=failed, which
+// the status filter already hides.
 func (r *DanmuRepo) SuperChatHistory(ctx context.Context, roomID string, before int64, limit int) ([]SuperChatHistoryRow, error) {
 	if limit <= 0 {
 		limit = 50
+	}
+	out, err := r.superChatHistory(ctx, roomID, before, limit, true)
+	if err != nil && isMissingModeratedAt(err) {
+		r.warnNoModeratedAt.Do(func() {
+			logger.L().Warn("super_chat_orders.moderated_at is missing; serving super chat history without it until gift-service migrates", zap.Error(err))
+		})
+		out, err = r.superChatHistory(ctx, roomID, before, limit, false)
+	}
+	return out, err
+}
+
+func (r *DanmuRepo) superChatHistory(ctx context.Context, roomID string, before int64, limit int, hideModerated bool) ([]SuperChatHistoryRow, error) {
+	where := "sc.room_id = ? AND sc.status = ?"
+	if hideModerated {
+		where += " AND sc.moderated_at IS NULL"
 	}
 	q := r.db.WithContext(ctx).Table("super_chat_orders AS sc").
 		Select(`
@@ -290,7 +317,7 @@ sc.text AS text,
 CAST(UNIX_TIMESTAMP(sc.created_at) * 1000 AS SIGNED) AS ts
 `).
 		Joins("LEFT JOIN users AS u ON u.id = sc.user_id").
-		Where("sc.room_id = ? AND sc.status = ? AND sc.moderated_at IS NULL", roomID, "success")
+		Where(where, roomID, "success")
 	if before > 0 {
 		q = q.Where("sc.created_at < FROM_UNIXTIME(?)", float64(before)/1000)
 	}
@@ -299,4 +326,12 @@ CAST(UNIX_TIMESTAMP(sc.created_at) * 1000 AS SIGNED) AS ts
 		return nil, err
 	}
 	return out, nil
+}
+
+// isMissingModeratedAt reports a query that failed because moderated_at does
+// not exist yet (MySQL error 1054 "Unknown column"; SQLite "no such column").
+func isMissingModeratedAt(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "moderated_at") &&
+		(strings.Contains(msg, "unknown column") || strings.Contains(msg, "no such column"))
 }

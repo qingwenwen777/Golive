@@ -29,6 +29,7 @@ import {
   Server,
   Settings,
   Shield,
+  ShieldAlert,
   SlidersHorizontal,
   Ticket,
   ToggleLeft,
@@ -1093,12 +1094,22 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
     setBan.mutate(
       { banned: !user.banned, reason: banReason.trim() },
       {
-        onSuccess: () =>
+        onSuccess: (data) => {
           toast.success(
             user.banned
               ? t('admin.users.detail.unbanned', { defaultValue: 'User unbanned.' })
               : t('admin.users.detail.banned', { defaultValue: 'User banned.' }),
-          ),
+          );
+          // The ban stands; room-service ends the stream on its next check.
+          if (banWarningReason(data) === 'live_end_failed') {
+            toast.warning(
+              t('admin.users.detail.liveEndFailed', {
+                defaultValue:
+                  'Their live stream could not be ended right away. It will end automatically within a few minutes.',
+              }),
+            );
+          }
+        },
         onError: (err) => toast.error(apiErrorMessage(err)),
       },
     );
@@ -1660,8 +1671,11 @@ function ContentPage() {
   );
   const detailNeedsClaim = Boolean(detail && !detailClosed && !detailClaimedByMe);
   const detailActionDisabled = detailClosed || detailNeedsClaim;
+  const detailUnverified = detail?.targetVerified === false;
   const detailActions = detail
-    ? reportActionsForTarget(detail.targetType).filter((action) => !isExclusiveReportAction(action))
+    ? reportActionsForTarget(detail.targetType, !detailUnverified).filter(
+        (action) => !isExclusiveReportAction(action),
+      )
     : [];
 
   useEffect(() => {
@@ -2017,6 +2031,13 @@ function ContentPage() {
                         </span>
                       )}
                       {item.targetUserName && <span>{item.targetUserName}</span>}
+                      {item.targetVerified === false && (
+                        <span>
+                          {t('admin.content.reports.unverifiedTag', {
+                            defaultValue: 'Unverified',
+                          })}
+                        </span>
+                      )}
                       {item.status === 'reviewing' && (
                         <span>
                           {t('admin.content.reports.cardReviewer', {
@@ -2294,6 +2315,24 @@ function ContentPage() {
                     })}
                     value={detail.targetUserName || detail.targetOwnerName || '-'}
                   />
+                  {detailUnverified && (
+                    <div className="gl-admin-handled-note is-warning">
+                      <ShieldAlert size={16} />
+                      <div>
+                        <strong>
+                          {t('admin.content.reports.unverifiedTitle', {
+                            defaultValue: 'Unverified snapshot',
+                          })}
+                        </strong>
+                        <span>
+                          {t('admin.content.reports.unverifiedBody', {
+                            defaultValue:
+                              "This report predates server-side checks and its content no longer exists, so the user and text shown came from the reporter's app and may be false. It can only be dismissed.",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <AdminDetailRow
                     label={t('admin.content.reports.status', { defaultValue: 'Status' })}
                     value={reportStatusLabel(detail.status, t)}
@@ -2399,7 +2438,7 @@ function ContentPage() {
                       })}
                     />
                   </label>
-                  {!detailClosed && (
+                  {!detailClosed && detailActions.length > 0 && (
                     <div className="gl-admin-action-select">
                       <div className="gl-admin-action-select-head">
                         <span>{t('admin.content.reports.action', { defaultValue: 'Action' })}</span>
@@ -2695,6 +2734,12 @@ function apiErrorMessage(err: unknown) {
   return 'Request failed';
 }
 
+// banWarningReason reads the warning a ban response carries when a follow-up
+// step (such as ending the user's live stream) failed.
+function banWarningReason(data: unknown) {
+  return (data as { warning?: { reason?: string } } | undefined)?.warning?.reason;
+}
+
 function reportStatusLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
     all: t('admin.content.status.all', { defaultValue: 'All statuses' }),
@@ -2796,7 +2841,12 @@ function reportActionDescription(value: string, t: Translate) {
   return map[value] ?? '';
 }
 
-function reportActionsForTarget(targetType: string): ReportAction[] {
+export function reportActionsForTarget(targetType: string, targetVerified = true): ReportAction[] {
+  // The server refuses enforcement on a report whose target it could not
+  // verify, so only dismissing is offered.
+  if (!targetVerified) {
+    return ['dismiss'];
+  }
   if (targetType === 'room') {
     return ['warn_room', 'force_end_live', 'warn_user', 'site_mute', 'ban_user', 'dismiss'];
   }

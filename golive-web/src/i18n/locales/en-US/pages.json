@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "Upgrade to tier 1+ to include a message",
       "insufficientCoins": "Insufficient coins",
       "failed": "Failed to send SuperChat",
+      "textTooLong": "Message is too long for this tier (max {{count}} characters).",
       "insufficientBalance": "Insufficient balance (need {{coins}} more).",
       "cancel": "Cancel",
       "topUp": "Top up",
@@ -283,6 +284,8 @@
       "join": "Join fan club",
       "joining": "Joining...",
       "joined": "Fan club joined. The room is unlocked.",
+      "alreadyMember": "You are already in this fan club. No coins were charged.",
+      "unlocking": "Joined. Unlocking the room...",
       "signIn": "Sign in to join"
     }
   },
@@ -416,6 +419,7 @@
       "pending": "Purchasing...",
       "success": "Fan badge lit.",
       "insufficient": "Not enough coins to buy this fan badge.",
+      "alreadyMember": "You are already in this fan club. No coins were charged.",
       "failed": "Could not purchase the fan badge."
     },
     "message": "Message"
@@ -662,6 +666,7 @@
         "weakPassword": "New password must be at least 8 characters and include both letters and numbers.",
         "passwordMismatch": "The two new passwords do not match.",
         "usernameTaken": "This username is already taken.",
+        "displayNameTaken": "This display name is another user's username. Choose a different one.",
         "usernameCooldown": "Username is cooling down. You can change it again after {{date}}.",
         "usernameCooldownUnknown": "Username changes are still in cooldown.",
         "invalidCurrentPassword": "Current password is incorrect.",
@@ -672,6 +677,7 @@
         "emailTaken": "This email is already bound to another account.",
         "invalidEmailCode": "Email verification code is incorrect or expired.",
         "emailCodeTooSoon": "Please wait before requesting another email code.",
+        "emailCodeLimit": "Too many codes were requested for this email. Please try again later.",
         "emailCodeUnavailable": "Email verification is temporarily unavailable.",
         "googleLoadFailed": "Could not load Google sign-in.",
         "googleEmailExists": "That Google email is already used by another GoLive account.",
@@ -1378,6 +1384,7 @@
         "roleSaved": "Role updated.",
         "banned": "User banned.",
         "unbanned": "User unbanned.",
+        "liveEndFailed": "Their live stream could not be ended right away. It will end automatically within a few minutes.",
         "invalidAmount": "Enter a valid amount.",
         "coinsSaved": "Coin balance updated.",
         "tabs": {
@@ -1942,7 +1949,10 @@
         "claimLockedBody": "Locked until {{time}} unless the reviewer finishes first.",
         "claimLockedBodyNoExpiry": "This report is locked by another reviewer.",
         "claimOpenTitle": "Ready to claim",
-        "claimOpenBody": "Claim this report to lock it while you review and act."
+        "claimOpenBody": "Claim this report to lock it while you review and act.",
+        "unverifiedTag": "Unverified",
+        "unverifiedTitle": "Unverified snapshot",
+        "unverifiedBody": "This report predates server-side checks and its content no longer exists, so the user and text shown came from the reporter's app and may be false. It can only be dismissed."
       },
       "actions": {
         "review": "Mark reviewing",

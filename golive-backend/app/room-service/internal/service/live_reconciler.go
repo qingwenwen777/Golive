@@ -43,21 +43,25 @@ type staleRoom struct {
 }
 
 // Reconcile runs one pass over the active rooms:
+//   - rooms of banned owners are ended and their publisher kicked;
 //   - live rooms keep their stream key and publish session from expiring;
 //   - live rooms whose publisher is gone are ended like a normal stop once the
 //     unpublish grace period has passed, whether the on_unpublish hook was
 //     lost or its grace timer died with a restart;
 //   - rooms never published to are ended once their stream key has expired.
 //
-// A room counts as without publisher when SRS's stream list lacks it, or,
-// while SRS cannot be asked, only when on_unpublish recorded a disconnect: an
-// SRS outage alone never ends rooms.
+// A room counts as without publisher when SRS's stream list lacks its play
+// name, or, while SRS cannot be asked, only when on_unpublish recorded a
+// disconnect: an SRS outage alone never ends rooms. A room that went live
+// before play names still publishes under its raw key, which nobody can play:
+// it ends like a room without publisher, and stopRoom kicks that publisher.
 func (s *LiveService) Reconcile(ctx context.Context) {
 	rooms, err := s.rooms.ActiveRooms(ctx)
 	if err != nil {
 		logger.L().Warn("reconcile: load active rooms", zap.Error(err))
 		return
 	}
+	rooms = s.endBannedOwnersRooms(ctx, rooms)
 	var publishers map[string]string
 	if s.srs != nil {
 		if publishers, err = s.srs.activePublishers(ctx); err != nil {
@@ -81,11 +85,46 @@ func (s *LiveService) Reconcile(ctx context.Context) {
 	}
 }
 
+// endBannedOwnersRooms ends the rooms whose owner is banned and returns the
+// others. A ban made in user-service ends the owner's rooms right away through
+// POST /internal/users/:id/end-live; this catches the rooms that call missed,
+// within one reconcile interval.
+func (s *LiveService) endBannedOwnersRooms(ctx context.Context, rooms []model.Room) []model.Room {
+	if s.moderation == nil || len(rooms) == 0 {
+		return rooms
+	}
+	ownerIDs := make([]string, 0, len(rooms))
+	for _, room := range rooms {
+		if room.OwnerID != "" {
+			ownerIDs = append(ownerIDs, room.OwnerID)
+		}
+	}
+	banned, err := s.moderation.BannedUserIDs(ctx, ownerIDs)
+	if err != nil {
+		logger.L().Warn("reconcile: load banned owners", zap.Error(err))
+		return rooms
+	}
+	kept := make([]model.Room, 0, len(rooms))
+	for i := range rooms {
+		room := &rooms[i]
+		if !banned[room.OwnerID] {
+			kept = append(kept, *room)
+			continue
+		}
+		logger.L().Info("reconcile: ending live room of banned owner",
+			zap.String("room_id", room.ID), zap.String("owner_id", room.OwnerID))
+		if _, err := s.stopRoom(ctx, room, s.now(), true); err != nil {
+			logger.L().Warn("reconcile: end banned owner's room", zap.Error(err), zap.String("room_id", room.ID))
+		}
+	}
+	return kept
+}
+
 // reconcileRoom handles one active room. publishers is SRS's stream list, nil
 // when SRS could not be asked. It returns the room when SRS shows it has been
 // without a publisher past the grace period, for endStaleRooms to confirm.
 func (s *LiveService) reconcileRoom(ctx context.Context, room *model.Room, publishers map[string]string, now time.Time) (*staleRoom, error) {
-	clientID, publishing := publishers[room.ID]
+	clientID, publishing := publishers[playStreamName(room.ID, room.StreamKey)]
 	if room.Status == model.StatusPublishing {
 		// Never went live. Its key expires keyTTL after GoLive/Start, after
 		// which nobody can publish to it any more.
@@ -101,9 +140,13 @@ func (s *LiveService) reconcileRoom(ctx context.Context, room *model.Room, publi
 		if err := s.live.Save(ctx, room.StreamKey, room.ID, s.keyTTL); err != nil {
 			return nil, err
 		}
-		err := s.live.RefreshPublishSession(ctx, room.StreamKey, s.keyTTL)
-		if errors.Is(err, repo.ErrStreamKeyNotFound) && clientID != "" {
+		var err error
+		if clientID != "" {
+			// SRS's publisher is the session, also over one a publish
+			// attempt SRS then refused as busy left behind.
 			err = s.live.SavePublishSession(ctx, room.StreamKey, clientID, s.keyTTL)
+		} else {
+			err = s.live.RefreshPublishSession(ctx, room.StreamKey, s.keyTTL)
 		}
 		if err != nil && !errors.Is(err, repo.ErrStreamKeyNotFound) {
 			return nil, err
@@ -135,7 +178,7 @@ func (s *LiveService) reconcileRoom(ctx context.Context, room *model.Room, publi
 		// Only SRS saw it missing: wait until SRS can confirm.
 		return nil, nil
 	}
-	return nil, s.finalizeUnpublish(ctx, room.StreamKey, room.ID)
+	return nil, s.finalizeUnpublish(ctx, room.StreamKey, room.ID, disconnect.At)
 }
 
 // endStaleRooms ends rooms SRS showed without a publisher, after checking a
@@ -149,7 +192,7 @@ func (s *LiveService) endStaleRooms(ctx context.Context, stale []staleRoom) {
 	}
 	for i := range stale {
 		room := &stale[i].room
-		if _, ok := publishers[room.ID]; ok {
+		if _, ok := publishers[playStreamName(room.ID, room.StreamKey)]; ok {
 			continue
 		}
 		disconnect, err := s.live.Disconnect(ctx, room.ID)

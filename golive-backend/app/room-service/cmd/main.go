@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +19,7 @@ import (
 	"github.com/qingwenwen777/golive/app/room-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/room-service/internal/server"
 	"github.com/qingwenwen777/golive/app/room-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -96,6 +96,10 @@ func main() {
 		BunnyPlayerBase:   cfg.Replay.BunnyPlayerBase,
 		UploadTimeout:     cfg.Replay.UploadTimeout,
 		StaleRecordingAge: cfg.Replay.StaleRecordingAge,
+		// Retries of failed uploads, and how long a recording outlives them.
+		UploadAttempts:           cfg.Replay.UploadAttempts,
+		UploadRetryDelay:         cfg.Replay.UploadRetryDelay,
+		FailedRecordingRetention: cfg.Replay.FailedRecordingRetention,
 	})
 	roomSvc.SetReplayService(replaySvc)
 	roomSvc.SetLiveRepo(liveRepo)
@@ -107,7 +111,7 @@ func main() {
 	moderationSvc := service.NewModerationService(moderationRepo, roomRepo, socialRepo)
 	moderationSvc.SetOwnerServices(service.NewOwnerServices(cfg.Users.ServiceURL, cfg.Gifts.ServiceURL, cfg.Chat.ServiceURL, cfg.Internal.Token))
 	if cfg.Internal.Token == "" {
-		log.Warn("internal.token is empty: moderation calls to user/gift/chat-service will be rejected")
+		log.Warn("internal.token is empty: /internal endpoints and moderation calls to user/gift/chat-service will be rejected")
 	}
 	messageSvc := service.NewMessageService(messageRepo, roomRepo, socialRepo)
 	moderationSvc.SetLiveService(liveSvc)
@@ -176,20 +180,17 @@ func main() {
 		Moderation:     moderationSvc,
 		Messages:       messageSvc,
 		Permission:     permission,
+		InternalToken:  cfg.Internal.Token,
 		CoverDir:       cfg.Upload.CoverDir,
 		CoverPublicURL: cfg.Upload.CoverPublicURL,
 		PostImageDir:   cfg.Upload.PostImageDir,
 		PostPublicURL:  cfg.Upload.PostPublicURL,
 	})
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
 	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
 	defer stopScheduler()
 
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	go func() {
 		log.Info("room-service listening", zap.String("addr", cfg.Service.HTTPAddr))
@@ -197,7 +198,7 @@ func main() {
 			log.Fatal("http exit", zap.Error(err))
 		}
 	}()
-	go replaySvc.RecoverInterruptedUploads(schedulerCtx)
+	go replaySvc.RunUploadRetries(schedulerCtx)
 	go appointmentSvc.RunScheduler(schedulerCtx)
 	go liveSvc.RunReconciler(schedulerCtx, cfg.Live.ReconcileInterval)
 

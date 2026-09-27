@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/go-redis/redis/v9"
 	"github.com/google/uuid"
@@ -43,11 +44,33 @@ func AmountToTier(amount int64) int {
 	}
 }
 
+// SuperChatMaxText mirrors src/types/gift.ts SC_MAX_TEXT_BY_TIER: how many
+// characters (runes, after trimming surrounding whitespace) a super chat of
+// the tier may carry.
+func SuperChatMaxText(tier int) int {
+	switch tier {
+	case 1:
+		return 50
+	case 2:
+		return 100
+	case 3:
+		return 150
+	case 4, 5:
+		return 200
+	default:
+		return 0
+	}
+}
+
 // ErrInvalidAmount is returned when amount maps to tier 0. Tier 0 super
 // chats are not allowed (the frontend won't send them but we double-check).
 var ErrInvalidAmount = errors.New("amount below minimum tier")
 var ErrContentBlocked = errors.New("content contains blocked word")
 var ErrUserRestricted = errors.New("user is restricted from interactions")
+
+// ErrSuperChatTextTooLong is returned when the text exceeds SuperChatMaxText
+// for the amount's tier.
+var ErrSuperChatTextTooLong = errors.New("super chat text too long")
 
 type SuperChatService struct {
 	orders *repo.OrderRepo
@@ -67,12 +90,19 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 	if tier == 0 {
 		return nil, false, ErrInvalidAmount
 	}
+	// The text is stored in the order row, both ledger descriptions and the
+	// broadcast; the largest tier limit fits the narrowest of those columns
+	// (coin_transactions.description, varchar(255)).
+	text := strings.TrimSpace(req.Text)
+	if utf8.RuneCountInString(text) > SuperChatMaxText(tier) {
+		return nil, false, ErrSuperChatTextTooLong
+	}
 	if restricted, err := s.userRestricted(ctx, req.UserID); err != nil {
 		return nil, false, err
 	} else if restricted {
 		return nil, false, ErrUserRestricted
 	}
-	if blocked, err := s.containsBlockedWord(ctx, req.Text); err != nil {
+	if blocked, err := s.containsBlockedWord(ctx, text); err != nil {
 		return nil, false, err
 	} else if blocked {
 		return nil, false, ErrContentBlocked
@@ -88,7 +118,7 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 	}
 
 	payload, err := repo.MarshalSuperChatOutbox(orderID, req.UserID, username, avatar,
-		strconv.FormatInt(req.Amount, 10), tier, userLevel, req.Text, now.UnixMilli())
+		strconv.FormatInt(req.Amount, 10), tier, userLevel, text, now.UnixMilli())
 	if err != nil {
 		return nil, false, err
 	}
@@ -100,7 +130,7 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 		RoomID:    req.RoomID,
 		Amount:    req.Amount,
 		Tier:      tier,
-		Text:      req.Text,
+		Text:      text,
 		Status:    model.StatusSuccess,
 		CreatedAt: now,
 	}
@@ -120,7 +150,7 @@ func (s *SuperChatService) Send(ctx context.Context, req SendSuperChatReq) (*mod
 		RoomID:     req.RoomID,
 		Amount:     req.Amount,
 		Tier:       tier,
-		Text:       req.Text,
+		Text:       text,
 		Status:     model.StatusFailed,
 		FailReason: model.FailInsufficientCoin,
 		CreatedAt:  now,

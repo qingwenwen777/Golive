@@ -16,10 +16,14 @@ import (
 
 type adminAuthChecker interface {
 	IsAdmin(context.Context, string) (bool, error)
+	IsBanned(context.Context, string) (bool, error)
 }
 
+// AdminRequired admits admins who are not banned. A banned admin keeps the
+// role (banned users can still sign in to appeal) but loses admin powers.
 func AdminRequired(checker adminAuthChecker) gin.HandlerFunc {
 	forbidden := errcode.New(http.StatusForbidden, "Admin permission required")
+	banned := errcode.New(http.StatusForbidden, "This account has been banned").WithReason("user_banned")
 	return func(c *gin.Context) {
 		uid := UserIDFromCtx(c)
 		if uid == "" {
@@ -33,6 +37,15 @@ func AdminRequired(checker adminAuthChecker) gin.HandlerFunc {
 		}
 		if !ok {
 			errcode.Respond(c, forbidden)
+			return
+		}
+		isBanned, err := checker.IsBanned(c.Request.Context(), uid)
+		if err != nil {
+			errcode.Respond(c, err)
+			return
+		}
+		if isBanned {
+			errcode.Respond(c, banned)
 			return
 		}
 		c.Next()
@@ -49,6 +62,10 @@ func NewAdminHandler(svc *service.AdminService) *AdminHandler {
 
 func (h *AdminHandler) IsAdmin(ctx context.Context, userID string) (bool, error) {
 	return h.svc.IsAdmin(ctx, userID)
+}
+
+func (h *AdminHandler) IsBanned(ctx context.Context, userID string) (bool, error) {
+	return h.svc.IsBanned(ctx, userID)
 }
 
 func (h *AdminHandler) Summary(c *gin.Context) {
@@ -102,7 +119,10 @@ type moderateSuperChatReq struct {
 
 // ModerateSuperChat serves POST /internal/super-chats/:id/moderation for
 // room-service's report moderation: it hides the super chat but keeps its
-// status and the coin ledger untouched (no automatic refund).
+// status and the coin ledger untouched (no automatic refund). An unknown
+// order is 404 with reason super_chat_not_found, which room-service takes as
+// "nothing left to hide" (a 404 without it, e.g. for a missing route, is an
+// error there).
 func (h *AdminHandler) ModerateSuperChat(c *gin.Context) {
 	var req moderateSuperChatReq
 	if c.Request.ContentLength != 0 {
@@ -120,7 +140,7 @@ func (h *AdminHandler) ModerateSuperChat(c *gin.Context) {
 			"moderatedAt": order.ModeratedAt,
 		})
 	case errors.Is(err, repo.ErrSuperChatNotFound):
-		errcode.Respond(c, errcode.New(http.StatusNotFound, "Super chat not found"))
+		errcode.Respond(c, errcode.New(http.StatusNotFound, "Super chat not found").WithReason("super_chat_not_found"))
 	default:
 		errcode.Respond(c, err)
 	}

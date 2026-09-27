@@ -6,7 +6,6 @@ import (
 	"flag"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,6 +25,7 @@ import (
 	"github.com/qingwenwen777/golive/app/user-service/internal/repo"
 	"github.com/qingwenwen777/golive/app/user-service/internal/server"
 	"github.com/qingwenwen777/golive/app/user-service/internal/service"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -85,6 +85,13 @@ func main() {
 	}
 
 	tokenRepo := repo.NewTokenRepo(rdb)
+	// One-off: index refresh tokens saved before the per-user index existed
+	// so that a ban revokes them too.
+	if indexed, err := tokenRepo.IndexLegacyRefreshTokens(context.Background()); err != nil {
+		log.Warn("index legacy refresh tokens", zap.Error(err))
+	} else if indexed > 0 {
+		log.Info("indexed legacy refresh tokens", zap.Int("tokens", indexed))
+	}
 	captcha := service.NewCaptchaService(rdb, 5*time.Minute)
 	var emailMailer service.EmailCodeMailer
 	if cfg.Email.Enabled {
@@ -101,6 +108,7 @@ func main() {
 		}
 	}
 	emailCodes := service.NewEmailCodeService(rdb, emailMailer, cfg.Email.CodeTTL, cfg.Email.ResendInterval)
+	emailCodes.SetMaxCodesPerHour(cfg.Email.MaxCodesPerHour)
 	auth := service.NewAuthService(userRepo, tokenRepo, service.Options{
 		JWTSecret:      cfg.JWT.Secret,
 		JWTKeys:        jwtKeys,
@@ -125,20 +133,16 @@ func main() {
 		AvatarPublicURL: cfg.Upload.AvatarPublicURL,
 		CoverDir:        cfg.Upload.CoverDir,
 		CoverPublicURL:  cfg.Upload.CoverPublicURL,
+		LiveRooms:       service.NewRoomServiceClient(cfg.Rooms.ServiceURL, cfg.Internal.Token),
 		InternalToken:   cfg.Internal.Token,
 	})
 	if cfg.Internal.Token == "" {
 		log.Warn("internal.token is empty: /internal endpoints reject every call")
 	}
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
 	var grpcSrv *grpc.Server
 
-	// pprof on a side port.
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 	if cfg.Service.GRPCAddr != "" {
 		lis, err := net.Listen("tcp", cfg.Service.GRPCAddr)
 		if err != nil {

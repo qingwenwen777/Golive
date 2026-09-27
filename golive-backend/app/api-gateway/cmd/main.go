@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/qingwenwen777/golive/app/api-gateway/internal/config"
 	"github.com/qingwenwen777/golive/app/api-gateway/internal/router"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -43,16 +43,8 @@ func main() {
 		log.Fatal("build router", zap.Error(err))
 	}
 
-	httpSrv := &http.Server{
-		Addr:    cfg.Service.HTTPAddr,
-		Handler: r,
-	}
-
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	go func() {
 		log.Info("api-gateway listening", zap.String("addr", cfg.Service.HTTPAddr))

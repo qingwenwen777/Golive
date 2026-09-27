@@ -39,7 +39,12 @@ type RedisCfg struct {
 	Password string `mapstructure:"password"`
 }
 
+// KafkaCfg configures the optional Kafka consumer (topic danmu). Enabled
+// defaults to false: im-gateway publishes live chat straight to Redis and
+// chat-service persists it from Redis pub/sub, so nothing produces to Kafka
+// unless im-gateway's kafka.enabled is turned on as well.
 type KafkaCfg struct {
+	Enabled bool     `mapstructure:"enabled"`
 	Brokers []string `mapstructure:"brokers"`
 	Topic   string   `mapstructure:"topic"`
 	Group   string   `mapstructure:"group"`
@@ -99,6 +104,8 @@ func Load(path string) (*Config, error) {
 	v.AutomaticEnv()
 	v.SetEnvPrefix("CHATSVC")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	// Known key even when the file omits it, so CHATSVC_KAFKA_ENABLED works.
+	v.SetDefault("kafka.enabled", false)
 	_ = v.BindEnv("mysql.dsn")
 	_ = v.BindEnv("redis.password")
 	_ = v.BindEnv("internal.token")

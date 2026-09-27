@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -144,5 +145,35 @@ func TestSuperChatHistory_ExcludesModerated(t *testing.T) {
 	rows, err := NewDanmuRepo(db, 8).SuperChatHistory(context.Background(), "live-1", 0, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// gift-service adds moderated_at when it migrates. Until then (first deploy,
+// or gift-service down) the history must still load, without that filter,
+// instead of failing for every room; other errors still fail.
+func TestSuperChatHistory_WorksBeforeModeratedAtExists(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
+	require.NoError(t, err)
+	r := NewDanmuRepo(db, 8)
+	cols := []string{"id", "user", "avatar", "amount", "tier", "text", "ts"}
+
+	mock.ExpectQuery(`WHERE sc\.room_id = \? AND sc\.status = \? AND sc\.moderated_at IS NULL ORDER BY`).
+		WithArgs("live-1", "success", 50).
+		WillReturnError(errors.New("Error 1054 (42S22): Unknown column 'sc.moderated_at' in 'where clause'"))
+	mock.ExpectQuery(`WHERE sc\.room_id = \? AND sc\.status = \? ORDER BY`).
+		WithArgs("live-1", "success", 50).
+		WillReturnRows(sqlmock.NewRows(cols).AddRow("sc-1", "Fan", "", 1000, 2, "hi", 1))
+	rows, err := r.SuperChatHistory(context.Background(), "live-1", 0, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	mock.ExpectQuery(`AND sc\.moderated_at IS NULL ORDER BY`).
+		WithArgs("live-1", "success", 50).
+		WillReturnError(errors.New("Error 1146 (42S02): Table 'golive.users' doesn't exist"))
+	_, err = r.SuperChatHistory(context.Background(), "live-1", 0, 0)
+	require.ErrorContains(t, err, "doesn't exist")
 	require.NoError(t, mock.ExpectationsWereMet())
 }

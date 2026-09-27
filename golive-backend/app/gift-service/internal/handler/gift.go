@@ -204,6 +204,10 @@ func (h *GiftHandler) JoinFanClub(c *gin.Context) {
 		errcode.Respond(c, errcode.New(409, "Cannot join your own fan club"))
 		return
 	}
+	if sErr != nil && errors.Is(sErr, service.ErrAlreadyFanClubMember) {
+		errcode.Respond(c, errcode.New(409, "Already a fan club member").WithReason("already_fan_club_member"))
+		return
+	}
 	var locked *service.GiftLevelLockedError
 	if sErr != nil && errors.As(sErr, &locked) {
 		c.JSON(http.StatusForbidden, gin.H{

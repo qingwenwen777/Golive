@@ -20,6 +20,7 @@ type Config struct {
 	Upload    UploadCfg    `mapstructure:"upload"`
 	Stripe    StripeCfg    `mapstructure:"stripe"`
 	Bootstrap BootstrapCfg `mapstructure:"bootstrap"`
+	Rooms     RoomsCfg     `mapstructure:"rooms"`
 	Internal  InternalCfg  `mapstructure:"internal"`
 }
 
@@ -71,6 +72,9 @@ type EmailCfg struct {
 	SenderName     string        `mapstructure:"sender_name"`
 	CodeTTL        time.Duration `mapstructure:"code_ttl"`
 	ResendInterval time.Duration `mapstructure:"resend_interval"`
+	// MaxCodesPerHour caps the codes sent to one address per purpose per
+	// hour (default 5). Every code allows 5 guesses.
+	MaxCodesPerHour int `mapstructure:"max_codes_per_hour"`
 }
 
 type UploadCfg struct {
@@ -106,6 +110,12 @@ type AdminCfg struct {
 	DisplayName string `mapstructure:"display_name"`
 }
 
+// RoomsCfg locates room-service, which a ban asks to end the user's live
+// rooms.
+type RoomsCfg struct {
+	ServiceURL string `mapstructure:"service_url"`
+}
+
 // InternalCfg holds the shared secret other services send on /internal
 // calls (USERSVC_INTERNAL_TOKEN). Empty rejects every internal call.
 type InternalCfg struct {
@@ -138,6 +148,7 @@ func Load(path string) (*Config, error) {
 	_ = v.BindEnv("email.sender_name")
 	_ = v.BindEnv("email.code_ttl")
 	_ = v.BindEnv("email.resend_interval")
+	_ = v.BindEnv("email.max_codes_per_hour")
 	_ = v.BindEnv("stripe.publishable_key")
 	_ = v.BindEnv("stripe.secret_key")
 	_ = v.BindEnv("stripe.currency")

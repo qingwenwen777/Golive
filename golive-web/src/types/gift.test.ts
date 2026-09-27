@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SC_MAX_TEXT_BY_TIER, amountToTier } from './gift';
+import { SC_MAX_TEXT_BY_TIER, amountToTier, superChatTextLength } from './gift';
 
 describe('gift helpers', () => {
   it.each([
@@ -28,5 +28,11 @@ describe('gift helpers', () => {
       4: 200,
       5: 200,
     });
+  });
+
+  it('counts Super Chat text in code points, as the server does', () => {
+    expect(superChatTextLength('')).toBe(0);
+    expect(superChatTextLength('赢 hi')).toBe(4);
+    expect(superChatTextLength('😀😀')).toBe(2);
   });
 });

@@ -1,7 +1,7 @@
 service:
   name: room-service
   http_addr: ":8091"
-  pprof_addr: ":6063"
+  pprof_addr: "127.0.0.1:6063"  # loopback only; "" disables pprof
   log_level: info
 
 mysql:
@@ -36,6 +36,12 @@ replay:
   bunny_player_base: "https://player.mediadelivery.net/embed"
   upload_timeout: 30m
   stale_recording_age: 24h
+  # Failed uploads: attempts in all, first retry delay (doubling after each
+  # further failure; a restart retries right away), and how long the
+  # recording is kept after the last attempt.
+  upload_attempts: 7
+  upload_retry_delay: 15m
+  failed_recording_retention: 168h
 
 upload:
   cover_dir: "/tmp/golive/covers"

@@ -6,7 +6,7 @@ WebSockets, stream callbacks, gift orders, chat processing, uploads, and admin c
 ## Technology stack
 
 - Go 1.25+, Gin, gorilla/websocket, gRPC + Protobuf
-- MySQL 8 + GORM, Redis 7, Kafka, etcd, MinIO
+- MySQL 8 + GORM, Redis 7, optional Kafka (Compose profile `kafka`; off by default)
 - Viper, zap, OpenTelemetry, Jaeger, Prometheus, Grafana
 - SRS 5(RTMP → HTTP-FLV/HLS), Docker Compose, nginx
 
@@ -32,18 +32,23 @@ api-gateway (which only forwards `/api/<prefix>/*` to `/<prefix>/*` and drops cl
 
 | Internal API | Owner | Caller |
 | ---- | ---- | ---- |
-| `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens) | user-service | room-service report moderation |
+| `POST /internal/users/:id/restriction` (ban/unban/mute/unmute; a ban revokes refresh tokens and ends the user's live rooms) | user-service | room-service report moderation |
 | `GET /internal/users/:id/permission` | user-service | room-service (HTTP fallback to gRPC) |
-| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund) | gift-service | room-service report moderation |
-| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete) | chat-service | room-service report moderation |
+| `POST /internal/users/:id/end-live` (ends the user's active rooms and kicks their SRS publisher; idempotent) | room-service | user-service bans (admin panel and report moderation); the live reconciler also ends banned owners' rooms if the call fails |
+| `POST /internal/super-chats/:id/moderation` (sets `moderated_at`, keeps `status`, no refund; unknown order: 404 `super_chat_not_found`) | gift-service | room-service report moderation |
+| `DELETE /internal/rooms/:id/danmus/:danmuId` (soft delete; unknown message: 404 `message_not_found`) | chat-service | room-service report moderation |
 | `GET /internal/rooms/:id/fan-badges/:userId` | chat-service | im-gateway |
+
+Report moderation treats a 404 as "already hidden" only when it carries the owning service's
+reason above. Any other 404 (a route missing on an older build, a wrong `service_url`) fails
+the action and leaves the report open.
 
 Cross-service reads remain (direct SQL on the shared database):
 
 | Table | Owner | Also read by |
 | ---- | ---- | ---- |
 | `users` | user-service | room-service, gift-service, chat-service |
-| `user_moderation_states` | user-service | room-service (ban/mute checks) |
+| `user_moderation_states` | user-service | room-service (ban/mute checks), gift-service (banned-admin check) |
 | `coin_transactions` | user-service + gift-service (wallet) | room-service (admin overview), chat-service (user level) |
 | `rooms` | room-service | user-service, gift-service, chat-service |
 | `room_watch_events` | room-service | user-service (daily tasks) |
@@ -73,7 +78,8 @@ Cross-service writes that remain, by design or pending a decision:
 | im-gateway | 8081 | WebSocket at `/ws` |
 | SRS RTMP | 1935 | OBS publishing |
 | SRS HTTP | 8080 inside the container | Proxied by nginx as `/live` |
-| MySQL / Redis / Kafka / etcd / MinIO | Compose internal network | Must not be publicly exposed |
+| MySQL / Redis / Kafka (optional) | Compose internal network | Must not be publicly exposed; Redis requires `GOLIVE_REDIS_PASSWORD` |
+| pprof | 6060-6068 on 127.0.0.1 inside each service container | `docker compose exec <service> wget -qO- http://127.0.0.1:<port>/debug/pprof/` |
 | Grafana / Prometheus / Jaeger | Bound to 127.0.0.1 | Access through an SSH tunnel |
 
 ## Directory structure
@@ -95,7 +101,7 @@ golive-backend/
     nginx*.conf         HTTP/HTTPS entry points
     srs.conf            SRS configuration
     observability/      Prometheus, OTel, Grafana
-  pkg/                  Shared packages: JWT, idempotency, error codes, logging, uploads, content policies, etc.
+  pkg/                  Shared packages: JWT, error codes, logging, HTTP server timeouts, uploads, content policies, etc.
 ```
 
 ## Run locally
@@ -155,6 +161,7 @@ balance change and stays in user-service.
   `Idempotent-Replayed: true`.
 - Insufficient balance returns HTTP 402 with `reason=insufficient_coin`.
 - Stream information returned to viewers must not expose `streamKey`.
-- WebSocket handshake: `/ws?roomId=<id>&token=<jwt>`.
+- WebSocket handshake: `/ws?roomId=<id>`, with the JWT offered as the subprotocol `auth.<jwt>` next to
+  `golive.v1` (never in the URL, which ends up in access logs).
 
 See `../docs/integration.md` for integration details and `../docs/deploy-git-bare.md` for deployment instructions.

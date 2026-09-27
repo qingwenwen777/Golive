@@ -372,6 +372,13 @@ export default function LiveRoomPage() {
   const exclusiveLocked = Boolean(
     displayStream.fanClubOnly && !displayStream.fanClubMember && !ownsStream,
   );
+  // The badge list can show a membership the room has not caught up with yet
+  // (right after joining); the join must not be offered again meanwhile.
+  const holdsOwnerFanBadge = Boolean(
+    displayStream.ownerId &&
+    fanBadges.data?.some((badge) => badge.creatorId === displayStream.ownerId),
+  );
+  const joinPending = joinFanClub.isPending || (isAuthed && fanBadges.isPending);
   const ownerName = streamChannelName(displayStream, currentUser);
   const openSuperChat = () => {
     if (exclusiveLocked) {
@@ -429,8 +436,14 @@ export default function LiveRoomPage() {
       ];
     });
   };
+  const refreshFanClubAccess = () => {
+    void queryClient.invalidateQueries({ queryKey: ['room', roomId] });
+    void queryClient.invalidateQueries({ queryKey: ['channel-appointments'] });
+    void queryClient.invalidateQueries({ queryKey: ['fan-badges'] });
+    void refetch();
+  };
   const handleJoinFanClub = () => {
-    if (!displayStream.ownerId || ownsStream) return;
+    if (!displayStream.ownerId || ownsStream || holdsOwnerFanBadge) return;
     if (!isAuthed) {
       openLogin(handleJoinFanClub);
       return;
@@ -439,11 +452,17 @@ export default function LiveRoomPage() {
       { creatorId: displayStream.ownerId },
       {
         onSuccess: (order) => {
+          // A retried join can replay an earlier attempt that lacked coins.
+          if (order.status !== 'success') {
+            toast.error(
+              t('channel.fanBadge.insufficient', {
+                defaultValue: 'Not enough coins to join the fan club.',
+              }),
+            );
+            return;
+          }
           updateLocalFanBadge(order.totalCoin || 1000, true);
-          void queryClient.invalidateQueries({ queryKey: ['room', roomId] });
-          void queryClient.invalidateQueries({ queryKey: ['channel-appointments'] });
-          void queryClient.invalidateQueries({ queryKey: ['fan-badges'] });
-          void refetch();
+          refreshFanClubAccess();
           toast.success(
             t('liveRoom.fanClubExclusive.joined', {
               defaultValue: 'Fan club joined. The room is unlocked.',
@@ -451,6 +470,15 @@ export default function LiveRoomPage() {
           );
         },
         onError: (err) => {
+          if (err.reason === 'already_fan_club_member') {
+            refreshFanClubAccess();
+            toast.info(
+              t('liveRoom.fanClubExclusive.alreadyMember', {
+                defaultValue: 'You are already in this fan club. No coins were charged.',
+              }),
+            );
+            return;
+          }
           if (err.reason === 'insufficient_coin') {
             toast.error(
               t('channel.fanBadge.insufficient', {
@@ -524,7 +552,8 @@ export default function LiveRoomPage() {
           defaultValue: 'Join the fan club to unlock replay chat.',
         })}
         authed={isAuthed}
-        pending={joinFanClub.isPending || fanBadges.isPending}
+        pending={joinPending}
+        member={holdsOwnerFanBadge}
         onJoin={handleJoinFanClub}
         onLogin={() => openLogin(handleJoinFanClub)}
       />
@@ -661,7 +690,8 @@ export default function LiveRoomPage() {
                 stream={stream}
                 appointment={appointment}
                 authed={isAuthed}
-                pending={joinFanClub.isPending || fanBadges.isPending}
+                pending={joinPending}
+                member={holdsOwnerFanBadge}
                 scheduled
                 onJoin={handleJoinFanClub}
                 onLogin={() => openLogin(handleJoinFanClub)}
@@ -920,7 +950,8 @@ export default function LiveRoomPage() {
           stream={displayStream}
           appointment={appointment}
           authed={isAuthed}
-          pending={joinFanClub.isPending || fanBadges.isPending}
+          pending={joinPending}
+          member={holdsOwnerFanBadge}
           scheduled={isScheduledRoom || roomIsStarting}
           onJoin={handleJoinFanClub}
           onLogin={() => openLogin(handleJoinFanClub)}
@@ -1138,6 +1169,7 @@ function ReplayRoomView({
   lockedChatLabel,
   authed,
   pending,
+  member,
   onJoin,
   onLogin,
 }: {
@@ -1154,6 +1186,7 @@ function ReplayRoomView({
   lockedChatLabel?: string;
   authed: boolean;
   pending: boolean;
+  member?: boolean;
   onJoin: () => void;
   onLogin: () => void;
 }) {
@@ -1192,6 +1225,7 @@ function ReplayRoomView({
               stream={stream}
               authed={authed}
               pending={pending}
+              member={member}
               mode="replay"
               onJoin={onJoin}
               onLogin={onLogin}
@@ -1437,6 +1471,7 @@ function FanClubLockedPlayer({
   appointment,
   authed,
   pending,
+  member = false,
   scheduled = false,
   mode,
   onJoin,
@@ -1446,6 +1481,8 @@ function FanClubLockedPlayer({
   appointment?: AppointmentItem | null;
   authed: boolean;
   pending: boolean;
+  /** Already holds the creator's fan badge; the room has not unlocked yet. */
+  member?: boolean;
   scheduled?: boolean;
   mode?: 'live' | 'scheduled' | 'replay';
   onJoin: () => void;
@@ -1524,15 +1561,19 @@ function FanClubLockedPlayer({
             <button
               type="button"
               className="gl-fan-exclusive-join"
-              disabled={pending}
+              disabled={pending || member}
               onClick={authed ? onJoin : onLogin}
             >
               <UserPlus size={17} />
-              {pending
-                ? t('liveRoom.fanClubExclusive.joining', { defaultValue: 'Joining...' })
-                : authed
-                  ? t('liveRoom.fanClubExclusive.join', { defaultValue: 'Join fan club' })
-                  : t('liveRoom.fanClubExclusive.signIn', { defaultValue: 'Sign in to join' })}
+              {member
+                ? t('liveRoom.fanClubExclusive.unlocking', {
+                    defaultValue: 'Joined. Unlocking the room...',
+                  })
+                : pending
+                  ? t('liveRoom.fanClubExclusive.joining', { defaultValue: 'Joining...' })
+                  : authed
+                    ? t('liveRoom.fanClubExclusive.join', { defaultValue: 'Join fan club' })
+                    : t('liveRoom.fanClubExclusive.signIn', { defaultValue: 'Sign in to join' })}
             </button>
           </div>
         </div>

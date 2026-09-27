@@ -18,6 +18,7 @@ const wsMock = vi.hoisted(() => ({
   lastMessage: null as { data: string } | null,
   readyState: 'open',
   retryCount: 0,
+  options: undefined as unknown,
 }));
 
 const chatMock = vi.hoisted(() => ({
@@ -25,12 +26,15 @@ const chatMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@/hooks/useWebSocket', () => ({
-  useWebSocket: () => ({
-    sendMessage: wsMock.sendMessage,
-    lastMessage: wsMock.lastMessage,
-    readyState: wsMock.readyState,
-    retryCount: wsMock.retryCount,
-  }),
+  useWebSocket: (_url: string | null, options?: unknown) => {
+    wsMock.options = options;
+    return {
+      sendMessage: wsMock.sendMessage,
+      lastMessage: wsMock.lastMessage,
+      readyState: wsMock.readyState,
+      retryCount: wsMock.retryCount,
+    };
+  },
 }));
 
 vi.mock('@/api/chat', () => ({
@@ -114,6 +118,14 @@ describe('useRoomRealtime', () => {
     expect(slice.messages).toHaveLength(0);
     expect(slice.bullets).toHaveLength(0);
     expect(loadRecentChatMessages('room-1', 1_700_000_000_000)).toHaveLength(0);
+  });
+
+  // The socket used to give up after 10 attempts (about 3 minutes), e.g. while
+  // the gateway refused a crowded NAT address, and the room kept no chat or
+  // viewer count until a reload.
+  it('keeps reconnecting to the gateway for as long as the room is open', () => {
+    renderRealtime();
+    expect(wsMock.options).toMatchObject({ reconnect: true, maxRetries: Infinity });
   });
 
   it('turns server chat into one chat message and one danmu bullet', async () => {

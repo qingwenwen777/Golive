@@ -69,6 +69,9 @@ func NewRoomService(rooms *repo.RoomRepo, flvBase string, social ...*repo.Social
 
 func (s *RoomService) SetReplayService(replay *ReplayService) {
 	s.replay = replay
+	if replay != nil {
+		replay.OnReplayChanged(s.hotReplays.clear)
+	}
 }
 
 func (s *RoomService) SetLiveRepo(live *repo.LiveRepo) {
@@ -79,13 +82,14 @@ func (s *RoomService) SetBlockChecker(blocks ChannelBlockChecker) {
 	s.blocks = blocks
 }
 
-// playbackURL builds the public HTTP-FLV URL for a live room. Viewers receive
-// this; it names the stream by room id so the publish key stays server-side.
+// playbackURL builds the HTTP-FLV URL for a live room. Viewers allowed to
+// watch receive this; it names the stream by its play name, which keeps the
+// publish key server-side and cannot be derived from the public room id.
 func (s *RoomService) playbackURL(r *model.Room) string {
 	if r == nil || r.Status != model.StatusLive || r.StreamKey == "" {
 		return ""
 	}
-	return s.flvBase + "/" + r.ID + ".flv"
+	return s.flvBase + "/" + playStreamName(r.ID, r.StreamKey) + ".flv"
 }
 
 // NormalizeCategory accepts empty / "all" / "すべて" as no filter; else trimmed input.

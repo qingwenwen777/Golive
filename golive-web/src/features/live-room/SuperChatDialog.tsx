@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { tierSpec } from '@/constants/chat';
-import { amountToTier, SC_MAX_TEXT_BY_TIER } from '@/types/gift';
+import { amountToTier, SC_MAX_TEXT_BY_TIER, superChatTextLength } from '@/types/gift';
 import { useMe } from '@/api/auth';
 import { useSendSuperChat, newRequestId } from '@/api/gift';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -50,8 +50,11 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
   const spec = tierSpec(tier);
   const canText = tier >= 1;
   const maxText = SC_MAX_TEXT_BY_TIER[tier];
+  // Lowering the amount can leave the text over the new tier's limit, which
+  // the server rejects; it has to be shortened before sending.
+  const textTooLong = canText && superChatTextLength(text.trim()) > maxText;
   const insufficient = amount > balance;
-  const disabled = send.isPending || amount < MIN;
+  const disabled = send.isPending || amount < MIN || (textTooLong && !insufficient);
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const amountLabel = formatSuperChatAmount(amount, locale);
 
@@ -136,6 +139,13 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             toast.error(
               t('contentPolicy.userRestricted', {
                 defaultValue: 'Your account is restricted from sending interactive content.',
+              }),
+            );
+          } else if (err.reason === 'super_chat_text_too_long') {
+            toast.error(
+              t('liveRoom.superChatDialog.textTooLong', {
+                count: maxText,
+                defaultValue: 'Message is too long for this tier (max {{count}} characters).',
               }),
             );
           } else {
@@ -235,8 +245,10 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             value={text}
             onChange={(e) => {
               if (!canText) return;
-              if (e.target.value.length > maxText) return;
-              setText(e.target.value);
+              const next = e.target.value;
+              // Over the limit, only edits that shorten the text go through.
+              if (superChatTextLength(next) > maxText && next.length >= text.length) return;
+              setText(next);
             }}
             placeholder={
               canText
@@ -252,11 +264,25 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             className="gl-sc-textarea"
           />
           {canText && (
-            <div className="mt-1 text-right text-xs text-text-secondary">
-              {text.length} / {maxText}
+            <div
+              className={cn(
+                'mt-1 text-right text-xs',
+                textTooLong ? 'text-red-500' : 'text-text-secondary',
+              )}
+            >
+              {superChatTextLength(text)} / {maxText}
             </div>
           )}
         </div>
+
+        {textTooLong && (
+          <div className="text-red-500 text-xs">
+            {t('liveRoom.superChatDialog.textTooLong', {
+              count: maxText,
+              defaultValue: 'Message is too long for this tier (max {{count}} characters).',
+            })}
+          </div>
+        )}
 
         {insufficient && (
           <div className="text-red-500 text-xs">

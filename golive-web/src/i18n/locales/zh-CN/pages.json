@@ -262,6 +262,7 @@
       "upgradeTextPlaceholder": "升级到档位 1+ 后可附带留言",
       "insufficientCoins": "coins 不足",
       "failed": "SuperChat 发送失败",
+      "textTooLong": "留言超出当前档位的字数上限（最多 {{count}} 字）。",
       "insufficientBalance": "余额不足（还差 {{coins}}）。",
       "cancel": "取消",
       "topUp": "去充值",
@@ -283,6 +284,8 @@
       "join": "一键加入粉丝团",
       "joining": "加入中...",
       "joined": "已加入粉丝团，直播间已解锁。",
+      "alreadyMember": "你已经在这个粉丝团里了，本次未扣除 coins。",
+      "unlocking": "已加入粉丝团，正在解锁直播间...",
       "signIn": "登录后加入"
     }
   },
@@ -416,6 +419,7 @@
       "pending": "购买中...",
       "success": "粉丝灯牌已点亮。",
       "insufficient": "coins 不足，无法购买粉丝灯牌。",
+      "alreadyMember": "你已经在这个粉丝团里了，本次未扣除 coins。",
       "failed": "粉丝灯牌购买失败。"
     },
     "message": "私信"
@@ -662,6 +666,7 @@
         "weakPassword": "新密码至少 8 位，且必须同时包含字母和数字。",
         "passwordMismatch": "两次输入的新密码不一致。",
         "usernameTaken": "这个用户名已被使用。",
+        "displayNameTaken": "这个昵称与其他用户的用户名相同，请换一个。",
         "usernameCooldown": "用户名冷却中，{{date}} 后可再次修改。",
         "usernameCooldownUnknown": "用户名修改仍在冷却期。",
         "invalidCurrentPassword": "当前密码不正确。",
@@ -672,6 +677,7 @@
         "emailTaken": "该邮箱已被其他账号绑定。",
         "invalidEmailCode": "邮箱验证码错误或已过期。",
         "emailCodeTooSoon": "请稍后再请求邮箱验证码。",
+        "emailCodeLimit": "该邮箱请求验证码的次数过多，请稍后再试。",
         "emailCodeUnavailable": "邮箱验证暂时不可用。",
         "googleLoadFailed": "无法加载 Google 登录。",
         "googleEmailExists": "这个 Google 邮箱已经属于另一个 GoLive 账号。",
@@ -1378,6 +1384,7 @@
         "roleSaved": "用户角色已更新。",
         "banned": "用户已封禁。",
         "unbanned": "用户已解封。",
+        "liveEndFailed": "该用户的直播未能立即结束，系统将在几分钟内自动结束。",
         "invalidAmount": "请输入有效金额。",
         "coinsSaved": "Coin 余额已更新。",
         "tabs": {
@@ -1942,7 +1949,10 @@
         "claimLockedBody": "若未完成，将于 {{time}} 自动释放。",
         "claimLockedBodyNoExpiry": "该举报已被其他审核人锁定。",
         "claimOpenTitle": "待领取审核",
-        "claimOpenBody": "领取后即可锁定并处置这条举报。"
+        "claimOpenBody": "领取后即可锁定并处置这条举报。",
+        "unverifiedTag": "未核实",
+        "unverifiedTitle": "快照未经核实",
+        "unverifiedBody": "这条举报早于服务端核验，且被举报内容已不存在，因此显示的用户和内容来自举报人的客户端，可能不实。只能驳回。"
       },
       "actions": {
         "review": "标记处理中",

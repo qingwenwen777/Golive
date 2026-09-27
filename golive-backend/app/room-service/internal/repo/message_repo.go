@@ -208,7 +208,7 @@ func (r *MessageRepo) ListDirectThreads(ctx context.Context, userID string, page
 	}
 	var rows []model.DirectThread
 	err := tx.Order("last_message_at DESC, updated_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rows).Error
 	return rows, total, err
@@ -298,7 +298,7 @@ func (r *MessageRepo) DirectMessages(ctx context.Context, threadID, userID strin
 	}
 	var rows []model.DirectMessage
 	err := tx.Order("created_at DESC, id DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rows).Error
 	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
@@ -470,7 +470,7 @@ func (r *MessageRepo) ListBlocks(ctx context.Context, blockerID string, page, si
 	}
 	var rows []model.UserBlock
 	err := tx.Order("updated_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rows).Error
 	return rows, total, err
@@ -698,13 +698,17 @@ func syncFanGroupMember(tx *gorm.DB, groupID, userID string, sanction fanGroupSa
 		// Kicked from another of the creator's groups: leave this row inactive.
 		return nil
 	}
-	// muted_until is left alone so a sync never lifts an owner/admin mute.
+	// A sync never lifts an owner/admin mute: muted_until only moves later,
+	// to a mute carried from another of the creator's groups.
 	updates := map[string]any{
 		"kicked_at":           nil,
 		"kick_reason":         "",
 		"rejoin_requested_at": nil,
 		"rejoin_rejected_at":  nil,
 		"updated_at":          now,
+	}
+	if sanction.mutedUntil != nil && (member.MutedUntil == nil || sanction.mutedUntil.After(*member.MutedUntil)) {
+		updates["muted_until"] = sanction.mutedUntil
 	}
 	if member.Role == "" {
 		updates["role"] = model.FanGroupRoleMember
@@ -1013,7 +1017,7 @@ COALESCE(fb.level, 0) AS fan_badge_level
 		Joins("LEFT JOIN fan_badges AS fb ON fb.user_id = msg.sender_id AND fb.creator_id = fg.creator_id").
 		Where("msg.group_id = ?", groupID).
 		Order("msg.created_at DESC, msg.id DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Scan(&rows).Error
 	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {

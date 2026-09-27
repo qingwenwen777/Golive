@@ -29,6 +29,8 @@ var (
 	ErrUnauthorized            = errcode.New(401, "Unauthorized")
 	ErrInvalidRegister         = errcode.New(http.StatusBadRequest, "Invalid registration details")
 	ErrUsernameTaken           = errcode.New(http.StatusConflict, "Username already exists")
+	ErrUsernameIsDisplayName   = errcode.New(http.StatusConflict, "Username is another user's display name").WithReason("username_taken")
+	ErrDisplayNameTaken        = errcode.New(http.StatusConflict, "Display name is another user's username").WithReason("display_name_taken")
 	ErrEmailTaken              = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
 	ErrEmailNotFound           = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
 	ErrEmailUserMismatch       = errcode.New(http.StatusNotFound, "Username and email do not match").WithReason("email_user_mismatch")
@@ -51,6 +53,19 @@ const (
 	loginFailureWindow  = 5 * time.Minute
 	loginCooldownPeriod = time.Minute
 )
+
+// NameConflict returns the API error for a new username or display name that
+// would pass for another user's (see repo.ErrUsernameIsDisplayName and
+// repo.ErrDisplayNameTaken), or nil for any other error.
+func NameConflict(err error) error {
+	switch {
+	case errors.Is(err, repo.ErrUsernameIsDisplayName):
+		return ErrUsernameIsDisplayName
+	case errors.Is(err, repo.ErrDisplayNameTaken):
+		return ErrDisplayNameTaken
+	}
+	return nil
+}
 
 type UserStore interface {
 	FindByUsername(ctx context.Context, username string) (*model.User, error)
@@ -256,6 +271,9 @@ func (s *AuthService) Register(ctx context.Context, username, password, displayN
 		return nil, errors.New("user store cannot create users")
 	}
 	if err := creator.Create(ctx, u); err != nil {
+		if conflict := NameConflict(err); conflict != nil {
+			return nil, conflict
+		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
@@ -307,6 +325,9 @@ func (s *AuthService) RegisterWithInvite(ctx context.Context, username, password
 		return nil, errors.New("user store cannot register with invites")
 	}
 	if err := registrar.RegisterWithInvite(ctx, u, inviteCode); err != nil {
+		if conflict := NameConflict(err); conflict != nil {
+			return nil, conflict
+		}
 		switch {
 		case errors.Is(err, repo.ErrUsernameTaken):
 			return nil, ErrUsernameTaken
@@ -426,6 +447,19 @@ func (s *AuthService) Refresh(ctx context.Context, oldRefresh string) (*RefreshR
 			return nil, ErrInvalidRefresh
 		}
 		return nil, fmt.Errorf("lookup refresh: %w", err)
+	}
+	// A banned user signs in again instead (login stays open so the client
+	// learns about the ban and can reach the appeal page), whatever tokens
+	// the ban's revocation missed.
+	u, err := s.users.FindByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrUserNotFound) {
+			return nil, ErrInvalidRefresh
+		}
+		return nil, fmt.Errorf("find user: %w", err)
+	}
+	if u.Banned {
+		return nil, ErrUserBanned
 	}
 	access, err := s.signAccess(userID)
 	if err != nil {

@@ -96,8 +96,6 @@ func TestHistoryByChannelHidesCreatorMetricsFromNonOwners(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, seedHotReplayMetricTables(db))
-	// ResolveOwnerID orders users by updated_at.
-	require.NoError(t, db.Exec("ALTER TABLE users ADD COLUMN updated_at DATETIME").Error)
 
 	rooms := repo.NewRoomRepo(db)
 	require.NoError(t, rooms.AutoMigrate())

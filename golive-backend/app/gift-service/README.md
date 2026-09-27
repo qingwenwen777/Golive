@@ -3,7 +3,7 @@
 Gift catalog, tipping, SuperChat, and a transactional outbox.
 
 - HTTP: `:8092` (unprefixed routes; api-gateway exposes them under `/api`)
-- pprof: `:6067`
+- pprof: `127.0.0.1:6067` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Endpoints
 
@@ -11,7 +11,8 @@ Gift catalog, tipping, SuperChat, and a transactional outbox.
 | ---- | ---------------- | ---- | ------------------------------------------------------------------- |
 | GET | `/gifts` | No | Gift catalog |
 | POST | `/gifts/send` | JWT | Send a gift; idempotent via X-Request-Id; 402 for insufficient balance |
-| POST | `/super-chats` | JWT | SuperChat; map amount→tier; reject tier 0; otherwise follow gifts/send rules |
+| POST | `/gifts/fan-clubs/join` | JWT | Join a creator's fan club (Fan Light price); 409 `already_fan_club_member` for an existing member, without charging |
+| POST | `/super-chats` | JWT | SuperChat; map amount→tier; reject tier 0 and text over the tier's limit; otherwise follow gifts/send rules |
 
 ## Response shapes (matching src/mocks/handlers/gift.ts)
 
@@ -24,6 +25,8 @@ HTTP 402 + body={...GiftOrder, reason, message}        # Insufficient balance
                                                      #   order.status="failed", failReason="insufficient_coin"
                                                      #   Cache failures too; the same requestId still returns 402 without another debit.
 HTTP 400 + {message: "Bad request" | "Missing requestId" | "Amount below minimum tier"}
+HTTP 400 + {message, reason: "super_chat_text_too_long"}  # SC text over its tier's limit: 50/100/150/200/200
+                                                     #   characters (runes) for tiers 1-5, after trimming
 HTTP 401 + {message: "Unauthorized"}
 HTTP 404 + {message: "Gift not found"}
 ```
@@ -130,6 +133,7 @@ Coverage:
   - Failure does **not** write to the outbox (failed orders are not broadcast).
   - `AmountToTier`: 12 boundary values.
   - Reject SC tier=0 without debiting.
+  - Reject SC text over its tier's limit without debiting; every limit fits the columns that store the text.
 
 - **outbox_service_test.go** (5 cases)
   - Fail twice, retry, then succeed on the third attempt → status=sent.
@@ -141,7 +145,8 @@ Coverage:
 - **\*_mysql_test.go** (run only when `GOLIVE_TEST_MYSQL_DSN` is set, e.g.
   `root:root@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC`; each test creates
   and drops its own database): bet settle/cancel races, concurrent fan-badge
-  contributions, and concurrent outbox claims/drains.
+  contributions and fan club joins, concurrent outbox claims/drains, and SC
+  text at the column limits.
 
 ## Verify against the frontend mock
 

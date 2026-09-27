@@ -78,12 +78,10 @@ func (r *RoomRepo) List(ctx context.Context, q ListQuery) ([]model.Room, int64, 
 	if q.Size > maxListSize {
 		q.Size = maxListSize
 	}
-	offset := (q.Page - 1) * q.Size
-
 	var rooms []model.Room
 	// Live first (already filtered), then newest start, then highest viewers.
 	if err := tx.Order("started_at DESC, viewers DESC").
-		Offset(offset).Limit(q.Size).Find(&rooms).Error; err != nil {
+		Scopes(pageWindow(q.Page, q.Size)).Limit(q.Size).Find(&rooms).Error; err != nil {
 		return nil, 0, err
 	}
 	return rooms, total, nil
@@ -392,6 +390,10 @@ func (r *RoomRepo) EndActiveByOwner(ctx context.Context, ownerID string, endedAt
 	return rooms, nil
 }
 
+// ResolveOwnerID maps a channel key to the owner's id: "ch-<id>" or a UUID
+// as is, else a user's username or display name (see userIDByName), else a
+// room's channel id or owner id, else a room's channel label when only one
+// owner uses it.
 func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -402,33 +404,74 @@ func (r *RoomRepo) ResolveOwnerID(ctx context.Context, key string) (string, erro
 		return key, nil
 	}
 
-	var ownerID string
-	err := r.db.WithContext(ctx).Raw(`
-SELECT id FROM users
-WHERE username = ? OR display_name = ?
+	ownerID, err := userIDByName(ctx, r.db, key)
+	switch {
+	case err == nil:
+		return ownerID, nil
+	case errors.Is(err, errUserNameAmbiguous):
+		return "", ErrRoomNotFound
+	case !errors.Is(err, ErrRoomNotFound) && !isMissingTable(err):
+		return "", err
+	}
+
+	err = r.db.WithContext(ctx).Raw(`
+SELECT owner_id FROM rooms
+WHERE channel_id = ? OR owner_id = ?
 ORDER BY updated_at DESC
 LIMIT 1
 `, key, key).Row().Scan(&ownerID)
 	if err == nil && strings.TrimSpace(ownerID) != "" {
 		return ownerID, nil
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) && !isMissingTable(err) {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", err
 	}
-
-	err = r.db.WithContext(ctx).Raw(`
-SELECT owner_id FROM rooms
-WHERE channel_id = ? OR owner_id = ? OR channel = ?
-ORDER BY updated_at DESC
-LIMIT 1
-`, key, key, key).Row().Scan(&ownerID)
-	if errors.Is(err, sql.ErrNoRows) || strings.TrimSpace(ownerID) == "" {
+	// Whoever goes live picks the room's channel label, so a label counts
+	// only while a single owner uses it.
+	var owners []string
+	if err := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("channel = ? AND owner_id <> ?", key, "").
+		Distinct("owner_id").Limit(2).
+		Pluck("owner_id", &owners).Error; err != nil {
+		return "", err
+	}
+	if len(owners) != 1 {
 		return "", ErrRoomNotFound
 	}
-	if err != nil {
+	return owners[0], nil
+}
+
+// errUserNameAmbiguous means several users have the display name a key names.
+var errUserNameAmbiguous = errors.New("display name belongs to several users")
+
+// userIDByName resolves a channel name to a user id. A username match always
+// wins. Display names are not unique and anyone can take one, so a display
+// name resolves only when exactly one user has it (errUserNameAmbiguous
+// otherwise), never to whoever changed their profile last. ErrRoomNotFound
+// means no user has the name.
+func userIDByName(ctx context.Context, db *gorm.DB, name string) (string, error) {
+	var ids []string
+	if err := db.WithContext(ctx).Table("users").
+		Where("username = ?", name).Limit(1).
+		Pluck("id", &ids).Error; err != nil {
 		return "", err
 	}
-	return ownerID, nil
+	if len(ids) == 1 {
+		return ids[0], nil
+	}
+	if err := db.WithContext(ctx).Table("users").
+		Where("display_name = ?", name).Limit(2).
+		Pluck("id", &ids).Error; err != nil {
+		return "", err
+	}
+	switch len(ids) {
+	case 0:
+		return "", ErrRoomNotFound
+	case 1:
+		return ids[0], nil
+	default:
+		return "", errUserNameAmbiguous
+	}
 }
 
 func isMissingTable(err error) bool {
@@ -455,7 +498,7 @@ func (r *RoomRepo) HistoryByOwner(ctx context.Context, ownerID string, page, siz
 	var rooms []model.Room
 	err := tx.
 		Order("COALESCE(ended_at, updated_at) DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rooms).Error
 	return rooms, total, err
@@ -477,7 +520,7 @@ func (r *RoomRepo) ReplayRoomsByOwner(ctx context.Context, ownerID string, page,
 	var rooms []model.Room
 	err := tx.
 		Order("COALESCE(replay_uploaded_at, ended_at, updated_at) DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rooms).Error
 	return rooms, total, err
@@ -493,8 +536,8 @@ func (r *RoomRepo) ReplayCandidateRoomsByOwner(ctx context.Context, ownerID stri
 }
 
 // ReplayRecoverableUploads returns ended rooms whose replay upload was
-// interrupted. Failed uploads are not retried: each attempt creates a new
-// Bunny video, so retrying on every restart would pile up orphaned videos.
+// interrupted. Failed uploads are retried separately, a limited number of
+// times (see ReplayRetryableUploads).
 func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]model.Room, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
@@ -512,17 +555,42 @@ func (r *RoomRepo) ReplayRecoverableUploads(ctx context.Context, limit int) ([]m
 	return rooms, err
 }
 
-// RecordingRooms returns the id and stream key of rooms whose DVR recording
-// may still be needed: active rooms, and ended rooms whose replay upload is
-// pending or in progress.
-func (r *RoomRepo) RecordingRooms(ctx context.Context) ([]model.Room, error) {
+// ReplayRetryableUploads returns ended rooms whose failed replay upload has
+// retries left: the upload is still on, and a retry is scheduled or the
+// failure predates retry scheduling (no attempts counted). A non-zero dueBy
+// limits it to the retries due by then; oldest first.
+func (r *RoomRepo) ReplayRetryableUploads(ctx context.Context, dueBy time.Time, limit int) ([]model.Room, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	tx := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("status = ? AND replay_upload_enabled = ? AND replay_status = ?", model.StatusEnded, true, model.ReplayStatusFailed)
+	if dueBy.IsZero() {
+		tx = tx.Where("(replay_retry_at IS NOT NULL OR replay_attempts = ?)", 0)
+	} else {
+		tx = tx.Where("(replay_retry_at <= ? OR (replay_retry_at IS NULL AND replay_attempts = ?))", dueBy, 0)
+	}
+	var rooms []model.Room
+	err := tx.Order("replay_retry_at ASC, COALESCE(ended_at, updated_at) ASC").
+		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+// RecordingRooms returns the rooms whose DVR recording may still be needed:
+// active rooms, and ended rooms with replay upload on whose upload is pending,
+// in progress, or failed and either has retries left (see
+// ReplayRetryableUploads) or gave up after keepFailedSince, as such a
+// recording is kept a while for a manual retry.
+func (r *RoomRepo) RecordingRooms(ctx context.Context, keepFailedSince time.Time) ([]model.Room, error) {
 	var rooms []model.Room
 	err := r.db.WithContext(ctx).Model(&model.Room{}).
-		Select("id", "stream_key").
-		Where("status IN ? OR (status = ? AND replay_upload_enabled = ? AND replay_status IN ?)",
+		Where("status IN ? OR (status = ? AND replay_upload_enabled = ? AND (replay_status IN ? OR "+
+			"(replay_status = ? AND (replay_retry_at IS NOT NULL OR replay_attempts = ? OR replay_failed_at >= ?))))",
 			[]string{model.StatusPublishing, model.StatusLive, model.StatusEnding},
 			model.StatusEnded, true,
-			[]string{model.ReplayStatusPending, model.ReplayStatusUploading}).
+			[]string{model.ReplayStatusPending, model.ReplayStatusUploading},
+			model.ReplayStatusFailed, 0, keepFailedSince).
 		Find(&rooms).Error
 	return rooms, err
 }
@@ -838,6 +906,47 @@ func (r *RoomRepo) SetReplayStatus(ctx context.Context, roomID, status, message 
 			"replay_status": status,
 			"replay_error":  message,
 		}).Error
+}
+
+// SetReplayFailed records a failed replay upload attempt: the reason shown
+// to the creator, the attempts failed so far, and when to retry (nil for no
+// retry). A deleted replay stays deleted; it reports whether the row changed.
+func (r *RoomRepo) SetReplayFailed(ctx context.Context, roomID, message string, attempts int, failedAt time.Time, retryAt *time.Time) (bool, error) {
+	var retry any
+	if retryAt != nil {
+		retry = *retryAt
+	}
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND replay_status <> ?", roomID, model.ReplayStatusDeleted).
+		Updates(map[string]any{
+			"replay_status":    model.ReplayStatusFailed,
+			"replay_error":     message,
+			"replay_attempts":  attempts,
+			"replay_failed_at": failedAt,
+			"replay_retry_at":  retry,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
+// ClaimReplayRetry moves a failed replay upload back to pending for a retry.
+// It reports false when the replay changed since attempts was read: deleted,
+// its upload turned off, or retried already.
+func (r *RoomRepo) ClaimReplayRetry(ctx context.Context, roomID string, attempts int) (bool, error) {
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("id = ? AND status = ? AND replay_upload_enabled = ? AND replay_status = ? AND replay_attempts = ?",
+			roomID, model.StatusEnded, true, model.ReplayStatusFailed, attempts).
+		Updates(map[string]any{
+			"replay_status":   model.ReplayStatusPending,
+			"replay_error":    "",
+			"replay_retry_at": nil,
+		})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
 }
 
 // SetReplayUploaded records the uploaded video, but only while the upload is

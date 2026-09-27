@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,6 +24,7 @@ import (
 	"github.com/qingwenwen777/golive/app/chat-service/internal/service"
 	"github.com/qingwenwen777/golive/pkg/chatfilter"
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
+	"github.com/qingwenwen777/golive/pkg/httpserver"
 	"github.com/qingwenwen777/golive/pkg/logger"
 	"github.com/qingwenwen777/golive/pkg/obs"
 )
@@ -77,14 +77,21 @@ func main() {
 	pub := repo.NewPublisher(rdb)
 	svc := service.New(f, limiter, danmuRepo, pub)
 
-	cons, err := consumer.New(consumer.Config{
-		Brokers: cfg.Kafka.Brokers,
-		Topic:   cfg.Kafka.Topic,
-		Group:   cfg.Kafka.Group,
-		Workers: cfg.Kafka.Workers,
-	}, svc)
-	if err != nil {
-		log.Fatal("kafka client", zap.Error(err))
+	// The Kafka consumer is optional: with kafka.enabled=false (the default)
+	// nothing is created, instead of a client retrying an absent broker.
+	var cons *consumer.Consumer
+	if cfg.Kafka.Enabled {
+		cons, err = consumer.New(consumer.Config{
+			Brokers: cfg.Kafka.Brokers,
+			Topic:   cfg.Kafka.Topic,
+			Group:   cfg.Kafka.Group,
+			Workers: cfg.Kafka.Workers,
+		}, svc)
+		if err != nil {
+			log.Fatal("kafka client", zap.Error(err))
+		}
+	} else {
+		log.Info("kafka consumer disabled (kafka.enabled=false); live chat is persisted from Redis pub/sub")
 	}
 
 	histH := handler.NewHistoryHandler(svc, cfg.Room.HistoryDefaultLimit, cfg.Room.HistoryMaxLimit)
@@ -92,25 +99,22 @@ func main() {
 	if cfg.Internal.Token == "" {
 		log.Warn("internal.token is empty: /internal endpoints reject every call")
 	}
-	httpSrv := &http.Server{Addr: cfg.Service.HTTPAddr, Handler: r}
-
-	go func() {
-		if err := http.ListenAndServe(cfg.Service.PprofAddr, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Warn("pprof exit", zap.Error(err))
-		}
-	}()
+	httpSrv := httpserver.New(cfg.Service.HTTPAddr, r)
+	httpserver.StartPprof(cfg.Service.PprofAddr, log)
 
 	consumerCtx, cancelConsumer := context.WithCancel(context.Background())
 	defer cancelConsumer()
-	go func() {
-		log.Info("kafka consumer started",
-			zap.Strings("brokers", cfg.Kafka.Brokers),
-			zap.String("topic", cfg.Kafka.Topic),
-			zap.Int("workers", cfg.Kafka.Workers))
-		if err := cons.Run(consumerCtx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Fatal("consumer exit", zap.Error(err))
-		}
-	}()
+	if cons != nil {
+		go func() {
+			log.Info("kafka consumer started",
+				zap.Strings("brokers", cfg.Kafka.Brokers),
+				zap.String("topic", cfg.Kafka.Topic),
+				zap.Int("workers", cfg.Kafka.Workers))
+			if err := cons.Run(consumerCtx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Fatal("consumer exit", zap.Error(err))
+			}
+		}()
+	}
 
 	// Redis pub/sub subscriber for live-chat persistence. This is what
 	// actually writes danmus to MySQL in the current deployment, because

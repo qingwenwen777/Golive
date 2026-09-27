@@ -175,6 +175,38 @@ WHERE id = ?
 	return strings.TrimSpace(role) == "admin", nil
 }
 
+// IsBanned applies room-service's ban rule: user-service records a ban in
+// both users.banned and user_moderation_states.banned, and either counts.
+func (r *AdminRepo) IsBanned(ctx context.Context, userID string) (bool, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return false, nil
+	}
+	var banned bool
+	err := r.db.WithContext(ctx).Raw(`
+SELECT COALESCE(banned, false)
+FROM users
+WHERE id = ?
+`, userID).Row().Scan(&banned)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+	if banned {
+		return true, nil
+	}
+	var states int64
+	err = r.db.WithContext(ctx).Raw(`
+SELECT COUNT(*)
+FROM user_moderation_states
+WHERE user_id = ? AND banned = ?
+`, userID, true).Row().Scan(&states)
+	// user-service creates the table; until it has, nobody is banned in it.
+	if err != nil && !isMissingTable(err) {
+		return false, err
+	}
+	return states > 0, nil
+}
+
 func (r *AdminRepo) EconomySummary(ctx context.Context) (AdminEconomySummary, error) {
 	var out AdminEconomySummary
 	today := startOfDay(time.Now().UTC())

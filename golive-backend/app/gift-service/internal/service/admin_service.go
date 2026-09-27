@@ -23,6 +23,10 @@ func (s *AdminService) IsAdmin(ctx context.Context, userID string) (bool, error)
 	return s.admin.IsAdmin(ctx, userID)
 }
 
+func (s *AdminService) IsBanned(ctx context.Context, userID string) (bool, error) {
+	return s.admin.IsBanned(ctx, userID)
+}
+
 func (s *AdminService) EconomySummary(ctx context.Context) (repo.AdminEconomySummary, error) {
 	return s.admin.EconomySummary(ctx)
 }

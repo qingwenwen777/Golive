@@ -20,11 +20,12 @@ import (
 
 // fakeSRS serves SRS 5's GET /api/v1/streams/ (paged by start/count, count
 // at least 10, every stream listed with its publish state) and DELETE
-// /api/v1/clients/{id}.
+// /api/v1/clients/{id}, which ends the kicked client's publish.
 type fakeSRS struct {
 	mu          sync.Mutex
 	publishers  map[string]string // stream name -> publisher client id
 	idle        []string          // streams listed without a publisher
+	kicked      []string          // client ids, in kick order
 	down        bool
 	ignoreStart bool
 	listCalls   int
@@ -52,6 +53,12 @@ func (f *fakeSRS) setDown(down bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.down = down
+}
+
+func (f *fakeSRS) kickedClients() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.kicked...)
 }
 
 func (f *fakeSRS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +102,13 @@ func (f *fakeSRS) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": 0, "server": "vid-test", "streams": page})
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/api/v1/clients/"):
+		clientID := strings.TrimPrefix(r.URL.Path, "/api/v1/clients/")
+		f.kicked = append(f.kicked, clientID)
+		for stream, publisher := range f.publishers {
+			if publisher == clientID {
+				delete(f.publishers, stream)
+			}
+		}
 		_, _ = w.Write([]byte(`{"code":0}`))
 	default:
 		http.NotFound(w, r)
@@ -169,7 +183,7 @@ func TestReconcilerKeepsLongLiveKeysAlive(t *testing.T) {
 	env.svc.SetSRSAPIBase(base)
 	st := startTestLive(t, env.svc, "owner-marathon")
 	publishTestLiveClient(t, env.svc, st.StreamKey, "client-marathon")
-	srs.setPublisher(st.ID, "client-marathon")
+	srs.setPublisher(publishStream(st.StreamKey), "client-marathon")
 
 	for range 5 {
 		env.mr.FastForward(50 * time.Minute)
@@ -192,7 +206,7 @@ func TestReconcilerRestoresPublishSessionFromSRS(t *testing.T) {
 	env.svc.SetSRSAPIBase(base)
 	st := startTestLive(t, env.svc, "owner-session")
 	publishTestLiveClient(t, env.svc, st.StreamKey, "client-session")
-	srs.setPublisher(st.ID, "client-session")
+	srs.setPublisher(publishStream(st.StreamKey), "client-session")
 	require.NoError(t, env.live.DeletePublishSession(ctx, publishSecret(st.StreamKey)))
 
 	env.svc.Reconcile(ctx)
@@ -200,6 +214,29 @@ func TestReconcilerRestoresPublishSessionFromSRS(t *testing.T) {
 	client, err := env.live.PublishSession(ctx, publishSecret(st.StreamKey))
 	require.NoError(t, err)
 	require.Equal(t, "client-session", client)
+}
+
+func TestReconcilerFindsRoomsByPlayName(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	srs, base := newFakeSRS(t)
+	t0 := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	env.svc.now = func() time.Time { return t0 }
+	st := startTestLive(t, env.svc, "owner-play-name")
+	publishTestLiveClient(t, env.svc, st.StreamKey, "client-play")
+	srs.setPublisher(publishStream(st.StreamKey), "client-play")
+
+	env.restarted(20*time.Second, t0.Add(time.Minute), base).Reconcile(ctx)
+	env.restarted(20*time.Second, t0.Add(2*time.Minute), base).Reconcile(ctx)
+	requireRoomStatus(t, env, st.ID, model.StatusLive)
+
+	// A stream under the bare room id is not the room's.
+	srs.setPublisher(publishStream(st.StreamKey), "")
+	srs.setPublisher(st.ID, "client-bare")
+	env.restarted(20*time.Second, t0.Add(3*time.Minute), base).Reconcile(ctx)
+	env.restarted(20*time.Second, t0.Add(4*time.Minute), base).Reconcile(ctx)
+	room := requireRoomStatus(t, env, st.ID, model.StatusEnded)
+	require.True(t, t0.Add(3*time.Minute).Equal(*room.EndedAt))
 }
 
 func TestReconcilerFinishesUnpublishGraceAfterRestart(t *testing.T) {
@@ -276,7 +313,7 @@ func TestReconcilerKeepsPublisherReconnectingWithinGrace(t *testing.T) {
 
 	// The publisher is back before the grace period ends.
 	require.NoError(t, svc.OnPublish(ctx, srsClientReq(st.StreamKey, "", "client-2")))
-	srs.setPublisher(st.ID, "client-2")
+	srs.setPublisher(publishStream(st.StreamKey), "client-2")
 	env.restarted(20*time.Second, t0.Add(5*time.Minute), base).Reconcile(ctx)
 	requireRoomStatus(t, env, st.ID, model.StatusLive)
 
@@ -313,6 +350,46 @@ func TestReconcilerDoesNotEndRoomsWhileSRSUnreachable(t *testing.T) {
 	requireRoomStatus(t, env, st.ID, model.StatusLive)
 	env.restarted(20*time.Second, t0.Add(5*time.Hour+time.Minute), base).Reconcile(ctx)
 	requireRoomStatus(t, env, st.ID, model.StatusEnded)
+}
+
+// A ban whose call to end the owner's live never got through is caught on the
+// next pass: rooms of banned owners end and their publishers are kicked.
+func TestReconcilerEndsLiveRoomsOfBannedOwners(t *testing.T) {
+	ctx := context.Background()
+	env := newLifecycleTestEnv(t)
+	srs, base := newFakeSRS(t)
+	env.svc.SetSRSAPIBase(base)
+	owners := []string{"owner-state-banned", "owner-user-banned", "owner-fine"}
+	streams := map[string]*model.Stream{}
+	for _, owner := range owners {
+		st := startTestLive(t, env.svc, owner)
+		publishTestLiveClient(t, env.svc, st.StreamKey, "client-"+owner)
+		srs.setPublisher(publishStream(st.StreamKey), "client-"+owner)
+		streams[owner] = st
+	}
+	moderation := repo.NewModerationRepo(env.db, env.rdb)
+	require.NoError(t, moderation.AutoMigrate())
+	require.NoError(t, env.db.Exec(`CREATE TABLE users (id varchar(36) primary key, banned boolean)`).Error)
+	env.svc.SetModerationRepo(moderation)
+
+	env.svc.Reconcile(ctx)
+	for _, owner := range owners {
+		requireRoomStatus(t, env, streams[owner].ID, model.StatusLive)
+	}
+
+	// user-service records a ban in both places; either one counts.
+	now := time.Now()
+	require.NoError(t, env.db.Create(&model.UserModerationState{UserID: "owner-state-banned", Banned: true, UpdatedAt: now, CreatedAt: now}).Error)
+	require.NoError(t, env.db.Exec(`INSERT INTO users (id, banned) VALUES (?, ?), (?, ?)`, "owner-user-banned", true, "owner-fine", false).Error)
+	env.svc.Reconcile(ctx)
+
+	for _, owner := range owners[:2] {
+		requireRoomStatus(t, env, streams[owner].ID, model.StatusEnded)
+		_, err := env.live.Resolve(ctx, publishSecret(streams[owner].StreamKey))
+		require.ErrorIs(t, err, repo.ErrStreamKeyNotFound)
+	}
+	requireRoomStatus(t, env, streams["owner-fine"].ID, model.StatusLive)
+	require.ElementsMatch(t, []string{"client-owner-state-banned", "client-owner-user-banned"}, srs.kickedClients())
 }
 
 func TestReconcilerEndsPublishingRoomAfterKeyExpires(t *testing.T) {

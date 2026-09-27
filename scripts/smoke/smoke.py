@@ -79,6 +79,12 @@ def srs_hook(action, stream, param="", client_id="", app="live"):
     return r.json().get("code")
 
 
+def play_name_and_secret(obs_key):
+    """Splits an OBS stream key, "<playName>?key=<secret>"."""
+    stream, _, query = obs_key.partition("?")
+    return stream, query[len("key="):] if query.startswith("key=") else ""
+
+
 def public_checks():
     """Anonymous, read-only checks: safe against production."""
     h = {"Origin": ORIGIN}
@@ -124,21 +130,24 @@ def main():
                                                      "channelName": "Smoke Creator"})
     room = r.json() if r.ok else {}
     room_id, obs_key = room.get("id", ""), room.get("streamKey", "")
-    secret = obs_key.split("key=", 1)[1] if "key=" in obs_key else ""
-    check("go live returns an OBS key of the form <roomId>?key=<secret>",
-          r.ok and obs_key.startswith(room_id + "?key=") and secret, f"{r.status_code} {r.text[:300]}")
-    check("SRS publish without a key is rejected", srs_hook("on_publish", room_id) != 0)
-    check("SRS publish with a wrong key is rejected", srs_hook("on_publish", room_id, "?key=lk_guess") != 0)
+    # OBS publishes to live/<obs_key>: the play name, then ?key=<secret>.
+    stream, secret = play_name_and_secret(obs_key)
+    check("go live returns an OBS key <playName>?key=<secret>, the play name not the bare room id",
+          r.ok and stream.startswith(room_id + "_") and secret, f"{r.status_code} {r.text[:300]}")
+    check("SRS publish without a key is rejected", srs_hook("on_publish", stream) != 0)
+    check("SRS publish with a wrong key is rejected", srs_hook("on_publish", stream, "?key=lk_guess") != 0)
     check("SRS publish with the leaked-style bare key as stream name is rejected",
           srs_hook("on_publish", secret) != 0)
+    check("SRS publish of the public room id, even with the correct key, is rejected",
+          srs_hook("on_publish", room_id, "?key=" + secret) != 0)
     check("SRS publish with the correct key is accepted",
-          srs_hook("on_publish", room_id, "?key=" + secret, client_id="cid-smoke-1") == 0)
+          srs_hook("on_publish", stream, "?key=" + secret, client_id="cid-smoke-1") == 0)
     r = requests.get(f"{API}/api/rooms", headers={"Origin": ORIGIN})
     items = r.json().get("items", []) if r.ok else []
     ours = [i for i in items if i.get("id") == room_id]
     pub = json.dumps(r.json()) if r.ok else ""
-    check("public room list shows the room with playback URL /live/<roomId>.flv",
-          ours and ours[0].get("playbackUrl", "").endswith(f"/{room_id}.flv"), json.dumps(ours)[:300])
+    check("public room list shows the room with playback URL /live/<playName>.flv",
+          ours and ours[0].get("playbackUrl", "").endswith(f"/{stream}.flv"), json.dumps(ours)[:300])
     check("public room list never contains the publish secret", secret and secret not in pub)
     check("miclink-* stream without a token is rejected", srs_hook("on_publish", f"miclink-{room_id}-x") != 0)
 
@@ -247,6 +256,32 @@ def main():
     r = creator.req("GET", f"/api/rooms/channels/ch-{creator.id}/history")
     check("the channel owner still sees their revenue", r.ok and "revenueCoin" in r.text, f"{r.status_code} {r.text[:200]}")
 
+    # ---------------- Fan-club-only playback stays with members ----------------
+    # The room id is public; the play name that plays the stream must not be.
+    r = creator.req("POST", "/api/rooms/live", json={"title": "Smoke members only", "category": "Gaming",
+                                                     "channelName": "Smoke Creator", "fanClubOnly": True})
+    fc_id = r.json().get("id", "") if r.ok else ""
+    fc_stream, fc_secret = play_name_and_secret(r.json().get("streamKey", "") if r.ok else "")
+    fc_tag = fc_stream[len(fc_id) + 1:] if fc_id and fc_stream.startswith(fc_id + "_") else ""
+    fc_live = bool(fc_tag) and srs_hook("on_publish", fc_stream, "?key=" + fc_secret, client_id="cid-smoke-fc") == 0
+    r = creator.req("GET", f"/api/rooms/{fc_id}")
+    check("the owner of a fan-club-only live gets its playback URL",
+          fc_live and r.ok and r.json().get("playbackUrl", "").endswith(f"/{fc_stream}.flv"), f"{r.status_code} {r.text[:200]}")
+    viewer.req("POST", f"/api/rooms/{fc_id}/watch")  # puts it in the viewer's watch history
+    seen = {  # the viewer never joined the creator's fan club (no fan_light gift)
+        "room detail": viewer.req("GET", f"/api/rooms/{fc_id}"),
+        "anonymous room detail": requests.get(f"{API}/api/rooms/{fc_id}", headers={"Origin": ORIGIN}),
+        "room list": viewer.req("GET", "/api/rooms?size=100"),
+        "recommendations": viewer.req("GET", "/api/rooms/recommended"),
+        "search": viewer.req("GET", "/api/rooms/search", params={"q": "Smoke members only"}),
+        "watch history": viewer.req("GET", "/api/rooms/library/history"),
+    }
+    leaks = [name for name, resp in seen.items() if fc_tag and fc_tag in resp.text]
+    check("a non-member never gets a fan-club-only live's play name",
+          fc_live and seen["room detail"].ok and fc_id in seen["room detail"].text and not leaks,
+          f"leaking: {leaks}; room detail {seen['room detail'].status_code} {seen['room detail'].text[:200]}")
+    creator.req("DELETE", "/api/rooms/live")
+
     # ---------------- Medium / boundaries ----------------
     r = requests.get(f"{API}/api/rooms?size=100000", headers={"Origin": ORIGIN})
     check("room list page size is capped at 100", r.ok and r.json().get("size", 0) <= 100, f"{r.status_code} {r.text[:200]}")
@@ -264,9 +299,17 @@ def main():
 async def chat_checks(sender, other, room_id):
     import websockets
     out = []
-    hdr = {"Origin": ORIGIN}
-    async with websockets.connect(f"{WS}?roomId={room_id}&token={other.token}", additional_headers=hdr) as watch, \
-               websockets.connect(f"{WS}?roomId={room_id}&token={sender.token}", additional_headers=hdr) as ws:
+    url = f"{WS}?roomId={room_id}"
+
+    def connect(token, target=url):
+        # Like the web client: the access token rides in Sec-WebSocket-Protocol
+        # next to golive.v1, never in the URL (URLs end up in access logs).
+        return websockets.connect(target, subprotocols=["golive.v1", f"auth.{token}"],
+                                  additional_headers={"Origin": ORIGIN})
+
+    async with connect(other.token) as watch, connect(sender.token) as ws:
+        out.append(("im-gateway answers with golive.v1, never echoing the token", ws.subprotocol == "golive.v1",
+                    f"subprotocol={(ws.subprotocol or '')[:16]!r}"))
         await asyncio.sleep(0.5)
         await ws.send(json.dumps({"type": "chat", "text": "hello from smoke", "clientId": "smoke-client-1",
                                   "username": "Smoke Creator", "userLevel": 99, "fanBadge": {"name": "fake"}}))
@@ -288,11 +331,19 @@ async def chat_checks(sender, other, room_id):
             out.append(("chat ignores a client-supplied level 99", '"userLevel": 99' not in blob, detail))
             out.append(("chat message id is server-assigned, not the client id",
                         got.get("id") and got.get("id") != "smoke-client-1", detail))
+    # A token in the URL is refused even next to a valid one in the header.
+    status = None
+    try:
+        async with connect(sender.token, target=f"{url}&token=smoke-in-url"):
+            pass
+    except websockets.exceptions.InvalidStatus as e:
+        status = e.response.status_code
+    out.append(("a token in the WebSocket URL is refused (400)", status == 400, f"status={status}"))
     # Per-user connection cap: the 9th socket for one user is refused.
     same_user, capped = [], None
     try:
         for _ in range(9):
-            same_user.append(await websockets.connect(f"{WS}?roomId={room_id}&token={other.token}", additional_headers=hdr))
+            same_user.append(await connect(other.token))
     except websockets.exceptions.InvalidStatus as e:
         capped = e.response.status_code
     for c in same_user:
@@ -302,8 +353,8 @@ async def chat_checks(sender, other, room_id):
     conns = []
     for tok in TOKENS:
         for _ in range(6):
-            conns.append(await websockets.connect(f"{WS}?roomId={room_id}&token={tok}", additional_headers=hdr))
-    async with websockets.connect(f"{WS}?roomId={room_id}&token={sender.token}", additional_headers=hdr) as ws:
+            conns.append(await connect(tok))
+    async with connect(sender.token) as ws:
         for i in range(20):
             await ws.send(json.dumps({"type": "chat", "text": f"burst {i}", "clientId": f"b{i}"}))
             if i == 5:

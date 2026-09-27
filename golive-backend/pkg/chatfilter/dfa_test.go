@@ -3,7 +3,9 @@ package chatfilter_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -87,6 +89,209 @@ func TestFilter_WordBoundaries(t *testing.T) {
 	// "this bad": "bad" alone is still a hit, but "s b" across the space is not.
 	require.Equal(t, "this ***", f.Replace("this bad"))
 	require.Equal(t, "badge", f.Replace("badge"))
+}
+
+// Reviewer-found false positives: an apostrophe counted as a word boundary,
+// so the "s" of "let's" started a word and "s hit" read as "shit".
+func TestFilter_ApostrophesStayInsideWords(t *testing.T) {
+	f := filter.New([]string{"shit", "sb"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	for _, in := range []string{
+		"let's hit the road",
+		"that's hit or miss",
+		"Chris's hit song",
+		"It’s hit the top 10",
+		"what's hit points",
+		"it's b",
+	} {
+		require.Equal(t, in, f.Replace(in))
+		require.False(t, f.HasMatch(in), "%q", in)
+	}
+	// Quote marks around a word are not apostrophes.
+	require.Equal(t, "'***'", f.Replace("'sb'"))
+	require.Equal(t, "‘***’", f.Replace("‘s b’"))
+}
+
+// A match that skips whitespace spans words, so it must end at a word
+// boundary as well as start at one: "an alternative" is not "an al" + "ternative".
+func TestFilter_MatchAcrossWordsMustEndAtBoundary(t *testing.T) {
+	f := filter.New([]string{"anal", "shit", "傻逼"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	require.Equal(t, "an alternative", f.Replace("an alternative"))
+	require.Equal(t, "in an algorithm", f.Replace("in an algorithm"))
+	require.False(t, f.HasMatch("an alarm"))
+
+	// Spaced-out words still hit, with or without trailing text.
+	require.Equal(t, "***", f.Replace("a n a l"))
+	require.Equal(t, "*** happens", f.Replace("s h i t happens"))
+	require.Equal(t, "***.s", f.Replace("s h i t.s"))
+	// Inside one token the match may still run into a suffix.
+	require.Equal(t, "***s", f.Replace("s.h.i.ts"))
+	// CJK has no word boundaries, next to Latin text or not.
+	require.Equal(t, "ok***lol", f.Replace("ok傻 逼lol"))
+}
+
+// Reviewer-found misses: separators are skipped in the text but were kept in
+// list entries, so "kill yourself" and "hand-job" could never match.
+func TestFilter_EntriesWithSeparatorsMatch(t *testing.T) {
+	f := filter.New([]string{"kill yourself", "hand-job"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	for in, want := range map[string]string{
+		"kill yourself":        "***",
+		"just kill   yourself": "just ***",
+		"killyourself":         "***",
+		"a hand-job":           "a ***",
+		"hand job":             "***",
+		"handjob":              "***",
+		"skill yourself":       "skill yourself",
+	} {
+		require.Equal(t, want, f.Replace(in), "%q", in)
+	}
+
+	// Without skipping, entries match exactly as listed.
+	exact := filter.New([]string{"hand-job"})
+	require.Equal(t, "a ***", exact.Replace("a hand-job"))
+	require.Equal(t, "handjob", exact.Replace("handjob"))
+}
+
+// Reviewer-found misses: only " .*-_" were skipped, so any other punctuation
+// or whitespace split a word unnoticed.
+func TestFilter_AnyPunctuationOrWhitespaceSeparates(t *testing.T) {
+	f := filter.New([]string{"fuck", "sb", "傻逼"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	for in, want := range map[string]string{
+		"f,u,c,k":      "***",
+		"f/u/c/k":      "***",
+		"f\tuck":       "***",
+		"f\nuck":       "***",
+		"f\r\nu!c?k":   "***",
+		"f…u…c…k":      "***",
+		"(f)(u)(c)(k)": "(***)",
+		"s　b":          "***",
+		"s/b!":         "***!",
+		"傻 逼":          "***",
+		"傻,逼":          "***",
+		"傻、逼":          "***",
+		"傻，逼":          "***",
+		"傻·逼":          "***",
+	} {
+		require.Equal(t, want, f.Replace(in), "%q", in)
+		require.True(t, f.HasMatch(in), "%q", in)
+	}
+}
+
+// Reviewer-found misses: Cyrillic and Greek letters that look Latin.
+func TestFilter_LookalikeLettersFold(t *testing.T) {
+	f := filter.New([]string{"fuck", "shit", "asshole"}, filter.WithSkipChars(filter.DefaultSkipChars))
+	for _, in := range []string{
+		"fuсk",    // Cyrillic es
+		"ѕhit",    // Cyrillic dze
+		"ЅНІТ",    // Cyrillic capitals
+		"ѕніт",    // Cyrillic small letters shaped like small capitals
+		"аѕѕһоlе", // Cyrillic a, dze, shha, o, ie
+		"ΑSSΗΟLΕ", // Greek capitals
+		"fυck",    // Greek upsilon
+	} {
+		require.Equal(t, "***", f.Replace(in), "%q", in)
+	}
+	// Real Cyrillic and Greek text is left alone.
+	require.Equal(t, "Привет, как дела?", f.Replace("Привет, как дела?"))
+	require.Equal(t, "Καλημέρα σας", f.Replace("Καλημέρα σας"))
+	// Entries fold the same way.
+	require.Equal(t, "***", filter.New([]string{"ѕhit"}).Replace("shit"))
+}
+
+// Text that must stay unmasked with the shipped list (plus "ass" to cover a
+// short entry): apostrophes inside words, short entries inside longer words
+// (the Scunthorpe problem), words that only meet across a space, and CJK
+// text with punctuation. Four-letter entries still match inside longer words
+// on purpose ("motherfucker"), so innocent words that contain one need an
+// allow list, which the filter doesn't have.
+func TestFilter_InnocentTextStaysUnmasked(t *testing.T) {
+	f := filter.New([]string{"fuck", "shit", "bitch", "asshole", "傻逼", "垃圾", "sb", "nmsl", "ass"},
+		filter.WithSkipChars(filter.DefaultSkipChars))
+	for _, in := range []string{
+		// Apostrophes
+		"let's hit the road",
+		"that's hit or miss",
+		"Chris's hit song",
+		"It’s hit the top 10",
+		"what's hit points",
+		"it's b",
+		"he's b-list at best",
+		"Shi'ite",
+		// Short entries inside longer words
+		"usb",
+		"a USB-C cable",
+		"flights to Lisbon",
+		"/sbin/init",
+		"classic bass passage",
+		"the embassy's assistant",
+		// Words that only meet across whitespace or punctuation
+		"this hit",
+		"class hole",
+		"pass hole",
+		"is b",
+		"1s hit",
+		"it's bad; she's back",
+		// CJK with punctuation
+		"你好，世界！",
+		"今天天气很好。明天见",
+		"他说：“好的”",
+		"价格：100元/件",
+		"一、二、三",
+		"傻瓜，别逼我",
+		"我不傻，你呢？",
+	} {
+		require.Equal(t, in, f.Replace(in), "%q", in)
+		require.False(t, f.HasMatch(in), "%q", in)
+	}
+}
+
+// Matching stays linear: every start walks at most the longest entry plus the
+// separators inside it. Live chat is capped at 200 characters; this guards
+// the filter against much longer input (chat-service, admin tools).
+func TestFilter_LongAdversarialInputStaysFast(t *testing.T) {
+	f := adversarialFilter()
+	for name, in := range adversarialInputs() {
+		start := time.Now()
+		f.Replace(in)
+		f.HasMatch(in)
+		require.Less(t, time.Since(start), 2*time.Second, name)
+	}
+}
+
+func BenchmarkReplace_Adversarial(b *testing.B) {
+	f := adversarialFilter()
+	for name, in := range adversarialInputs() {
+		b.Run(name, func(b *testing.B) {
+			for b.Loop() {
+				f.Replace(in)
+			}
+		})
+	}
+}
+
+func BenchmarkReplace_Chat(b *testing.B) {
+	f := adversarialFilter()
+	in := "let's hit the road, you ｆｕｃｋ, 傻、逼 and ѕhit: plug in the usb"
+	for b.Loop() {
+		f.Replace(in)
+	}
+}
+
+func adversarialFilter() *filter.Filter {
+	return filter.New([]string{"fuck", "shit", "bitch", "asshole", "傻逼", "垃圾", "sb", "nmsl", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaab"},
+		filter.WithSkipChars(filter.DefaultSkipChars))
+}
+
+// adversarialInputs are about 200,000 runes each.
+func adversarialInputs() map[string]string {
+	return map[string]string{
+		"prefix-dots":     strings.Repeat("a.", 100_000),
+		"prefix-runs":     strings.Repeat("a"+strings.Repeat(",", 999), 200),
+		"f-space":         strings.Repeat("f ", 100_000),
+		"one-long-gap":    "s" + strings.Repeat("\t", 200_000) + "b",
+		"cjk-separators":  strings.Repeat("傻、", 100_000),
+		"lookalikes":      strings.Repeat("ѕһіт ", 40_000),
+		"apostrophe-runs": strings.Repeat("s's ", 50_000),
+	}
 }
 
 func TestFilter_Normalisation(t *testing.T) {

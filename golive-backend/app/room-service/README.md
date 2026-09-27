@@ -3,7 +3,7 @@
 Live-room lists / details / follows / likes and dislikes / creator go-live flow + SRS publishing authentication.
 
 - HTTP: `:8091` (unprefixed routes; api-gateway exposes them under `/api` through its reverse proxy)
-- pprof: `:6063`
+- pprof: `127.0.0.1:6063` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Endpoints
 
@@ -126,10 +126,13 @@ vhost __defaultVhost__ {
 }
 ```
 
-Creator flow: `POST /api/rooms/live` returns `streamKey="<roomId>?key=lk_xxxx"`. In OBS, set the
-server to `rtmp://localhost:1935/live` and paste that value as the stream key. SRS calls
-`/srs/on_publish`, which checks that the `key` parameter belongs to the `<roomId>` stream.
-Viewers play `/live/<roomId>.flv`, so the secret never appears in public URLs.
+Creator flow: `POST /api/rooms/live` returns `streamKey="<playName>?key=lk_xxxx"`, where the
+play name is `<roomId>_<tag>` and the tag is derived from the key (HMAC). In OBS, set the server
+to `rtmp://localhost:1935/live` and paste that value as the stream key. SRS calls
+`/srs/on_publish`, which checks that the `key` parameter is the key the stream's play name belongs
+to. Viewers allowed to watch get `playbackUrl` `/live/<playName>.flv`: the secret never appears in
+public URLs, and the play name cannot be derived from the public room id, so a fan-club-only room
+is not playable by non-members who only know its id.
 
 When a live is stopped (stop, force-end/ban, or a new go-live replacing it), room-service
 disconnects the publisher through the SRS HTTP API (`DELETE /api/v1/clients/{client_id}`) at

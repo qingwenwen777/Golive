@@ -4,7 +4,7 @@ Gateway for persistent real-time messaging connections. Handles all live-room We
 
 - HTTP/WS: `:8081`
 - /metrics + /healthz + /debug/rooms share the same port.
-- pprof: `:6066`
+- pprof: `127.0.0.1:6066` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Purpose and design rationale
 
@@ -15,14 +15,15 @@ Gateway for persistent real-time messaging connections. Handles all live-room We
 | **Lazy subscriptions** | First connection enters a room → SUBSCRIBE; last connection leaves → UNSUBSCRIBE. All rooms share **one** Redis PubSub connection (go-redis re-subscribes after reconnects), so the number of rooms never multiplies Redis connections. The hub lock is not held across SUBSCRIBE; the reaper re-checks the connection count (owners included) under the room lock and marks the room closed so late joiners retry. |
 | Slow consumers | Each `Conn.send` channel has capacity 256; **evict immediately when full** (nonblocking). One slow client cannot stall the other 50k viewers in a room. |
 | Client→server | With `kafka.enabled=false` (production) the gateway itself moderates chat — per-user Redis rate limit (`pkg/chatlimit`), mute/ban state, admin blocked words, sensitive-word masking (`pkg/chatfilter`) — then publishes to `room:<id>`; chat-service persists passively. With Kafka on, `chat` goes to topic `danmu` (partition=roomId) and chat-service moderates, persists, and republishes. |
-| Authentication | The handshake query must contain a valid `token`: missing/invalid → 401; valid → populate `Identity`. |
+| Authentication | The client offers its access token as a second subprotocol, `auth.<jwt>`, next to `golive.v1`: browsers can't set other handshake headers, and URLs (query string included) end up in access logs. Missing/invalid → 401; a `token` query parameter → 400; valid → populate `Identity`. The handshake selects `golive.v1`, never echoing the token. |
 | Handshake limits | `roomId` must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` (400) and, with `room.require_known`, exist (404): Redis `room:owner:<id>` (written by room-service when a room goes live; also the trusted owner id — the client's `ownerId` is ignored for known rooms), else a cached, rate-limited room-service `GET /rooms/<id>`. Concurrent connections are capped per user (`ws.max_conns_per_user`) and per client IP (`ws.max_conns_per_ip`, X-Real-IP honoured only from `ws.trusted_proxies`) → 429. The caps are per instance. |
 | Heartbeats/timeouts | `ReadIdleTimeout=60s`, renewed by any frame including heartbeat and pong; `WriteDeadline=10s`; `ReadLimit=4KB` prevents abuse. |
 | Metrics | Prometheus: connection/room counts, sent/received counts by type, drop reasons, and broadcast latency histogram. Top-N data lives separately at `/debug/rooms` to avoid high-cardinality roomId labels. |
 
 ## Protocol (matching frontend ws-server.ts)
 
-Handshake: `ws://host:8081/ws?roomId=<id>&token=<jwt>`
+Handshake: `ws://host:8081/ws?roomId=<id>` with `Sec-WebSocket-Protocol: golive.v1, auth.<jwt>`
+(browser: `new WebSocket(url, ['golive.v1', 'auth.' + jwt])`); the response selects `golive.v1`.
 
 | Direction | type | Fields |
 | ---------- | --------------- | --------------------------------------------------------------------- |
@@ -35,7 +36,7 @@ Handshake: `ws://host:8081/ws?roomId=<id>&token=<jwt>`
 | C→S        | `heartbeat`     | —                                                                     |
 | C→S | `resume` | `lastMessageId?` (MVP only replies with `system: "resumed"`; no replay buffer) |
 | C→S | `chat` | `text` (≤200 chars), `clientId?`. Identity/display fields a client sends (`user`, `avatar`, `userLevel`, `fanBadge`, ...) are ignored. Per-user limit `chat_ratelimit`; every frame type also counts against `ws.max_message_rate` per connection. |
-| C→S | `viewer_profile` | — (payload ignored; asks the gateway to re-resolve the user's server-side profile) |
+| C→S | `viewer_profile` | — (payload ignored; asks the gateway to refetch the user's server-side profile, at most once per 5s per user). Identity is resolved when it is used (chat, viewer list), not kept per connection; a fallback name from a failed lookup is retried on a later frame. |
 
 Immediately after the handshake, send one `system: "Welcome to the live room!"` and one `viewer_count: 1`, matching the frontend mock.
 
@@ -63,6 +64,8 @@ Coverage:
 - **dispatch**: silent heartbeat / resume acknowledgment / reject unauthenticated chat / send authenticated chat to the producer /
   rate-limit cap / discard oversized chat / discard unknown types.
 - **auth**: reject empty tokens / authenticate valid tokens / reject invalid signatures / reject incorrect secrets.
+- **handshake**: token only via the `auth.<jwt>` subprotocol (URL token → 400, bad token → 401, guests → 401) /
+  `golive.v1` selected, token never echoed / malformed and unknown rooms / owner from the room directory / connection caps.
 
 ## Load testing
 

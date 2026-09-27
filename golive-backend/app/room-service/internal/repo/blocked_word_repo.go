@@ -18,7 +18,7 @@ func (r *ModerationRepo) ListBlockedWords(ctx context.Context, page, size int) (
 	}
 	var rows []model.BlockedWord
 	err := q.Order("enabled DESC, updated_at DESC, created_at DESC").
-		Offset((page - 1) * size).
+		Scopes(pageWindow(page, size)).
 		Limit(size).
 		Find(&rows).Error
 	return rows, total, err

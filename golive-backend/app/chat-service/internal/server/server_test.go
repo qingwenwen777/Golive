@@ -85,8 +85,10 @@ func TestInternalFanBadgeAndDeleteDanmu(t *testing.T) {
 	require.JSONEq(t, `{"hidden":true}`, rec.Body.String())
 	require.True(t, chat.hidden["live-1/m-1"])
 
+	// room-service treats only this reason as "nothing left to hide".
 	rec = serve(r, http.MethodDelete, "/internal/rooms/live-1/danmus/missing", testToken)
 	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.JSONEq(t, `{"message":"message not found","reason":"message_not_found"}`, rec.Body.String())
 }
 
 // api-gateway forwards /api/chat/<rest> as /chat/<rest> without cleaning

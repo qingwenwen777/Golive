@@ -19,6 +19,16 @@ import (
 	"github.com/qingwenwen777/golive/pkg/logger"
 )
 
+// subprotocol is the protocol the gateway speaks. The browser WebSocket API
+// can't set request headers but can offer subprotocols, so clients send their
+// access token as a second one, authProtocolPrefix+token, instead of in the
+// URL, which ends up in access logs. The upgrade only ever selects
+// subprotocol: the token is never echoed back.
+const (
+	subprotocol        = "golive.v1"
+	authProtocolPrefix = "auth."
+)
+
 // upgrader is shared across all upgrades. WriteBufferPool reduces alloc
 // pressure at high fan-out (gorilla acquires a [WriteBufferSize]byte per
 // write otherwise). CheckOrigin allows all in dev — production should swap
@@ -29,6 +39,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 	WriteBufferPool: writeBufPool,
+	Subprotocols:    []string{subprotocol},
 }
 
 type WSHandler struct {
@@ -54,6 +65,7 @@ func NewWSHandler(d Deps, v auth.Verifier, cfg WSConfig, welcome string) *WSHand
 // ServeHTTP performs the handshake. Failure modes (per spec):
 //
 //	roomId missing / malformed -> 400
+//	token in the URL -> 400
 //	token missing/invalid -> 401
 //	room unknown (with RequireKnownRoom) -> 404
 //	too many connections for the user / IP -> 429
@@ -71,7 +83,15 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid roomId", http.StatusBadRequest)
 		return
 	}
-	identity, err := h.verifier.Verify(r.URL.Query().Get("token"))
+	if r.URL.Query().Has("token") {
+		// Tokens used to ride in the query string. Refuse them instead of
+		// ignoring them so a stale client fails loudly (and shows up in the
+		// metric) rather than looking like a guest.
+		metrics.HandshakeFailures.WithLabelValues("token_in_url").Inc()
+		http.Error(w, "send the token in Sec-WebSocket-Protocol, not the URL", http.StatusBadRequest)
+		return
+	}
+	identity, err := h.verifier.Verify(protocolToken(r))
 	if err != nil {
 		reason := "invalid_token"
 		message := "invalid token"
@@ -126,10 +146,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := newConn(ws, roomID, ownerID, identity, h.deps, h.cfg)
-	// Resolve the public identity (cached; bounded by the resolver timeout)
-	// so the viewer list shows the real name from the first push.
-	c.loadProfile(r.Context())
-	room, err := h.hub.Join(roomID, c, c.viewerProfile())
+	room, err := c.joinRoom(r.Context())
 	if err != nil {
 		release()
 		logger.L().Error("hub join", zap.Error(err))
@@ -149,6 +166,17 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer release()
 		c.readPump(context.Background())
 	}()
+}
+
+// protocolToken returns the access token offered as the "auth.<token>"
+// subprotocol, or "" when there is none.
+func protocolToken(r *http.Request) string {
+	for _, p := range websocket.Subprotocols(r) {
+		if token, ok := strings.CutPrefix(p, authProtocolPrefix); ok {
+			return token
+		}
+	}
+	return ""
 }
 
 func (h *WSHandler) checkOrigin(r *http.Request) bool {

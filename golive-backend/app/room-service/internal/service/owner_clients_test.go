@@ -106,13 +106,19 @@ func (f *fakeOwners) restriction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *fakeOwners) superChat(w http.ResponseWriter, r *http.Request) {
-	res := f.db.Exec(`UPDATE super_chat_orders SET moderated_at = ? WHERE order_id = ? AND moderated_at IS NULL`, time.Now(), r.PathValue("id"))
-	if res.Error != nil {
+	if err := f.db.Exec(`UPDATE super_chat_orders SET moderated_at = ? WHERE order_id = ? AND moderated_at IS NULL`, time.Now(), r.PathValue("id")).Error; err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if res.RowsAffected == 0 {
-		w.WriteHeader(http.StatusNotFound)
+	// Like gift-service: an already hidden order is fine, an unknown one is
+	// its own 404.
+	var orders int64
+	if err := f.db.Raw(`SELECT COUNT(*) FROM super_chat_orders WHERE order_id = ?`, r.PathValue("id")).Scan(&orders).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if orders == 0 {
+		writeOwnerNotFound(w, superChatNotFoundReason)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -127,10 +133,18 @@ func (f *fakeOwners) danmu(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if hidden == 0 {
-		w.WriteHeader(http.StatusNotFound)
+		writeOwnerNotFound(w, chatMessageNotFoundReason)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// writeOwnerNotFound answers like the owning service's handler does for an
+// item that does not exist: 404 with an errcode body carrying reason.
+func writeOwnerNotFound(w http.ResponseWriter, reason string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": "not found", "reason": reason})
 }
 
 // capture records the last request an owner service received.
@@ -182,10 +196,18 @@ func TestGiftServiceClientModeratesSuperChat(t *testing.T) {
 	require.Equal(t, "tok", got.token)
 	require.Equal(t, map[string]any{"operatorId": "admin-1"}, got.body)
 
-	owners = NewOwnerServices("", captureServer(t, http.StatusNotFound, &got), "", "tok")
+	owners = NewOwnerServices("", notFoundServer(t, superChatNotFoundReason), "", "tok")
 	require.NoError(t, owners.SuperChats.ModerateSuperChat(context.Background(), "sc-gone", "admin-1"), "nothing left to hide")
-	owners = NewOwnerServices("", captureServer(t, http.StatusBadGateway, &got), "", "tok")
-	require.Error(t, owners.SuperChats.ModerateSuperChat(context.Background(), "sc-1", "admin-1"))
+	// A 404 that is not gift-service saying so (no such route, another
+	// service's not-found) leaves the super chat up: it is an error.
+	for _, url := range []string{
+		captureServer(t, http.StatusNotFound, &got),
+		notFoundServer(t, chatMessageNotFoundReason),
+		captureServer(t, http.StatusBadGateway, &got),
+	} {
+		owners = NewOwnerServices("", url, "", "tok")
+		require.Error(t, owners.SuperChats.ModerateSuperChat(context.Background(), "sc-1", "admin-1"))
+	}
 }
 
 func TestChatServiceClientHidesMessage(t *testing.T) {
@@ -196,10 +218,28 @@ func TestChatServiceClientHidesMessage(t *testing.T) {
 	require.Equal(t, "/internal/rooms/room-1/danmus/m-1", got.path)
 	require.Equal(t, "tok", got.token)
 
-	owners = NewOwnerServices("", "", captureServer(t, http.StatusNotFound, &got), "tok")
+	owners = NewOwnerServices("", "", notFoundServer(t, chatMessageNotFoundReason), "tok")
 	require.NoError(t, owners.Chat.HideChatMessage(context.Background(), "room-1", "gone"), "nothing left to hide")
+	for _, url := range []string{
+		captureServer(t, http.StatusNotFound, &got),
+		notFoundServer(t, superChatNotFoundReason),
+	} {
+		owners = NewOwnerServices("", "", url, "tok")
+		require.Error(t, owners.Chat.HideChatMessage(context.Background(), "room-1", "m-1"))
+	}
 	owners = NewOwnerServices("", "", captureServer(t, http.StatusUnauthorized, &got), "")
 	require.Error(t, owners.Chat.HideChatMessage(context.Background(), "room-1", "m-1"))
+}
+
+// notFoundServer answers every request like an owning service whose item
+// does not exist.
+func notFoundServer(t *testing.T, reason string) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeOwnerNotFound(w, reason)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
 }
 
 func TestOwnerClientsTimeOut(t *testing.T) {

@@ -56,6 +56,7 @@ describe('chat api hooks', () => {
             color: '#fff',
             role: 'moderator',
             fanBadge: { creatorId: 'creator-1', level: 3 },
+            userLevel: 12,
             ts: 1000,
           },
         ],
@@ -82,6 +83,7 @@ describe('chat api hooks', () => {
         color: '#fff',
         role: 'moderator',
         fanBadge: { creatorId: 'creator-1', level: 3 },
+        userLevel: 12,
         ts: 1000,
       },
       {

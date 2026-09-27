@@ -2,7 +2,7 @@ service:
   name: user-service
   http_addr: ":8090"
   grpc_addr: ":19090"
-  pprof_addr: ":6062"
+  pprof_addr: "127.0.0.1:6062"  # loopback only; "" disables pprof
   log_level: info
 
 mysql:
@@ -38,6 +38,8 @@ email:
   sender_name: "GoLive"
   code_ttl: 10m
   resend_interval: 60s
+  # Codes one address can be sent per purpose per hour; each allows 5 guesses.
+  max_codes_per_hour: 5
 
 upload:
   avatar_dir: "./uploads/avatars"
@@ -64,6 +66,10 @@ bootstrap:
     username: demo
     password: ""
     coin_balance: 100000
+
+# A ban ends the user's live rooms through room-service.
+rooms:
+  service_url: "http://127.0.0.1:8091"
 
 # Shared secret for service-to-service /internal APIs. Every service must use
 # the same value; an empty token rejects all internal calls. Env: USERSVC_INTERNAL_TOKEN.

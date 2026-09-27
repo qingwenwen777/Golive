@@ -5,9 +5,16 @@ Chat moderation / rate limiting / persistence / broadcasting. No HTTP write endp
 Internal (service-to-service, not proxied by api-gateway): `GET /internal/rooms/:id/fan-badges/:userId` → `{"fanBadge": {"creatorId","level"} | null}`, used by im-gateway to decorate live chat.
 
 - HTTP: `:8093` (only `/rooms/:id/danmus` + `/healthz`, proxied by api-gateway)
-- pprof: `:6068`
+- pprof: `127.0.0.1:6068` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Data flow
+
+Deployed today (`kafka.enabled: false` in chat-service and im-gateway, the default): im-gateway
+moderates live chat and publishes it to Redis `room:<id>`; chat-service subscribes to the same
+channels (`internal/redissub`) and persists each message. No Kafka client is created.
+
+The Kafka pipeline below is optional. It needs a broker (Compose profile `kafka`) and
+`kafka.enabled: true` in both im-gateway and chat-service:
 
 ```
 client → ws → im-gateway →(produce)→ kafka:danmu
@@ -38,7 +45,7 @@ client → ws → im-gateway →(produce)→ kafka:danmu
 | Stage | Implementation |
 | ---------- | --------------------------------------------------------------------------------------------- |
 | Rate limiting | `pkg/chatlimit`: Redis fixed window + Lua (`INCR` + `PEXPIRE`), 3 msg/sec per user by default (`ratelimit.bucket_seconds` is an integer number of seconds). Drop immediately when exceeded. |
-| Sensitive-word filtering | `pkg/chatfilter` (shared with im-gateway): custom DFA (rune-level trie) over normalised text (zero-width chars ignored, NFKD/fullwidth and case folded). Longest match first; short Latin words match whole words only; optional skipped characters `". *-_"`. |
+| Sensitive-word filtering | `pkg/chatfilter` (shared with im-gateway): custom DFA (rune-level trie) over normalised text (zero-width chars ignored, NFKD/fullwidth, Cyrillic/Greek look-alikes and case folded). Longest match first; short Latin words match whole words only; whitespace and punctuation inside a word are skipped. |
 | Persistence | MySQL **8 sharded tables** `danmus_0..7`, selected by `fnv32(roomId) % 8`. A room always uses the same table. |
 | Broadcasting | Redis `PUBLISH room:<roomId>`; im-gateway subscribes and fans out to WebSocket clients. |
 
@@ -57,7 +64,8 @@ Offsets use `DisableAutoCommit + CommitUncommittedOffsets` and are committed onl
 - Rune trie (`map[rune]*node`) with first-class CJK support.
 - `Replace(text)` scans once; at each starting position it takes the longest match and skips to its end, preventing overlapping replacements.
 - Fold ASCII letters to lowercase; use `unicode.ToLower` for non-ASCII characters.
-- `WithSkipChars(" .*-")` also matches `s.h.i.t`; characters are skipped only after matching has begun, avoiding empty matches.
+- `WithSkipChars(DefaultSkipChars)` skips whitespace, punctuation and control characters inside a word (not apostrophes: `let's` is one word), so `s.h.i.t`, `f,u,c,k` and `傻、逼` match. Separators are skipped only after matching has begun, avoiding empty matches, and are dropped from list entries too, so `kill yourself` matches.
+- A match that skipped separators must start on a word boundary; one that skipped whitespace spans words and must end on one as well (`an alternative` is not `anal`). CJK entries have no word boundaries.
 
 Test coverage: basic matches, case folding, longest prefix (`sh` vs `shit`), nonoverlap (`abcab → ***ab`), empty dictionary, skipped characters, no false match for a partial CJK prefix, and a large-dictionary smoke test.
 
@@ -89,8 +97,10 @@ Cross-room statistics require UNION ALL across all shards. Online cross-room agg
 
 ## Startup
 
+MySQL and Redis must be reachable at the addresses in `configs/config.yaml`; Kafka only when
+`kafka.enabled` is true.
+
 ```bash
-docker compose -f deploy/docker-compose.yml up -d mysql redis kafka zookeeper
 go run ./app/chat-service/cmd
 ```
 
@@ -98,7 +108,9 @@ At startup, the service:
 
 1. Runs AutoMigrate on the 8 sharded tables.
 2. Loads `configs/sensitive.txt` to build the DFA.
-3. Joins Kafka consumer group `chat-consumer` and subscribes to the `danmu` topic.
+3. Subscribes to Redis `room:*` and persists live chat.
+4. Only with `kafka.enabled: true` (env `CHATSVC_KAFKA_ENABLED`): joins Kafka consumer group
+   `chat-consumer` and subscribes to the `danmu` topic.
 
 ## Tests
 

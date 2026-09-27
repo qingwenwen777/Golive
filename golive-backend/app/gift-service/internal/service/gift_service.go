@@ -87,6 +87,9 @@ var (
 	ErrInsufficientCoin = errors.New("insufficient coin")
 	ErrGiftLevelLocked  = errors.New("gift level locked")
 	ErrSelfFanClubJoin  = errors.New("cannot join your own fan club")
+	// ErrAlreadyFanClubMember means the user already holds the creator's fan
+	// badge; joining again is refused without charging.
+	ErrAlreadyFanClubMember = errors.New("already a fan club member")
 
 	ErrInvalidGiftCount = errcode.New(http.StatusBadRequest, "invalid gift count").WithReason("invalid_gift_count")
 )
@@ -278,6 +281,9 @@ func (s *GiftService) JoinFanClub(ctx context.Context, req JoinFanClubReq) (*mod
 	}
 	if errors.Is(err, repo.ErrRoomOwnerNotFound) {
 		return nil, false, ErrGiftNotFound
+	}
+	if errors.Is(err, repo.ErrAlreadyFanClubMember) {
+		return nil, false, ErrAlreadyFanClubMember
 	}
 	if !errors.Is(err, repo.ErrInsufficientFunds) {
 		return nil, false, err

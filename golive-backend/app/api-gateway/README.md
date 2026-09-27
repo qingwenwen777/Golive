@@ -3,7 +3,7 @@
 Edge gateway. All `http://localhost:8080/api/*` requests are routed through it to downstream services.
 
 - HTTP: `:8080`
-- pprof: `:6060`
+- pprof: `127.0.0.1:6060` (loopback only; an empty `service.pprof_addr` disables it)
 
 ## Middleware chain
 

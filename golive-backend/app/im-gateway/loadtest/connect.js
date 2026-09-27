@@ -41,10 +41,12 @@ export const options = {
 export default function () {
   for (let i = 0; i < PER_VU; i++) {
     const roomId = `room-${(__VU * PER_VU + i) % ROOMS}`;
-    const url = `${WS_URL}?roomId=${roomId}${TOKEN ? `&token=${TOKEN}` : ''}`;
+    const url = `${WS_URL}?roomId=${roomId}`;
+    // The token rides in Sec-WebSocket-Protocol; the gateway refuses it in the URL.
+    const params = TOKEN ? { headers: { 'Sec-WebSocket-Protocol': `golive.v1, auth.${TOKEN}` } } : null;
 
     const t0 = Date.now();
-    const res = ws.connect(url, null, function (socket) {
+    const res = ws.connect(url, params, function (socket) {
       handshakeMs.add(Date.now() - t0);
 
       socket.setInterval(() => {

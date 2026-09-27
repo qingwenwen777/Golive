@@ -27,7 +27,8 @@ func TestPageQueryClampsPageAndSize(t *testing.T) {
 		{"page=-4&size=-1", 1, 24, "negative falls back to defaults"},
 		{"page=abc&size=xyz", 1, 24, "garbage falls back to defaults"},
 		{"size=100000", 1, maxPageSize, "size capped"},
-		{"page=99999999", maxPage, 24, "page capped"},
+		{"page=1000", maxPage, 24, "last page served"},
+		{"page=99999999", maxPage + 1, 24, "past the last page"},
 	}
 	for _, tc := range cases {
 		page, size := pageQuery(queryContext(tc.query), 1, 24)
