@@ -12,17 +12,26 @@ import (
 	"github.com/qingwenwen777/golive/pkg/chatlimit"
 )
 
-func newLimiter(t *testing.T, limit int, window time.Duration) (*chatlimit.Limiter, *miniredis.Miniredis) {
+// windowStart is a time at the start of every window the tests use, so calls
+// made "at the same time" share a window however long they take.
+var windowStart = time.Unix(1_700_000_000, 0)
+
+// newLimiter returns a limiter whose clock reads *now, starting at
+// windowStart; tests advance it to move to a later window.
+func newLimiter(t *testing.T, limit int, window time.Duration) (*chatlimit.Limiter, *miniredis.Miniredis, *time.Time) {
 	t.Helper()
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
 	t.Cleanup(mr.Close)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
-	return chatlimit.New(rdb, "rl:test:", limit, window), mr
+	l := chatlimit.New(rdb, "rl:test:", limit, window)
+	now := windowStart
+	l.SetNow(func() time.Time { return now })
+	return l, mr, &now
 }
 
 func TestLimiter_AllowsUnderLimit(t *testing.T) {
-	l, _ := newLimiter(t, 3, time.Second)
+	l, _, _ := newLimiter(t, 3, time.Second)
 	for i := 0; i < 3; i++ {
 		ok, err := l.Allow(context.Background(), "u1")
 		require.NoError(t, err)
@@ -31,7 +40,7 @@ func TestLimiter_AllowsUnderLimit(t *testing.T) {
 }
 
 func TestLimiter_DeniesOverLimit(t *testing.T) {
-	l, _ := newLimiter(t, 3, time.Second)
+	l, _, _ := newLimiter(t, 3, time.Second)
 	for i := 0; i < 3; i++ {
 		_, _ = l.Allow(context.Background(), "u1")
 	}
@@ -41,7 +50,7 @@ func TestLimiter_DeniesOverLimit(t *testing.T) {
 }
 
 func TestLimiter_PerUserIsolation(t *testing.T) {
-	l, _ := newLimiter(t, 1, time.Second)
+	l, _, _ := newLimiter(t, 1, time.Second)
 	ok1, _ := l.Allow(context.Background(), "u1")
 	ok2, _ := l.Allow(context.Background(), "u2")
 	require.True(t, ok1)
@@ -55,6 +64,8 @@ func TestLimiter_PrefixesAreIndependent(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	a := chatlimit.New(rdb, "rl:a:", 1, time.Second)
 	b := chatlimit.New(rdb, "rl:b:", 1, time.Second)
+	a.SetNow(func() time.Time { return windowStart })
+	b.SetNow(func() time.Time { return windowStart })
 	ok, _ := a.Allow(context.Background(), "u1")
 	require.True(t, ok)
 	ok, _ = b.Allow(context.Background(), "u1")
@@ -64,7 +75,7 @@ func TestLimiter_PrefixesAreIndependent(t *testing.T) {
 // A nanosecond window (what `bucket_seconds: 1` used to decode to) put every
 // call in its own bucket, so nothing was ever limited.
 func TestLimiter_SubMillisecondWindowStillLimits(t *testing.T) {
-	l, _ := newLimiter(t, 1, time.Nanosecond)
+	l, _, _ := newLimiter(t, 1, time.Nanosecond)
 	ok, err := l.Allow(context.Background(), "u1")
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -74,13 +85,14 @@ func TestLimiter_SubMillisecondWindowStillLimits(t *testing.T) {
 }
 
 func TestLimiter_ResetsAcrossWindow(t *testing.T) {
-	l, mr := newLimiter(t, 1, 100*time.Millisecond)
+	l, mr, now := newLimiter(t, 1, 100*time.Millisecond)
 	ok, _ := l.Allow(context.Background(), "u1")
 	require.True(t, ok)
 	ok, _ = l.Allow(context.Background(), "u1")
 	require.False(t, ok)
 
-	// fast-forward miniredis past the window
+	// Move the limiter's clock and miniredis past the window.
+	*now = now.Add(150 * time.Millisecond)
 	mr.FastForward(150 * time.Millisecond)
 	ok, _ = l.Allow(context.Background(), "u1")
 	require.True(t, ok)

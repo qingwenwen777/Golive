@@ -191,9 +191,29 @@ func TestProfile_ConcurrentLookupsShareOneFetch(t *testing.T) {
 // The default transport kept 2 idle connections per host, so each burst of
 // lookups opened a TCP connection per lookup and closed most of them again.
 func TestProfile_BurstsReuseConnections(t *testing.T) {
+	const burstSize = 64
 	var newConns atomic.Int32
+	// The server holds each request until the whole burst has arrived, so
+	// both bursts need burstSize connections at once however the goroutines
+	// are scheduled. Otherwise a slow first burst reuses its own connections,
+	// leaves fewer idle ones, and the second burst has to open the rest.
+	var (
+		mu      sync.Mutex
+		arrived int
+		gate    = make(chan struct{})
+	)
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		time.Sleep(5 * time.Millisecond)
+		mu.Lock()
+		burstDone := gate
+		if arrived++; arrived == burstSize {
+			close(gate)
+			gate, arrived = make(chan struct{}), 0
+		}
+		mu.Unlock()
+		select {
+		case <-burstDone:
+		case <-time.After(5 * time.Second):
+		}
 		id := strings.TrimPrefix(req.URL.Path, "/users/profile/")
 		_, _ = fmt.Fprintf(w, `{"id":%q,"displayName":"N-%s"}`, id, id)
 	}))
@@ -208,7 +228,7 @@ func TestProfile_BurstsReuseConnections(t *testing.T) {
 
 	burst := func(round int) {
 		var wg sync.WaitGroup
-		for i := 0; i < 64; i++ {
+		for i := 0; i < burstSize; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -222,6 +242,7 @@ func TestProfile_BurstsReuseConnections(t *testing.T) {
 	// The transport hands connections back to its pool asynchronously.
 	time.Sleep(100 * time.Millisecond)
 	first := newConns.Load()
+	require.EqualValues(t, burstSize, first, "the first burst runs every lookup at once")
 	burst(2)
 	// With 2 idle connections kept, the second burst opened ~62 new ones.
 	require.LessOrEqual(t, newConns.Load()-first, int32(16), "the second burst reuses the first one's connections")
