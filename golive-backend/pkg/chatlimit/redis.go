@@ -27,6 +27,7 @@ type Limiter struct {
 	prefix string
 	limit  int
 	window time.Duration
+	now    func() time.Time // picks the window; tests pin it
 }
 
 // New returns a limiter allowing limit calls per window per user. Keys are
@@ -41,7 +42,7 @@ func New(rdb *redis.Client, prefix string, limit int, window time.Duration) *Lim
 	if window < time.Millisecond {
 		window = time.Second
 	}
-	return &Limiter{rdb: rdb, prefix: prefix, limit: limit, window: window}
+	return &Limiter{rdb: rdb, prefix: prefix, limit: limit, window: window, now: time.Now}
 }
 
 // luaCheckIncr returns 1 if allowed, 0 if denied.
@@ -58,7 +59,7 @@ return 1
 
 // Allow returns true if the user is under the limit for the current window.
 func (l *Limiter) Allow(ctx context.Context, userID string) (bool, error) {
-	bucket := strconv.FormatInt(time.Now().UnixNano()/int64(l.window), 10)
+	bucket := strconv.FormatInt(l.now().UnixNano()/int64(l.window), 10)
 	key := l.prefix + userID + ":" + bucket
 	res, err := luaCheckIncr.Run(ctx, l.rdb,
 		[]string{key},
