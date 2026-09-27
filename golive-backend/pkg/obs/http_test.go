@@ -24,10 +24,15 @@ func TestHTTPMiddlewareBoundsMethodLabel(t *testing.T) {
 	r.Use(HTTPMiddleware("obs-test"))
 	r.GET("/ok", func(c *gin.Context) { c.Status(http.StatusOK) })
 
+	// The counters are process-wide, so compare against their values before
+	// the requests (go test -count=N reruns this in the same process).
+	other := httpRequests.WithLabelValues("obs-test", "unmatched", "OTHER", "404")
+	get := httpRequests.WithLabelValues("obs-test", "/ok", http.MethodGet, "200")
+	otherBefore, getBefore := counterValue(t, other), counterValue(t, get)
 	for _, m := range []string{"FOO", "BAR", "BAZ", http.MethodGet} {
 		r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(m, "/ok", nil))
 	}
 
-	require.Equal(t, 3.0, counterValue(t, httpRequests.WithLabelValues("obs-test", "unmatched", "OTHER", "404")))
-	require.Equal(t, 1.0, counterValue(t, httpRequests.WithLabelValues("obs-test", "/ok", http.MethodGet, "200")))
+	require.Equal(t, 3.0, counterValue(t, other)-otherBefore)
+	require.Equal(t, 1.0, counterValue(t, get)-getBefore)
 }
