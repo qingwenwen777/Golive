@@ -1339,10 +1339,6 @@
         "unknown": "Not checked",
         "empty": "No health data."
       },
-      "modules": {
-        "eyebrow": "Modules",
-        "title": "Admin modules"
-      },
       "focus": {
         "eyebrow": "Operations",
         "title": "Current focus",

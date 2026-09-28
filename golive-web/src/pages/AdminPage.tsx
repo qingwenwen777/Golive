@@ -686,28 +686,6 @@ function DashboardPage({
       <section className="gl-admin-panel">
         <div className="gl-admin-panel-head">
           <div>
-            <span>{t('admin.dashboard.modules.eyebrow', { defaultValue: 'Modules' })}</span>
-            <h2>{t('admin.dashboard.modules.title', { defaultValue: 'Admin modules' })}</h2>
-          </div>
-        </div>
-        <div className="gl-admin-module-grid">
-          {ADMIN_MODULES.filter((module) => module.key !== 'dashboard').map((module) => {
-            const Icon = module.icon;
-            const copy = moduleText(t, module.key);
-            return (
-              <Link className="gl-admin-module-card" to={module.path} key={module.key}>
-                <Icon size={22} />
-                <strong>{copy.label}</strong>
-                <span>{copy.subtitle}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="gl-admin-panel">
-        <div className="gl-admin-panel-head">
-          <div>
             <span>{t('admin.dashboard.focus.eyebrow', { defaultValue: 'Operations' })}</span>
             <h2>{t('admin.dashboard.focus.title', { defaultValue: 'Current focus' })}</h2>
           </div>

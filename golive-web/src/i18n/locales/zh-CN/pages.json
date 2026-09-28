@@ -1339,10 +1339,6 @@
         "unknown": "未检测",
         "empty": "暂无健康状态数据。"
       },
-      "modules": {
-        "eyebrow": "模块",
-        "title": "管理台模块"
-      },
       "focus": {
         "eyebrow": "运营",
         "title": "当前重点",

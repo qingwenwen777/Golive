@@ -7608,45 +7608,6 @@ input:focus-visible,
   font-weight: 800;
   line-height: 1.25;
 }
-.gl-admin-module-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px;
-}
-.gl-admin-module-card {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--gl-border);
-  border-radius: 8px;
-  background: var(--gl-bg);
-  color: var(--gl-text);
-  padding: 14px;
-  text-decoration: none;
-}
-.gl-admin-module-card:hover {
-  background: var(--gl-bg-hover);
-}
-.gl-admin-module-card svg {
-  color: var(--gl-red-fg);
-}
-.gl-admin-module-card strong,
-.gl-admin-module-card span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gl-admin-module-card strong {
-  font-size: 14px;
-  font-weight: 900;
-}
-.gl-admin-module-card span {
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 700;
-}
 .gl-admin-health-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -11692,6 +11653,11 @@ button.gl-fan-badge-empty {
 .gl-creator-tabs::-webkit-scrollbar {
   display: none;
 }
+/* The same links are in the sidebar while its Creator Studio list is open;
+   the tabs are for when it isn't (phones, a collapsed or folded sidebar). */
+.gl-layout:has(#gl-sidebar-studio-subnav) .gl-creator-tabs {
+  display: none;
+}
 .gl-creator-tabs a {
   flex: 0 0 auto;
   border-bottom: 3px solid transparent;
@@ -14984,9 +14950,6 @@ button.gl-fan-badge-empty {
   .gl-admin-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .gl-admin-module-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 767px) {
@@ -15007,7 +14970,6 @@ button.gl-fan-badge-empty {
   }
   .gl-admin-nav-list,
   .gl-admin-kpi-grid,
-  .gl-admin-module-grid,
   .gl-admin-detail-row {
     grid-template-columns: 1fr;
   }
