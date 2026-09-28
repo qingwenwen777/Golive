@@ -17,7 +17,8 @@
     "allLive": {
       "title": "さらにライブ",
       "loading": "読み込み中...",
-      "loadMore": "もっと見る"
+      "loadMore": "もっと見る",
+      "moreError": "続きのライブを読み込めませんでした"
     },
     "recommendations": {
       "title": "人気クリエイター",
@@ -106,6 +107,8 @@
     "title": "ライブルーム",
     "roomId": "ルーム ID: {{id}}",
     "ended": "この配信は終了しました",
+    "endedSub": "配信が終了したか、リンクが間違っている可能性があります。",
+    "loadError": "ライブルームを読み込めませんでした",
     "endingChatReadOnly": "配信は終了しました。チャットは閲覧のみです。",
     "chat": "ライブ チャット",
     "openChat": "チャットを開く",
@@ -366,6 +369,7 @@
     "subscriptions": "登録チャンネル",
     "notFound": "チャンネルが見つかりません",
     "notFoundSub": "クリエイタープロフィールが利用できないか、リンクが正しくありません。",
+    "loadError": "チャンネルを読み込めませんでした",
     "noLiveRooms": "現在ライブ配信はありません",
     "noLiveOwnerSub": "配信準備ができたらライブルームを開始できます。",
     "noLiveViewerSub": "このチャンネルを登録して、クリエイターの配信開始後にまた確認してください。",

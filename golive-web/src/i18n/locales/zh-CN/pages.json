@@ -17,7 +17,8 @@
     "allLive": {
       "title": "更多直播",
       "loading": "加载中...",
-      "loadMore": "加载更多"
+      "loadMore": "加载更多",
+      "moreError": "更多直播加载失败"
     },
     "recommendations": {
       "title": "热门主播推荐",
@@ -106,6 +107,8 @@
     "title": "直播间",
     "roomId": "房间 ID：{{id}}",
     "ended": "这场直播已结束",
+    "endedSub": "直播可能已结束，或链接有误。",
+    "loadError": "直播间加载失败",
     "endingChatReadOnly": "直播已结束，聊天已转为只读。",
     "chat": "直播聊天",
     "openChat": "打开聊天",
@@ -366,6 +369,7 @@
     "subscriptions": "订阅",
     "notFound": "频道不存在",
     "notFoundSub": "这个创作者资料不可用，或链接不正确。",
+    "loadError": "频道加载失败",
     "noLiveRooms": "现在没有直播间",
     "noLiveOwnerSub": "准备好后就可以开始直播。",
     "noLiveViewerSub": "订阅这个频道，等创作者开播后再回来看看。",

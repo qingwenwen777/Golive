@@ -25,6 +25,7 @@ import {
   type CoinTransactionType,
 } from '@/api/coins';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { LoadError } from '@/components/LoadError';
 import { readDailyCoinActivity, coinTodayKey } from '@/lib/coinActivity';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatNumber } from '@/lib/format';
@@ -418,11 +419,7 @@ export default function CoinPage() {
             <CreditCard size={16} />
             {t('coin.goTopup', { defaultValue: 'Top up' })}
           </button>
-          <button
-            type="button"
-            className="gl-secondary-btn gl-coin-wide"
-            onClick={openWithdraw}
-          >
+          <button type="button" className="gl-secondary-btn gl-coin-wide" onClick={openWithdraw}>
             <ArrowUpRight size={16} />
             {t('coin.withdraw.title', { defaultValue: 'Withdraw' })}
           </button>
@@ -497,14 +494,19 @@ export default function CoinPage() {
               <div key={i} className="gl-coin-record is-loading" />
             ))}
           </div>
+        ) : transactions.isError && rows.length === 0 ? (
+          <LoadError
+            error={transactions.error}
+            onRetry={transactions.refetch}
+            retrying={transactions.isFetching}
+          />
         ) : filteredRows.length === 0 ? (
           <div className="gl-coin-empty">
             <Sparkles size={32} />
             <strong>{t('coin.emptyTitle', { defaultValue: 'No coin records yet' })}</strong>
             <span>
               {t('coin.emptySub', {
-                defaultValue:
-                  'Top-ups, gifts, Super Chats, and betting activity will appear here.',
+                defaultValue: 'Top-ups, gifts, Super Chats, and betting activity will appear here.',
               })}
             </span>
           </div>

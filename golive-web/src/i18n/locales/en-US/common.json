@@ -172,6 +172,13 @@
     }
   },
   "loading": "Loading...",
+  "loadError": {
+    "title": "Couldn't load this section",
+    "networkHint": "Check your connection and try again.",
+    "serverHint": "Something went wrong on our end. Try again in a moment.",
+    "retry": "Retry",
+    "retrying": "Retrying…"
+  },
   "notificationsReadAll": "Read all",
   "notificationsViewAll": "View all",
   "notificationsEmpty": "No notifications yet",

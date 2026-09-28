@@ -17,7 +17,8 @@
     "allLive": {
       "title": "More live streams",
       "loading": "Loading...",
-      "loadMore": "Load more"
+      "loadMore": "Load more",
+      "moreError": "Couldn't load more live streams"
     },
     "recommendations": {
       "title": "Popular creators",
@@ -106,6 +107,8 @@
     "title": "Live Room",
     "roomId": "Room id: {{id}}",
     "ended": "This stream has ended",
+    "endedSub": "It may have ended, or the link may be wrong.",
+    "loadError": "Couldn't load this live room",
     "endingChatReadOnly": "Live has ended. Chat is now read-only.",
     "chat": "Live chat",
     "openChat": "Open chat",
@@ -366,6 +369,7 @@
     "subscriptions": "Subscriptions",
     "notFound": "Channel not found",
     "notFoundSub": "This creator profile is unavailable or the link is incorrect.",
+    "loadError": "Couldn't load this channel",
     "noLiveRooms": "No live rooms right now",
     "noLiveOwnerSub": "Start a live room when you are ready to broadcast.",
     "noLiveViewerSub": "Follow this channel and check back when the creator goes live.",

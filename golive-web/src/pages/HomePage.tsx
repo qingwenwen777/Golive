@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bell, CloudOff, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
+import { Bell, Inbox, Radio, RefreshCw, UserPlus } from 'lucide-react';
 import { CategoryChips } from '@/components/CategoryChips';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { ReplayCard } from '@/components/ReplayCard';
 import { LiveCardSkeleton } from '@/components/Skeleton';
+import { LoadError } from '@/components/LoadError';
 import {
   useFollow,
   useHotReplays,
@@ -68,15 +69,14 @@ export default function HomePage() {
               <LiveCardSkeleton key={i} />
             ))}
           </div>
-        ) : recommended.isError ? (
-          <div className="gl-error" role="alert">
-            <CloudOff size={64} strokeWidth={1.5} />
-            <div className="gl-empty-title">{t('home.errorTitle')}</div>
-            <div className="gl-empty-sub">{t('home.errorSub')}</div>
-            <button className="gl-retry-btn" onClick={() => recommended.refetch()}>
-              {t('home.retry')}
-            </button>
-          </div>
+        ) : recommended.isError && !recommended.data ? (
+          <LoadError
+            variant="page"
+            title={t('home.errorTitle')}
+            error={recommended.error}
+            onRetry={recommended.refetch}
+            retrying={recommended.isFetching}
+          />
         ) : recommended.data && recommended.data.items.length === 0 ? (
           <HomeNoLiveEmpty />
         ) : recommendedItems.length === 0 ? (
@@ -165,6 +165,12 @@ function UpcomingAppointmentsSection({ category }: { category?: string }) {
             />
           ))}
         </div>
+      ) : appointments.isError ? (
+        <LoadError
+          error={appointments.error}
+          onRetry={appointments.refetch}
+          retrying={appointments.isFetching}
+        />
       ) : (
         <div className="gl-creator-empty-soft">{t('home.upcoming.empty')}</div>
       )}
@@ -217,6 +223,12 @@ function HomeRecommendationsSection({ category }: { category?: string }) {
             <RecommendedCreatorCard key={creator.channelId} creator={creator} />
           ))}
         </div>
+      ) : recommendations.isError ? (
+        <LoadError
+          error={recommendations.error}
+          onRetry={recommendations.refetch}
+          retrying={recommendations.isFetching}
+        />
       ) : (
         <div className="gl-creator-empty-soft">{t('home.recommendations.empty')}</div>
       )}
@@ -257,6 +269,12 @@ function HomeHotReplaysSection({ category }: { category?: string }) {
             <ReplayCard key={replay.id} replay={replay} />
           ))}
         </div>
+      ) : hotReplays.isError ? (
+        <LoadError
+          error={hotReplays.error}
+          onRetry={hotReplays.refetch}
+          retrying={hotReplays.isFetching}
+        />
       ) : (
         <div className="gl-creator-empty-soft">
           {t('home.hotReplays.empty', { defaultValue: 'No hot replays in the last three days.' })}
@@ -270,17 +288,30 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
   const { t } = useTranslation('pages');
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const rooms = useInfiniteRooms({ category, size: LIVE_PAGE_SIZE });
-  const { data, fetchNextPage, hasNextPage, isError, isFetchingNextPage, isPending, refetch } =
-    rooms;
+  const {
+    data,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isError,
+    isFetchNextPageError,
+    isFetching,
+    isFetchingNextPage,
+    isPending,
+    refetch,
+  } = rooms;
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data?.pages]);
   const visibleItems = useMemo(
     () => filterStreamsBySearch(items, searchQuery),
     [items, searchQuery],
   );
+  const showMoreError = isFetchNextPageError && !isFetchingNextPage;
 
+  // After a failed page, wait for the user's Retry instead of re-requesting
+  // every time the sentinel is re-observed.
   useEffect(() => {
     const node = sentinelRef.current;
-    if (!node || !hasNextPage) return;
+    if (!node || !hasNextPage || isFetchNextPageError) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting) && !isFetchingNextPage) {
@@ -291,14 +322,27 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  }, [fetchNextPage, hasNextPage, isFetchNextPageError, isFetchingNextPage]);
 
   useEffect(() => {
-    if (!searchQuery || visibleItems.length > 0 || !hasNextPage || isFetchingNextPage) {
+    if (
+      !searchQuery ||
+      visibleItems.length > 0 ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      isFetchNextPageError
+    ) {
       return;
     }
     void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage, searchQuery, visibleItems.length]);
+  }, [
+    fetchNextPage,
+    hasNextPage,
+    isFetchNextPageError,
+    isFetchingNextPage,
+    searchQuery,
+    visibleItems.length,
+  ]);
 
   return (
     <section
@@ -317,14 +361,13 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
             <LiveCardSkeleton key={index} />
           ))}
         </div>
-      ) : isError ? (
-        <div className="gl-error" role="alert">
-          <CloudOff size={56} strokeWidth={1.5} />
-          <div className="gl-empty-title">{t('home.errorTitle')}</div>
-          <button className="gl-retry-btn" onClick={() => refetch()}>
-            {t('home.retry')}
-          </button>
-        </div>
+      ) : isError && items.length === 0 ? (
+        <LoadError
+          title={t('home.errorTitle')}
+          error={error}
+          onRetry={refetch}
+          retrying={isFetching}
+        />
       ) : visibleItems.length > 0 ? (
         <>
           <div className="gl-grid">
@@ -333,19 +376,37 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
             ))}
           </div>
           <div ref={sentinelRef} className="gl-home-live-sentinel" aria-hidden />
-          {hasNextPage && (
-            <button
-              type="button"
-              className="gl-home-live-more"
-              disabled={isFetchingNextPage}
-              onClick={() => fetchNextPage()}
-            >
-              {isFetchingNextPage
-                ? t('home.allLive.loading', { defaultValue: '加载中...' })
-                : t('home.allLive.loadMore', { defaultValue: '加载更多' })}
-            </button>
+          {showMoreError ? (
+            <LoadError
+              className="mt-4"
+              title={t('home.allLive.moreError', {
+                defaultValue: "Couldn't load more live streams",
+              })}
+              error={error}
+              onRetry={fetchNextPage}
+            />
+          ) : (
+            hasNextPage && (
+              <button
+                type="button"
+                className="gl-home-live-more"
+                disabled={isFetchingNextPage}
+                onClick={() => fetchNextPage()}
+              >
+                {isFetchingNextPage
+                  ? t('home.allLive.loading', { defaultValue: '加载中...' })
+                  : t('home.allLive.loadMore', { defaultValue: '加载更多' })}
+              </button>
+            )
           )}
         </>
+      ) : showMoreError ? (
+        // Searching found nothing so far, but the next page failed to load.
+        <LoadError
+          title={t('home.allLive.moreError', { defaultValue: "Couldn't load more live streams" })}
+          error={error}
+          onRetry={fetchNextPage}
+        />
       ) : (
         <div className="gl-creator-empty-soft">
           {searchQuery

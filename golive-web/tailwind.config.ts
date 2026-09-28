@@ -30,7 +30,8 @@ const config: Config = {
         // Brand live red. Named `live` so Tailwind's default `red-*` scale
         // (used for error text) stays available.
         live: 'var(--gl-red)',
-        blue: '#1c62b9',
+        // Link blue; lighter in dark mode (see --gl-accent-fg).
+        blue: 'var(--gl-accent-fg)',
 
         // shadcn / radix-style semantic tokens. Defined in CSS as HSL triples
         // so opacity modifiers like `bg-popover/80` keep working.

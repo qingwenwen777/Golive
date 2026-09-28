@@ -172,6 +172,13 @@
     }
   },
   "loading": "読み込み中...",
+  "loadError": {
+    "title": "このセクションを読み込めませんでした",
+    "networkHint": "接続を確認して、もう一度お試しください。",
+    "serverHint": "サーバーで問題が発生しました。しばらくしてからもう一度お試しください。",
+    "retry": "再試行",
+    "retrying": "再試行しています…"
+  },
   "notificationsReadAll": "すべて既読",
   "notificationsViewAll": "すべて表示",
   "notificationsEmpty": "通知はまだありません",

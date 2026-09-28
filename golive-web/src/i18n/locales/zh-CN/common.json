@@ -172,6 +172,13 @@
     }
   },
   "loading": "加载中...",
+  "loadError": {
+    "title": "这部分内容加载失败",
+    "networkHint": "请检查网络连接后重试。",
+    "serverHint": "服务器出了点问题，请稍后重试。",
+    "retry": "重试",
+    "retrying": "正在重试…"
+  },
   "notificationsReadAll": "全部已读",
   "notificationsViewAll": "查看全部",
   "notificationsEmpty": "暂无通知",

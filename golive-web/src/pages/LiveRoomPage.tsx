@@ -59,16 +59,15 @@ import {
   removeFromLibrary,
   saveToLibrary,
 } from '@/lib/liveLibrary';
-import {
-  clearPublisherSession,
-  savePublisherSession,
-} from '@/features/creator/publisherSession';
+import { clearPublisherSession, savePublisherSession } from '@/features/creator/publisherSession';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { LoadableImage } from '@/components/LoadableImage';
+import { LoadError } from '@/components/LoadError';
 import { Avatar } from '@/components/Avatar';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
+import { isNotFoundError } from '@/lib/httpError';
 import type { AppointmentItem } from '@/api/room';
 import { userDisplayName } from '@/types/user';
 import { streamChannelName, type Stream } from '@/types/stream';
@@ -117,7 +116,14 @@ export default function LiveRoomPage() {
   } | null>(null);
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
-  const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
+  const {
+    data: stream,
+    error: roomError,
+    isPending,
+    isError,
+    isFetching,
+    refetch,
+  } = useRoom(id, authHydrated);
   const isScheduledRoom = stream?.status === 'scheduled';
   const appointmentList = useChannelAppointments(
     stream?.channelId ?? '',
@@ -349,11 +355,30 @@ export default function LiveRoomPage() {
 
   const displayStream = endTransition?.stream ?? stream;
 
-  if ((isError && !displayStream) || !displayStream) {
+  if (!displayStream) {
+    // Only a 404 means the room is gone; any other failure gets a retry.
+    if (isError && !isNotFoundError(roomError)) {
+      return (
+        <LoadError
+          variant="page"
+          title={t('liveRoom.loadError', { defaultValue: "Couldn't load this live room" })}
+          error={roomError}
+          onRetry={refetch}
+          retrying={isFetching}
+        >
+          <Link to="/" className="text-blue hover:underline">
+            {t('notFound.back')}
+          </Link>
+        </LoadError>
+      );
+    }
     return (
       <div className="gl-empty">
         <CloudOff size={64} strokeWidth={1.5} />
         <div className="gl-empty-title">{t('liveRoom.ended')}</div>
+        <div className="gl-empty-sub">
+          {t('liveRoom.endedSub', { defaultValue: 'It may have ended, or the link may be wrong.' })}
+        </div>
         <button className="gl-retry-btn mt-4" onClick={() => navigate('/')}>
           {t('notFound.back')}
         </button>

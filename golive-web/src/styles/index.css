@@ -3295,6 +3295,58 @@ input:focus-visible,
   font-size: 14px;
   margin-top: 4px;
 }
+/* A failed request (components/LoadError.tsx). Solid border, unlike the
+   dashed "nothing here yet" boxes, so a failure never reads as empty. */
+.gl-load-error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--gl-border);
+  border-radius: 12px;
+  background: var(--gl-bg-card);
+  color: var(--gl-text-2);
+  padding: 16px 20px;
+}
+.gl-load-error > svg {
+  flex: 0 0 auto;
+  color: var(--gl-text-3);
+}
+.gl-load-error .gl-load-error-text {
+  flex: 1;
+  min-width: 0;
+}
+.gl-load-error .gl-empty-title {
+  font-size: 15px;
+}
+.gl-load-error .gl-empty-sub {
+  font-size: 13px;
+}
+.gl-load-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+}
+.gl-load-error-actions .gl-retry-btn {
+  margin-top: 0;
+}
+.gl-error .gl-load-error-actions {
+  margin-top: 16px;
+}
+.gl-retry-btn[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.7;
+}
+@media (max-width: 767px) {
+  .gl-load-error {
+    flex-wrap: wrap;
+  }
+  .gl-load-error-actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}
 .gl-home-empty-wrap {
   display: flex;
   flex-direction: column;
