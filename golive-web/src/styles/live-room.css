@@ -434,6 +434,13 @@
   background: color-mix(in srgb, var(--gl-accent, #065fd4) 12%, transparent);
 }
 
+/* #065fd4 text is 2.6:1 on dark surfaces; the filled button keeps it as a
+   background, where white text stays at 5.8:1. */
+.dark .gl-replay-comment-reply-chip button,
+.dark .gl-replay-comment-toggle {
+  color: var(--gl-accent-fg);
+}
+
 .gl-replay-comment-children {
   display: flex;
   flex-direction: column;
@@ -1228,7 +1235,7 @@
 }
 .gl-chat-tab-btn.is-active .gl-chat-tab-count {
   background: rgba(255, 0, 51, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-viewer-panel {
   flex: 1;
@@ -1948,7 +1955,7 @@
   background: var(--gl-bg-hover);
 }
 .gl-chat-action-popover button:first-child {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-chat-owner-badge {
   display: inline-flex;

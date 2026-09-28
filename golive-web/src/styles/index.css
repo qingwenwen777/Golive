@@ -1095,7 +1095,8 @@
   --gl-bg-card: #272727;
   --gl-text: #ffffff;
   --gl-text-2: #aaaaaa;
-  --gl-text-3: #717171;
+  /* #717171 was 3.1:1 on dark cards; this keeps 4.9:1 on cards and 6.3:1 on the page. */
+  --gl-text-3: #949494;
   --gl-border: #3f3f3f;
   --gl-btn-primary: #ffffff;
   --gl-btn-primary-text: #0f0f0f;
@@ -1145,6 +1146,7 @@
   --gl-bet-fg: #0f8f8e;
   --gl-bet-fg-strong: #0f766e;
   --gl-bag-fg: #c2790a; /* lucky bag */
+  --gl-red-fg: var(--gl-red); /* red text; badges and buttons keep --gl-red */
 }
 
 .dark {
@@ -1170,6 +1172,7 @@
   --gl-bet-fg: #5eead4;
   --gl-bet-fg-strong: #99f6e4;
   --gl-bag-fg: #f5b73c;
+  --gl-red-fg: #ff6b81;
 }
 
 * {
@@ -2692,7 +2695,7 @@ input:focus-visible,
 }
 
 .gl-menu-danger {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-menu-danger svg {
   margin-right: 8px;
@@ -2717,7 +2720,7 @@ input:focus-visible,
   place-items: center;
   border-radius: 999px;
   background: rgba(255, 61, 92, 0.1);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-report-dialog-body .text-lg {
   font-size: 20px;
@@ -3546,7 +3549,7 @@ input:focus-visible,
 }
 .gl-home-rec-card:not(.is-loading):hover .gl-home-rec-meta svg,
 .gl-home-rec-card:not(.is-loading):focus-within .gl-home-rec-meta svg {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-home-rec-meta span {
   overflow: hidden;
@@ -3958,7 +3961,7 @@ input:focus-visible,
   min-width: 0;
 }
 .gl-search-meta .is-live-dot {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   font-weight: 850;
 }
 .gl-search-channel-line {
@@ -4457,7 +4460,7 @@ input:focus-visible,
   border: 1px solid rgba(255, 0, 51, 0.25);
   border-radius: 8px;
   background: rgba(255, 0, 51, 0.08);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   font-size: 13px;
   line-height: 1.4;
   padding: 10px 12px;
@@ -5048,7 +5051,7 @@ input:focus-visible,
   justify-content: center;
   border-radius: 999px;
   background: rgba(255, 0, 51, 0.1);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   flex: 0 0 auto;
 }
 .gl-live-create h2,
@@ -5183,7 +5186,7 @@ input:focus-visible,
   color: var(--gl-pending-fg);
 }
 .gl-creator-permission.is-rejected strong {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-live-cover-picker {
   position: relative;
@@ -6280,7 +6283,7 @@ input:focus-visible,
 }
 .gl-mic-reject:hover,
 .gl-mic-remove:hover {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-mic-state {
   display: inline-flex;
@@ -6409,7 +6412,7 @@ input:focus-visible,
 }
 .gl-mic-leave-btn {
   background: var(--gl-bg-card);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-mic-mute-btn:disabled,
 .gl-mic-leave-btn:disabled {
@@ -6676,7 +6679,7 @@ input:focus-visible,
 }
 .gl-library-kicker,
 .gl-channel-kicker {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
@@ -6955,7 +6958,7 @@ input:focus-visible,
   color: var(--gl-pending-fg);
 }
 .gl-admin-status.is-rejected {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-actions {
   display: flex;
@@ -6979,7 +6982,7 @@ input:focus-visible,
   color: #15803d;
 }
 .gl-admin-action.reject {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-action:disabled {
   opacity: 0.38;
@@ -7076,7 +7079,7 @@ input:focus-visible,
   white-space: nowrap;
 }
 .gl-admin-danger-btn {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-danger-btn svg,
 .gl-admin-action-text svg {
@@ -7099,7 +7102,7 @@ input:focus-visible,
   color: var(--gl-success-fg);
 }
 .gl-admin-action-text.reject {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-danger-btn:hover,
 .gl-admin-action-text:hover {
@@ -7286,7 +7289,7 @@ input:focus-visible,
   place-items: center;
   width: 36px;
   height: 36px;
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   flex: 0 0 auto;
   line-height: 0;
 }
@@ -7459,7 +7462,7 @@ input:focus-visible,
 }
 .gl-admin-kpi.is-red .gl-admin-kpi-icon {
   background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-kpi strong,
 .gl-admin-kpi span {
@@ -7504,7 +7507,7 @@ input:focus-visible,
   background: var(--gl-bg-hover);
 }
 .gl-admin-module-card svg {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-module-card strong,
 .gl-admin-module-card span {
@@ -7579,7 +7582,7 @@ input:focus-visible,
 }
 .gl-admin-health-card.is-down > span {
   background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-health-card.is-unknown > span {
   color: var(--gl-text-3);
@@ -7934,7 +7937,7 @@ input:focus-visible,
 .gl-admin-user-state.is-banned,
 .gl-admin-user-detail-head em.is-banned {
   background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-user-state.is-appeal {
   background: rgba(245, 158, 11, 0.14);
@@ -8073,7 +8076,7 @@ input:focus-visible,
   background: var(--gl-bg-hover);
 }
 .gl-admin-user-form button.is-danger {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-user-form button:disabled,
 .gl-admin-pagination button:disabled {
@@ -8203,7 +8206,7 @@ input:focus-visible,
   background: var(--gl-bg-hover);
 }
 .gl-admin-appeal-review button.is-danger {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-appeal-review button:disabled {
   cursor: not-allowed;
@@ -8309,7 +8312,7 @@ input:focus-visible,
 }
 .gl-admin-report-severity.pending {
   background: rgba(255, 61, 92, 0.1);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-report-severity.reviewing {
   background: rgba(28, 98, 185, 0.1);
@@ -8750,7 +8753,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   background: rgba(255, 61, 92, 0.06);
 }
 .gl-admin-claim-note.is-open > svg {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-claim-note.is-mine {
   border-color: rgba(22, 163, 74, 0.22);
@@ -8832,7 +8835,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   padding: 0;
 }
 .gl-admin-word-actions button.is-danger {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-word-form {
   display: grid;
@@ -9216,7 +9219,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-ledger-icon.is-negative {
   background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-ledger-side {
   min-width: 0;
@@ -9238,7 +9241,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   color: var(--gl-success-fg);
 }
 .gl-admin-ledger-side strong.is-negative {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-ledger-side span {
   margin-top: 3px;
@@ -9348,7 +9351,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-system-card.is-danger .gl-admin-system-card-head > span {
   background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-admin-system-card-head div,
 .gl-admin-system-card small,
@@ -10157,7 +10160,7 @@ button.gl-fan-badge-empty {
   height: 36px;
   border-radius: 999px;
   background: rgba(255, 0, 51, 0.1);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   flex: 0 0 auto;
 }
 .gl-quick-label {
@@ -12517,7 +12520,7 @@ button.gl-fan-badge-empty {
 }
 .gl-live-console-pill.is-live {
   background: rgba(255, 0, 51, 0.1);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-live-console-pill.is-live span {
   background: var(--gl-red);
@@ -13747,7 +13750,7 @@ button.gl-fan-badge-empty {
   justify-content: center;
   border-radius: 16px;
   background: rgba(255, 61, 92, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 
 .gl-banned-head {
@@ -14020,7 +14023,7 @@ button.gl-fan-badge-empty {
 
 .gl-legal-brand {
   width: fit-content;
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
   font-size: 15px;
   font-weight: 950;
 }
@@ -14445,7 +14448,7 @@ button.gl-fan-badge-empty {
   color: #137333;
 }
 .gl-coin-record-icon.is-spend {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .dark .gl-coin-record-icon.is-income {
   color: #7bd88f;
@@ -14488,7 +14491,7 @@ button.gl-fan-badge-empty {
   color: #137333;
 }
 .gl-coin-record-amount.is-spend strong {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .dark .gl-coin-record-amount.is-income strong {
   color: #7bd88f;
