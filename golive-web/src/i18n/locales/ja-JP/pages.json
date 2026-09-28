@@ -254,7 +254,7 @@
     "superChatDialog": {
       "title": "SuperChatを送信",
       "balance": "利用可能 {{coins}} coins",
-      "tierUnlockHint": "ティア {{tier}} は {{amount}}+ でメッセージ解放",
+      "tierUnlockHint": "ティア {{tier}} は {{amount}} 以上でメッセージ解放",
       "amount": "金額",
       "tierMaxChars": "ティア {{tier}} · 最大 {{count}} 文字",
       "amountAria": "SuperChat 金額",
@@ -2059,7 +2059,7 @@
     "authTitle": "ログインして coins を管理",
     "authSub": "利用履歴、チャージ、デイリータスク、出金プレビューを確認できます。",
     "guest": "ゲスト",
-    "heroSub": "{{name}} の coin アカウント。チャージ比率は 10 coins = ¥1 です。",
+    "heroSub": "{{name}} の coin アカウント。チャージ比率は {{coins}} coins = {{price}} です。",
     "goTopup": "チャージ",
     "watchHistory": "視聴履歴",
     "availableLabel": "利用可能",

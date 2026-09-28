@@ -254,7 +254,7 @@
     "superChatDialog": {
       "title": "Send SuperChat",
       "balance": "{{coins}} coins available",
-      "tierUnlockHint": "Tier {{tier}} text messages unlock at {{amount}}+",
+      "tierUnlockHint": "Tier {{tier}} text messages unlock at {{amount}} or more",
       "amount": "Amount",
       "tierMaxChars": "Tier {{tier}} · max {{count}} chars",
       "amountAria": "SuperChat amount",
@@ -2059,7 +2059,7 @@
     "authTitle": "Sign in to manage coins",
     "authSub": "View spending records, top up, daily tasks, and withdrawal previews.",
     "guest": "Guest",
-    "heroSub": "{{name}} coin account. Top-up rate: 10 coins = ¥1.",
+    "heroSub": "{{name}} coin account. Top-up rate: {{coins}} coins = {{price}}.",
     "goTopup": "Top up",
     "watchHistory": "Watch history",
     "availableLabel": "Available",

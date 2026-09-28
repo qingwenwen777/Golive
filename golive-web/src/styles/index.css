@@ -18022,3 +18022,10 @@ button.gl-fan-badge-empty {
     justify-content: flex-start;
   }
 }
+
+.gl-coin-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}

@@ -38,6 +38,8 @@ import type {
   GiftMessage,
 } from '@/types/message';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
+import { CoinAmount } from '@/components/CoinAmount';
 import { useIsAuthed, useAuthStore } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
@@ -154,13 +156,6 @@ function parseAmountValue(amount: string): number {
   return Number.isFinite(value) ? value : 0;
 }
 
-// formatYenAmount normalises a wire amount (raw "1000", "1,000", or "JPY1,000")
-// to a single canonical yen rendering while keeping the source ASCII-safe.
-function formatYenAmount(amount: string): string {
-  const n = parseAmountValue(amount);
-  return `\u00a5${n.toLocaleString('en-US')}`;
-}
-
 function superChatPinDurationMs(m: SuperChatMessage): number {
   const amount = parseAmountValue(m.amount);
   if (amount >= 20000) return 15 * 60_000;
@@ -170,11 +165,6 @@ function superChatPinDurationMs(m: SuperChatMessage): number {
   if (amount >= 1000) return 3 * 60_000;
   if (amount >= 500) return 2 * 60_000;
   return 60_000;
-}
-
-function formatCoinAmount(amount: string, locale: string): string {
-  const n = parseAmountValue(amount);
-  return `${n.toLocaleString(locale)} coins`;
 }
 
 function comparePinnedSuperChats(
@@ -413,7 +403,7 @@ const SuperChatCard = memo(function SuperChatCard({
         {m.userLevel && (
           <UserLevelBadge level={m.userLevel} size="compact" className="gl-sc-level" />
         )}
-        <span className="gl-sc-amt">{formatYenAmount(m.amount)}</span>
+        <CoinAmount value={parseAmountValue(m.amount)} className="gl-sc-amt" />
         <span className="gl-sc-menu-wrap">
           <button type="button" aria-label={t('report.moreActions')} onClick={onToggleMenu}>
             <MoreVertical size={15} />
@@ -508,7 +498,13 @@ function PinnedSuperChatBubble({ m, locale }: { m: SuperChatMessage; locale: str
         />
         <div className="gl-sc-pin-popover-meta">
           <strong>{m.user}</strong>
-          <span>{formatCoinAmount(m.amount, locale)}</span>
+          <span>
+            {t('account.coins', {
+              ns: 'common',
+              amount: formatNumber(parseAmountValue(m.amount), locale),
+              defaultValue: '{{amount}} coins',
+            })}
+          </span>
         </div>
       </div>
       <p>{m.text || t('liveRoom.chatPanel.noSuperChatMessage')}</p>

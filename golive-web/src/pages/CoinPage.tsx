@@ -27,6 +27,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { readDailyCoinActivity, coinTodayKey } from '@/lib/coinActivity';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
@@ -42,8 +43,11 @@ type RecordFilter =
   | 'task'
   | 'creator';
 
-const COINS_PER_CURRENCY_UNIT = 10;
-const DISPLAY_CURRENCY = 'USD';
+// Top-ups are charged in this currency at this rate. They must match the
+// user-service's USERSVC_STRIPE_CURRENCY and USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT,
+// whose defaults are also USD and 10.
+const COINS_PER_CURRENCY_UNIT = Number(import.meta.env.VITE_COINS_PER_CURRENCY_UNIT) || 10;
+const DISPLAY_CURRENCY = (import.meta.env.VITE_TOPUP_CURRENCY || 'USD').toUpperCase();
 const MIN_TOPUP_COINS = 10;
 const MIN_WITHDRAW_COINS = 10;
 const QUICK_TOPUPS = [10, 50, 100, 500] as const;
@@ -403,7 +407,9 @@ export default function CoinPage() {
               name: currentUser
                 ? userDisplayName(currentUser)
                 : t('coin.guest', { defaultValue: 'Guest' }),
-              defaultValue: '{{name}} coin account. Top-up rate: 10 coins = ¥1.',
+              coins: formatNumber(COINS_PER_CURRENCY_UNIT, i18n.language),
+              price: formatFiat(COINS_PER_CURRENCY_UNIT, i18n.language),
+              defaultValue: '{{name}} coin account. Top-up rate: {{coins}} coins = {{price}}.',
             })}
           </p>
         </div>

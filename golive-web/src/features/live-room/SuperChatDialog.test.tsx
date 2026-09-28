@@ -88,12 +88,12 @@ describe('SuperChatDialog', () => {
   it('holds back text over the limit of a lowered tier until it is shortened', () => {
     const { textarea, send } = renderDialog();
 
-    fireEvent.click(screen.getByRole('button', { name: '¥1,000' }));
+    fireEvent.click(screen.getByRole('button', { name: '1,000 coins' }));
     fireEvent.change(textarea, { target: { value: 'a'.repeat(80) } });
     expect(textarea.value).toHaveLength(80);
 
-    // ¥500 is tier 1, which allows 50 characters.
-    fireEvent.click(screen.getByRole('button', { name: '¥500' }));
+    // 500 coins is tier 1, which allows 50 characters.
+    fireEvent.click(screen.getByRole('button', { name: '500 coins' }));
     expect(send.disabled).toBe(true);
     expect(screen.getByText('Message is too long for this tier (max 50 characters).')).toBeTruthy();
 

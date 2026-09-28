@@ -254,7 +254,7 @@
     "superChatDialog": {
       "title": "发送 SuperChat",
       "balance": "可用 {{coins}} coins",
-      "tierUnlockHint": "档位 {{tier}} 在 {{amount}}+ 解锁留言",
+      "tierUnlockHint": "档位 {{tier}} 需 {{amount}} 及以上才可留言",
       "amount": "金额",
       "tierMaxChars": "档位 {{tier}} · 最多 {{count}} 字",
       "amountAria": "SuperChat 金额",
@@ -2059,7 +2059,7 @@
     "authTitle": "登录后管理 coins",
     "authSub": "查看消费记录、充值、每日任务和提现预留信息。",
     "guest": "游客",
-    "heroSub": "{{name}} 的 coin 账户，充值比例为 10 coins = ¥1。",
+    "heroSub": "{{name}} 的 coin 账户，充值比例为 {{coins}} coins = {{price}}。",
     "goTopup": "去充值",
     "watchHistory": "观看记录",
     "availableLabel": "可用",

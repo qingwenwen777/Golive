@@ -19,6 +19,8 @@ import { userDisplayName } from '@/types/user';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
+import { CoinAmount } from '@/components/CoinAmount';
 import type { SuperChatMessage } from '@/types/message';
 
 export interface SuperChatDialogProps {
@@ -56,7 +58,6 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
   const insufficient = amount > balance;
   const disabled = send.isPending || amount < MIN || (textTooLong && !insufficient);
   const locale = i18n.resolvedLanguage ?? i18n.language;
-  const amountLabel = formatSuperChatAmount(amount, locale);
 
   const updateAmount = (value: number) => {
     const next = Math.min(MAX, Math.max(MIN, Math.round(value / 100) * 100));
@@ -180,7 +181,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         <div className="gl-sc-preview text-white" style={{ background: spec.bg }}>
           <div className="flex items-center justify-between">
             <span className="font-semibold">{userDisplayName(user)}</span>
-            <span className="font-bold">{amountLabel}</span>
+            <CoinAmount value={amount} className="font-bold" />
           </div>
           {canText && text.trim() && (
             <div className="gl-sc-preview-message text-black" style={{ background: spec.soft }}>
@@ -191,8 +192,12 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             <div className="mt-2 text-xs opacity-80">
               {t('liveRoom.superChatDialog.tierUnlockHint', {
                 tier,
-                amount: formatSuperChatAmount(MIN, locale),
-                defaultValue: 'Tier {{tier}} text messages unlock at {{amount}}+',
+                amount: t('account.coins', {
+                  ns: 'common',
+                  amount: formatNumber(MIN, locale),
+                  defaultValue: '{{amount}} coins',
+                }),
+                defaultValue: 'Tier {{tier}} text messages unlock at {{amount}} or more',
               })}
             </div>
           )}
@@ -234,7 +239,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
                 onClick={() => updateAmount(v)}
                 className={cn('gl-sc-quick-btn', amount === v ? 'is-active' : '')}
               >
-                {formatSuperChatAmount(v, locale)}
+                <CoinAmount value={v} iconSize={12} />
               </button>
             ))}
           </div>
@@ -312,8 +317,4 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
       </DialogContent>
     </Dialog>
   );
-}
-
-function formatSuperChatAmount(value: number, locale: string): string {
-  return `\u00a5${value.toLocaleString(locale)}`;
 }
