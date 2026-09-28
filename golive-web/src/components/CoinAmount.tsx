@@ -18,7 +18,9 @@ export function CoinAmount({ value, iconSize = 14, className }: CoinAmountProps)
     <span className={cn('gl-coin-amount', className)}>
       <Coins size={iconSize} aria-hidden="true" />
       <span aria-hidden="true">{amount}</span>
-      <span className="sr-only">{t('account.coins', { amount, defaultValue: '{{amount}} coins' })}</span>
+      <span className="sr-only">
+        {t('account.coins', { amount, defaultValue: '{{amount}} coins' })}
+      </span>
     </span>
   );
 }

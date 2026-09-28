@@ -7,7 +7,8 @@ export type PlayerShortcut =
   | 'volumeDown';
 
 const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
-const OVERLAY = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="menubar"], [role="listbox"]';
+const OVERLAY =
+  '[role="dialog"], [role="alertdialog"], [role="menu"], [role="menubar"], [role="listbox"]';
 const CONTROL =
   'button, a[href], summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"], [role="option"], [role="switch"], [role="checkbox"], [role="radio"], [role="slider"]';
 
@@ -26,7 +27,9 @@ export function playerShortcutFor(e: ShortcutEvent, player: Element): PlayerShor
 
   const target = e.target instanceof Element ? e.target : null;
   const onPage =
-    !target || target === target.ownerDocument.body || target === target.ownerDocument.documentElement;
+    !target ||
+    target === target.ownerDocument.body ||
+    target === target.ownerDocument.documentElement;
   const inPlayer = !!target && player.contains(target);
   if (!onPage && !inPlayer) return null;
 

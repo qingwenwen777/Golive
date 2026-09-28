@@ -102,7 +102,11 @@ const RELATIVE_STEPS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
  * a week it falls back to formatDateTime, which is easier to place than
  * "5 weeks ago".
  */
-export function formatRelativeTime(value: DateInput, locale = appLocale(), now = new Date()): string {
+export function formatRelativeTime(
+  value: DateInput,
+  locale = appLocale(),
+  now = new Date(),
+): string {
   const date = toDate(value);
   if (!date) return '';
   let delta = (date.getTime() - now.getTime()) / 1000;

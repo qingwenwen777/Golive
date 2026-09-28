@@ -69,6 +69,8 @@ describe('playerShortcutFor', () => {
     expect(playerShortcutFor(key(document.body, 'f', { ctrlKey: true }), player)).toBeNull();
     expect(playerShortcutFor(key(document.body, 'm', { metaKey: true }), player)).toBeNull();
     expect(playerShortcutFor(key(document.body, ' ', { repeat: true }), player)).toBeNull();
-    expect(playerShortcutFor(key(document.body, 'm', { defaultPrevented: true }), player)).toBeNull();
+    expect(
+      playerShortcutFor(key(document.body, 'm', { defaultPrevented: true }), player),
+    ).toBeNull();
   });
 });

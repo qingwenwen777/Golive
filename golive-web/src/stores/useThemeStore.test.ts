@@ -63,7 +63,9 @@ describe('theme resolution', () => {
     expect(useThemeStore.getState().theme).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(document.documentElement.style.colorScheme).toBe('dark');
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#0f0f0f');
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
+      '#0f0f0f',
+    );
     expect(localStorage.getItem('golive-theme')).toBe('dark');
     expect(localStorage.getItem('golive-theme-explicit')).toBe('1');
   });
