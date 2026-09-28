@@ -1299,6 +1299,11 @@ input:focus-visible,
   align-items: center;
   gap: 8px;
 }
+/* Phone-only search controls (see the max-width: 767px block). */
+.gl-topbar-search .gl-search-open-btn,
+.gl-topbar-search .gl-search-back-btn {
+  display: none;
+}
 
 .gl-icon-btn {
   width: 40px;
@@ -12874,6 +12879,40 @@ button.gl-fan-badge-empty {
   .gl-lang-toggle {
     display: none;
   }
+  /* No room for the pill: a search button opens it across the whole bar. */
+  .gl-topbar-search .gl-search-open-btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+  .gl-topbar.is-searching {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gl-topbar.is-searching .gl-topbar-left,
+  .gl-topbar.is-searching .gl-topbar-right,
+  .gl-topbar.is-searching .gl-search-open-btn {
+    display: none;
+  }
+  .gl-topbar.is-searching .gl-topbar-search {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .gl-topbar.is-searching .gl-search-back-btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+  .gl-topbar.is-searching .gl-search-pill {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .gl-topbar.is-searching .gl-search-suggest-popover {
+    left: -8px;
+    right: -8px;
+    width: auto;
+    max-height: calc(100dvh - 64px);
+    border-inline: 0;
+    border-radius: 0 0 12px 12px;
+  }
   .gl-create-btn {
     padding: 0 10px;
   }
@@ -18162,4 +18201,15 @@ button.gl-fan-badge-empty {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+
+/* Under 360px a signed-in top bar can't fit the search button next to all
+   its icons; the theme switch is also in the account menu. */
+@media (max-width: 359px) {
+  .gl-topbar {
+    gap: 4px;
+  }
+  .gl-theme-btn.is-in-menu {
+    display: none;
+  }
 }

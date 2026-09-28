@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Coins, Plus, User as UserIcon, X } from 'lucide-react';
+import { ArrowLeft, Bell, Coins, Plus, User as UserIcon, X } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
 import {
   useMarkAllNotificationsRead,
@@ -57,8 +58,12 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
   const [search, setSearch] = useState(() => new URLSearchParams(location.search).get('q') ?? '');
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  // Phones have no room for the search pill; a search button opens it over
+  // the top bar instead (the CSS only honours this below 768px).
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchRef = useRef<HTMLFormElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const openSearchRef = useRef<HTMLButtonElement | null>(null);
   const currentUser = isAuthed ? (me.data ?? user) : null;
   const balance = isAuthed ? (me.data?.coinBalance ?? user?.coinBalance ?? 0) : 0;
   const isBanned = isAuthed && Boolean(currentUser?.banned);
@@ -86,10 +91,32 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
     setActiveSuggestion(-1);
   }, [trimmedSearch]);
 
+  useEffect(() => {
+    setMobileSearchOpen(false);
+  }, [location.pathname]);
+
+  // Both run inside the tap handler: iOS only raises the keyboard for a
+  // focus() made during the tap, so the pill must be shown synchronously.
+  const openMobileSearch = () => {
+    flushSync(() => setMobileSearchOpen(true));
+    inputRef.current?.focus();
+  };
+
+  const closeMobileSearch = () => {
+    setSuggestionsOpen(false);
+    setActiveSuggestion(-1);
+    flushSync(() => setMobileSearchOpen(false));
+    openSearchRef.current?.focus();
+  };
+
   const commitSearch = (value = search) => {
     const q = value.trim();
     setSuggestionsOpen(false);
     setActiveSuggestion(-1);
+    if (mobileSearchOpen) {
+      setMobileSearchOpen(false);
+      inputRef.current?.blur();
+    }
     navigate(q ? `/search?q=${encodeURIComponent(q)}` : '/');
   };
 
@@ -123,17 +150,23 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
     if (event.key === 'Enter' && activeSuggestion >= 0 && suggestionItems[activeSuggestion]) {
       event.preventDefault();
       commitSearch(suggestionItems[activeSuggestion].value);
-      return;
     }
-    if (event.key === 'Escape') {
+  };
+
+  // Escape closes the suggestions first, then the phone search bar.
+  const handleSearchFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== 'Escape') return;
+    if (suggestionsOpen && trimmedSearch) {
       setSuggestionsOpen(false);
       setActiveSuggestion(-1);
+    } else if (mobileSearchOpen) {
+      closeMobileSearch();
     }
   };
 
   return (
     <>
-      <header className="gl-topbar">
+      <header className={mobileSearchOpen ? 'gl-topbar is-searching' : 'gl-topbar'}>
         <div className="gl-topbar-left">
           <button
             type="button"
@@ -153,12 +186,22 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
           ref={searchRef}
           className="gl-topbar-search"
           onSubmit={handleSearchSubmit}
+          onKeyDown={handleSearchFormKeyDown}
           role="search"
         >
+          <button
+            type="button"
+            className="gl-icon-btn gl-search-back-btn"
+            aria-label={t('searchClose', { defaultValue: 'Close search' })}
+            onClick={closeMobileSearch}
+          >
+            <ArrowLeft size={22} />
+          </button>
           <div className="gl-search-pill">
             <input
               ref={inputRef}
               className="gl-search-input"
+              enterKeyHint="search"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -191,6 +234,15 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
               <Icons.Search size={22} />
             </button>
           </div>
+          <button
+            ref={openSearchRef}
+            type="button"
+            className="gl-icon-btn gl-search-open-btn"
+            aria-label={t('search')}
+            onClick={openMobileSearch}
+          >
+            <Icons.Search size={22} />
+          </button>
           {suggestionsOpen && trimmedSearch && (
             <div id="gl-search-suggestions" className="gl-search-suggest-popover" role="listbox">
               {suggestions.isPending && suggestionItems.length === 0 ? (
@@ -257,9 +309,12 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* The account menu repeats this, so the narrowest phones drop it here. */}
           <button
             type="button"
-            className="gl-icon-btn"
+            className={
+              isAuthed ? 'gl-icon-btn gl-theme-btn is-in-menu' : 'gl-icon-btn gl-theme-btn'
+            }
             onClick={toggleTheme}
             aria-label={t('theme.toggle')}
           >
