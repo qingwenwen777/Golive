@@ -830,16 +830,19 @@
   gap: 24px;
   flex-wrap: wrap;
 }
+/* The channel block keeps a real basis so that, when the row runs out of
+   room, the action buttons wrap to the next line instead of squeezing the
+   channel name down to its first letter. */
 .gl-info-chan {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 280px;
+  min-width: min(280px, 100%);
 }
 .gl-info-chan-link {
   display: inline-flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   align-items: center;
@@ -872,6 +875,7 @@
 }
 
 .gl-sub-btn {
+  flex: 0 0 auto;
   height: 36px;
   padding: 0 16px;
   border: 0;
