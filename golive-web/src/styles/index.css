@@ -4420,6 +4420,11 @@ input:focus-visible,
   font-size: 12px;
   font-weight: 600;
 }
+.gl-auth-hint {
+  color: var(--gl-text-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
 .gl-auth-input-wrap {
   display: flex;
   align-items: center;

@@ -2,9 +2,14 @@
 import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useUploadAvatar, useUploadChannelCover } from './auth';
+import {
+  useLoginMutation,
+  useSendEmailCodeMutation,
+  useUploadAvatar,
+  useUploadChannelCover,
+} from './auth';
 import type { User } from '@/types/user';
 
 const httpMock = vi.hoisted(() => ({
@@ -132,5 +137,66 @@ describe('auth upload hooks', () => {
     expect(authStoreMock.setUser).toHaveBeenCalledWith(uploadedUser);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['public-user', 'user-1'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['public-user', 'streamer'] });
+  });
+});
+
+describe('password sign-in with an emailed code', () => {
+  beforeEach(() => {
+    httpMock.post.mockReset();
+    authStoreMock.login.mockReset();
+    // Signing in schedules a page reload, which jsdom cannot do.
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('asks for a login code for the named account', async () => {
+    httpMock.post.mockResolvedValueOnce({ data: { ok: true, expiresIn: 600 } });
+    const { result } = renderHook(() => useSendEmailCodeMutation(), {
+      wrapper: wrapperFor(makeQueryClient()),
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        purpose: 'login',
+        username: 'streamer',
+        email: 'streamer@example.com',
+      }),
+    ).resolves.toEqual({ ok: true, expiresIn: 600 });
+
+    expect(httpMock.post).toHaveBeenCalledWith('/auth/email-code', {
+      purpose: 'login',
+      username: 'streamer',
+      email: 'streamer@example.com',
+    });
+  });
+
+  it('sends the email and code in place of the captcha', async () => {
+    const user = makeUser();
+    httpMock.post.mockResolvedValueOnce({ data: { token: 'access-token', user } });
+    const { result } = renderHook(() => useLoginMutation(), {
+      wrapper: wrapperFor(makeQueryClient()),
+    });
+
+    await result.current.mutateAsync({
+      username: 'streamer',
+      password: 'secret123',
+      email: 'streamer@example.com',
+      emailCode: '123456',
+    });
+
+    expect(httpMock.post).toHaveBeenCalledTimes(1);
+    const [url, body] = httpMock.post.mock.calls[0];
+    expect(url).toBe('/auth/login');
+    expect(body).toStrictEqual({
+      username: 'streamer',
+      password: 'secret123',
+      email: 'streamer@example.com',
+      emailCode: '123456',
+    });
+    expect(authStoreMock.login).toHaveBeenCalledWith({ token: 'access-token', user });
   });
 });
