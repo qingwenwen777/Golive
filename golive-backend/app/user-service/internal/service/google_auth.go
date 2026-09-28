@@ -311,9 +311,6 @@ func (s *AuthService) loginResponseForUser(ctx context.Context, u *model.User) (
 
 func newGoogleUser(username, email, displayName, hash string, profile *GoogleProfile) *model.User {
 	avatar := strings.TrimSpace(profile.Picture)
-	if avatar == "" {
-		avatar = DefaultAvatarURL(displayName)
-	}
 	sub := profile.Subject
 	now := time.Now().UTC()
 	return &model.User{

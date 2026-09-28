@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
-	"net/url"
 	"strings"
 	"time"
 
@@ -575,7 +574,6 @@ func newLocalUser(username, email, displayName, hash string) *model.User {
 		Email:                emailPtr,
 		DisplayName:          displayName,
 		PasswordHash:         hash,
-		Avatar:               DefaultAvatarURL(displayName),
 		CoinBalance:          1200,
 		Verified:             false,
 		Role:                 model.RoleUser,
@@ -597,11 +595,4 @@ func normalizeEmail(raw string) (string, bool) {
 
 func NormalizeEmail(raw string) (string, bool) {
 	return normalizeEmail(raw)
-}
-
-func urlSafeSeed(seed string) string {
-	if seed == "" {
-		return "user"
-	}
-	return url.QueryEscape(seed)
 }

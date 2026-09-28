@@ -752,7 +752,6 @@ func (h *AdminHandler) CreateAdmin(c *gin.Context) {
 		Username:             username,
 		DisplayName:          displayName,
 		PasswordHash:         hash,
-		Avatar:               service.DefaultAvatarURL(displayName),
 		CoinBalance:          1200,
 		Verified:             false,
 		Role:                 model.RoleAdmin,

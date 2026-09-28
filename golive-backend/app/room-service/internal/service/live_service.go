@@ -240,7 +240,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 		Channel:             ownerName,
 		ChannelID:           channelID,
 		Verified:            verified,
-		Avatar:              cleanAvatar(req.Avatar, ownerName),
+		Avatar:              cleanAvatar(req.Avatar),
 		FanClubOnly:         req.FanClubOnly,
 		Viewers:             0,
 		PeakViewers:         0,
@@ -365,12 +365,10 @@ func (s *LiveService) UpdateLiveMetadata(ctx context.Context, ownerID string, re
 	return &st, nil
 }
 
-func cleanAvatar(raw, ownerName string) string {
-	avatar := strings.TrimSpace(raw)
-	if avatar != "" {
-		return trimRunes(avatar, 500)
-	}
-	return "https://api.dicebear.com/7.x/initials/svg?seed=" + url.QueryEscape(ownerName)
+// cleanAvatar keeps an empty avatar empty: clients draw the owner's initial
+// instead of loading a generated image from a third-party service.
+func cleanAvatar(raw string) string {
+	return trimRunes(strings.TrimSpace(raw), 500)
 }
 
 var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

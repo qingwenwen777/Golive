@@ -1,6 +1,7 @@
 import { useLayoutEffect, useState, type CSSProperties } from 'react';
 import { cn } from '@/lib/cn';
 import { isLoadableImageReady, LoadableImage } from '@/components/LoadableImage';
+import { avatarColor, avatarInitial } from '@/lib/avatar';
 
 export interface AvatarProps {
   name: string;
@@ -10,14 +11,13 @@ export interface AvatarProps {
   className?: string;
 }
 
+// Without a photo, an avatar is the name's first letter on a colour picked
+// from the name, drawn here rather than fetched from an avatar service.
 export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
-  const primarySrc = normalizeAvatarSrc(src);
-  const fallbackSrc = defaultAvatarSrc(name);
-  const [primaryFailed, setPrimaryFailed] = useState(false);
-  const [fallbackFailed, setFallbackFailed] = useState(false);
-  const imageSrc = primarySrc && !primaryFailed ? primarySrc : fallbackSrc;
+  const imageSrc = normalizeAvatarSrc(src);
+  const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(() => isLoadableImageReady(imageSrc));
-  const showImage = Boolean(imageSrc && !(imageSrc === fallbackSrc && fallbackFailed));
+  const showImage = Boolean(imageSrc) && !failed;
   const style: CSSProperties = {
     width: size,
     height: size,
@@ -29,19 +29,16 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
     overflow: 'hidden',
     color: 'white',
     fontWeight: 600,
-    fontSize: size * 0.42,
+    fontSize: Math.round(size * 0.42),
+    lineHeight: 1,
     letterSpacing: 0,
-    background: 'var(--gl-avatar-placeholder)',
+    background: showImage ? 'var(--gl-avatar-placeholder)' : avatarColor(name),
     flexShrink: 0,
     ...(ring ? { boxShadow: `0 0 0 2px ${ring}, 0 0 0 4px var(--gl-avatar-placeholder)` } : null),
   };
 
   useLayoutEffect(() => {
-    setPrimaryFailed(false);
-    setFallbackFailed(false);
-  }, [fallbackSrc, primarySrc]);
-
-  useLayoutEffect(() => {
+    setFailed(false);
     setLoaded(isLoadableImageReady(imageSrc));
   }, [imageSrc]);
 
@@ -50,10 +47,11 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
       className={cn(
         'gl-avatar',
         showImage && !loaded && 'is-loading',
-        !showImage && 'is-empty',
+        !showImage && 'is-initial',
         className,
       )}
       style={style}
+      role="img"
       aria-label={name}
     >
       {showImage ? (
@@ -63,38 +61,25 @@ export function Avatar({ name, src, size = 36, ring, className }: AvatarProps) {
           autoFormat={false}
           className="gl-avatar-img"
           onReady={() => setLoaded(true)}
-          onError={() => {
-            if (imageSrc === fallbackSrc) {
-              setFallbackFailed(true);
-            } else {
-              setPrimaryFailed(true);
-            }
-          }}
+          onError={() => setFailed(true)}
         />
-      ) : null}
+      ) : (
+        <span aria-hidden="true">{avatarInitial(name)}</span>
+      )}
     </div>
   );
 }
 
-const DEFAULT_AVATAR_BASE = 'https://api.dicebear.com/7.x/avataaars/svg?seed=';
-const DEFAULT_AVATAR_SKIN_COLOR = 'ffdbb4';
-
-function defaultAvatarSrc(name: string): string {
-  const seed = name.trim() || 'golive';
-  return `${DEFAULT_AVATAR_BASE}${encodeURIComponent(seed)}&skinColor=${DEFAULT_AVATAR_SKIN_COLOR}`;
-}
+// Avatars that older accounts and rooms got from DiceBear are generated
+// defaults, not pictures anyone chose; draw the initial instead.
+const GENERATED_AVATAR = /^https?:\/\/api\.dicebear\.com\//i;
 
 function normalizeAvatarSrc(src: string | undefined): string {
-  if (!src) return '';
-  if (/^(https?:)?\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) {
-    return withDefaultAvatarOptions(src);
+  const value = src?.trim() ?? '';
+  if (!value || GENERATED_AVATAR.test(value)) return '';
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value;
   }
-  if (src.startsWith('/')) return src;
-  return `/${src.replace(/^\/+/, '')}`;
-}
-
-function withDefaultAvatarOptions(src: string): string {
-  if (!/^https:\/\/api\.dicebear\.com\/7\.x\/avataaars\/svg(?:\?|$)/i.test(src)) return src;
-  if (/[?&]skinColor=/i.test(src)) return src;
-  return `${src}${src.includes('?') ? '&' : '?'}skinColor=${DEFAULT_AVATAR_SKIN_COLOR}`;
+  if (value.startsWith('/')) return value;
+  return `/${value.replace(/^\/+/, '')}`;
 }

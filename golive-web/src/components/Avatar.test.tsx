@@ -2,38 +2,40 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { avatarColor, avatarInitial } from '@/lib/avatar';
 import { Avatar } from './Avatar';
 import { LoadableImage } from './LoadableImage';
 
 describe('Avatar', () => {
   afterEach(() => cleanup());
 
-  it('uses the original DiceBear default avatar when no avatar image is available', () => {
+  it('draws the first letter when there is no avatar image', () => {
     render(<Avatar name="Luna Nova" src="" />);
 
-    const avatar = screen.getByLabelText('Luna Nova');
-    const image = avatar.querySelector('img');
-    expect(image?.src).toBe('https://api.dicebear.com/7.x/avataaars/svg?seed=Luna%20Nova&skinColor=ffdbb4');
+    const avatar = screen.getByRole('img', { name: 'Luna Nova' });
+    expect(avatar.querySelector('img')).toBeNull();
+    expect(avatar.textContent).toBe('L');
+    expect(avatar.style.background).not.toBe('');
   });
 
-  it('falls back to the DiceBear default avatar when the primary avatar image fails to load', () => {
+  it('falls back to the letter when the avatar image fails to load', () => {
     render(<Avatar name="Luna" src="/missing-avatar.png" />);
 
-    const image = screen.getByLabelText('Luna').querySelector('img');
+    const image = screen.getByRole('img', { name: 'Luna' }).querySelector('img');
     expect(image).toBeTruthy();
     fireEvent.error(image as HTMLImageElement);
 
-    expect(screen.getByLabelText('Luna').querySelector('img')?.src).toBe(
-      'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&skinColor=ffdbb4',
-    );
+    const avatar = screen.getByRole('img', { name: 'Luna' });
+    expect(avatar.querySelector('img')).toBeNull();
+    expect(avatar.textContent).toBe('L');
   });
 
-  it('adds the default skin tone to stored DiceBear avatar URLs', () => {
+  it('never loads generated DiceBear avatars stored by older accounts', () => {
     render(<Avatar name="Luna" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Luna" />);
 
-    expect(screen.getByLabelText('Luna').querySelector('img')?.src).toBe(
-      'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna&skinColor=ffdbb4',
-    );
+    const avatar = screen.getByRole('img', { name: 'Luna' });
+    expect(avatar.querySelector('img')).toBeNull();
+    expect(avatar.textContent).toBe('L');
   });
 
   it('reuses a previously loaded avatar without showing the loading shimmer again', () => {
@@ -44,10 +46,30 @@ describe('Avatar', () => {
     preload.unmount();
 
     render(<Avatar name="Luna" src={src} />);
-    const avatar = screen.getByLabelText('Luna');
+    const avatar = screen.getByRole('img', { name: 'Luna' });
     expect(avatar.className).not.toContain('is-loading');
 
     const image = avatar.querySelector('img');
     expect(image?.className ?? '').toContain('is-loaded');
+  });
+});
+
+describe('avatarInitial', () => {
+  it('takes the first letter or digit of any script', () => {
+    expect(avatarInitial('luna')).toBe('L');
+    expect(avatarInitial('星野るな')).toBe('星');
+    expect(avatarInitial('🌸 Sakura')).toBe('S');
+    expect(avatarInitial('  #1 fan')).toBe('1');
+    expect(avatarInitial('')).toBe('');
+  });
+});
+
+describe('avatarColor', () => {
+  it('gives a name the same colour every time', () => {
+    expect(avatarColor('Luna')).toBe(avatarColor(' luna '));
+    const colours = new Set(
+      ['Luna', 'Kuroneko', 'Mika', 'devlogdan', 'Zeph', 'Aki'].map(avatarColor),
+    );
+    expect(colours.size).toBeGreaterThan(1);
   });
 });
