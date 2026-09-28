@@ -2070,7 +2070,11 @@
   },
   "login": {
     "title": "Login",
-    "placeholder": "Stage 2 placeholder"
+    "showcase": {
+      "title": "Live streams, chat and replays in one place",
+      "body": "Watch without an account. Sign in to chat, follow channels and send gifts.",
+      "watch": "Watch {{title}}"
+    }
   },
   "notFound": {
     "title": "404",

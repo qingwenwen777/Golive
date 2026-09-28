@@ -2070,7 +2070,11 @@
   },
   "login": {
     "title": "登录",
-    "placeholder": "阶段 2 占位内容"
+    "showcase": {
+      "title": "直播、聊天和回放，都在这里",
+      "body": "不登录也能观看。登录后可以聊天、关注频道和送礼物。",
+      "watch": "观看 {{title}}"
+    }
   },
   "notFound": {
     "title": "404",

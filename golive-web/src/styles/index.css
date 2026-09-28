@@ -6656,11 +6656,47 @@ input:focus-visible,
 }
 .gl-auth-preview {
   position: relative;
+  display: block;
   min-height: 380px;
   overflow: hidden;
   border-radius: 12px;
   background: #000;
   color: #fff;
+}
+.gl-auth-preview.is-loading {
+  background: var(--gl-bg-hover);
+}
+.gl-auth-preview.is-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  background: linear-gradient(160deg, #fff5f6, #ffe3e8);
+  color: var(--gl-text);
+  text-align: center;
+}
+.dark .gl-auth-preview.is-brand {
+  background: linear-gradient(160deg, #2a171b, #181012);
+}
+.gl-auth-preview.is-brand img {
+  position: static;
+  width: min(200px, 55%);
+  height: auto;
+  object-fit: contain;
+}
+.gl-auth-preview.is-brand h2 {
+  max-width: 420px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.gl-auth-preview.is-brand p {
+  max-width: 380px;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.5;
 }
 .gl-auth-preview img {
   position: absolute;
@@ -13090,7 +13126,6 @@ button.gl-fan-badge-empty {
   }
   .gl-auth-preview {
     min-height: 240px;
-    order: -1;
   }
   .gl-auth-copy h1 {
     font-size: 22px;
