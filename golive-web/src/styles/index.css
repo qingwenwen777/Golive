@@ -1777,7 +1777,7 @@ input:focus-visible,
   color: #ffffff;
 }
 .gl-brand-logo-live {
-  color: #fdd3d0;
+  color: var(--gl-red-fg);
 }
 .gl-logo-word {
   font-weight: 700;
@@ -4423,13 +4423,6 @@ input:focus-visible,
   gap: 6px;
   font-size: 20px;
   font-weight: 700;
-}
-.gl-auth-brand-region {
-  align-self: flex-start;
-  color: var(--gl-text-2);
-  font-size: 10px;
-  font-weight: 500;
-  margin-top: 2px;
 }
 .gl-auth-live {
   display: inline-flex;
