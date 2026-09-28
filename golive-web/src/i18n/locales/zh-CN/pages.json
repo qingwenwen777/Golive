@@ -12,7 +12,7 @@
     "errorTitle": "直播加载失败",
     "errorSub": "请检查网络后重试",
     "retry": "重试",
-    "watching": "{{count}} 人正在观看",
+    "watching": "{{count, compact}} 人正在观看",
     "subscribers": "{{count}} 位订阅者",
     "allLive": {
       "title": "更多直播",
@@ -22,7 +22,9 @@
     "recommendations": {
       "title": "热门主播推荐",
       "subtitle": "先订阅感兴趣的频道，开播时更容易回来看。",
-      "followers": "{{count}} 位粉丝",
+      "followers": "{{count, compact}} 位粉丝",
+      "followers_one": "{{count, compact}} 位粉丝",
+      "followers_other": "{{count, compact}} 位粉丝",
       "lastLive": "上次直播：{{time}}",
       "noLive": "暂未开播",
       "subscribe": "订阅",
@@ -121,8 +123,10 @@
     "heart": "点赞",
     "subscribe": "订阅",
     "subscribed": "已订阅",
-    "subscribers": "{{count}} 位订阅者",
-    "watching": "{{count}} 人正在观看",
+    "subscribers": "{{count, compact}} 位订阅者",
+    "subscribers_one": "{{count, compact}} 位订阅者",
+    "subscribers_other": "{{count, compact}} 位订阅者",
+    "watching": "{{count, number}} 人正在观看",
     "like": "喜欢",
     "dislike": "不喜欢",
     "share": "分享",
@@ -145,11 +149,11 @@
     "showLess": "收起",
     "scheduledBadge": "直播预约",
     "liveBadge": "直播中",
-    "scheduledReserved": "{{count}} 人已预约",
+    "scheduledReserved": "{{count, compact}} 人已预约",
     "scheduledOwner": "主播视角",
     "scheduledReservedByYou": "你已预约",
     "scheduledOpen": "可预约",
-    "appointmentWaiting": "{{count}} 人正在等待",
+    "appointmentWaiting": "{{count, compact}} 人正在等待",
     "appointmentPremiereTime": "首播时间：{{time}}",
     "appointmentStartingSoon": "即将开始",
     "quickReserve": "快速预约",
@@ -334,7 +338,9 @@
     "changeCover": "更换封面",
     "yourChannel": "我的频道",
     "liveChannel": "直播频道",
-    "subscribers": "{{count}} 位订阅者",
+    "subscribers": "{{count, compact}} 位订阅者",
+    "subscribers_one": "{{count, compact}} 位订阅者",
+    "subscribers_other": "{{count, compact}} 位订阅者",
     "activeRooms": "{{count}} 个活跃直播间",
     "startLive": "开播",
     "changeAvatar": "更换头像",
@@ -404,7 +410,9 @@
       "subtitle": "感谢每一位点亮粉丝灯牌的观众。",
       "members": "粉丝灯牌成员",
       "emptyMembers": "等待首位粉丝",
-      "memberCount": "{{count}} 位粉丝已加入",
+      "memberCount": "{{count, compact}} 位粉丝已加入",
+      "memberCount_one": "{{count, compact}} 位粉丝已加入",
+      "memberCount_other": "{{count, compact}} 位粉丝已加入",
       "join": "加入粉丝团",
       "lit": "已点亮",
       "alreadyLit": "粉丝灯牌已点亮。"
@@ -527,7 +535,9 @@
       "clear": "全部清空"
     },
     "collection": {
-      "liveRoomCount": "{{count}} 个直播间",
+      "liveRoomCount": "{{count, number}} 个直播间",
+      "liveRoomCount_one": "{{count, number}} 个直播间",
+      "liveRoomCount_other": "{{count, number}} 个直播间",
       "remove": "移除",
       "exploreTitle": "去看看这些直播间",
       "exploreEmptyTitle": "暂无可用直播间",
@@ -847,7 +857,9 @@
       "quickHeading": "准备下一场直播",
       "recentTitle": "最近表现",
       "noRecent": "暂无直播记录",
-      "latestPeak": "峰值 {{count}} 人",
+      "latestPeak": "峰值 {{count, compact}} 人",
+      "latestPeak_one": "峰值 {{count, compact}} 人",
+      "latestPeak_other": "峰值 {{count, compact}} 人",
       "emptyRecent": "开播后复盘数据会显示在这里。"
     },
     "actions": {
@@ -1451,7 +1463,9 @@
         "markReviewing": "复核中",
         "approveAppeal": "通过",
         "rejectAppeal": "拒绝",
-        "appealBadge": "{{count}} 个申诉"
+        "appealBadge": "{{count, number}} 个申诉",
+        "appealBadge_one": "{{count, number}} 个申诉",
+        "appealBadge_other": "{{count, number}} 个申诉"
       },
       "coinActions": {
         "add": "充值",
@@ -1743,7 +1757,9 @@
         },
         "services": {
           "title": "服务健康",
-          "down": "{{count}} 个服务异常",
+          "down": "{{count, number}} 个服务异常",
+          "down_one": "{{count, number}} 个服务异常",
+          "down_other": "{{count, number}} 个服务异常",
           "ok": "当前无异常服务",
           "action": "查看总览"
         }
@@ -1921,7 +1937,9 @@
         "openDetail": "查看详情",
         "note": "处理备注",
         "notePlaceholder": "记录处理说明，便于审计。",
-        "reportCount": "{{count}} 条举报",
+        "reportCount": "{{count, number}} 条举报",
+        "reportCount_one": "{{count, number}} 条举报",
+        "reportCount_other": "{{count, number}} 条举报",
         "recentCount": "近 1 小时 {{count}} 条",
         "reporters": "举报记录",
         "result": "处理结果",
@@ -2400,12 +2418,16 @@
       "nextPage": "下一页"
     },
     "chat": {
-      "newMessages": "{{count}} 条新消息",
+      "newMessages": "{{count, number}} 条新消息",
+      "newMessages_one": "{{count, number}} 条新消息",
+      "newMessages_other": "{{count, number}} 条新消息",
       "loadingOlder": "正在加载更早消息..."
     },
     "private": {
       "title": "我的消息",
-      "conversationCount": "{{count}} 个会话",
+      "conversationCount": "{{count, number}} 个会话",
+      "conversationCount_one": "{{count, number}} 个会话",
+      "conversationCount_other": "{{count, number}} 个会话",
       "fanGroups": "粉丝团群聊",
       "loading": "正在加载私信...",
       "emptyHint": "关注主播后，可以从频道页发起私信。",
@@ -2571,8 +2593,12 @@
       "deleteFailed": "无法删除评论。",
       "reply": "回复",
       "delete": "删除",
-      "expandReplies": "展开 {{count}} 条回复",
-      "collapseReplies": "收起 {{count}} 条回复"
+      "expandReplies": "展开 {{count, number}} 条回复",
+      "expandReplies_one": "展开 {{count, number}} 条回复",
+      "expandReplies_other": "展开 {{count, number}} 条回复",
+      "collapseReplies": "收起 {{count, number}} 条回复",
+      "collapseReplies_one": "收起 {{count, number}} 条回复",
+      "collapseReplies_other": "收起 {{count, number}} 条回复"
     },
     "editor": {
       "visibility": "可见性",
@@ -2638,10 +2664,14 @@
     "posts": "帖子",
     "appointmentBadge": "预告",
     "noResults": "暂无结果",
-    "subscribers": "{{count}} 位订阅者",
+    "subscribers": "{{count, compact}} 位订阅者",
+    "subscribers_one": "{{count, compact}} 位订阅者",
+    "subscribers_other": "{{count, compact}} 位订阅者",
     "liveDot": "正在直播",
-    "views": "{{count}} 次观看",
-    "reservations": "{{count}} 人预约",
+    "views": "{{count, compact}} 次观看",
+    "views_one": "{{count, compact}} 次观看",
+    "views_other": "{{count, compact}} 次观看",
+    "reservations": "{{count, compact}} 人预约",
     "imagePost": "图片帖子"
   }
 }

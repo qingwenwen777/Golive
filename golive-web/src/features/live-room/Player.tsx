@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Stream } from '@/types/stream';
 import type { Bullet } from '@/stores/useRealtimeStore';
+import { formatNumber } from '@/lib/format';
 
 const DEFAULT_VIDEO_SRC =
   'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
@@ -680,7 +681,7 @@ export function Player({
         <span className="gl-player-title">{stream.title}</span>
         <span className="gl-player-viewers">
           <span className="gl-live-dot-red" aria-hidden="true" />
-          {viewers.toLocaleString()}
+          {formatNumber(viewers)}
         </span>
       </div>
 

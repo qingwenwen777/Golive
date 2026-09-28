@@ -8,6 +8,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import type { BetOption, BetOptionSummary } from '@/types/bet';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
 
 const DEFAULT_AMOUNT = 1000;
 const MAX_QUESTION_LENGTH = 80;
@@ -176,7 +177,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
           <div className="gl-bet-meta">
             <span>
               <Coins size={14} />
-              {round.amount.toLocaleString()} coin
+              {formatNumber(round.amount)} coin
             </span>
             <span>
               <Clock3 size={14} />
@@ -189,7 +190,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
             </span>
             <span>
               {t('betting.pool', {
-                total: totalPool.toLocaleString(),
+                total: formatNumber(totalPool),
                 defaultValue: 'Pool {{total}}',
               })}
             </span>
@@ -216,7 +217,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
               })}
               {myWager.status === 'won' &&
                 t('betting.myWagerWon', {
-                  payout: myWager.payout.toLocaleString(),
+                  payout: formatNumber(myWager.payout),
                   defaultValue: ', returned {{payout}} coin',
                 })}
               {myWager.status === 'refunded' &&
@@ -369,7 +370,7 @@ function BetOptionButton({
       <span className="gl-bet-option-meta">
         {t('betting.optionMeta', {
           count,
-          total: total.toLocaleString(),
+          total: formatNumber(total),
           defaultValue: '{{count}} people · {{total}} coin',
         })}
       </span>

@@ -23,6 +23,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
 import { streamChannelName, type Stream } from '@/types/stream';
+import { formatRelativeTime } from '@/lib/format';
 
 const UPCOMING_APPOINTMENT_LIMIT = 3;
 const RECOMMENDED_LIVE_LIMIT = 12;
@@ -488,10 +489,5 @@ function filterStreamsBySearch(items: Stream[], searchQuery: string): Stream[] {
 }
 
 function formatRecommendationTime(value: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  return formatRelativeTime(value, locale);
 }

@@ -74,6 +74,7 @@ import { userDisplayName } from '@/types/user';
 import { streamChannelName, type Stream } from '@/types/stream';
 import type { FanBadge } from '@/types/gift';
 import type { Message } from '@/types/message';
+import { formatCount, formatDateTime } from '@/lib/format';
 
 const LIVE_END_TRANSITION_MS = 3200;
 const FAN_BADGE_LEVEL_STEP_CONTRIBUTION = 1000;
@@ -1366,7 +1367,7 @@ function BunnyReplayPlayer({
 }
 
 function ReplayInfoBlock({ stream }: { stream: Stream }) {
-  const { t } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
@@ -1377,14 +1378,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
   const liked = likeState.data?.liked ?? likedMembership.isMember;
   const likes =
     likeState.data?.likes ?? Math.max(0, Math.floor((stream.peakViewers ?? stream.viewers) * 0.3));
-  const endedAt = stream.endedAt
-    ? new Intl.DateTimeFormat(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(stream.endedAt))
-    : '';
+  const endedAt = formatDateTime(stream.endedAt, i18n.language);
 
   const toggleLike = () => {
     const nextLiked = !liked;
@@ -1438,7 +1432,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
             onClick={toggleLike}
           >
             <ThumbsUp size={18} />
-            <span>{likes.toLocaleString()}</span>
+            <span>{formatCount(likes)}</span>
           </button>
         </div>
       </div>
@@ -1625,12 +1619,7 @@ function ScheduledRoomPlayer({
   onStart: () => void;
 }) {
   const { t, i18n } = useTranslation('pages');
-  const scheduled = new Intl.DateTimeFormat(i18n.language, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(stream.startedAt));
+  const scheduled = formatDateTime(stream.startedAt, i18n.language);
   const reserved = appointment?.reserved ?? false;
   const reservationCount = appointment?.reservationCount ?? 0;
   return (

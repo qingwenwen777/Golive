@@ -12,7 +12,7 @@
     "errorTitle": "Couldn\u0027t load streams",
     "errorSub": "Check your connection and try again",
     "retry": "Retry",
-    "watching": "{{count}} watching",
+    "watching": "{{count, compact}} watching",
     "subscribers": "{{count}} subscribers",
     "allLive": {
       "title": "More live streams",
@@ -22,7 +22,9 @@
     "recommendations": {
       "title": "Popular creators",
       "subtitle": "Follow channels you like so they are easier to find when they go live.",
-      "followers": "{{count}} followers",
+      "followers": "{{count, compact}} followers",
+      "followers_one": "{{count, compact}} follower",
+      "followers_other": "{{count, compact}} followers",
       "lastLive": "Last live: {{time}}",
       "noLive": "No live yet",
       "subscribe": "Subscribe",
@@ -120,8 +122,10 @@
     "heart": "Heart",
     "subscribe": "Subscribe",
     "subscribed": "Subscribed",
-    "subscribers": "{{count}} subscribers",
-    "watching": "{{count}} watching",
+    "subscribers": "{{count, compact}} subscribers",
+    "subscribers_one": "{{count, compact}} subscriber",
+    "subscribers_other": "{{count, compact}} subscribers",
+    "watching": "{{count, number}} watching",
     "like": "Like",
     "dislike": "Dislike",
     "share": "Share",
@@ -145,11 +149,11 @@
     "showLess": "Show less",
     "scheduledBadge": "Appointment",
     "liveBadge": "Live",
-    "scheduledReserved": "{{count}} reserved",
+    "scheduledReserved": "{{count, compact}} reserved",
     "scheduledOwner": "Owner view",
     "scheduledReservedByYou": "Reserved by you",
     "scheduledOpen": "Open for reservation",
-    "appointmentWaiting": "{{count}} waiting",
+    "appointmentWaiting": "{{count, compact}} waiting",
     "appointmentPremiereTime": "Premieres: {{time}}",
     "appointmentStartingSoon": "Upcoming",
     "quickReserve": "Reserve",
@@ -334,7 +338,9 @@
     "changeCover": "Change cover",
     "yourChannel": "Your channel",
     "liveChannel": "Live channel",
-    "subscribers": "{{count}} subscribers",
+    "subscribers": "{{count, compact}} subscribers",
+    "subscribers_one": "{{count, compact}} subscriber",
+    "subscribers_other": "{{count, compact}} subscribers",
     "activeRooms": "{{count}} active rooms",
     "startLive": "Start live",
     "changeAvatar": "Change avatar",
@@ -404,7 +410,9 @@
       "subtitle": "Thanks to every viewer who has lit a fan badge.",
       "members": "Fan badge members",
       "emptyMembers": "Waiting for the first fan",
-      "memberCount": "{{count}} fans joined",
+      "memberCount": "{{count, compact}} fans joined",
+      "memberCount_one": "{{count, compact}} fan joined",
+      "memberCount_other": "{{count, compact}} fans joined",
       "join": "Join fan club",
       "lit": "Lit",
       "alreadyLit": "Fan badge already lit."
@@ -527,7 +535,9 @@
       "clear": "Clear all"
     },
     "collection": {
-      "liveRoomCount": "{{count}} live rooms",
+      "liveRoomCount": "{{count, number}} live rooms",
+      "liveRoomCount_one": "{{count, number}} live room",
+      "liveRoomCount_other": "{{count, number}} live rooms",
       "remove": "Remove",
       "exploreTitle": "Live rooms to explore",
       "exploreEmptyTitle": "No live rooms available",
@@ -847,7 +857,9 @@
       "quickHeading": "Prepare your next live",
       "recentTitle": "Latest result",
       "noRecent": "No stream yet",
-      "latestPeak": "{{count}} peak viewers",
+      "latestPeak": "{{count, compact}} peak viewers",
+      "latestPeak_one": "{{count, compact}} peak viewer",
+      "latestPeak_other": "{{count, compact}} peak viewers",
       "emptyRecent": "Start a live and the recap will appear here."
     },
     "actions": {
@@ -1451,7 +1463,9 @@
         "markReviewing": "Reviewing",
         "approveAppeal": "Approve",
         "rejectAppeal": "Reject",
-        "appealBadge": "{{count}} appeal"
+        "appealBadge": "{{count, number}} appeals",
+        "appealBadge_one": "{{count, number}} appeal",
+        "appealBadge_other": "{{count, number}} appeals"
       },
       "coinActions": {
         "add": "Recharge",
@@ -1743,7 +1757,9 @@
         },
         "services": {
           "title": "Service health",
-          "down": "{{count}} services down",
+          "down": "{{count, number}} services down",
+          "down_one": "{{count, number}} service down",
+          "down_other": "{{count, number}} services down",
           "ok": "No service issues",
           "action": "View dashboard"
         }
@@ -1921,7 +1937,9 @@
         "openDetail": "Review details",
         "note": "Resolution note",
         "notePlaceholder": "Record action notes for audit.",
-        "reportCount": "{{count}} reports",
+        "reportCount": "{{count, number}} reports",
+        "reportCount_one": "{{count, number}} report",
+        "reportCount_other": "{{count, number}} reports",
         "recentCount": "{{count}} in 1h",
         "reporters": "Report records",
         "result": "Result",
@@ -2400,12 +2418,16 @@
       "nextPage": "Next"
     },
     "chat": {
-      "newMessages": "{{count}} new messages",
+      "newMessages": "{{count, number}} new messages",
+      "newMessages_one": "{{count, number}} new message",
+      "newMessages_other": "{{count, number}} new messages",
       "loadingOlder": "Loading earlier messages..."
     },
     "private": {
       "title": "My messages",
-      "conversationCount": "{{count}} conversations",
+      "conversationCount": "{{count, number}} conversations",
+      "conversationCount_one": "{{count, number}} conversation",
+      "conversationCount_other": "{{count, number}} conversations",
       "fanGroups": "Fan club group chats",
       "loading": "Loading direct messages...",
       "emptyHint": "Follow a creator, then start a direct message from their channel.",
@@ -2571,8 +2593,12 @@
       "deleteFailed": "Could not delete the comment.",
       "reply": "Reply",
       "delete": "Delete",
-      "expandReplies": "Show {{count}} replies",
-      "collapseReplies": "Hide {{count}} replies"
+      "expandReplies": "Show {{count, number}} replies",
+      "expandReplies_one": "Show {{count, number}} reply",
+      "expandReplies_other": "Show {{count, number}} replies",
+      "collapseReplies": "Hide {{count, number}} replies",
+      "collapseReplies_one": "Hide {{count, number}} reply",
+      "collapseReplies_other": "Hide {{count, number}} replies"
     },
     "editor": {
       "visibility": "Visibility",
@@ -2638,10 +2664,14 @@
     "posts": "Posts",
     "appointmentBadge": "Upcoming",
     "noResults": "No results",
-    "subscribers": "{{count}} subscribers",
+    "subscribers": "{{count, compact}} subscribers",
+    "subscribers_one": "{{count, compact}} subscriber",
+    "subscribers_other": "{{count, compact}} subscribers",
     "liveDot": "Live now",
-    "views": "{{count}} views",
-    "reservations": "{{count}} reserved",
+    "views": "{{count, compact}} views",
+    "views_one": "{{count, compact}} view",
+    "views_other": "{{count, compact}} views",
+    "reservations": "{{count, compact}} reserved",
     "imagePost": "Image post"
   }
 }

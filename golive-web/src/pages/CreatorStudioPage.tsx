@@ -125,6 +125,7 @@ import { PostCard } from '@/features/posts/PostCard';
 import type { Message } from '@/types/message';
 import type { ReplayVisibility, Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
+import { formatDateTime, formatNumber } from '@/lib/format';
 
 const DEFAULT_CATEGORY = 'Just Chatting';
 const LEGACY_APPOINTMENT_CATEGORY = 'Scheduled';
@@ -284,7 +285,7 @@ export function CreatorStudioOverviewPage() {
         <StudioKpi
           icon={<Users size={18} />}
           label={t('studio.overview.cards.subscribers', { defaultValue: 'Subscribers' })}
-          value={(data?.subscriberCount ?? 0).toLocaleString()}
+          value={formatNumber(data?.subscriberCount ?? 0)}
           sub={t('studio.overview.cards.subscribersSub', { defaultValue: 'channel total' })}
         />
         <StudioKpi
@@ -292,7 +293,7 @@ export function CreatorStudioOverviewPage() {
           label={t('studio.overview.cards.fanClubAudience', {
             defaultValue: 'Fan club audience',
           })}
-          value={fanClubAudience.toLocaleString()}
+          value={formatNumber(fanClubAudience)}
           sub={t('studio.overview.cards.fanClubAudienceSub', {
             defaultValue: 'joined fans',
           })}
@@ -300,7 +301,7 @@ export function CreatorStudioOverviewPage() {
         <StudioKpi
           icon={<Radio size={18} />}
           label={t('studio.overview.cards.streams', { defaultValue: 'Streams' })}
-          value={(data?.streams ?? 0).toLocaleString()}
+          value={formatNumber(data?.streams ?? 0)}
           sub={t('studio.overview.cards.streamsSub', { defaultValue: 'completed' })}
         />
         <StudioKpi
@@ -1534,7 +1535,7 @@ export function CreatorPostsPage() {
         <StudioKpi
           icon={<FileText size={18} />}
           label={t('posts.editor.total', { defaultValue: '全部帖子' })}
-          value={total.toLocaleString()}
+          value={formatNumber(total)}
           sub={t('posts.editor.totalSub', { defaultValue: '已发布' })}
         />
         <StudioKpi
@@ -1828,19 +1829,19 @@ export function CreatorRoomModeratorsPage() {
         <StudioKpi
           icon={<ShieldCheck size={18} />}
           label={t('studio.moderators.active', { defaultValue: '房间房管' })}
-          value={(moderators.data?.total ?? 0).toLocaleString()}
+          value={formatNumber(moderators.data?.total ?? 0)}
           sub={t('studio.moderators.activeSub', { defaultValue: '当前有效' })}
         />
         <StudioKpi
           icon={<Crown size={18} />}
           label={t('studio.moderators.followers', { defaultValue: '可选粉丝团成员' })}
-          value={(followers.data?.total ?? 0).toLocaleString()}
+          value={formatNumber(followers.data?.total ?? 0)}
           sub={t('studio.moderators.followersSub', { defaultValue: '仅已加入粉丝团' })}
         />
         <StudioKpi
           icon={<Clock3 size={18} />}
           label={t('studio.moderators.logs', { defaultValue: '操作记录' })}
-          value={(logs.data?.total ?? 0).toLocaleString()}
+          value={formatNumber(logs.data?.total ?? 0)}
           sub={t('studio.moderators.logsSub', { defaultValue: '分页记录' })}
         />
         <StudioKpi
@@ -2043,25 +2044,25 @@ export function CreatorFanGroupsPage() {
         <StudioKpi
           icon={<MessageSquare size={18} />}
           label={t('studio.fanGroups.groupCount', { defaultValue: '群聊数量' })}
-          value={(groups.data?.total ?? 0).toLocaleString()}
+          value={formatNumber(groups.data?.total ?? 0)}
           sub={t('studio.fanGroups.groupCountSub', { defaultValue: '每群最多 200 人' })}
         />
         <StudioKpi
           icon={<Users size={18} />}
           label={t('studio.fanGroups.memberCount', { defaultValue: '粉丝团成员' })}
-          value={memberCount.toLocaleString()}
+          value={formatNumber(memberCount)}
           sub={t('studio.fanGroups.memberCountSub', { defaultValue: '已分配入群' })}
         />
         <StudioKpi
           icon={<Crown size={18} />}
           label={t('studio.fanGroups.adminCount', { defaultValue: '群管理员' })}
-          value={adminCount.toLocaleString()}
+          value={formatNumber(adminCount)}
           sub={t('studio.fanGroups.adminCountSub', { defaultValue: '可协助管理群聊' })}
         />
         <StudioKpi
           icon={<LockKeyhole size={18} />}
           label={t('studio.fanGroups.mutedCount', { defaultValue: '禁言成员' })}
-          value={mutedCount.toLocaleString()}
+          value={formatNumber(mutedCount)}
           sub={t('studio.fanGroups.mutedCountSub', { defaultValue: '含临时禁言' })}
         />
       </section>
@@ -2347,16 +2348,7 @@ function fanGroupRoleLabel(role: string, t: TFunction<'pages'>) {
 }
 
 function formatFanGroupDate(value: string, locale: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatDateTime(value, locale);
 }
 
 function ModerationUserRow({
@@ -3123,7 +3115,7 @@ export function CreatorLiveConsolePage() {
           />
           <StatusMetric
             label={t('studio.console.online', { defaultValue: 'Online' })}
-            value={viewerCount.toLocaleString()}
+            value={formatNumber(viewerCount)}
           />
         </div>
         <button
@@ -4493,5 +4485,5 @@ function rtmpServer(): string {
 }
 
 function formatCoins(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+  return `${formatNumber(Math.round(value))} coins`;
 }

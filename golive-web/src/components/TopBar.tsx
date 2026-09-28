@@ -35,6 +35,7 @@ import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
 import type { AppLang } from '@/i18n';
+import { formatNumber, formatRelativeTime } from '@/lib/format';
 
 export interface TopBarProps {
   onMenuClick: () => void;
@@ -310,7 +311,7 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
                     <>
                       <DropdownMenuItem className="flex items-center gap-2">
                         <Coins size={14} />
-                        <span>{t('account.coins', { amount: balance.toLocaleString() })}</span>
+                        <span>{t('account.coins', { amount: formatNumber(balance) })}</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="flex items-center gap-2"
@@ -654,10 +655,5 @@ function notificationActorLabel(item: NotificationItem): string {
 }
 
 function formatNotificationTime(value: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  return formatRelativeTime(value, locale);
 }

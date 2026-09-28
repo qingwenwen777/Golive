@@ -31,6 +31,7 @@ import {
   saveToLibrary,
 } from '@/lib/liveLibrary';
 import { streamChannelName, type Stream } from '@/types/stream';
+import { formatCount } from '@/lib/format';
 
 export interface InfoBlockProps {
   stream: Stream;
@@ -241,7 +242,7 @@ export function InfoBlock({
               onClick={handleLike}
             >
               <ThumbsUp size={18} />
-              <span>{likes.toLocaleString()}</span>
+              <span>{formatCount(likes)}</span>
               {likeBurstKey > 0 && <LikeBurst key={likeBurstKey} />}
             </button>
             <div className="gl-pg-div" />

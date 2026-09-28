@@ -12,7 +12,7 @@
     "errorTitle": "配信を読み込めませんでした",
     "errorSub": "接続を確認してもう一度お試しください",
     "retry": "再試行",
-    "watching": "{{count}} 人が視聴中",
+    "watching": "{{count, compact}} 人が視聴中",
     "subscribers": "チャンネル登録者数 {{count}} 人",
     "allLive": {
       "title": "さらにライブ",
@@ -22,7 +22,9 @@
     "recommendations": {
       "title": "人気クリエイター",
       "subtitle": "気になるチャンネルを登録しておくと、配信開始時に見つけやすくなります。",
-      "followers": "フォロワー {{count}} 人",
+      "followers": "フォロワー {{count, compact}} 人",
+      "followers_one": "フォロワー {{count, compact}} 人",
+      "followers_other": "フォロワー {{count, compact}} 人",
       "lastLive": "前回の配信：{{time}}",
       "noLive": "まだ配信はありません",
       "subscribe": "登録",
@@ -120,8 +122,10 @@
     "heart": "ハート",
     "subscribe": "チャンネル登録",
     "subscribed": "登録済み",
-    "subscribers": "チャンネル登録者数 {{count}} 人",
-    "watching": "{{count}} 人が視聴中",
+    "subscribers": "チャンネル登録者数 {{count, compact}} 人",
+    "subscribers_one": "チャンネル登録者数 {{count, compact}} 人",
+    "subscribers_other": "チャンネル登録者数 {{count, compact}} 人",
+    "watching": "{{count, number}} 人が視聴中",
     "like": "高評価",
     "dislike": "低評価",
     "share": "共有",
@@ -145,11 +149,11 @@
     "showLess": "折りたたむ",
     "scheduledBadge": "ライブ予約",
     "liveBadge": "配信中",
-    "scheduledReserved": "{{count}} 人が予約済み",
+    "scheduledReserved": "{{count, compact}} 人が予約済み",
     "scheduledOwner": "配信者ビュー",
     "scheduledReservedByYou": "予約済み",
     "scheduledOpen": "予約受付中",
-    "appointmentWaiting": "{{count}} 人が待機中",
+    "appointmentWaiting": "{{count, compact}} 人が待機中",
     "appointmentPremiereTime": "プレミア公開：{{time}}",
     "appointmentStartingSoon": "まもなく開始",
     "quickReserve": "予約",
@@ -334,7 +338,9 @@
     "changeCover": "カバーを変更",
     "yourChannel": "自分のチャンネル",
     "liveChannel": "ライブチャンネル",
-    "subscribers": "登録者 {{count}} 人",
+    "subscribers": "登録者 {{count, compact}} 人",
+    "subscribers_one": "登録者 {{count, compact}} 人",
+    "subscribers_other": "登録者 {{count, compact}} 人",
     "activeRooms": "アクティブなライブルーム {{count}} 件",
     "startLive": "配信開始",
     "changeAvatar": "アバターを変更",
@@ -404,7 +410,9 @@
       "subtitle": "ファンバッジを点灯してくれた視聴者に感謝します。",
       "members": "ファンバッジメンバー",
       "emptyMembers": "最初のファンを待っています",
-      "memberCount": "{{count}}人のファンが参加済み",
+      "memberCount": "{{count, compact}}人のファンが参加済み",
+      "memberCount_one": "{{count, compact}}人のファンが参加済み",
+      "memberCount_other": "{{count, compact}}人のファンが参加済み",
       "join": "ファンクラブに参加",
       "lit": "点灯済み",
       "alreadyLit": "ファンバッジは点灯済みです。"
@@ -527,7 +535,9 @@
       "clear": "すべて消去"
     },
     "collection": {
-      "liveRoomCount": "{{count}} 件のライブルーム",
+      "liveRoomCount": "{{count, number}} 件のライブルーム",
+      "liveRoomCount_one": "{{count, number}} 件のライブルーム",
+      "liveRoomCount_other": "{{count, number}} 件のライブルーム",
       "remove": "削除",
       "exploreTitle": "探索できるライブルーム",
       "exploreEmptyTitle": "利用できるライブルームはありません",
@@ -847,7 +857,9 @@
       "quickHeading": "次の配信を準備",
       "recentTitle": "最新の結果",
       "noRecent": "配信履歴はまだありません",
-      "latestPeak": "ピーク {{count}} 人",
+      "latestPeak": "ピーク {{count, compact}} 人",
+      "latestPeak_one": "ピーク {{count, compact}} 人",
+      "latestPeak_other": "ピーク {{count, compact}} 人",
       "emptyRecent": "配信を開始すると振り返りがここに表示されます。"
     },
     "actions": {
@@ -1451,7 +1463,9 @@
         "markReviewing": "確認中",
         "approveAppeal": "承認",
         "rejectAppeal": "拒否",
-        "appealBadge": "{{count}} 件の申立て"
+        "appealBadge": "{{count, number}} 件の申立て",
+        "appealBadge_one": "{{count, number}} 件の申立て",
+        "appealBadge_other": "{{count, number}} 件の申立て"
       },
       "coinActions": {
         "add": "チャージ",
@@ -1743,7 +1757,9 @@
         },
         "services": {
           "title": "サービスヘルス",
-          "down": "{{count}} 件の異常",
+          "down": "{{count, number}} 件の異常",
+          "down_one": "{{count, number}} 件の異常",
+          "down_other": "{{count, number}} 件の異常",
           "ok": "異常なし",
           "action": "ダッシュボード"
         }
@@ -1921,7 +1937,9 @@
         "openDetail": "詳細を確認",
         "note": "対応メモ",
         "notePlaceholder": "対応内容を監査用に記録します。",
-        "reportCount": "{{count}} 件の通報",
+        "reportCount": "{{count, number}} 件の通報",
+        "reportCount_one": "{{count, number}} 件の通報",
+        "reportCount_other": "{{count, number}} 件の通報",
         "recentCount": "直近 1 時間 {{count}} 件",
         "reporters": "通報記録",
         "result": "対応結果",
@@ -2400,12 +2418,16 @@
       "nextPage": "次へ"
     },
     "chat": {
-      "newMessages": "新着 {{count}} 件",
+      "newMessages": "新着 {{count, number}} 件",
+      "newMessages_one": "新着 {{count, number}} 件",
+      "newMessages_other": "新着 {{count, number}} 件",
       "loadingOlder": "以前のメッセージを読み込み中..."
     },
     "private": {
       "title": "メッセージ",
-      "conversationCount": "{{count}} 件の会話",
+      "conversationCount": "{{count, number}} 件の会話",
+      "conversationCount_one": "{{count, number}} 件の会話",
+      "conversationCount_other": "{{count, number}} 件の会話",
       "fanGroups": "ファンクラブグループ",
       "loading": "DM を読み込み中...",
       "emptyHint": "配信者をフォローすると、チャンネルから DM を開始できます。",
@@ -2571,8 +2593,12 @@
       "deleteFailed": "コメントを削除できませんでした。",
       "reply": "返信",
       "delete": "削除",
-      "expandReplies": "{{count}} 件の返信を表示",
-      "collapseReplies": "{{count}} 件の返信を隠す"
+      "expandReplies": "{{count, number}} 件の返信を表示",
+      "expandReplies_one": "{{count, number}} 件の返信を表示",
+      "expandReplies_other": "{{count, number}} 件の返信を表示",
+      "collapseReplies": "{{count, number}} 件の返信を隠す",
+      "collapseReplies_one": "{{count, number}} 件の返信を隠す",
+      "collapseReplies_other": "{{count, number}} 件の返信を隠す"
     },
     "editor": {
       "visibility": "公開範囲",
@@ -2638,10 +2664,14 @@
     "posts": "投稿",
     "appointmentBadge": "予定",
     "noResults": "結果なし",
-    "subscribers": "{{count}} 人が登録",
+    "subscribers": "{{count, compact}} 人が登録",
+    "subscribers_one": "{{count, compact}} 人が登録",
+    "subscribers_other": "{{count, compact}} 人が登録",
     "liveDot": "配信中",
-    "views": "{{count}} 回視聴",
-    "reservations": "{{count}} 件の予約",
+    "views": "{{count, compact}} 回視聴",
+    "views_one": "{{count, compact}} 回視聴",
+    "views_other": "{{count, compact}} 回視聴",
+    "reservations": "{{count, compact}} 件の予約",
     "imagePost": "画像投稿"
   }
 }

@@ -80,6 +80,7 @@ import { useThemeStore } from '@/stores/useThemeStore';
 import type { FanBadge } from '@/types/gift';
 import type { Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
+import { formatNumber } from '@/lib/format';
 
 export function SubscriptionsPage() {
   const { t } = useTranslation('pages');
@@ -419,7 +420,7 @@ export function YouPage() {
               title={t('library.you.openCoinCenter')}
             >
               <Wallet size={14} />
-              <span>{balance.toLocaleString()}</span>
+              <span>{formatNumber(balance)}</span>
               <span className="gl-yt-coin-chip-add">{t('library.you.recharge')}</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
@@ -669,7 +670,7 @@ function FanBadgeShelf({
                 </span>
                 <span>
                   {t('library.fanBadges.contribution', {
-                    amount: badge.totalContribution.toLocaleString(),
+                    amount: formatNumber(badge.totalContribution),
                   })}
                 </span>
               </div>

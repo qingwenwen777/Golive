@@ -68,6 +68,7 @@ import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import type { FanClubMember } from '@/types/gift';
 import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
+import { formatNumber, formatRelativeTime } from '@/lib/format';
 
 const HISTORY_PAGE_SIZE = 4;
 const REPLAY_GRID_PAGE_SIZE = 8;
@@ -906,7 +907,7 @@ function ChannelHistoryRow({
           <span>
             <Users size={14} />
             {t('channel.history.peakViewers', {
-              amount: record.peakViewers.toLocaleString(),
+              amount: formatNumber(record.peakViewers),
             })}
           </span>
         </div>
@@ -1082,7 +1083,7 @@ function FanBadgeConfirmDialog({
   onConfirm: () => void;
 }) {
   const { t } = useTranslation('pages');
-  const amount = FAN_BADGE_PRICE.toLocaleString();
+  const amount = formatNumber(FAN_BADGE_PRICE);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gl-fan-badge-dialog p-0 sm:max-w-[460px]">
@@ -1247,14 +1248,9 @@ function formatChannelKey(key: string, t: ReturnType<typeof useTranslation>['t']
 }
 
 function formatHistoryDate(value: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  return formatRelativeTime(value, locale);
 }
 
 function formatCoin(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+  return `${formatNumber(Math.round(value))} coins`;
 }

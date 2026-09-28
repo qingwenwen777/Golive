@@ -27,7 +27,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { readDailyCoinActivity, coinTodayKey } from '@/lib/coinActivity';
 import { cn } from '@/lib/cn';
-import { formatNumber } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
@@ -177,7 +177,7 @@ export default function CoinPage() {
             toast.success(
               resp.credited
                 ? t('coin.toast.topupSuccess', {
-                    balance: resp.user.coinBalance.toLocaleString(),
+                    balance: formatNumber(resp.user.coinBalance),
                     defaultValue: 'Top-up complete. Current balance: {{balance}} coins.',
                   })
                 : t('coin.toast.topupAlreadyCredited', {
@@ -301,7 +301,7 @@ export default function CoinPage() {
           }
           toast.success(
             t('coin.toast.claimSuccess', {
-              amount: resp.transaction.amount.toLocaleString(),
+              amount: formatNumber(resp.transaction.amount),
               defaultValue: 'Earned {{amount}} coins.',
             }),
           );
@@ -386,19 +386,19 @@ export default function CoinPage() {
             <span className="gl-coin-wallet-coin" aria-hidden="true">
               <Coins size={26} />
             </span>
-            <strong>{balance.toLocaleString()}</strong>
+            <strong>{formatNumber(balance)}</strong>
             <em>coins</em>
           </div>
           <div className="gl-coin-wallet-breakdown">
             <span>
               {t('coin.availableLabel', { defaultValue: 'Available' })}
-              <strong>{availableBalance.toLocaleString()}</strong>
+              <strong>{formatNumber(availableBalance)}</strong>
             </span>
             {frozenBalance > 0 && (
               <span className="gl-coin-wallet-frozen">
                 <Snowflake size={13} />
                 {t('coin.frozenLabel', { defaultValue: 'Frozen' })}
-                <strong>{frozenBalance.toLocaleString()}</strong>
+                <strong>{formatNumber(frozenBalance)}</strong>
               </span>
             )}
           </div>
@@ -566,7 +566,7 @@ export default function CoinPage() {
                 className={cn(topupAmount === amount && 'is-active')}
                 onClick={() => setTopupText(String(amount))}
               >
-                {amount.toLocaleString()}
+                {formatNumber(amount)}
               </button>
             ))}
           </div>
@@ -754,11 +754,11 @@ function CoinRecordRow({ item }: { item: CoinTransaction }) {
       <div className={cn('gl-coin-record-amount', positive ? 'is-income' : 'is-spend')}>
         <strong>
           {positive ? '+' : ''}
-          {item.amount.toLocaleString()}
+          {formatNumber(item.amount)}
         </strong>
         <span>
           {t('coin.record.balance', {
-            balance: item.balanceAfter.toLocaleString(),
+            balance: formatNumber(item.balanceAfter),
             defaultValue: 'Balance {{balance}}',
           })}
         </span>
@@ -783,7 +783,7 @@ function RecordPagination({
     <div className="gl-coin-pagination" aria-label="Coin record pagination">
       <span>
         {t('coin.pagination', {
-          total: totalItems.toLocaleString(),
+          total: formatNumber(totalItems),
           page,
           totalPages,
           defaultValue: '{{total}} records · Page {{page}} / {{totalPages}}',
@@ -886,7 +886,7 @@ function sum(rows: CoinTransaction[]): number {
 }
 
 function formatCoins(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+  return `${formatNumber(Math.round(value))} coins`;
 }
 
 function formatFiat(coins: number, locale: string): string {
@@ -899,14 +899,7 @@ function formatFiat(coins: number, locale: string): string {
 }
 
 function formatTime(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatDateTime(value, locale) || value;
 }
 
 function parseCoinInput(value: string): number {

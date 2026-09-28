@@ -176,10 +176,14 @@
       "title": "Scheduled live has started"
     },
     "direct_message": {
-      "title": "{{name}} sent {{count}} DMs"
+      "title": "{{name}} sent {{count, number}} DMs",
+      "title_one": "{{name}} sent {{count, number}} DM",
+      "title_other": "{{name}} sent {{count, number}} DMs"
     },
     "fan_group_message": {
-      "title": "{{name}} has {{count}} new messages",
+      "title": "{{name}} has {{count, number}} new messages",
+      "title_one": "{{name}} has {{count, number}} new message",
+      "title_other": "{{name}} has {{count, number}} new messages",
       "body": "{{count}}/200 members · Fan club group chat"
     }
   },

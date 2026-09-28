@@ -176,10 +176,14 @@
       "title": "予約ライブが開始されました"
     },
     "direct_message": {
-      "title": "{{name}} から新着DM {{count}} 件"
+      "title": "{{name}} から新着DM {{count, number}} 件",
+      "title_one": "{{name}} から新着DM {{count, number}} 件",
+      "title_other": "{{name}} から新着DM {{count, number}} 件"
     },
     "fan_group_message": {
-      "title": "{{name}} に新着 {{count}} 件",
+      "title": "{{name}} に新着 {{count, number}} 件",
+      "title_one": "{{name}} に新着 {{count, number}} 件",
+      "title_other": "{{name}} に新着 {{count, number}} 件",
       "body": "{{count}}/200 人 · ファンクラブグループチャット"
     }
   },
