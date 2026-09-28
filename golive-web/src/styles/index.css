@@ -1970,6 +1970,10 @@ input:focus-visible,
 .gl-lang-toggle:hover {
   background: var(--gl-bg-hover);
 }
+/* Phones swap the label for this icon (see the max-width: 767px block). */
+.gl-lang-toggle-icon {
+  display: none;
+}
 
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
 .gl-layout {
@@ -12875,9 +12879,25 @@ button.gl-fan-badge-empty {
   .gl-topbar-search {
     justify-content: flex-end;
   }
-  .gl-search-pill,
-  .gl-lang-toggle {
+  .gl-search-pill {
     display: none;
+  }
+  /* No room for the language label: signed out, the switch becomes an icon
+     button; signed in, the account menu lists the languages instead. */
+  .gl-lang-toggle {
+    width: 40px;
+    min-width: 0;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+  }
+  .gl-lang-toggle-label,
+  .gl-lang-toggle.is-in-menu {
+    display: none;
+  }
+  .gl-lang-toggle-icon {
+    display: block;
   }
   /* No room for the pill: a search button opens it across the whole bar. */
   .gl-topbar-search .gl-search-open-btn {
@@ -15394,7 +15414,8 @@ button.gl-fan-badge-empty {
     font-size: 10px;
   }
 
-  .gl-icon-btn {
+  .gl-icon-btn,
+  .gl-lang-toggle {
     width: 38px;
     height: 38px;
   }
