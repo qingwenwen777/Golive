@@ -174,6 +174,23 @@
   color: #2856a3;
 }
 
+.dark .gl-replay-status.is-ready {
+  background: rgba(34, 197, 94, 0.14);
+  color: var(--gl-success-fg);
+}
+
+.dark .gl-replay-status.is-failed {
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--gl-danger-fg);
+}
+
+.dark .gl-replay-status.is-uploading,
+.dark .gl-replay-status.is-pending,
+.dark .gl-replay-status.is-processing {
+  background: rgba(96, 165, 250, 0.14);
+  color: var(--gl-info-fg);
+}
+
 .gl-replay-manage-meta {
   display: flex;
   flex-wrap: wrap;
@@ -183,7 +200,7 @@
 }
 
 .gl-replay-manage-meta .is-error {
-  color: #b42318;
+  color: var(--gl-danger-fg-2);
 }
 
 .gl-replay-manage-controls,
@@ -381,7 +398,7 @@
 
 .gl-post-icon-button.is-danger,
 .gl-post-comment-actions .is-danger {
-  color: #dc2626;
+  color: var(--gl-danger-fg-5);
 }
 
 .gl-post-editor-controls,
@@ -1096,6 +1113,63 @@
   --gl-avatar-placeholder: #3f3f3f;
   --gl-analytics-accent: #78b88d;
   --gl-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+/* Status and accent text colours. Light values are the literals these rules
+   used before, so light mode is unchanged. Dark values are lighter tints of
+   the same hue that keep at least 4.5:1 on the dark page, card and hover
+   surfaces (#0f0f0f, #272727, #3f3f3f), including the translucent status
+   tints drawn on them. The numbered and -soft variants are older light shades
+   of the same role: in dark mode they share the role's colour, and they can
+   fold into the base token if the light shades are ever unified. */
+:root {
+  --gl-success-fg: #15803d;
+  --gl-success-fg-strong: #166534;
+  --gl-warning-fg: #b45309;
+  --gl-warning-fg-strong: #92400e;
+  --gl-pending-fg: #a16207;
+  --gl-danger-fg: #b91c1c;
+  --gl-danger-fg-2: #b42318;
+  --gl-danger-fg-3: #b4232f;
+  --gl-danger-fg-4: #d33426;
+  --gl-danger-fg-5: #dc2626;
+  --gl-loss-fg: #be123c;
+  --gl-info-fg: #2563eb;
+  --gl-info-fg-soft: #3b82f6;
+  --gl-neutral-fg: #475569;
+  --gl-neutral-fg-soft: #64748b;
+  --gl-accent-fg: #1c62b9;
+  --gl-mic-fg: #6d40e6; /* voice mic-link panel */
+  --gl-moderator-fg: #7c3aed; /* moderator user-role label */
+  --gl-staff-fg: #0f766e; /* chat staff badge (group admin) */
+  --gl-bet-fg: #0f8f8e;
+  --gl-bet-fg-strong: #0f766e;
+  --gl-bag-fg: #c2790a; /* lucky bag */
+}
+
+.dark {
+  --gl-success-fg: #86efac;
+  --gl-success-fg-strong: #bbf7d0;
+  --gl-warning-fg: #fcd34d;
+  --gl-warning-fg-strong: #fde68a;
+  --gl-pending-fg: #fde047;
+  --gl-danger-fg: #fca5a5;
+  --gl-danger-fg-2: var(--gl-danger-fg);
+  --gl-danger-fg-3: var(--gl-danger-fg);
+  --gl-danger-fg-4: var(--gl-danger-fg);
+  --gl-danger-fg-5: var(--gl-danger-fg);
+  --gl-loss-fg: #fda4af;
+  --gl-info-fg: #93c5fd;
+  --gl-info-fg-soft: var(--gl-info-fg);
+  --gl-neutral-fg: #cbd5e1;
+  --gl-neutral-fg-soft: var(--gl-neutral-fg);
+  --gl-accent-fg: #93c5fd;
+  --gl-mic-fg: #c4b5fd;
+  --gl-moderator-fg: #c4b5fd;
+  --gl-staff-fg: #99f6e4;
+  --gl-bet-fg: #5eead4;
+  --gl-bet-fg-strong: #99f6e4;
+  --gl-bag-fg: #f5b73c;
 }
 
 * {
@@ -3443,7 +3517,7 @@ input:focus-visible,
 }
 .gl-home-rec-copy h3 svg:not(.gl-platform-verified-badge) {
   flex: 0 0 auto;
-  color: #1c62b9;
+  color: var(--gl-accent-fg);
 }
 .gl-home-rec-copy h3 .gl-platform-verified-badge {
   flex: 0 0 auto;
@@ -4392,7 +4466,7 @@ input:focus-visible,
   border: 1px solid rgba(21, 128, 61, 0.25);
   border-radius: 8px;
   background: rgba(21, 128, 61, 0.08);
-  color: #15803d;
+  color: var(--gl-success-fg);
   font-size: 13px;
   line-height: 1.4;
   padding: 10px 12px;
@@ -5106,7 +5180,7 @@ input:focus-visible,
   text-transform: uppercase;
 }
 .gl-creator-permission.is-pending strong {
-  color: #a16207;
+  color: var(--gl-pending-fg);
 }
 .gl-creator-permission.is-rejected strong {
   color: var(--gl-red);
@@ -5288,7 +5362,7 @@ input:focus-visible,
   justify-content: center;
   border-radius: 999px;
   background: rgba(14, 165, 164, 0.12);
-  color: #0f8f8e;
+  color: var(--gl-bet-fg);
 }
 .gl-bet-head h2 {
   margin: 0;
@@ -5312,15 +5386,15 @@ input:focus-visible,
 }
 .gl-bet-status.is-open {
   background: rgba(14, 165, 164, 0.12);
-  color: #0f8f8e;
+  color: var(--gl-bet-fg);
 }
 .gl-bet-status.is-settled {
   background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-bet-status.is-cancelled {
   background: rgba(100, 116, 139, 0.14);
-  color: #475569;
+  color: var(--gl-neutral-fg);
 }
 .gl-bet-open {
   display: grid;
@@ -5437,18 +5511,18 @@ input:focus-visible,
 .gl-bet-my {
   border-radius: 8px;
   background: rgba(14, 165, 164, 0.1);
-  color: #0f766e;
+  color: var(--gl-bet-fg-strong);
   font-size: 13px;
   font-weight: 800;
   padding: 9px 10px;
 }
 .gl-bet-my.is-lost {
   background: rgba(244, 63, 94, 0.1);
-  color: #be123c;
+  color: var(--gl-loss-fg);
 }
 .gl-bet-my.is-refunded {
   background: rgba(100, 116, 139, 0.12);
-  color: #475569;
+  color: var(--gl-neutral-fg);
 }
 .gl-bet-host-actions {
   display: flex;
@@ -5527,19 +5601,19 @@ input:focus-visible,
 }
 .gl-bag-status.is-open {
   background: rgba(245, 164, 0, 0.14);
-  color: #c2790a;
+  color: var(--gl-bag-fg);
 }
 .gl-bag-status.is-drawing {
   background: rgba(59, 130, 246, 0.14);
-  color: #2563eb;
+  color: var(--gl-info-fg);
 }
 .gl-bag-status.is-drawn {
   background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-bag-status.is-cancelled {
   background: rgba(100, 116, 139, 0.14);
-  color: #475569;
+  color: var(--gl-neutral-fg);
 }
 .gl-bag-open {
   display: flex;
@@ -5772,11 +5846,11 @@ input:focus-visible,
 }
 .gl-bag-result.is-joined {
   background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+  color: var(--gl-info-fg);
 }
 .gl-bag-result.is-missed {
   background: rgba(100, 116, 139, 0.12);
-  color: #475569;
+  color: var(--gl-neutral-fg);
 }
 .dark .gl-bag-result.is-won {
   color: #f5b73c;
@@ -6193,7 +6267,7 @@ input:focus-visible,
 }
 .gl-mic-approve {
   background: rgba(34, 197, 94, 0.14);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-mic-approve:disabled {
   cursor: default;
@@ -6219,11 +6293,11 @@ input:focus-visible,
 }
 .gl-mic-state.is-live {
   background: rgba(124, 92, 252, 0.14);
-  color: #6d40e6;
+  color: var(--gl-mic-fg);
 }
 .gl-mic-state.is-muted {
   background: rgba(100, 116, 139, 0.16);
-  color: #64748b;
+  color: var(--gl-neutral-fg-soft);
 }
 .gl-mic-empty {
   margin: 0;
@@ -6267,7 +6341,7 @@ input:focus-visible,
 }
 .gl-mic-self.is-pending {
   background: rgba(124, 92, 252, 0.1);
-  color: #6d40e6;
+  color: var(--gl-mic-fg);
   font-size: 13px;
   font-weight: 800;
 }
@@ -6331,7 +6405,7 @@ input:focus-visible,
 }
 .gl-mic-mute-btn.is-muted {
   background: rgba(100, 116, 139, 0.18);
-  color: #475569;
+  color: var(--gl-neutral-fg);
 }
 .gl-mic-leave-btn {
   background: var(--gl-bg-card);
@@ -6875,10 +6949,10 @@ input:focus-visible,
   padding: 5px 10px;
 }
 .gl-admin-status.is-approved {
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-status.is-pending {
-  color: #a16207;
+  color: var(--gl-pending-fg);
 }
 .gl-admin-status.is-rejected {
   color: var(--gl-red);
@@ -7022,7 +7096,7 @@ input:focus-visible,
   display: none;
 }
 .gl-admin-action-text.approve {
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-action-text.reject {
   color: var(--gl-red);
@@ -7501,7 +7575,7 @@ input:focus-visible,
 }
 .gl-admin-health-card.is-ok > span {
   background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-health-card.is-down > span {
   background: rgba(255, 61, 92, 0.12);
@@ -7758,7 +7832,7 @@ input:focus-visible,
   white-space: nowrap;
 }
 .gl-admin-filter-option svg {
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-content-search > div {
   display: grid;
@@ -7852,10 +7926,10 @@ input:focus-visible,
   white-space: nowrap;
 }
 .gl-admin-user-role.is-admin {
-  color: #1c62b9;
+  color: var(--gl-accent-fg);
 }
 .gl-admin-user-role.is-moderator {
-  color: #7c3aed;
+  color: var(--gl-moderator-fg);
 }
 .gl-admin-user-state.is-banned,
 .gl-admin-user-detail-head em.is-banned {
@@ -7864,7 +7938,7 @@ input:focus-visible,
 }
 .gl-admin-user-state.is-appeal {
   background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
+  color: var(--gl-warning-fg);
 }
 .gl-admin-user-detail {
   display: flex;
@@ -8066,7 +8140,7 @@ input:focus-visible,
   width: fit-content;
   border-radius: 999px;
   background: rgba(28, 98, 185, 0.1);
-  color: #1c62b9;
+  color: var(--gl-accent-fg);
   padding: 5px 9px;
 }
 .gl-admin-appeal-record p,
@@ -8239,11 +8313,11 @@ input:focus-visible,
 }
 .gl-admin-report-severity.reviewing {
   background: rgba(28, 98, 185, 0.1);
-  color: #1c62b9;
+  color: var(--gl-accent-fg);
 }
 .gl-admin-report-severity.resolved {
   background: rgba(22, 163, 74, 0.1);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-report-snapshot span {
   color: var(--gl-text-2);
@@ -8683,7 +8757,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   background: rgba(22, 163, 74, 0.07);
 }
 .gl-admin-claim-note.is-mine > svg {
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-claim-note.is-locked {
   border-color: rgba(100, 116, 139, 0.2);
@@ -8706,7 +8780,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   border: 1px solid rgba(22, 163, 74, 0.22);
   border-radius: 12px;
   background: rgba(22, 163, 74, 0.08);
-  color: #15803d;
+  color: var(--gl-success-fg);
   padding: 11px 12px;
 }
 .gl-admin-handled-note strong,
@@ -8719,7 +8793,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-handled-note span {
   margin-top: 2px;
-  color: #166534;
+  color: var(--gl-success-fg-strong);
   font-size: 12px;
   font-weight: 750;
   line-height: 1.4;
@@ -8727,10 +8801,10 @@ html[lang='zh'] .gl-admin-action-select-head small {
 .gl-admin-handled-note.is-warning {
   border-color: rgba(217, 119, 6, 0.25);
   background: rgba(217, 119, 6, 0.08);
-  color: #b45309;
+  color: var(--gl-warning-fg);
 }
 .gl-admin-handled-note.is-warning span {
-  color: #92400e;
+  color: var(--gl-warning-fg-strong);
 }
 .gl-admin-report-actions-bar.is-modal {
   margin-top: auto;
@@ -8751,7 +8825,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-report-severity.dismissed {
   background: rgba(100, 116, 139, 0.12);
-  color: #64748b;
+  color: var(--gl-neutral-fg-soft);
 }
 .gl-admin-word-actions button {
   width: 36px;
@@ -8856,7 +8930,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-word-row .gl-admin-word-status.is-on {
   background: rgba(22, 163, 74, 0.1);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-content-workbench .gl-admin-content-filters {
   grid-template-columns: repeat(3, minmax(120px, 1fr));
@@ -9138,7 +9212,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
 }
 .gl-admin-ledger-icon.is-positive {
   background: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-ledger-icon.is-negative {
   background: rgba(255, 61, 92, 0.12);
@@ -9161,7 +9235,7 @@ html[lang='zh'] .gl-admin-action-select-head small {
   font-weight: 950;
 }
 .gl-admin-ledger-side strong.is-positive {
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-admin-ledger-side strong.is-negative {
   color: var(--gl-red);
@@ -11785,7 +11859,7 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-step.is-done .gl-creator-step-head > span {
   background: rgba(34, 197, 94, 0.14);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-creator-step-head strong {
   overflow: hidden;
@@ -12194,7 +12268,7 @@ button.gl-fan-badge-empty {
 }
 .gl-creator-check-row.is-ok {
   border-color: rgba(34, 197, 94, 0.28);
-  color: #15803d;
+  color: var(--gl-success-fg);
 }
 .gl-creator-publisher-line,
 .gl-creator-key-placeholder {
@@ -13631,7 +13705,7 @@ button.gl-fan-badge-empty {
 .gl-settings-button.is-danger {
   border-color: rgba(210, 44, 44, 0.26);
   background: rgba(210, 44, 44, 0.08);
-  color: #b4232f;
+  color: var(--gl-danger-fg-3);
 }
 
 .gl-settings-button.is-danger:hover {
@@ -13798,7 +13872,7 @@ button.gl-fan-badge-empty {
   border: 1px solid rgba(21, 128, 61, 0.24);
   border-radius: 12px;
   background: rgba(21, 128, 61, 0.08);
-  color: #15803d;
+  color: var(--gl-success-fg);
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 850;
@@ -14082,7 +14156,7 @@ button.gl-fan-badge-empty {
   border-left: 1px solid var(--gl-border);
 }
 .gl-coin-wallet-frozen svg {
-  color: #3b82f6;
+  color: var(--gl-info-fg-soft);
 }
 .gl-coin-wallet-sub {
   max-width: 560px;
@@ -16335,7 +16409,7 @@ button.gl-fan-badge-empty {
 
 .gl-appointment-error {
   border-color: rgba(220, 38, 38, 0.3);
-  color: #b91c1c;
+  color: var(--gl-danger-fg);
   text-align: left;
 }
 
@@ -17383,7 +17457,7 @@ button.gl-fan-badge-empty {
 .gl-chat-role-badge.is-admin {
   border: 1px solid rgba(20, 184, 166, 0.34);
   background: rgba(20, 184, 166, 0.1);
-  color: #0f766e;
+  color: var(--gl-staff-fg);
 }
 
 .gl-chat-message-bubble {

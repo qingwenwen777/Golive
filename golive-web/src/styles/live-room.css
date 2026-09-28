@@ -411,7 +411,7 @@
 }
 
 .gl-replay-comment-menu button.is-danger {
-  color: #d33426;
+  color: var(--gl-danger-fg-4);
 }
 
 .gl-replay-comment-toggle {
@@ -981,7 +981,7 @@
 .gl-pg-left.is-on,
 .gl-pg-right.is-on,
 .gl-pg-solo.is-on {
-  color: #1c62b9;
+  color: var(--gl-accent-fg);
 }
 .gl-like-burst {
   position: absolute;
