@@ -2073,6 +2073,13 @@
     "subtitle": "页面不存在",
     "back": "返回首页"
   },
+  "routeError": {
+    "title": "页面出错了",
+    "body": "刷新一下通常就能恢复；如果还是不行，请返回首页。",
+    "updatedTitle": "GoLive 已更新",
+    "updatedBody": "刷新页面即可加载新版本。",
+    "reload": "刷新"
+  },
   "coin": {
     "authTitle": "登录后管理 coins",
     "authSub": "查看消费记录、充值、每日任务和提现预留信息。",

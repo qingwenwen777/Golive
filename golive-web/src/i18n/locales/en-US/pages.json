@@ -2073,6 +2073,13 @@
     "subtitle": "Page not found",
     "back": "Back to home"
   },
+  "routeError": {
+    "title": "This page hit an error",
+    "body": "Reloading usually fixes it. If it doesn't, head back home.",
+    "updatedTitle": "GoLive has been updated",
+    "updatedBody": "Reload to get the new version of this page.",
+    "reload": "Reload"
+  },
   "coin": {
     "authTitle": "Sign in to manage coins",
     "authSub": "View spending records, top up, daily tasks, and withdrawal previews.",
