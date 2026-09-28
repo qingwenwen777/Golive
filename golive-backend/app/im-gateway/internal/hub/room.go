@@ -99,9 +99,6 @@ func (r *Room) add(c Sink, profile ViewerProfile) bool {
 	}
 	r.conns[c.ID()] = c
 	r.resetContributionIfNeededLocked()
-	if profile.User == "" {
-		profile.User = "Guest"
-	}
 	r.viewerProfiles[c.ID()] = profile
 	n := r.uniqueViewerCountLocked()
 	r.mu.Unlock()
@@ -196,9 +193,6 @@ func (r *Room) updateViewer(connID string, profile ViewerProfile) {
 		return
 	}
 	r.resetContributionIfNeededLocked()
-	if profile.User == "" {
-		profile.User = "Guest"
-	}
 	if r.viewerProfiles[connID] == profile {
 		r.mu.Unlock()
 		return
@@ -342,15 +336,11 @@ func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 		if key == "" {
 			continue
 		}
-		user := profile.User
-		if user == "" {
-			user = "Guest"
-		}
-		item := byViewer[key]
-		if item.User == "" {
+		item, seen := byViewer[key]
+		if !seen {
 			item = ViewerListItem{
 				UserID:    profile.UserID,
-				User:      user,
+				User:      profile.User,
 				Avatar:    profile.Avatar,
 				UserLevel: profile.UserLevel,
 			}
@@ -358,8 +348,8 @@ func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 			if item.UserID == "" && profile.UserID != "" {
 				item.UserID = profile.UserID
 			}
-			if item.User == "Guest" && user != "" {
-				item.User = user
+			if item.User == "" && profile.User != "" {
+				item.User = profile.User
 			}
 			if item.Avatar == "" && profile.Avatar != "" {
 				item.Avatar = profile.Avatar
@@ -381,6 +371,10 @@ func (r *Room) viewerListSnapshot(limit int) (int, []ViewerListItem) {
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].Contribution != items[j].Contribution {
 			return items[i].Contribution > items[j].Contribution
+		}
+		// Guests and viewers without a name (User is "") go after named ones.
+		if (items[i].User == "") != (items[j].User == "") {
+			return items[j].User == ""
 		}
 		return items[i].User < items[j].User
 	})

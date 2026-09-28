@@ -128,7 +128,6 @@ func (h *GiftHandler) Send(c *gin.Context) {
 	// 2) Hand to the service. It owns the DB-level idempotency / balance check.
 	order, replayed, sErr := h.svc.Send(c.Request.Context(), service.SendGiftReq{
 		UserID:    uid,
-		Username:  uid,
 		RoomID:    body.RoomID,
 		GiftID:    body.GiftID,
 		Count:     body.Count,

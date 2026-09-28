@@ -162,7 +162,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 
 	roomID := "appt-" + ownerID + "-" + strconv.FormatInt(now.UnixNano(), 36)
 	channelID := "ch-" + ownerID
-	channelName := cleanDisplayName(payload.ChannelName, ownerID)
+	channelName := cleanDisplayName(payload.ChannelName)
 	verified := s.ownerVerified(ctx, ownerID)
 	room := &model.Room{
 		ID:          roomID,
@@ -935,9 +935,6 @@ func (s *AppointmentService) notificationActor(ctx context.Context, appt model.L
 			actor.avatar = profile.Avatar
 		}
 		actor.verified = actor.verified || profile.Verified
-	}
-	if actor.name == "" {
-		actor.name = "Creator " + trimRunes(appt.OwnerID, 8)
 	}
 	return actor
 }

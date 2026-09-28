@@ -24,6 +24,7 @@ import {
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
 import { LoadableImage } from '@/components/LoadableImage';
+import { personName } from '@/types/user';
 
 export function CreatorAnalyticsPage() {
   const { t, i18n } = useTranslation('pages');
@@ -295,8 +296,8 @@ export function LiveAnalysisPage() {
               <div className="gl-studio-fans">
                 {data.topFans.map((fan) => (
                   <div className="gl-studio-fan-row" key={fan.userId || fan.name}>
-                    <Avatar name={fan.name} src={fan.avatar} size={34} />
-                    <span>{fan.name}</span>
+                    <Avatar name={personName(fan.name)} src={fan.avatar} size={34} />
+                    <span>{personName(fan.name)}</span>
                     <strong>{formatCoin(fan.amount, locale, t)}</strong>
                   </div>
                 ))}

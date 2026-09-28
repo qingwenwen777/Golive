@@ -237,9 +237,6 @@ func creatorSuggestions(phrase repo.SearchPhrase, rows []repo.CreatorSearchRow) 
 			channelID = "ch-" + row.ID
 		}
 		name := creatorSearchName(row)
-		if name == "" {
-			name = fallbackChannelName(channelID)
-		}
 		item := ranked{name: name, username: strings.TrimSpace(row.Username), live: row.LiveRoomID != ""}
 		item.score = searchScore(phrase, item.name, item.username, channelID, strings.TrimSpace(row.LastTitle))
 		if item.live {

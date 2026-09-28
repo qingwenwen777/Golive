@@ -736,7 +736,7 @@ func (s *PostService) authorForUser(ctx context.Context, userID string) PostAuth
 		ID:          profile.ID,
 		Username:    profile.Username,
 		DisplayName: profile.DisplayName,
-		Name:        nonEmpty(profile.Name, profile.Username, profile.ID),
+		Name:        nonEmpty(profile.Name, profile.Username),
 		Avatar:      profile.Avatar,
 		Verified:    profile.Verified,
 	}
@@ -759,7 +759,7 @@ func commentRowDTO(row repo.PostCommentRow, liked, canDelete bool) PostCommentDT
 			ID:          row.UserID,
 			Username:    row.Username,
 			DisplayName: row.DisplayName,
-			Name:        nonEmpty(row.AuthorName, row.Username, row.UserID),
+			Name:        nonEmpty(row.AuthorName, row.Username),
 			Avatar:      row.Avatar,
 			Verified:    row.Verified,
 		},
@@ -962,24 +962,21 @@ func channelIDForOwner(ownerID string) string {
 	return "ch-" + ownerID
 }
 
+// fallbackPostAuthor is an author whose profile could not be loaded. Name
+// is "": the apps label an author without a name in the viewer's language.
 func fallbackPostAuthor(userID string) PostAuthor {
-	name := userID
-	if len(name) > 8 {
-		name = "Creator " + name[:8]
-	}
-	if name == "" {
-		name = "Creator"
-	}
-	return PostAuthor{ID: userID, Name: name}
+	return PostAuthor{ID: userID}
 }
 
+// nonEmpty returns the first value that isn't blank, else "". Names never
+// fall back to an id.
 func nonEmpty(values ...string) string {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {
 			return value
 		}
 	}
-	return "Creator"
+	return ""
 }
 
 func normalizeListPage(page, size int) (int, int) {

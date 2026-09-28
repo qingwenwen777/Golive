@@ -286,7 +286,7 @@ func (s *ReplayCommentService) authorForUser(ctx context.Context, userID string)
 		ID:          profile.ID,
 		Username:    profile.Username,
 		DisplayName: profile.DisplayName,
-		Name:        nonEmpty(profile.Name, profile.Username, profile.ID),
+		Name:        nonEmpty(profile.Name, profile.Username),
 		Avatar:      profile.Avatar,
 		Verified:    profile.Verified,
 	}
@@ -368,7 +368,7 @@ func replayCommentRowDTO(row repo.ReplayCommentRow, liked, canDelete bool) Repla
 			ID:          row.UserID,
 			Username:    row.Username,
 			DisplayName: row.DisplayName,
-			Name:        nonEmpty(row.AuthorName, row.Username, row.UserID),
+			Name:        nonEmpty(row.AuthorName, row.Username),
 			Avatar:      row.Avatar,
 			Verified:    row.Verified,
 		},

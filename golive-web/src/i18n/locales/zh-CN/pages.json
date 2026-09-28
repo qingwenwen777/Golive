@@ -336,8 +336,6 @@
   "channel": {
     "title": "频道",
     "name": "频道：{{name}}",
-    "creatorFallback": "创作者",
-    "creatorShort": "创作者 {{id}}",
     "copyTarget": "频道链接",
     "copyManual": "频道链接已打开，请手动复制。",
     "copySuccess": "频道链接已复制。",

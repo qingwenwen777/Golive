@@ -28,6 +28,7 @@ import { useIsAuthed } from '@/stores/useAuthStore';
 import { publishMic, micStreamName, MicSetupError, type MicPublishHandle } from '@/lib/micRtc';
 import type { MicLinkEligibility, MicLinkGuest } from '@/types/micLink';
 import { cn } from '@/lib/cn';
+import { personName } from '@/types/user';
 
 const ELIGIBILITY_OPTIONS: MicLinkEligibility[] = ['all', 'followers', 'fans', 'fans_level'];
 
@@ -227,9 +228,9 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
               <ul className="gl-mic-list">
                 {requests.map((req) => (
                   <li key={req.userId} className="gl-mic-row">
-                    <Avatar name={req.name} src={req.avatar} size={30} />
-                    <span className="gl-mic-row-name" title={req.name}>
-                      {req.name}
+                    <Avatar name={personName(req.name)} src={req.avatar} size={30} />
+                    <span className="gl-mic-row-name" title={personName(req.name)}>
+                      {personName(req.name)}
                     </span>
                     <div className="gl-mic-row-actions">
                       <button
@@ -287,9 +288,9 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
               <ul className="gl-mic-list">
                 {roster.map((guest) => (
                   <li key={guest.userId} className="gl-mic-row">
-                    <Avatar name={guest.name} src={guest.avatar} size={30} />
-                    <span className="gl-mic-row-name" title={guest.name}>
-                      {guest.name}
+                    <Avatar name={personName(guest.name)} src={guest.avatar} size={30} />
+                    <span className="gl-mic-row-name" title={personName(guest.name)}>
+                      {personName(guest.name)}
                     </span>
                     <span className={cn('gl-mic-state', guest.muted ? 'is-muted' : 'is-live')}>
                       {guest.muted ? <MicOff size={13} /> : <Mic size={13} />}
@@ -321,7 +322,7 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
           </DialogTitle>
           <p className="gl-mic-confirm-body">
             {t('micLink.removeConfirmBody', {
-              name: removeTarget?.name ?? '',
+              name: removeTarget ? personName(removeTarget.name) : '',
               defaultValue: '{{name}} will be taken off the mic.',
             })}
           </p>
@@ -459,9 +460,9 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
         <ul className="gl-mic-list gl-mic-list-compact">
           {roster.map((guest) => (
             <li key={guest.userId} className="gl-mic-row is-readonly">
-              <Avatar name={guest.name} src={guest.avatar} size={28} />
-              <span className="gl-mic-row-name" title={guest.name}>
-                {guest.name}
+              <Avatar name={personName(guest.name)} src={guest.avatar} size={28} />
+              <span className="gl-mic-row-name" title={personName(guest.name)}>
+                {personName(guest.name)}
               </span>
               <span className={cn('gl-mic-state', guest.muted ? 'is-muted' : 'is-live')}>
                 {guest.muted ? <MicOff size={13} /> : <Mic size={13} />}

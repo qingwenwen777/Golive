@@ -24,6 +24,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { cn } from '@/lib/cn';
 import { streamChannelName, type Stream } from '@/types/stream';
+import { creatorName } from '@/types/user';
 import { formatRelativeTime } from '@/lib/format';
 
 const UPCOMING_APPOINTMENT_LIMIT = 3;
@@ -420,6 +421,7 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
 
 function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
   const { t, i18n } = useTranslation('pages');
+  const name = creatorName(creator.name);
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const [followAnimating, setFollowAnimating] = useState(false);
@@ -473,10 +475,10 @@ function RecommendedCreatorCard({ creator }: { creator: RecommendedCreator }) {
     <article className="gl-home-rec-card">
       <div className="gl-home-rec-top">
         <Link className="gl-home-rec-main" to={channelPath}>
-          <Avatar name={creator.name} src={creator.avatar} size={54} />
+          <Avatar name={name} src={creator.avatar} size={54} />
           <div className="gl-home-rec-copy">
             <h3>
-              <span>{creator.name}</span>
+              <span>{name}</span>
               {creator.verified && <VerifiedBadge size={15} />}
             </h3>
             <span>

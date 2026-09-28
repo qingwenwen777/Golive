@@ -213,7 +213,7 @@ func (s *LiveService) GoLive(ctx context.Context, ownerID string, req GoLiveReq)
 
 	roomID := "live-" + ownerID + "-" + strconv.FormatInt(now.UnixNano(), 36)
 	channelID := "ch-" + ownerID
-	ownerName := cleanDisplayName(req.ChannelName, ownerID)
+	ownerName := cleanDisplayName(req.ChannelName)
 	verified := false
 	if profile, err := s.rooms.OwnerProfile(ctx, ownerID); err == nil {
 		verified = profile.Verified
@@ -379,14 +379,13 @@ func IsUUIDLike(s string) bool {
 	return uuidRe.MatchString(strings.TrimSpace(s))
 }
 
-func cleanDisplayName(raw, ownerID string) string {
+// cleanDisplayName is the channel name to store for a room: the name the
+// client sent, or "" when it is only a UUID. The apps show a translated
+// label for a channel without a name.
+func cleanDisplayName(raw string) string {
 	name := trimRunes(strings.TrimSpace(raw), 64)
-	if name == "" || IsUUIDLike(name) {
-		suffix := ownerID
-		if len(suffix) > 8 {
-			suffix = suffix[:8]
-		}
-		return "Creator " + suffix
+	if IsUUIDLike(name) {
+		return ""
 	}
 	return name
 }

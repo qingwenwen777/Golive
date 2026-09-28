@@ -79,7 +79,7 @@ import { APP_LANGS, useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
 import type { FanBadge } from '@/types/gift';
 import type { Stream } from '@/types/stream';
-import { userDisplayName, type User } from '@/types/user';
+import { creatorName, personName, userDisplayName, userName, type User } from '@/types/user';
 import { formatNumber } from '@/lib/format';
 
 export function SubscriptionsPage() {
@@ -116,7 +116,7 @@ export function SubscriptionsPage() {
           channel.stream ??
           ({
             id: channel.channelId,
-            title: channel.name,
+            title: creatorName(channel.name),
             channel: channel.name,
             channelId: channel.channelId,
             verified: channel.verified,
@@ -157,7 +157,7 @@ export function SubscriptionsPage() {
       .filter((stream) => stream.channelId === selectedChannel?.channelId)
       .slice(0, 1);
   }, [allSelected, hydratedStreams, selectedChannel?.channelId]);
-  const selectedChannelName = selectedChannel?.name ?? '';
+  const selectedChannelName = selectedChannel ? creatorName(selectedChannel.name) : '';
   const selectedChannelUrl = selectedChannel
     ? `/channel/${encodeURIComponent(selectedChannel.key)}`
     : '';
@@ -213,11 +213,11 @@ export function SubscriptionsPage() {
                 onClick={() => setSelectedChannelId(channel.channelId)}
               >
                 <div className="gl-yt-channel-avatar">
-                  <Avatar name={channel.name} src={channel.avatar} size={64} />
+                  <Avatar name={creatorName(channel.name)} src={channel.avatar} size={64} />
                   {channel.live && <span className="gl-yt-live-dot" aria-hidden="true" />}
                 </div>
-                <div className="gl-yt-channel-name" title={channel.name}>
-                  <span>{channel.name}</span>
+                <div className="gl-yt-channel-name" title={creatorName(channel.name)}>
+                  <span>{creatorName(channel.name)}</span>
                 </div>
               </button>
             ))}
@@ -597,7 +597,7 @@ function useHydratedFanBadges(badges: FanBadge[]): FanBadge[] {
     if (!profile) return badge;
     return {
       ...badge,
-      creatorName: userDisplayName(profile),
+      creatorName: userName(profile),
       creatorAvatar: profile.avatar || badge.creatorAvatar,
     };
   });
@@ -660,10 +660,10 @@ function FanBadgeShelf({
         {badges.slice(0, 12).map((badge) => (
           <div key={`${badge.creatorId}:${badge.level}`} className="gl-fan-badge-card">
             <div className="gl-fan-badge-avatar">
-              <Avatar name={badge.creatorName} src={badge.creatorAvatar} size={42} />
+              <Avatar name={creatorName(badge.creatorName)} src={badge.creatorAvatar} size={42} />
             </div>
             <div className="gl-fan-badge-copy">
-              <div className="gl-fan-badge-name">{badge.creatorName}</div>
+              <div className="gl-fan-badge-name">{creatorName(badge.creatorName)}</div>
               <div className="gl-fan-badge-meta">
                 <span className={`gl-fan-badge-level ${fanBadgeToneClass(badge.level)}`}>
                   <Crown size={13} strokeWidth={2.4} /> #{badge.level}
@@ -821,7 +821,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     setProfileUsername(currentUser?.username ?? '');
-    setProfileDisplayName(userDisplayName(currentUser));
+    setProfileDisplayName(userName(currentUser));
   }, [currentUser]);
 
   useEffect(() => {
@@ -1753,9 +1753,9 @@ function BlacklistSettings({
         <div className="gl-blacklist-list">
           {items.map((item) => (
             <div className="gl-blacklist-row" key={item.user.id}>
-              <Avatar name={item.user.name} src={item.user.avatar} size={42} />
+              <Avatar name={personName(item.user.name)} src={item.user.avatar} size={42} />
               <span>
-                <strong>{item.user.name}</strong>
+                <strong>{personName(item.user.name)}</strong>
                 <small>
                   {item.role === 'creator'
                     ? t('library.settings.blacklist.creator', { defaultValue: 'Creator' })
@@ -2113,7 +2113,7 @@ function hydrateStreamCreatorProfile<T extends Stream>(stream: T, profiles: Map<
   if (!profile) return stream;
   return {
     ...stream,
-    channel: userDisplayName(profile),
+    channel: userName(profile),
     avatar: profile.avatar || stream.avatar,
     verified: profile.verified ?? stream.verified,
   };

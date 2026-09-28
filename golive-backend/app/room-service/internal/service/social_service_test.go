@@ -52,6 +52,45 @@ func TestFollow_PopulatesSubscriberCountAndListing(t *testing.T) {
 	require.Equal(t, "ch-creator", resp.Items[0].ChannelID)
 	require.Equal(t, int64(2), resp.Items[0].SubscriberCount)
 	require.NotNil(t, resp.Items[0].Stream, "stream placeholder must be set so the grid can render the channel")
+	require.Empty(t, resp.Items[0].Name, "no profile: no name made from the channel id")
+}
+
+// A creator without a usable name (no display name, a uuid username) was
+// listed as "Creator <id prefix>"; the apps now label them.
+func TestListSubscriptionsLeavesUnnamedCreatorsToTheApps(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	rooms := repo.NewRoomRepo(db)
+	require.NoError(t, rooms.AutoMigrate())
+	require.NoError(t, db.Exec(`
+CREATE TABLE users (
+	id varchar(36) primary key,
+	username varchar(64),
+	display_name varchar(64),
+	avatar varchar(500),
+	verified boolean,
+	updated_at datetime
+)`).Error)
+	const ownerID = "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"
+	require.NoError(t, db.Exec(
+		`INSERT INTO users (id, username, display_name, avatar, verified, updated_at) VALUES (?, ?, '', '', false, ?)`,
+		ownerID, ownerID, time.Now(),
+	).Error)
+
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	svc := service.NewSocialService(repo.NewSocialRepo(rdb), rooms)
+	_, err = svc.Follow(ctx, "viewer-1", "ch-"+ownerID)
+	require.NoError(t, err)
+
+	resp, err := svc.ListSubscriptions(ctx, "viewer-1")
+	require.NoError(t, err)
+	require.Len(t, resp.Items, 1)
+	require.Empty(t, resp.Items[0].Name)
+	require.NotNil(t, resp.Items[0].Stream)
+	require.Empty(t, resp.Items[0].Stream.Channel)
 }
 
 func TestListSubscriptionsUsesOwnerProfileWithoutRoomHistory(t *testing.T) {

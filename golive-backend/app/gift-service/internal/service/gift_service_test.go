@@ -124,7 +124,6 @@ func TestGiftSend_ConcurrentSameRequestID(t *testing.T) {
 			defer wg.Done()
 			order, replayed, err := svc.Send(context.Background(), service.SendGiftReq{
 				UserID:    "u-demo",
-				Username:  "demo",
 				RoomID:    "r1",
 				GiftID:    "rocket",
 				Count:     2,
@@ -224,7 +223,6 @@ func TestGiftSend_UsesResolvedDisplayNameInOutbox(t *testing.T) {
 
 	order, replayed, err := svc.Send(context.Background(), service.SendGiftReq{
 		UserID:    "u-demo",
-		Username:  "u-demo",
 		RoomID:    "r",
 		GiftID:    "flower",
 		Count:     1,
@@ -240,6 +238,30 @@ func TestGiftSend_UsesResolvedDisplayNameInOutbox(t *testing.T) {
 	require.Equal(t, model.OutboxTopicGift, msgs[0].Topic)
 	require.Contains(t, msgs[0].Payload, `"user":"Xiahaobo"`)
 	require.NotContains(t, msgs[0].Payload, `"user":"u-demo"`)
+}
+
+// A sender without a usable name was broadcast as their user id (the handler
+// passed it as a fallback name) or as "Creator <id prefix>".
+func TestGiftSend_NeverBroadcastsAnIDAsTheSenderName(t *testing.T) {
+	db := newTestDB(t, 0)
+	seedGift(t, db, "flower", 10)
+	const uid = "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"
+	require.NoError(t, db.Exec(
+		"INSERT INTO users (id, username, display_name, avatar, coin_balance) VALUES (?, ?, '', '', 100)",
+		uid, uid,
+	).Error)
+	svc := service.NewGiftService(repo.NewGiftRepo(db), repo.NewOrderRepo(db))
+
+	_, _, err := svc.Send(context.Background(), service.SendGiftReq{
+		UserID: uid, RoomID: "r", GiftID: "flower", Count: 1, RequestID: "rq-nameless",
+	})
+	require.NoError(t, err)
+
+	var msgs []model.LocalMessage
+	require.NoError(t, db.Find(&msgs).Error)
+	require.Len(t, msgs, 1)
+	require.Contains(t, msgs[0].Payload, `"user":""`)
+	require.NotContains(t, msgs[0].Payload, "Creator")
 }
 
 // 3) Gift not found.
@@ -635,6 +657,38 @@ func varcharLen(t *testing.T, v any, field string) int {
 	n, err := strconv.Atoi(m[1])
 	require.NoError(t, err)
 	return n
+}
+
+// The name the client sent stands in only when users has no name at all,
+// and neither it nor a uuid username is broadcast as a bare uuid; there was
+// an English "Creator <id prefix>" fallback.
+func TestSuperChat_BroadcastNameWithoutAUsersName(t *testing.T) {
+	const uid = "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"
+	for _, tc := range []struct{ name, username, clientName, want string }{
+		{"client name when users has none", "", "Luna", `"user":"Luna"`},
+		{"never a uuid from the client", "", uid, `"user":""`},
+		// users knows this sender, so the client can't pick their name.
+		{"never a uuid username", uid, "Luna", `"user":""`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newTestDB(t, 0)
+			require.NoError(t, db.Exec(
+				"INSERT INTO users (id, username, display_name, avatar, coin_balance) VALUES (?, ?, '', '', 1000)",
+				uid, tc.username,
+			).Error)
+			svc := service.NewSuperChatService(repo.NewOrderRepo(db))
+			_, _, err := svc.Send(context.Background(), service.SendSuperChatReq{
+				UserID: uid, Username: tc.clientName, RoomID: "r", Amount: 200, Text: "hello", RequestID: "rq-nameless",
+			})
+			require.NoError(t, err)
+
+			var msgs []model.LocalMessage
+			require.NoError(t, db.Find(&msgs).Error)
+			require.Len(t, msgs, 1)
+			require.Contains(t, msgs[0].Payload, tc.want)
+			require.NotContains(t, msgs[0].Payload, "Creator")
+		})
+	}
 }
 
 func TestSuperChat_UsesResolvedDisplayNameInOutbox(t *testing.T) {

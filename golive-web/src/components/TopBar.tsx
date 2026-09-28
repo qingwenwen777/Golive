@@ -37,6 +37,7 @@ import { useLangStore } from '@/stores/useLangStore';
 import { useThemeStore } from '@/stores/useThemeStore';
 import type { AppLang } from '@/i18n';
 import { formatNumber, formatRelativeTime } from '@/lib/format';
+import { isUuidLike, personName } from '@/types/user';
 
 export interface TopBarProps {
   onMenuClick: () => void;
@@ -651,17 +652,19 @@ function directThreadNotice(
   t: ReturnType<typeof useTranslation>['t'],
 ): NotificationMenuNotice {
   const count = Math.max(1, thread.unread);
+  const name = personName(thread.peer.name);
   return {
     id: `direct:${thread.id}`,
     title: t('notificationTypes.direct_message.title', {
       count,
-      name: thread.peer.name,
+      name,
       defaultValue: '{{name}} 发来 {{count}} 条私信',
     }),
     body: thread.lastMessagePreview,
     link: `/messages/direct/${encodeURIComponent(thread.creatorId)}?from=notice&unread=${count}`,
-    actorName: thread.peer.name,
-    actorLabel: thread.peer.username ? `@${thread.peer.username}` : thread.peer.name,
+    actorName: name,
+    actorLabel:
+      thread.peer.username && !isUuidLike(thread.peer.username) ? `@${thread.peer.username}` : name,
     actorAvatar: thread.peer.avatar,
     actorVerified: thread.peer.verified,
     createdAt: thread.lastMessageAt || new Date().toISOString(),
@@ -689,7 +692,7 @@ function fanGroupNotice(
     }),
     link: `/messages/private?group=${encodeURIComponent(group.id)}&from=notice&unread=${count}`,
     actorName: group.name,
-    actorLabel: owner?.user.name || group.name,
+    actorLabel: owner ? personName(owner.user.name) : group.name,
     actorAvatar: owner?.user.avatar,
     actorVerified: owner?.user.verified,
     createdAt: group.updatedAt,
@@ -712,8 +715,8 @@ function notificationActorName(item: NotificationItem): string {
 }
 
 function notificationActorLabel(item: NotificationItem): string {
-  if (item.actorUsername) return `@${item.actorUsername}`;
-  return item.actorName || '';
+  if (item.actorUsername && !isUuidLike(item.actorUsername)) return `@${item.actorUsername}`;
+  return item.actorName ? personName(item.actorName) : '';
 }
 
 function formatNotificationTime(value: string, locale: string): string {

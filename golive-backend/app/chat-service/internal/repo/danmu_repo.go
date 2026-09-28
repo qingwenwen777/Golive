@@ -217,7 +217,7 @@ COALESCE((SELECT SUM(ct.amount) FROM coin_transactions AS ct
 	}
 	for _, row := range rows {
 		out[row.ID] = UserProfile{
-			Name:   displayName(row.ID, row.DisplayName, row.Username),
+			Name:   displayName(row.DisplayName, row.Username),
 			Avatar: row.Avatar,
 			Level:  userlevel.LevelForTotalTopup(row.Topup),
 		}
@@ -227,19 +227,17 @@ COALESCE((SELECT SUM(ct.amount) FROM coin_transactions AS ct
 
 var uuidLike = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// displayName mirrors the frontend's userDisplayName and im-gateway's live
-// chat naming: display name, else a non-uuid username, else an id prefix.
-func displayName(id, display, username string) string {
+// displayName mirrors the frontend's userName and im-gateway's live chat
+// naming: display name, else a non-uuid username, else "" (the apps label a
+// user without a name in the viewer's language).
+func displayName(display, username string) string {
 	if s := strings.TrimSpace(display); s != "" {
 		return s
 	}
 	if s := strings.TrimSpace(username); s != "" && !uuidLike.MatchString(s) {
 		return s
 	}
-	if len(id) > 8 {
-		id = id[:8]
-	}
-	return "Creator " + id
+	return ""
 }
 
 func uniqueIDs(ids []string) []string {
@@ -309,7 +307,7 @@ func (r *DanmuRepo) superChatHistory(ctx context.Context, roomID string, before 
 	q := r.db.WithContext(ctx).Table("super_chat_orders AS sc").
 		Select(`
 sc.order_id AS id,
-COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), sc.user_id) AS user,
+COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), '') AS user,
 COALESCE(u.avatar, '') AS avatar,
 sc.amount AS amount,
 sc.tier AS tier,
@@ -324,6 +322,12 @@ CAST(UNIX_TIMESTAMP(sc.created_at) * 1000 AS SIGNED) AS ts
 	var out []SuperChatHistoryRow
 	if err := q.Order("sc.created_at DESC").Limit(limit).Scan(&out).Error; err != nil {
 		return nil, err
+	}
+	for i := range out {
+		// As in displayName: a bare uuid is not a name.
+		if uuidLike.MatchString(strings.TrimSpace(out[i].User)) {
+			out[i].User = ""
+		}
 	}
 	return out, nil
 }

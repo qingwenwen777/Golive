@@ -146,7 +146,7 @@ func TestDispatch_Chat_Authenticated_PublishesToProducer(t *testing.T) {
 	events := p.snapshot()
 	require.Len(t, events, 1)
 	require.Equal(t, "u-7", events[0].UserID)
-	require.Equal(t, "Creator u-7", events[0].Username, "no profile source: id-derived name")
+	require.Empty(t, events[0].Username, "no profile source: no name, never one made from the id")
 	require.Equal(t, "R1", events[0].RoomID)
 	require.Equal(t, "hello", events[0].Text)
 	require.NotZero(t, events[0].Ts)

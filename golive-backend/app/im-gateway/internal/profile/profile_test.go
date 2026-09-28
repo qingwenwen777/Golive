@@ -83,10 +83,10 @@ func TestProfile_FallbacksNeverUseClientData(t *testing.T) {
 
 	// user-service's answer, even when it has no such profile.
 	p, ok := lookup("by-name")
-	require.Equal(t, Profile{UserID: "by-name", Name: "Creator by-name"}, p)
+	require.Equal(t, Profile{UserID: "by-name"}, p)
 	require.True(t, ok)
 	p, ok = lookup("missing-user")
-	require.Equal(t, "Creator missing-", p.Name)
+	require.Empty(t, p.Name)
 	require.True(t, ok)
 
 	p, _ = lookup("u-1")
@@ -97,13 +97,13 @@ func TestProfile_FallbacksNeverUseClientData(t *testing.T) {
 	require.Equal(t, "Luna", p.Name, "stale value served while user-service is down")
 	require.True(t, ok)
 	p, ok = lookup("u-9")
-	require.Equal(t, Profile{UserID: "u-9", Name: "Creator u-9"}, p)
+	require.Equal(t, Profile{UserID: "u-9"}, p)
 	require.False(t, ok, "a fallback served because of an error says so")
 }
 
 // A lookup that failed was cached as the fallback for ErrorTTL and served
 // like any other profile, so a connection that resolved during a
-// user-service restart kept "Creator <id>" for its whole life.
+// user-service restart kept no name for its whole life.
 func TestProfile_FailedLookupIsRetriedAfterBackoff(t *testing.T) {
 	var fail atomic.Bool
 	var calls atomic.Int32
@@ -118,7 +118,7 @@ func TestProfile_FailedLookupIsRetriedAfterBackoff(t *testing.T) {
 	}, nil)
 
 	p, ok := r.Profile(context.Background(), "u-1")
-	require.Equal(t, "Creator u-1", p.Name)
+	require.Empty(t, p.Name)
 	require.False(t, ok)
 
 	fail.Store(false)
@@ -271,8 +271,10 @@ func TestFanBadge_ResolvedFromChatService(t *testing.T) {
 }
 
 func TestDisplayName(t *testing.T) {
-	require.Equal(t, "Luna", DisplayName("u", " Luna ", "luna"))
-	require.Equal(t, "luna", DisplayName("u", "", "luna"))
-	require.Equal(t, "Creator 3f2a0c1e", DisplayName("3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f", "", "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"))
-	require.Equal(t, "ab", DisplayName("u", "a\nb", ""))
+	require.Equal(t, "Luna", DisplayName(" Luna ", "luna"))
+	require.Equal(t, "luna", DisplayName("", "luna"))
+	// No id-derived stand-in: the apps label a nameless viewer themselves.
+	require.Empty(t, DisplayName("", "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"))
+	require.Empty(t, DisplayName(" ", ""))
+	require.Equal(t, "ab", DisplayName("a\nb", ""))
 }

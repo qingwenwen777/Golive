@@ -361,7 +361,7 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 		if err != nil {
 			return nil, err
 		}
-		name := fallbackChannelName(channelID)
+		name := ""
 		avatar := ""
 		verified := false
 		if hasProfile {
@@ -386,7 +386,7 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 			item.Status = room.Status
 			item.Stream = &stream
 			if !hasProfile {
-				item.Name = fallbackStreamChannelName(room)
+				item.Name = strings.TrimSpace(room.Channel)
 				item.Avatar = strings.TrimSpace(room.Avatar)
 				item.Verified = room.Verified
 			}
@@ -501,9 +501,6 @@ func (s *SocialService) SearchCreators(ctx context.Context, uid, query string, l
 			channelID = "ch-" + row.ID
 		}
 		name := creatorSearchName(row)
-		if name == "" {
-			name = fallbackChannelName(channelID)
-		}
 		count, err := s.social.FollowerCount(ctx, channelID)
 		if err != nil {
 			return nil, err
@@ -565,20 +562,15 @@ func creatorSearchName(row repo.CreatorSearchRow) string {
 	return ""
 }
 
+// recommendedCreatorName is "" when the creator has no usable name; the
+// apps show a translated label for it.
 func recommendedCreatorName(candidate repo.CreatorRecommendationCandidate) string {
 	for _, value := range []string{candidate.Channel, candidate.DisplayName, candidate.Username} {
 		if name := strings.TrimSpace(value); name != "" && !repo.IsUUIDLike(name) {
 			return name
 		}
 	}
-	id := candidate.ID
-	if len(id) > 8 {
-		id = id[:8]
-	}
-	if id == "" {
-		return "Creator"
-	}
-	return "Creator " + id
+	return ""
 }
 
 func recommendationScore(candidate repo.CreatorRecommendationCandidate, subscriberCount int64, following bool, now time.Time) float64 {
@@ -625,17 +617,8 @@ func ownerIDFromChannelID(channelID string) string {
 	return ""
 }
 
-func fallbackChannelName(channelID string) string {
-	id := strings.TrimPrefix(channelID, "ch-")
-	if len(id) > 8 {
-		id = id[:8]
-	}
-	if id == "" {
-		return "Creator"
-	}
-	return "Creator " + id
-}
-
+// ownerProfileName is "" when the user has no usable name; the apps show a
+// translated label for it.
 func ownerProfileName(profile repo.OwnerProfile) string {
 	for _, value := range []string{profile.DisplayName, profile.Username} {
 		name := strings.TrimSpace(value)
@@ -643,22 +626,7 @@ func ownerProfileName(profile repo.OwnerProfile) string {
 			return name
 		}
 	}
-	id := strings.TrimSpace(profile.ID)
-	if len(id) > 8 {
-		id = id[:8]
-	}
-	if id == "" {
-		return "Creator"
-	}
-	return "Creator " + id
-}
-
-func fallbackStreamChannelName(room model.Room) string {
-	name := strings.TrimSpace(room.Channel)
-	if name != "" {
-		return name
-	}
-	return fallbackChannelName(room.ChannelID)
+	return ""
 }
 
 // Like state -----------------------------------------------------------

@@ -76,10 +76,6 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 	}
 
 	cleanText := s.filter.Replace(ev.Text)
-	username := ev.Username
-	if username == "" {
-		username = ev.UserID
-	}
 
 	// Message ids are server-generated uuids (never a client-chosen string
 	// that could collide with, and overwrite, someone else's message).
@@ -89,11 +85,13 @@ func (s *ChatService) Process(ctx context.Context, ev Event) error {
 	}
 	fanBadge := safeFanBadge(ev.FanBadge)
 
+	// Username is "" when the gateway has no name for the sender, and the
+	// apps label it; it never falls back to the user id.
 	d := &model.Danmu{
 		ID:        id,
 		RoomID:    ev.RoomID,
 		UserID:    ev.UserID,
-		Username:  username,
+		Username:  ev.Username,
 		Avatar:    ev.Avatar,
 		Text:      cleanText,
 		Role:      safeRole(ev.Role),

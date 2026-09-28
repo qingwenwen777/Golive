@@ -75,6 +75,11 @@
     "signOut": "ログアウト",
     "bannedAppeal": "制限への異議申し立て"
   },
+  "names": {
+    "unknownUser": "不明なユーザー",
+    "unknownCreator": "不明なクリエイター",
+    "guest": "ゲスト"
+  },
   "badges": {
     "platformVerified": "プラットフォーム認定クリエイター"
   },

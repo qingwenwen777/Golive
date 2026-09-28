@@ -157,7 +157,7 @@ func (r *HTTPResolver) Refresh(ctx context.Context, userID string) (Profile, boo
 // concurrent callers.
 func (r *HTTPResolver) profile(ctx context.Context, userID string, maxAge time.Duration) (Profile, bool) {
 	if userID == "" || r.userURL == "" {
-		return Profile{UserID: userID, Name: FallbackName(userID)}, true
+		return Profile{UserID: userID}, true
 	}
 	if e, ok := r.cachedProfile(userID, maxAge); ok {
 		return e.p, e.ok
@@ -188,8 +188,8 @@ func (r *HTTPResolver) cachedProfile(userID string, maxAge time.Duration) (profi
 }
 
 // fetchProfileEntry fetches and caches the profile. On error it keeps
-// serving the last known value, else the fallback, and backs off before the
-// next attempt.
+// serving the last known value, else a profile without a name, and backs off
+// before the next attempt.
 func (r *HTTPResolver) fetchProfileEntry(ctx context.Context, userID string) profileEntry {
 	p, err := r.fetchProfile(ctx, userID)
 	now := r.now()
@@ -201,7 +201,7 @@ func (r *HTTPResolver) fetchProfileEntry(ctx context.Context, userID string) pro
 	logger.L().Warn("resolve chat profile", zap.String("user", userID), zap.Error(err))
 	e, _, cached := r.profiles.get(userID, now)
 	if !cached {
-		e = profileEntry{p: Profile{UserID: userID, Name: FallbackName(userID)}}
+		e = profileEntry{p: Profile{UserID: userID}}
 	}
 	e.failed, e.fetched = true, now
 	r.profiles.put(userID, e, now.Add(r.cfg.ErrorTTL))
@@ -247,11 +247,11 @@ func (r *HTTPResolver) fetchProfile(ctx context.Context, userID string) (Profile
 	}
 	if !found || body.ID != userID {
 		// The endpoint also resolves usernames; only an exact id match counts.
-		return Profile{UserID: userID, Name: FallbackName(userID)}, nil
+		return Profile{UserID: userID}, nil
 	}
 	return Profile{
 		UserID: userID,
-		Name:   DisplayName(userID, body.DisplayName, body.Username),
+		Name:   DisplayName(body.DisplayName, body.Username),
 		Avatar: cleanAvatar(body.Avatar),
 		Level:  clampLevel(body.LevelInfo.Level),
 	}, nil
@@ -306,27 +306,17 @@ func (r *HTTPResolver) getJSON(ctx context.Context, endpoint, internalToken stri
 
 var uuidLike = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// DisplayName mirrors the frontend's userDisplayName: display name, else a
-// username that isn't a bare uuid, else an id-derived fallback.
-func DisplayName(userID, displayName, username string) string {
+// DisplayName mirrors the frontend's userName: display name, else a username
+// that isn't a bare uuid, else "". The apps label a viewer without a name
+// (or without an account) in the viewer's own language.
+func DisplayName(displayName, username string) string {
 	if name := cleanName(displayName); name != "" {
 		return name
 	}
 	if name := cleanName(username); name != "" && !uuidLike.MatchString(name) {
 		return name
 	}
-	return FallbackName(userID)
-}
-
-// FallbackName is shown when no profile is available.
-func FallbackName(userID string) string {
-	if userID == "" {
-		return "Guest"
-	}
-	if len(userID) > 8 {
-		userID = userID[:8]
-	}
-	return "Creator " + userID
+	return ""
 }
 
 func cleanName(s string) string {

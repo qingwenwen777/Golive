@@ -20,50 +20,58 @@ import (
 )
 
 // forEachReplayRepoDB runs fn against SQLite and, when GOLIVE_TEST_MYSQL_DSN
-// names a server (root:root@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC),
-// against a fresh MySQL database on it that is dropped afterwards.
+// names a server, against a fresh MySQL database (see openTestMySQL).
 func forEachReplayRepoDB(t *testing.T, fn func(t *testing.T, rooms *repo.RoomRepo)) {
-	cfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}
 	t.Run("sqlite", func(t *testing.T) {
-		db, err := gorm.Open(sqlite.Open(":memory:"), cfg)
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 		require.NoError(t, err)
 		rooms := repo.NewRoomRepo(db)
 		require.NoError(t, rooms.AutoMigrate())
 		fn(t, rooms)
 	})
 	t.Run("mysql", func(t *testing.T) {
-		dsn := strings.TrimSpace(os.Getenv("GOLIVE_TEST_MYSQL_DSN"))
-		if dsn == "" {
-			t.Skip("GOLIVE_TEST_MYSQL_DSN not set; skipping MySQL-backed test")
-		}
-		slash := strings.LastIndex(dsn, "/")
-		require.GreaterOrEqual(t, slash, 0)
-		prefix, params := dsn[:slash+1], ""
-		if q := strings.IndexByte(dsn[slash+1:], '?'); q >= 0 {
-			params = dsn[slash+1+q:]
-		}
-		buf := make([]byte, 6)
-		_, err := rand.Read(buf)
-		require.NoError(t, err)
-		name := "golive_test_roomsvc_" + hex.EncodeToString(buf)
-		admin, err := gorm.Open(mysql.Open(prefix+params), cfg)
-		require.NoError(t, err)
-		adminSQL, err := admin.DB()
-		require.NoError(t, err)
-		require.NoError(t, admin.Exec("CREATE DATABASE `"+name+"` CHARACTER SET utf8mb4").Error)
-		t.Cleanup(func() {
-			_ = admin.Exec("DROP DATABASE IF EXISTS `" + name + "`").Error
-			_ = adminSQL.Close()
-		})
-		db, err := gorm.Open(mysql.Open(prefix+name+params), cfg)
-		require.NoError(t, err)
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = sqlDB.Close() })
-		rooms := repo.NewRoomRepo(db)
+		rooms := repo.NewRoomRepo(openTestMySQL(t))
 		require.NoError(t, rooms.AutoMigrate())
 		fn(t, rooms)
 	})
+}
+
+// openTestMySQL returns a fresh database, dropped afterwards, on the server
+// GOLIVE_TEST_MYSQL_DSN names (root:root@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC).
+// The test is skipped when it is unset.
+func openTestMySQL(t *testing.T) *gorm.DB {
+	t.Helper()
+	dsn := strings.TrimSpace(os.Getenv("GOLIVE_TEST_MYSQL_DSN"))
+	if dsn == "" {
+		t.Skip("GOLIVE_TEST_MYSQL_DSN not set; skipping MySQL-backed test")
+	}
+	cfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}
+	slash := strings.LastIndex(dsn, "/")
+	require.GreaterOrEqual(t, slash, 0)
+	prefix, params := dsn[:slash+1], ""
+	if q := strings.IndexByte(dsn[slash+1:], '?'); q >= 0 {
+		params = dsn[slash+1+q:]
+	}
+	buf := make([]byte, 6)
+	_, err := rand.Read(buf)
+	require.NoError(t, err)
+	name := "golive_test_roomsvc_" + hex.EncodeToString(buf)
+	admin, err := gorm.Open(mysql.Open(prefix+params), cfg)
+	require.NoError(t, err)
+	adminSQL, err := admin.DB()
+	require.NoError(t, err)
+	require.NoError(t, admin.Exec("CREATE DATABASE `"+name+"` CHARACTER SET utf8mb4").Error)
+	t.Cleanup(func() {
+		_ = admin.Exec("DROP DATABASE IF EXISTS `" + name + "`").Error
+		_ = adminSQL.Close()
+	})
+	db, err := gorm.Open(mysql.Open(prefix+name+params), cfg)
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	// Close before the DROP DATABASE cleanup above runs (cleanups are LIFO).
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	return db
 }
 
 // replayRetryRooms stores a live room and an ended room for each replay

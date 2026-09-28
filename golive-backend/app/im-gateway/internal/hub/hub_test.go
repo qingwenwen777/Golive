@@ -133,7 +133,7 @@ func (f *fakeSink) snapshot() [][]byte {
 }
 
 func joinRoom(h *hub.Hub, roomID string, s *fakeSink, profiles ...hub.ViewerProfile) (*hub.Room, error) {
-	profile := hub.ViewerProfile{User: "Guest"}
+	profile := hub.ViewerProfile{}
 	if len(profiles) > 0 {
 		profile = profiles[0]
 	}
@@ -395,6 +395,36 @@ func TestHub_ExcludesOwnerFromViewerMetrics(t *testing.T) {
 	})
 	require.Len(t, list.Viewers, 1)
 	require.Equal(t, "viewer-1", list.Viewers[0].UserID)
+}
+
+// Guests and viewers whose profile has no name were listed as "Guest", in
+// English whatever the viewer's language; now the apps label them. They
+// follow named viewers with the same contribution, and another connection
+// of the same user that has the name fills it in.
+func TestHub_ViewerListLeavesMissingNamesToTheApps(t *testing.T) {
+	br := newFakeBroker()
+	h := hub.New(context.Background(), br, 0, fastFlush)
+
+	watcher := newFakeSink("watcher")
+	_, _ = joinRoom(h, "R1", watcher, hub.ViewerProfile{UserID: "w-1", User: "Zed"})
+	_, _ = joinRoom(h, "R1", newFakeSink("tab-1"), hub.ViewerProfile{UserID: "u-1"})
+	_, _ = joinRoom(h, "R1", newFakeSink("tab-2"), hub.ViewerProfile{UserID: "u-1", User: "Luna"})
+	_, _ = joinRoom(h, "R1", newFakeSink("guest"), hub.ViewerProfile{})
+
+	var list hub.ViewerListMsg
+	waitFor(t, func() bool {
+		for _, payload := range watcher.snapshot() {
+			if json.Unmarshal(payload, &list) == nil && list.Type == "viewer_list" && list.Total == 3 {
+				return true
+			}
+		}
+		return false
+	})
+	require.Equal(t, []hub.ViewerListItem{
+		{UserID: "u-1", User: "Luna"},
+		{UserID: "w-1", User: "Zed"},
+		{},
+	}, list.Viewers)
 }
 
 func TestHub_SnapshotTopN(t *testing.T) {

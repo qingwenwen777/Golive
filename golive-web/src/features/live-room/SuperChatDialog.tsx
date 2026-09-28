@@ -15,7 +15,7 @@ import { amountToTier, SC_MAX_TEXT_BY_TIER, superChatTextLength } from '@/types/
 import { useMe } from '@/api/auth';
 import { useSendSuperChat, newRequestId } from '@/api/gift';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { userDisplayName } from '@/types/user';
+import { userDisplayName, userName } from '@/types/user';
 import { useRealtimeStore } from '@/stores/useRealtimeStore';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { cn } from '@/lib/cn';
@@ -75,7 +75,8 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
     const pendingId = `pending:${requestId}`;
     const now = Date.now();
     const payloadText = canText ? text.trim() : '';
-    const displayName = userDisplayName(user);
+    // The raw name, as the server sends it; chat labels a missing one.
+    const displayName = userName(user);
     const avatar = user.avatar;
 
     const pendingMsg: SuperChatMessage = {

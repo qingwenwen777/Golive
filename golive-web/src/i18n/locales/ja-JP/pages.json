@@ -336,8 +336,6 @@
   "channel": {
     "title": "チャンネル",
     "name": "チャンネル: {{name}}",
-    "creatorFallback": "クリエイター",
-    "creatorShort": "クリエイター {{id}}",
     "copyTarget": "チャンネルリンク",
     "copyManual": "チャンネルリンクを手動コピー用に開きました。",
     "copySuccess": "チャンネルリンクをコピーしました。",

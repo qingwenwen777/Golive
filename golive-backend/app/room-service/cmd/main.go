@@ -81,6 +81,11 @@ func main() {
 	} else if n > 0 {
 		log.Info("fixed legacy uuid channels", zap.Int64("rows", n))
 	}
+	if n, err := roomRepo.ClearGeneratedAvatars(context.Background()); err != nil {
+		log.Warn("clear generated avatars", zap.Error(err))
+	} else if n > 0 {
+		log.Info("cleared generated avatars", zap.Int64("rooms", n))
+	}
 	socialRepo := repo.NewSocialRepo(rdb)
 	liveRepo := repo.NewLiveRepo(rdb)
 
