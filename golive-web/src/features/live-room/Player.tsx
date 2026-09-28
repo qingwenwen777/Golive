@@ -691,7 +691,7 @@ export function Player({
           </strong>
           <span>
             {t('player.offlineBody', {
-              defaultValue: 'The video starts here as soon as the creator’s stream comes in.',
+              defaultValue: "The video starts here as soon as the creator's stream comes in.",
             })}
           </span>
         </div>
@@ -734,10 +734,10 @@ export function Player({
               <span className="gl-live-dot-red" aria-hidden="true" />
               {t('player.endingBadge', { defaultValue: 'Ended' })}
             </span>
-            <strong>{t('player.endingTitle', { defaultValue: 'Live ended' })}</strong>
+            <strong>{t('player.endingTitle', { defaultValue: 'Stream ended' })}</strong>
             <span>
               {t('player.endingSubtitle', {
-                defaultValue: 'Thanks for watching. Preparing the room...',
+                defaultValue: 'Thanks for watching. Wrapping up the stream...',
               })}
             </span>
             <i aria-hidden="true" />
@@ -804,8 +804,8 @@ export function Player({
             <DropdownMenuTrigger asChild>
               <button
                 className="gl-pbtn"
-                aria-label={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
-                title={t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+                aria-label={t('player.danmuFontSize', { defaultValue: 'On-screen chat size' })}
+                title={t('player.danmuFontSize', { defaultValue: 'On-screen chat size' })}
               >
                 <Type size={20} />
               </button>
@@ -817,7 +817,7 @@ export function Player({
               container={menuPortalContainer}
             >
               <DropdownMenuLabel>
-                {t('player.danmuFontSize', { defaultValue: 'Danmu size' })}
+                {t('player.danmuFontSize', { defaultValue: 'On-screen chat size' })}
               </DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={danmuFontSize}

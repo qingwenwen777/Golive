@@ -477,7 +477,7 @@ function suggestionTypeLabel(type: string, t: ReturnType<typeof useTranslation>[
     case 'replay':
       return t('searchSuggestionTypes.replay', { defaultValue: 'Replay' });
     case 'appointment':
-      return t('searchSuggestionTypes.appointment', { defaultValue: 'Appointment' });
+      return t('searchSuggestionTypes.appointment', { defaultValue: 'Upcoming' });
     case 'post':
       return t('searchSuggestionTypes.post', { defaultValue: 'Post' });
     default:

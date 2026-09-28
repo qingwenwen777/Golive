@@ -1,15 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Check,
-  ChevronDown,
-  Copy,
-  Mic,
-  MicOff,
-  Radio,
-  Users,
-  X,
-} from 'lucide-react';
+import { Check, ChevronDown, Copy, Mic, MicOff, Radio, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   useApproveMicLink,
@@ -57,14 +48,21 @@ export function MicLinkPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
 function PanelShell({ children, count }: { children: React.ReactNode; count?: number }) {
   const { t } = useTranslation('pages');
   return (
-    <section className="gl-mic-panel" aria-label={t('micLink.title', { defaultValue: 'Voice mic-link' })}>
+    <section
+      className="gl-mic-panel"
+      aria-label={t('micLink.title', { defaultValue: 'Voice guests' })}
+    >
       <div className="gl-mic-head">
         <div className="gl-mic-icon" aria-hidden="true">
           <Mic size={17} />
         </div>
         <div>
-          <h2>{t('micLink.title', { defaultValue: 'Voice mic-link' })}</h2>
-          <p>{t('micLink.subtitle', { defaultValue: 'Invite viewers onto the mic.' })}</p>
+          <h2>{t('micLink.title', { defaultValue: 'Voice guests' })}</h2>
+          <p>
+            {t('micLink.subtitle', {
+              defaultValue: 'Invite viewers to join your stream by voice.',
+            })}
+          </p>
         </div>
         {typeof count === 'number' && (
           <span className="gl-mic-count-pill">
@@ -103,9 +101,16 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
   const slotMax = view?.slotMax ?? 3;
   const slotFull = roster.length >= slotMax;
 
-  const stageUrl = useMemo(() => `${location.origin}/mic-stage/${encodeURIComponent(roomId)}`, [roomId]);
+  const stageUrl = useMemo(
+    () => `${location.origin}/mic-stage/${encodeURIComponent(roomId)}`,
+    [roomId],
+  );
 
-  const saveConfig = (next: { enabled?: boolean; eligibility?: MicLinkEligibility; minFanLevel?: number }) => {
+  const saveConfig = (next: {
+    enabled?: boolean;
+    eligibility?: MicLinkEligibility;
+    minFanLevel?: number;
+  }) => {
     config.mutate(
       {
         enabled: next.enabled ?? enabled,
@@ -119,9 +124,11 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
   const copyStageUrl = async () => {
     try {
       await navigator.clipboard.writeText(stageUrl);
-      toast.success(t('micLink.stageUrlCopied', { defaultValue: 'Mic-stage URL copied.' }));
+      toast.success(t('micLink.stageUrlCopied', { defaultValue: 'Guest audio URL copied.' }));
     } catch {
-      toast.error(t('micLink.stageUrlCopyFailed', { defaultValue: 'Copy failed. Copy it manually.' }));
+      toast.error(
+        t('micLink.stageUrlCopyFailed', { defaultValue: 'Copy failed. Copy it manually.' }),
+      );
     }
   };
 
@@ -135,11 +142,13 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
         aria-pressed={enabled}
       >
         <span>
-          <strong>{t('micLink.toggleLabel', { defaultValue: 'Accept mic-link' })}</strong>
+          <strong>{t('micLink.toggleLabel', { defaultValue: 'Allow voice guests' })}</strong>
           <small>
             {enabled
               ? t('micLink.toggleOnHint', { defaultValue: 'Viewers can request to join.' })
-              : t('micLink.toggleOffHint', { defaultValue: 'Mic-link is off for this stream.' })}
+              : t('micLink.toggleOffHint', {
+                  defaultValue: 'Voice guests are off for this stream.',
+                })}
           </small>
         </span>
         <i aria-hidden="true" />
@@ -180,7 +189,9 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
                   step={1}
                   value={minFanLevel}
                   onChange={(event) =>
-                    saveConfig({ minFanLevel: Math.max(1, Math.floor(Number(event.target.value) || 1)) })
+                    saveConfig({
+                      minFanLevel: Math.max(1, Math.floor(Number(event.target.value) || 1)),
+                    })
                   }
                   aria-label={t('micLink.minFanLevelLabel', { defaultValue: 'Min fan level' })}
                 />
@@ -189,7 +200,7 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
           </div>
 
           <div className="gl-mic-stage-url">
-            <span>{t('micLink.stageUrlLabel', { defaultValue: 'OBS mic-stage source' })}</span>
+            <span>{t('micLink.stageUrlLabel', { defaultValue: 'OBS guest audio source' })}</span>
             <div className="gl-mic-stage-row">
               <code title={stageUrl}>{stageUrl}</code>
               <button
@@ -202,7 +213,8 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
             </div>
             <small>
               {t('micLink.stageUrlHint', {
-                defaultValue: 'Add this as a Browser Source in OBS so guest audio joins your stream.',
+                defaultValue:
+                  'Add this as a Browser Source in OBS so guest audio joins your stream.',
               })}
             </small>
           </div>
@@ -227,7 +239,10 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
                         onClick={() =>
                           approve.mutate(
                             { targetId: req.userId },
-                            { onError: (err) => toast.error(micErrorText(err.reason, err.message, t)) },
+                            {
+                              onError: (err) =>
+                                toast.error(micErrorText(err.reason, err.message, t)),
+                            },
                           )
                         }
                         aria-label={t('micLink.approve', { defaultValue: 'Approve' })}
@@ -241,7 +256,10 @@ function MicLinkConsole({ roomId }: { roomId: string }) {
                         onClick={() =>
                           reject.mutate(
                             { targetId: req.userId },
-                            { onError: (err) => toast.error(micErrorText(err.reason, err.message, t)) },
+                            {
+                              onError: (err) =>
+                                toast.error(micErrorText(err.reason, err.message, t)),
+                            },
                           )
                         }
                         aria-label={t('micLink.reject', { defaultValue: 'Reject' })}
@@ -430,7 +448,7 @@ function MicLinkViewer({ roomId }: { roomId: string }) {
     }
     request.mutate(undefined, {
       onSuccess: () =>
-        toast.success(t('micLink.requestSent', { defaultValue: 'Request sent to the streamer.' })),
+        toast.success(t('micLink.requestSent', { defaultValue: 'Request sent to the creator.' })),
       onError: (err) => toast.error(micErrorText(err.reason, err.message, t)),
     });
   };
@@ -520,7 +538,7 @@ function eligibilityOptionLabel(
 ): string {
   switch (option) {
     case 'followers':
-      return t('micLink.eligibility.followers', { defaultValue: 'Followers' });
+      return t('micLink.eligibility.followers', { defaultValue: 'Subscribers' });
     case 'fans':
       return t('micLink.eligibility.fans', { defaultValue: 'Fan club members' });
     case 'fans_level':
@@ -536,20 +554,31 @@ function micErrorText(
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
   switch (reason) {
+    case 'network':
+      return t('loadError.networkHint', {
+        ns: 'common',
+        defaultValue: 'Check your connection and try again.',
+      });
     case 'mic_link_disabled':
-      return t('micLink.error.disabled', { defaultValue: 'Mic-link is currently off.' });
+      return t('micLink.error.disabled', {
+        defaultValue: 'Voice guests are turned off right now.',
+      });
     case 'mic_link_not_eligible':
-      return t('micLink.error.notEligible', { defaultValue: 'You do not meet the join requirement.' });
+      return t('micLink.error.notEligible', {
+        defaultValue: 'You do not meet the join requirement.',
+      });
     case 'mic_link_request_exists':
       return t('micLink.error.requestExists', { defaultValue: 'You already have a request.' });
     case 'mic_link_slot_full':
       return t('micLink.error.slotFull', { defaultValue: 'The mic is full.' });
     case 'mic_link_request_not_found':
-      return t('micLink.error.requestNotFound', { defaultValue: 'That request is no longer available.' });
+      return t('micLink.error.requestNotFound', {
+        defaultValue: 'That request is no longer available.',
+      });
     case 'mic_link_busy':
-      return t('micLink.error.busy', { defaultValue: 'Too busy, try again.' });
+      return t('micLink.error.busy', { defaultValue: 'Too many requests. Try again in a moment.' });
     case 'forbidden':
-      return t('micLink.error.forbidden', { defaultValue: 'Only the streamer can manage this.' });
+      return t('micLink.error.forbidden', { defaultValue: 'Only the creator can manage this.' });
     default:
       return fallback || t('micLink.error.generic', { defaultValue: 'Action failed.' });
   }

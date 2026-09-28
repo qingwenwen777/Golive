@@ -214,7 +214,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
                   : t('liveCard.menu.saveWatchLater', { defaultValue: 'Save to Watch later' })}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setShareOpen(true)}>
-                {t('liveCard.menu.shareLiveLink', { defaultValue: 'Share live' })}
+                {t('liveCard.menu.shareLiveLink', { defaultValue: 'Share' })}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={openChannel}>
@@ -242,7 +242,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
         url={`${window.location.origin}/live/${encodeURIComponent(stream.id)}`}
         description={stream.description}
         previewImage={stream.cover}
-        previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live room' })}
+        previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live stream' })}
         previewMeta={`${channelName}${t('shareDialog.metaSeparator', { defaultValue: ' · ' })}${
           isLive
             ? t('home.watching', { count: stream.viewers, defaultValue: '{{count}} watching' })

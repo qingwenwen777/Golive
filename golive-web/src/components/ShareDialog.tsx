@@ -37,10 +37,18 @@ export function ShareDialog({
     try {
       const method = await copyText(
         shareUrl,
-        t('shareDialog.copyTarget', { defaultValue: 'share link' }),
+        t('copyPrompt', {
+          ns: 'common',
+          target: t('shareDialog.copyTarget', { defaultValue: 'share link' }),
+          defaultValue: 'Copy {{target}}',
+        }),
       );
       if (method === 'manual') {
-        toast.info(t('shareDialog.copyManual', { defaultValue: 'Link opened for manual copy.' }));
+        toast.info(
+          t('shareDialog.copyManual', {
+            defaultValue: "Automatic copy isn't available. Copy the link manually.",
+          }),
+        );
       } else {
         toast.success(t('shareDialog.copySuccess', { defaultValue: 'Link copied.' }));
       }

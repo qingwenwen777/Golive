@@ -131,7 +131,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
         onSuccess: () =>
           toast.success(
             t('betting.cancelSuccess', {
-              defaultValue: 'Bet cancelled. Wagered coins were refunded.',
+              defaultValue: 'Bet canceled. Wagered coins were refunded.',
             }),
           ),
         onError: (err) => toast.error(betErrorText(err.reason, err.message, t)),
@@ -184,7 +184,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
               {accepting
                 ? t('betting.closesIn', {
                     seconds: Math.ceil(remainingMs / 1000),
-                    defaultValue: '{{seconds}}s to close',
+                    defaultValue: 'Closes in {{seconds}}s',
                   })
                 : t('betting.closed', { defaultValue: 'Closed' })}
             </span>
@@ -218,7 +218,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
               {myWager.status === 'won' &&
                 t('betting.myWagerWon', {
                   payout: formatNumber(myWager.payout),
-                  defaultValue: ', returned {{payout}} coin',
+                  defaultValue: ', won {{payout}} coins',
                 })}
               {myWager.status === 'refunded' &&
                 t('betting.myWagerRefunded', { defaultValue: ', refunded' })}
@@ -261,7 +261,7 @@ export function BettingPanel({ roomId, ownsStream }: { roomId: string; ownsStrea
                 <XCircle size={14} />
                 <span>
                   {cancelBet.isPending
-                    ? t('betting.cancelling', { defaultValue: 'Cancelling...' })
+                    ? t('betting.cancelling', { defaultValue: 'Canceling...' })
                     : t('betting.cancel', { defaultValue: 'Cancel' })}
                 </span>
               </button>
@@ -371,7 +371,7 @@ function BetOptionButton({
         {t('betting.optionMeta', {
           count,
           total: formatNumber(total),
-          defaultValue: '{{count}} people · {{total}} coin',
+          defaultValue: '{{count}} people · {{total}} coins',
         })}
       </span>
     </button>
@@ -382,14 +382,14 @@ function statusText(status: string | undefined, t: ReturnType<typeof useTranslat
   if (status === 'open') return t('betting.status.open', { defaultValue: 'Open' });
   if (status === 'closed') return t('betting.status.closed', { defaultValue: 'Closed' });
   if (status === 'settled') return t('betting.status.settled', { defaultValue: 'Settled' });
-  if (status === 'cancelled') return t('betting.status.cancelled', { defaultValue: 'Cancelled' });
+  if (status === 'cancelled') return t('betting.status.cancelled', { defaultValue: 'Canceled' });
   return t('betting.title', { defaultValue: 'Betting' });
 }
 
 function betOptionLabel(option: BetOption, t: ReturnType<typeof useTranslation>['t']): string {
   return option === 'win'
-    ? t('betting.option.win', { defaultValue: 'Can win' })
-    : t('betting.option.lose', { defaultValue: 'Cannot win' });
+    ? t('betting.option.win', { defaultValue: 'Will win' })
+    : t('betting.option.lose', { defaultValue: "Won't win" });
 }
 
 function betErrorText(
@@ -397,6 +397,12 @@ function betErrorText(
   fallback: string,
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
+  if (reason === 'network') {
+    return t('loadError.networkHint', {
+      ns: 'common',
+      defaultValue: 'Check your connection and try again.',
+    });
+  }
   if (reason === 'insufficient_coin') {
     return t('betting.errorInsufficient', { defaultValue: 'Insufficient coin balance.' });
   }
@@ -416,7 +422,7 @@ function betErrorText(
   }
   if (reason === 'bet_owner_forbidden') {
     return t('betting.errorOwnerWager', {
-      defaultValue: "Streamers can't bet on their own round.",
+      defaultValue: "Creators can't bet on their own round.",
     });
   }
   if (reason === 'bet_not_closed') {
@@ -428,7 +434,7 @@ function betErrorText(
     });
   }
   if (reason === 'forbidden') {
-    return t('betting.errorForbidden', { defaultValue: 'Only the streamer can manage betting.' });
+    return t('betting.errorForbidden', { defaultValue: 'Only the creator can manage betting.' });
   }
   return fallback || t('betting.errorGeneric', { defaultValue: 'Action failed.' });
 }

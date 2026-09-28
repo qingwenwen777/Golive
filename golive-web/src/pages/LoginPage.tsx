@@ -45,7 +45,7 @@ function LoginShowcase() {
         <img src="/golive-mascot.webp" alt="" width={200} height={200} />
         <h2>
           {t('login.showcase.title', {
-            defaultValue: 'Live streams, chat and replays in one place',
+            defaultValue: 'Live streams, chat, and replays in one place',
           })}
         </h2>
         <p>

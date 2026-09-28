@@ -152,13 +152,13 @@ const ADMIN_MODULES: AdminModuleDef[] = [
 ];
 
 const MODULE_DEFAULTS: Record<AdminModule, { label: string; subtitle: string }> = {
-  dashboard: { label: 'Dashboard', subtitle: 'Core status' },
+  dashboard: { label: 'Dashboard', subtitle: 'Key metrics' },
   users: { label: 'Users', subtitle: 'Accounts and invite codes' },
-  creators: { label: 'Creators', subtitle: 'Applications and live permissions' },
-  content: { label: 'Content review', subtitle: 'Live rooms and posts' },
+  creators: { label: 'Creators', subtitle: 'Applications and live access' },
+  content: { label: 'Content review', subtitle: 'Streams and posts' },
   economy: { label: 'Economy', subtitle: 'Coins and revenue' },
-  system: { label: 'System config', subtitle: 'Policies and switches' },
-  logs: { label: 'Operation logs', subtitle: 'Audit trail' },
+  system: { label: 'System settings', subtitle: 'Policies and toggles' },
+  logs: { label: 'Activity log', subtitle: 'Audit trail' },
 };
 
 const DETAIL_RECORD_PAGE_SIZE = 8;
@@ -304,7 +304,7 @@ export default function AdminPage() {
       void creators.refetch();
       void invites.refetch();
     }
-    toast.success(t('admin.refreshDone', { defaultValue: 'Admin data refreshed.' }));
+    toast.success(t('admin.refreshDone', { defaultValue: 'Refreshed.' }));
   };
 
   return (
@@ -488,7 +488,7 @@ export default function AdminPage() {
                 const ok = window.confirm(
                   t('admin.permissions.confirmDisable', {
                     name: item.displayName || item.username,
-                    defaultValue: 'Disable live permission for {{name}}?',
+                    defaultValue: 'Turn off live access for {{name}}?',
                   }),
                 );
                 if (!ok) return;
@@ -498,7 +498,7 @@ export default function AdminPage() {
                     onSuccess: () =>
                       toast.success(
                         t('admin.permissions.disabled', {
-                          defaultValue: 'Live permission disabled.',
+                          defaultValue: 'Live access turned off.',
                         }),
                       ),
                     onError: (err) =>
@@ -552,7 +552,7 @@ function AdminNav({
   return (
     <aside
       className="gl-admin-nav"
-      aria-label={t('admin.nav.aria', { defaultValue: 'Admin modules' })}
+      aria-label={t('admin.nav.aria', { defaultValue: 'Admin sections' })}
     >
       <div className="gl-admin-nav-brand">
         <span className="gl-admin-mark" aria-hidden="true">
@@ -624,7 +624,7 @@ function DashboardPage({
         <AdminKpi
           icon={Eye}
           label={t('admin.dashboard.kpis.onlineViewers', {
-            defaultValue: 'Online viewers',
+            defaultValue: 'Viewers now',
           })}
           value={overviewLoading ? '-' : (overview?.onlineViewers ?? 0)}
         />
@@ -638,7 +638,7 @@ function DashboardPage({
         <AdminKpi
           icon={Wallet}
           label={t('admin.dashboard.kpis.todayRevenue', {
-            defaultValue: 'Today revenue (Coins)',
+            defaultValue: "Today's revenue (coins)",
           })}
           value={overviewLoading ? '-' : (overview?.todayRevenueCoins ?? 0)}
         />
@@ -677,7 +677,9 @@ function DashboardPage({
           ))}
           {!overviewLoading && (overview?.health?.length ?? 0) === 0 && (
             <AdminEmptyState
-              label={t('admin.dashboard.health.empty', { defaultValue: 'No health data.' })}
+              label={t('admin.dashboard.health.empty', {
+                defaultValue: 'No health status available.',
+              })}
             />
           )}
         </div>
@@ -703,7 +705,7 @@ function DashboardPage({
           />
           <AdminDetailRow
             label={t('admin.dashboard.focus.permissionManagement', {
-              defaultValue: 'Live permission management',
+              defaultValue: 'Live access',
             })}
             value={
               loading
@@ -1145,7 +1147,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
             value={user.banned ? userStatusLabel('banned', t) : userStatusLabel('active', t)}
           />
           <AdminDetailRow
-            label={t('admin.users.detail.livePermission', { defaultValue: 'Live permission' })}
+            label={t('admin.users.detail.livePermission', { defaultValue: 'Live access' })}
             value={statusText(user.livePermissionStatus, t)}
           />
           <div className="gl-admin-user-form">
@@ -1164,7 +1166,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
           </div>
           <div className="gl-admin-user-form">
             <label>
-              <span>{t('admin.users.detail.boundEmail', { defaultValue: 'Bound email' })}</span>
+              <span>{t('admin.users.detail.boundEmail', { defaultValue: 'Email' })}</span>
               <input
                 type="email"
                 value={email}
@@ -1192,7 +1194,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
               disabled={updateEmail.isPending || updatePassword.isPending}
             >
               <KeyRound size={15} />
-              {t('admin.users.detail.saveSecurity', { defaultValue: 'Save security' })}
+              {t('admin.users.detail.saveSecurity', { defaultValue: 'Save email and password' })}
             </button>
           </div>
           <div className="gl-admin-user-form is-compact">
@@ -1297,7 +1299,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
           <div className="gl-admin-mini-list">
             {liveRecords.length === 0 ? (
               <AdminEmptyState
-                label={t('admin.users.detail.noLives', { defaultValue: 'No live records.' })}
+                label={t('admin.users.detail.noLives', { defaultValue: 'No streams yet.' })}
               />
             ) : (
               livePageData.items.map((record) => (
@@ -1331,7 +1333,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
           <div className="gl-admin-mini-list">
             {reportRecords.length === 0 ? (
               <AdminEmptyState
-                label={t('admin.users.detail.noReports', { defaultValue: 'No report records.' })}
+                label={t('admin.users.detail.noReports', { defaultValue: 'No reports.' })}
               />
             ) : (
               reportPageData.items.map((record) => (
@@ -1365,7 +1367,7 @@ function AdminUserDetailPanel({ userId }: { userId: string }) {
           <div className="gl-admin-mini-list gl-admin-appeal-list">
             {appealRecords.length === 0 ? (
               <AdminEmptyState
-                label={t('admin.users.detail.noAppeals', { defaultValue: 'No appeal records.' })}
+                label={t('admin.users.detail.noAppeals', { defaultValue: 'No appeals.' })}
               />
             ) : (
               appealPageData.items.map((record) => (
@@ -1419,7 +1421,7 @@ function AdminAppealRecord({
               : status === 'rejected'
                 ? t('admin.users.detail.appealRejected', { defaultValue: 'Appeal rejected.' })
                 : t('admin.users.detail.appealReviewing', {
-                    defaultValue: 'Appeal marked as reviewing.',
+                    defaultValue: 'Appeal marked as in review.',
                   }),
           );
         },
@@ -1457,7 +1459,7 @@ function AdminAppealRecord({
           />
           <div>
             <button type="button" disabled={review.isPending} onClick={() => submit('reviewing')}>
-              {t('admin.users.detail.markReviewing', { defaultValue: 'Reviewing' })}
+              {t('admin.users.detail.markReviewing', { defaultValue: 'Mark as in review' })}
             </button>
             <button type="button" disabled={review.isPending} onClick={() => submit('approved')}>
               <Check size={14} />
@@ -1875,7 +1877,7 @@ function ContentPage() {
         />
         <AdminKpi
           icon={Plus}
-          label={t('admin.content.kpis.today', { defaultValue: 'Today new' })}
+          label={t('admin.content.kpis.today', { defaultValue: 'New today' })}
           value={stats.today}
         />
         <AdminKpi
@@ -2270,7 +2272,7 @@ function ContentPage() {
 
                   <div className="gl-admin-reporters">
                     <strong>
-                      {t('admin.content.reports.reporters', { defaultValue: 'Report records' })}
+                      {t('admin.content.reports.reporters', { defaultValue: 'Reports' })}
                     </strong>
                     {(detail.reports ?? [detail]).map((entry) => (
                       <div className="gl-admin-reporter-row" key={entry.id}>
@@ -2658,8 +2660,8 @@ function userStatusLabel(value: string, t: Translate) {
     active: t('admin.users.status.active', { defaultValue: 'Active' }),
     banned: t('admin.users.status.banned', { defaultValue: 'Banned' }),
     appeal_pending: t('admin.users.status.appealPending', { defaultValue: 'Pending appeals' }),
-    frozen: t('admin.users.status.frozen', { defaultValue: 'Frozen coins' }),
-    live_approved: t('admin.users.status.liveApproved', { defaultValue: 'Live approved' }),
+    frozen: t('admin.users.status.frozen', { defaultValue: 'Has frozen coins' }),
+    live_approved: t('admin.users.status.liveApproved', { defaultValue: 'Can go live' }),
   };
   return map[value] ?? value;
 }
@@ -2668,7 +2670,7 @@ function userDetailTabLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
     profile: t('admin.users.detail.tabs.profile', { defaultValue: 'Profile' }),
     coins: t('admin.users.detail.tabs.coins', { defaultValue: 'Coins' }),
-    lives: t('admin.users.detail.tabs.lives', { defaultValue: 'Live records' }),
+    lives: t('admin.users.detail.tabs.lives', { defaultValue: 'Streams' }),
     reports: t('admin.users.detail.tabs.reports', { defaultValue: 'Reports' }),
     appeals: t('admin.users.detail.tabs.appeals', { defaultValue: 'Appeals' }),
   };
@@ -2691,14 +2693,14 @@ function liveRecordStatusLabel(value: string, t: Translate) {
     live: t('admin.users.detail.liveStatus.live', { defaultValue: 'Live' }),
     ended: t('admin.users.detail.liveStatus.ended', { defaultValue: 'Ended' }),
     expired: t('admin.users.detail.liveStatus.expired', { defaultValue: 'Expired' }),
-    cancelled: t('admin.users.detail.liveStatus.cancelled', { defaultValue: 'Cancelled' }),
+    cancelled: t('admin.users.detail.liveStatus.cancelled', { defaultValue: 'Canceled' }),
   };
   return map[value] ?? value;
 }
 
 function coinActionLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
-    add: t('admin.users.coinActions.add', { defaultValue: 'Recharge' }),
+    add: t('admin.users.coinActions.add', { defaultValue: 'Add' }),
     deduct: t('admin.users.coinActions.deduct', { defaultValue: 'Deduct' }),
     freeze: t('admin.users.coinActions.freeze', { defaultValue: 'Freeze' }),
     unfreeze: t('admin.users.coinActions.unfreeze', { defaultValue: 'Unfreeze' }),
@@ -2733,7 +2735,7 @@ function reportStatusLabel(value: string, t: Translate) {
 function reportTargetLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
     all: t('admin.content.targets.all', { defaultValue: 'All targets' }),
-    room: t('admin.content.targets.room', { defaultValue: 'Live room' }),
+    room: t('admin.content.targets.room', { defaultValue: 'Stream' }),
     channel: t('admin.content.targets.channel', { defaultValue: 'Channel' }),
     danmu: t('admin.content.targets.danmu', { defaultValue: 'Chat message' }),
     post: t('admin.content.targets.post', { defaultValue: 'Post' }),
@@ -2760,15 +2762,15 @@ function reportReasonLabel(value: string, t: Translate) {
 
 function reportActionLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
-    review: t('admin.content.actions.review', { defaultValue: 'Mark reviewing' }),
+    review: t('admin.content.actions.review', { defaultValue: 'Mark as in review' }),
     dismiss: t('admin.content.actions.dismiss', { defaultValue: 'Dismiss' }),
     delete_content: t('admin.content.actions.deleteContent', { defaultValue: 'Delete content' }),
     warn_user: t('admin.content.actions.warnUser', { defaultValue: 'Warn user' }),
-    warn_room: t('admin.content.actions.warnRoom', { defaultValue: 'Warn live room' }),
+    warn_room: t('admin.content.actions.warnRoom', { defaultValue: 'Warn stream' }),
     site_mute: t('admin.content.actions.siteMute', { defaultValue: 'Site mute' }),
     ban_user: t('admin.content.actions.banUser', { defaultValue: 'Ban user' }),
     force_end_live: t('admin.content.actions.forceEndLive', {
-      defaultValue: 'Force end live',
+      defaultValue: 'Force-end stream',
     }),
   };
   return map[value] ?? value;
@@ -2971,12 +2973,12 @@ function auditActionLabel(value: string, t: Translate) {
   const map: Record<string, string> = {
     delete_content: t('admin.logs.actions.deleteContent', { defaultValue: 'Delete content' }),
     warn_user: t('admin.logs.actions.warnUser', { defaultValue: 'Warn user' }),
-    warn_room: t('admin.logs.actions.warnRoom', { defaultValue: 'Warn live room' }),
+    warn_room: t('admin.logs.actions.warnRoom', { defaultValue: 'Warn stream' }),
     site_mute: t('admin.logs.actions.siteMute', { defaultValue: 'Site mute' }),
     ban_user: t('admin.logs.actions.banUser', { defaultValue: 'Ban user' }),
-    force_end_live: t('admin.logs.actions.forceEndLive', { defaultValue: 'Force end live' }),
+    force_end_live: t('admin.logs.actions.forceEndLive', { defaultValue: 'Force-end stream' }),
     dismiss: t('admin.logs.actions.dismiss', { defaultValue: 'Dismiss report' }),
-    review: t('admin.logs.actions.review', { defaultValue: 'Mark reviewing' }),
+    review: t('admin.logs.actions.review', { defaultValue: 'Mark as in review' }),
     blocked_word_create: t('admin.logs.actions.blockedWordCreate', {
       defaultValue: 'Add blocked word',
     }),
@@ -3022,10 +3024,10 @@ function auditActionLabel(value: string, t: Translate) {
       defaultValue: 'Reject certification application',
     }),
     live_permission_approved: t('admin.logs.actions.livePermissionApprove', {
-      defaultValue: 'Enable live permission',
+      defaultValue: 'Enable live access',
     }),
     live_permission_rejected: t('admin.logs.actions.livePermissionReject', {
-      defaultValue: 'Disable live permission',
+      defaultValue: 'Disable live access',
     }),
     admin_create: t('admin.logs.actions.adminCreate', { defaultValue: 'Create admin account' }),
     system_settings_update: t('admin.logs.actions.systemSettingsUpdate', {
@@ -3052,7 +3054,7 @@ function EconomyPage() {
         <AdminKpi
           icon={GiftIcon}
           label={t('admin.economy.kpis.todayGiftRevenue', {
-            defaultValue: 'Today gift revenue',
+            defaultValue: "Today's gift revenue",
           })}
           value={summary.isLoading ? '-' : formatKpiCoins(data?.todayGiftRevenue)}
           tone="red"
@@ -3060,18 +3062,18 @@ function EconomyPage() {
         <AdminKpi
           icon={CircleDollarSign}
           label={t('admin.economy.kpis.todaySuperChatRevenue', {
-            defaultValue: 'Today SuperChat revenue',
+            defaultValue: "Today's SuperChat revenue",
           })}
           value={summary.isLoading ? '-' : formatKpiCoins(data?.todaySuperChatRevenue)}
         />
         <AdminKpi
           icon={Wallet}
-          label={t('admin.economy.kpis.todayTopupCoins', { defaultValue: 'Today recharge' })}
+          label={t('admin.economy.kpis.todayTopupCoins', { defaultValue: "Today's top-ups" })}
           value={summary.isLoading ? '-' : formatKpiCoins(data?.todayTopupCoins)}
         />
         <AdminKpi
           icon={Coins}
-          label={t('admin.economy.kpis.frozenCoins', { defaultValue: 'Frozen Coins' })}
+          label={t('admin.economy.kpis.frozenCoins', { defaultValue: 'Frozen coins' })}
           value={summary.isLoading ? '-' : formatKpiCoins(data?.totalFrozenCoins)}
         />
         <AdminKpi
@@ -3172,12 +3174,12 @@ function EconomyGiftsPanel() {
         />
         <AdminMiniMetric
           icon={ToggleRight}
-          label={t('admin.economy.gifts.enabled', { defaultValue: 'On shelf' })}
+          label={t('admin.economy.gifts.enabled', { defaultValue: 'Enabled' })}
           value={stats?.enabled ?? '-'}
         />
         <AdminMiniMetric
           icon={ToggleLeft}
-          label={t('admin.economy.gifts.disabled', { defaultValue: 'Off shelf' })}
+          label={t('admin.economy.gifts.disabled', { defaultValue: 'Disabled' })}
           value={stats?.disabled ?? '-'}
         />
         <AdminMiniMetric
@@ -3226,8 +3228,8 @@ function EconomyGiftsPanel() {
                   </label>
                   <span className={`gl-admin-status is-${enabled ? 'approved' : 'rejected'}`}>
                     {enabled
-                      ? t('admin.economy.gifts.onShelf', { defaultValue: 'On shelf' })
-                      : t('admin.economy.gifts.offShelf', { defaultValue: 'Off shelf' })}
+                      ? t('admin.economy.gifts.onShelf', { defaultValue: 'Enabled' })
+                      : t('admin.economy.gifts.offShelf', { defaultValue: 'Disabled' })}
                   </span>
                   <div className="gl-admin-economy-actions">
                     <button
@@ -3253,10 +3255,10 @@ function EconomyGiftsPanel() {
                               toast.success(
                                 enabled
                                   ? t('admin.economy.gifts.disabledDone', {
-                                      defaultValue: 'Gift removed from shelf.',
+                                      defaultValue: 'Gift disabled.',
                                     })
                                   : t('admin.economy.gifts.enabledDone', {
-                                      defaultValue: 'Gift put on shelf.',
+                                      defaultValue: 'Gift enabled.',
                                     }),
                               ),
                             onError: (err) => toast.error(err.message),
@@ -3266,8 +3268,8 @@ function EconomyGiftsPanel() {
                     >
                       {enabled ? <ToggleLeft size={15} /> : <ToggleRight size={15} />}
                       {enabled
-                        ? t('admin.economy.gifts.disable', { defaultValue: 'Off shelf' })
-                        : t('admin.economy.gifts.enable', { defaultValue: 'On shelf' })}
+                        ? t('admin.economy.gifts.disable', { defaultValue: 'Disable' })
+                        : t('admin.economy.gifts.enable', { defaultValue: 'Enable' })}
                     </button>
                   </div>
                 </div>
@@ -3368,7 +3370,7 @@ function EconomyOrdersPanel() {
         ) : orders.isError ? (
           <AdminEmptyState
             label={t('admin.economy.orders.loadFailed', {
-              defaultValue: 'Order records failed to load. Please try again.',
+              defaultValue: 'Could not load orders. Please try again.',
             })}
           />
         ) : items.length === 0 ? (
@@ -3452,7 +3454,7 @@ function EconomyCoinsPanel() {
         />
         <AdminMiniMetric
           icon={Wallet}
-          label={t('admin.economy.coins.balance', { defaultValue: 'Balances' })}
+          label={t('admin.economy.coins.balance', { defaultValue: 'Total balance' })}
           value={formatCoins(stats?.totalBalanceCoins)}
         />
         <AdminMiniMetric
@@ -3463,7 +3465,7 @@ function EconomyCoinsPanel() {
       </div>
       <div className="gl-admin-content-filters gl-admin-economy-filters">
         <AdminFilterSelect
-          label={t('admin.economy.coins.type', { defaultValue: 'Flow type' })}
+          label={t('admin.economy.coins.type', { defaultValue: 'Transaction type' })}
           value={type}
           onChange={(value) => {
             setType(value);
@@ -3482,7 +3484,7 @@ function EconomyCoinsPanel() {
             },
             {
               value: 'bet_wager',
-              label: t('admin.economy.coins.betWager', { defaultValue: 'Bet wager' }),
+              label: t('admin.economy.coins.betWager', { defaultValue: 'Bet placed' }),
             },
             {
               value: 'bet_payout',
@@ -3526,7 +3528,9 @@ function EconomyCoinsPanel() {
           />
         ) : items.length === 0 ? (
           <AdminEmptyState
-            label={t('admin.economy.coins.empty', { defaultValue: 'No Coin records matched.' })}
+            label={t('admin.economy.coins.empty', {
+              defaultValue: 'No matching coin transactions.',
+            })}
           />
         ) : (
           items.map((item) => <EconomyCoinRow item={item} key={item.id} />)
@@ -3623,7 +3627,7 @@ function EconomyBetsPanel() {
         />
         <AdminMiniMetric
           icon={Coins}
-          label={t('admin.economy.bets.lockedCoins', { defaultValue: 'Locked Coins' })}
+          label={t('admin.economy.bets.lockedCoins', { defaultValue: 'Locked coins' })}
           value={formatCoins(stats?.lockedCoins)}
         />
       </div>
@@ -3648,7 +3652,7 @@ function EconomyBetsPanel() {
             },
             {
               value: 'cancelled',
-              label: t('admin.economy.bets.cancelledStatus', { defaultValue: 'Cancelled' }),
+              label: t('admin.economy.bets.cancelledStatus', { defaultValue: 'Canceled' }),
             },
           ]}
         />
@@ -3732,7 +3736,7 @@ function EconomyBetsPanel() {
                           onSuccess: () =>
                             toast.success(
                               t('admin.economy.bets.cancelled', {
-                                defaultValue: 'Bet round cancelled and refunded.',
+                                defaultValue: 'Bet round canceled and refunded.',
                               }),
                             ),
                           onError: (err) => toast.error(err.message),
@@ -3805,7 +3809,7 @@ function EconomyReportsPanel() {
         />
         <AdminMiniMetric
           icon={Coins}
-          label={t('admin.economy.reports.netBet', { defaultValue: 'Bet net delta' })}
+          label={t('admin.economy.reports.netBet', { defaultValue: 'Net bet result' })}
           value={signedCoins(totals.netBetCoins)}
         />
       </div>
@@ -3943,7 +3947,7 @@ function economyStatusLabel(value: string, t: Translate) {
     open: t('admin.economy.status.open', { defaultValue: 'Open' }),
     closed: t('admin.economy.status.closed', { defaultValue: 'Closed' }),
     settled: t('admin.economy.status.settled', { defaultValue: 'Settled' }),
-    cancelled: t('admin.economy.status.cancelled', { defaultValue: 'Cancelled' }),
+    cancelled: t('admin.economy.status.cancelled', { defaultValue: 'Canceled' }),
     success: t('admin.economy.status.success', { defaultValue: 'Success' }),
     failed: t('admin.economy.status.failed', { defaultValue: 'Failed' }),
     locked: t('admin.economy.status.locked', { defaultValue: 'Locked' }),
@@ -3974,14 +3978,14 @@ function coinTypeLabel(value: string, t: Translate) {
     daily_task: t('admin.economy.coins.dailyTask', { defaultValue: 'Daily task' }),
     gift_spend: t('admin.economy.coins.giftSpend', { defaultValue: 'Gift spend' }),
     super_chat_spend: t('admin.economy.coins.scSpend', { defaultValue: 'SuperChat spend' }),
-    bet_wager: t('admin.economy.coins.betWager', { defaultValue: 'Bet wager' }),
+    bet_wager: t('admin.economy.coins.betWager', { defaultValue: 'Bet placed' }),
     bet_payout: t('admin.economy.coins.betPayout', { defaultValue: 'Bet payout' }),
     bet_refund: t('admin.economy.coins.betRefund', { defaultValue: 'Bet refund' }),
     creator_gift_income: t('admin.economy.coins.giftIncome', { defaultValue: 'Gift income' }),
     creator_super_chat_income: t('admin.economy.coins.scIncome', {
       defaultValue: 'SuperChat income',
     }),
-    admin_adjust: t('admin.economy.coins.adminAdjust', { defaultValue: 'Admin adjust' }),
+    admin_adjust: t('admin.economy.coins.adminAdjust', { defaultValue: 'Admin adjustment' }),
     admin_freeze: t('admin.economy.coins.adminFreeze', { defaultValue: 'Admin freeze' }),
     admin_unfreeze: t('admin.economy.coins.adminUnfreeze', {
       defaultValue: 'Admin unfreeze',
@@ -4514,12 +4518,12 @@ function LogsPage() {
       >
         <AdminKpi
           icon={History}
-          label={t('admin.logs.kpis.today', { defaultValue: 'Today actions' })}
+          label={t('admin.logs.kpis.today', { defaultValue: 'Actions today' })}
           value={stats.today}
         />
         <AdminKpi
           icon={FileText}
-          label={t('admin.logs.kpis.reviews', { defaultValue: 'Review records' })}
+          label={t('admin.logs.kpis.reviews', { defaultValue: 'Reviews' })}
           value={stats.review}
         />
         <AdminKpi
@@ -4537,7 +4541,7 @@ function LogsPage() {
         <div className="gl-admin-panel-head">
           <div>
             <span>{t('admin.logs.eyebrow', { defaultValue: 'Logs' })}</span>
-            <h2>{t('admin.logs.title', { defaultValue: 'Operation logs' })}</h2>
+            <h2>{t('admin.logs.title', { defaultValue: 'Activity log' })}</h2>
           </div>
         </div>
         <div className="gl-admin-log-tabs" role="tablist">
@@ -4559,7 +4563,7 @@ function LogsPage() {
             <AdminEmptyState label={t('admin.logs.loading', { defaultValue: 'Loading logs...' })} />
           ) : logItems.length === 0 ? (
             <AdminEmptyState
-              label={t('admin.logs.empty', { defaultValue: 'No operations in this category.' })}
+              label={t('admin.logs.empty', { defaultValue: 'No activity in this category.' })}
             />
           ) : (
             logItems.map((item) => (
@@ -4684,7 +4688,7 @@ function PermissionPanel({
                   className="gl-admin-danger-btn"
                   aria-label={t('admin.permissions.disableFor', {
                     name: item.displayName || item.username,
-                    defaultValue: 'Disable live permission for {{name}}',
+                    defaultValue: 'Turn off live access for {{name}}',
                   })}
                   title={t('admin.permissions.disable', { defaultValue: 'Disable live' })}
                   disabled={busy}
@@ -4703,7 +4707,7 @@ function PermissionPanel({
       ) : (
         <div className="gl-yt-shelf-empty">
           {t('admin.permissions.empty', {
-            defaultValue: 'No creators currently have live permission.',
+            defaultValue: 'No creators currently have live access.',
           })}
         </div>
       )}
@@ -4745,7 +4749,7 @@ function ApplicationsPanel({
       <div className="gl-admin-panel-head">
         <div>
           <span>{t('admin.applications.eyebrow', { defaultValue: 'Live access review' })}</span>
-          <h2>{t('admin.applications.title', { defaultValue: 'Live permission applications' })}</h2>
+          <h2>{t('admin.applications.title', { defaultValue: 'Live access applications' })}</h2>
           <p>
             {t('admin.applications.liveHint', {
               defaultValue:
@@ -4800,7 +4804,7 @@ function ApplicationsPanel({
                   {app.rejectReason && (
                     <div className="gl-admin-reason is-reject">
                       <span>
-                        {t('admin.applications.rejectReason', { defaultValue: 'Reject reason' })}
+                        {t('admin.applications.rejectReason', { defaultValue: 'Rejection reason' })}
                       </span>
                       <p>{app.rejectReason}</p>
                     </div>
@@ -4858,7 +4862,9 @@ function ApplicationsPanel({
                           setRejectReason('');
                         }}
                       >
-                        {t('admin.applications.confirmReject', { defaultValue: 'Confirm reject' })}
+                        {t('admin.applications.confirmReject', {
+                          defaultValue: 'Confirm rejection',
+                        })}
                       </button>
                     </div>
                   )}
@@ -4913,7 +4919,7 @@ function PlatformApplicationsPanel({
       <div className="gl-admin-panel-head">
         <div>
           <span>
-            {t('admin.platformApplications.eyebrow', { defaultValue: 'Platform signing' })}
+            {t('admin.platformApplications.eyebrow', { defaultValue: 'Platform certification' })}
           </span>
           <h2>
             {t('admin.platformApplications.title', {
@@ -4964,7 +4970,7 @@ function PlatformApplicationsPanel({
                   </div>
                   <div className="gl-admin-reason">
                     <span>
-                      {t('admin.platformApplications.reason', { defaultValue: 'Signing note' })}
+                      {t('admin.platformApplications.reason', { defaultValue: 'Application note' })}
                     </span>
                     <p>
                       {app.reason ||
@@ -4977,7 +4983,7 @@ function PlatformApplicationsPanel({
                     <div className="gl-admin-reason is-reject">
                       <span>
                         {t('admin.platformApplications.rejectReason', {
-                          defaultValue: 'Reject reason',
+                          defaultValue: 'Rejection reason',
                         })}
                       </span>
                       <p>{app.rejectReason}</p>
@@ -5037,7 +5043,7 @@ function PlatformApplicationsPanel({
                         }}
                       >
                         {t('admin.platformApplications.confirmReject', {
-                          defaultValue: 'Confirm reject',
+                          defaultValue: 'Confirm rejection',
                         })}
                       </button>
                     </div>

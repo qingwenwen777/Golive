@@ -83,7 +83,7 @@ export default function HomePage() {
           <div className="gl-empty">
             <Inbox size={64} strokeWidth={1.5} />
             <div className="gl-empty-title">
-              {t('home.searchEmpty', { defaultValue: 'No matching live rooms' })}
+              {t('home.searchEmpty', { defaultValue: 'No matching streams' })}
             </div>
             <div className="gl-empty-sub">
               {t('home.searchEmptySub', { defaultValue: 'Try another keyword.' })}
@@ -410,7 +410,7 @@ function HomeAllLiveSection({ category, searchQuery }: { category?: string; sear
       ) : (
         <div className="gl-creator-empty-soft">
           {searchQuery
-            ? t('home.searchEmpty', { defaultValue: 'No matching live rooms' })
+            ? t('home.searchEmpty', { defaultValue: 'No matching streams' })
             : t('home.empty', { defaultValue: 'No live streams right now' })}
         </div>
       )}
