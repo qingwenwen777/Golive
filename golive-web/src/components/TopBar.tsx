@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bell, Coins, Plus, User as UserIcon, X } from 'lucide-react';
+import { ArrowLeft, Bell, Coins, Globe, Plus, User as UserIcon, X } from 'lucide-react';
 import { logout as doLogout, useMe } from '@/api/auth';
 import {
   useMarkAllNotificationsRead,
@@ -291,10 +291,17 @@ export function TopBar({ onMenuClick, onLogoClick }: TopBarProps) {
         </form>
 
         <div className="gl-topbar-right">
+          {/* Phones show only the globe, and only when signed out: the account
+              menu repeats the languages. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className="gl-lang-toggle" aria-label={t('lang.toggle')}>
-                {t(`lang.${lang}`)}
+              <button
+                type="button"
+                className={isAuthed ? 'gl-lang-toggle is-in-menu' : 'gl-lang-toggle'}
+                aria-label={t('lang.toggle')}
+              >
+                <Globe size={22} className="gl-lang-toggle-icon" />
+                <span className="gl-lang-toggle-label">{t(`lang.${lang}`)}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
