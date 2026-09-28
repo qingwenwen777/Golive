@@ -73,6 +73,8 @@ void i18n
 // Number formats for translations: {{count, compact}} for audience sizes
 // ("233K", "23万"); i18next's built-in {{count, number}} for exact figures
 // ("12,480"). Both follow the UI language.
-i18n.services.formatter?.add('compact', (value, lng) => formatCount(Number(value), lng || undefined));
+i18n.services.formatter?.add('compact', (value, lng) =>
+  formatCount(Number(value), lng || undefined),
+);
 
 export default i18n;

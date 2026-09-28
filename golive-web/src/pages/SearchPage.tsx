@@ -298,7 +298,9 @@ function StreamResultRow({ stream, kind }: { stream: Stream; kind: 'live' | 'rep
               : t('search.views', { count: stream.viewers, defaultValue: '{{count}} views' })}
           </span>
           <span>{category}</span>
-          {!isLive && stream.endedAt && <span>{formatRelativeTime(stream.endedAt, i18n.language)}</span>}
+          {!isLive && stream.endedAt && (
+            <span>{formatRelativeTime(stream.endedAt, i18n.language)}</span>
+          )}
         </div>
         <Link
           className="gl-search-channel-line"
@@ -436,4 +438,3 @@ function SearchEmpty({
     </div>
   );
 }
-
