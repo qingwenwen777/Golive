@@ -69,6 +69,11 @@ func main() {
 	if err := userRepo.ReconcilePlatformVerification(context.Background()); err != nil {
 		log.Warn("reconcile platform verification", zap.Error(err))
 	}
+	if n, err := userRepo.ClearGeneratedAvatars(context.Background()); err != nil {
+		log.Warn("clear generated avatars", zap.Error(err))
+	} else if n > 0 {
+		log.Info("cleared generated avatars", zap.Int64("users", n))
+	}
 	if cfg.Bootstrap.DemoUser.Enabled {
 		if err := seedDemoUser(context.Background(), userRepo, cfg.Bootstrap.DemoUser); err != nil {
 			log.Warn("seed demo user", zap.Error(err))

@@ -82,6 +82,17 @@ WHERE table_schema = DATABASE()
 	return r.db.Exec("CREATE FULLTEXT INDEX ft_users_search ON users (username, display_name, id)").Error
 }
 
+// ClearGeneratedAvatars blanks the DiceBear avatar URLs that older builds
+// saved for users without a photo; the apps draw initials for an empty
+// avatar. updated_at is left alone, since nobody edited these profiles.
+// Runs on startup and changes nothing once the URLs are gone.
+func (r *UserRepo) ClearGeneratedAvatars(ctx context.Context) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("avatar LIKE ? OR avatar LIKE ?", "https://api.dicebear.com/%", "http://api.dicebear.com/%").
+		UpdateColumn("avatar", "")
+	return res.RowsAffected, res.Error
+}
+
 func (r *UserRepo) CreateAdminAuditLog(ctx context.Context, log *model.AdminAuditLog) error {
 	if log == nil {
 		return nil

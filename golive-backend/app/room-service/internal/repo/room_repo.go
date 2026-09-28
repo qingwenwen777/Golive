@@ -1208,6 +1208,18 @@ WHERE r.channel REGEXP ?
 	return joined.RowsAffected + fallback.RowsAffected, fallback.Error
 }
 
+// ClearGeneratedAvatars blanks the DiceBear avatar URLs that older builds
+// copied into rooms for creators without a photo; the apps draw initials
+// for an empty avatar. updated_at is left alone. Runs on startup after
+// FixUUIDChannels, which copies users.avatar, and changes nothing once the
+// URLs are gone.
+func (r *RoomRepo) ClearGeneratedAvatars(ctx context.Context) (int64, error) {
+	res := r.db.WithContext(ctx).Model(&model.Room{}).
+		Where("avatar LIKE ? OR avatar LIKE ?", "https://api.dicebear.com/%", "http://api.dicebear.com/%").
+		UpdateColumn("avatar", "")
+	return res.RowsAffected, res.Error
+}
+
 // SetPublishing marks a room as waiting for SRS on_publish.
 func (r *RoomRepo) SetPublishing(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Model(&model.Room{}).Where("id = ?", id).Updates(map[string]any{
