@@ -1747,7 +1747,7 @@ function BlacklistSettings({
         </div>
       </div>
       {pending ? (
-        <div className="gl-settings-empty-line">{t('loading', { defaultValue: 'Loading...' })}</div>
+        <div className="gl-settings-empty-line">{t('loading', { ns: 'common' })}</div>
       ) : items.length ? (
         <div className="gl-blacklist-list">
           {items.map((item) => (

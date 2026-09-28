@@ -245,7 +245,7 @@ function CreatorResultRow({ creator }: { creator: SearchCreator }) {
         onClick={toggleFollow}
       >
         {creator.self ? (
-          t('account.yourChannel', { defaultValue: '你的频道' })
+          t('channel.yourChannel')
         ) : creator.following ? (
           <>
             <Bell size={18} />

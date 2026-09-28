@@ -3194,7 +3194,7 @@ export function CreatorLiveConsolePage() {
             <div className="gl-creator-panel-head">
               <div>
                 <span>{t('studio.console.activity', { defaultValue: 'Interaction' })}</span>
-                <h2>{t('studio.console.micLinkTitle', { defaultValue: 'Mic-link module' })}</h2>
+                <h2>{t('micLink.title')}</h2>
               </div>
               <Mic size={22} />
             </div>
