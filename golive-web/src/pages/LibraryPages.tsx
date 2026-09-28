@@ -2291,7 +2291,7 @@ function SettingRow({
         role="switch"
         aria-checked={checked}
         aria-label={title}
-        className={`gl-yt-switch${checked ? 'is-on' : ''}`}
+        className={cn('gl-yt-switch', checked && 'is-on')}
         onClick={onChange}
       >
         <span className="gl-yt-switch-thumb" />

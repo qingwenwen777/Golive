@@ -27,7 +27,9 @@ const config: Config = {
           active: 'var(--gl-chip-bg-active)',
           'active-fg': 'var(--gl-chip-text-active)',
         },
-        red: 'var(--gl-red)',
+        // Brand live red. Named `live` so Tailwind's default `red-*` scale
+        // (used for error text) stays available.
+        live: 'var(--gl-red)',
         blue: '#1c62b9',
 
         // shadcn / radix-style semantic tokens. Defined in CSS as HSL triples

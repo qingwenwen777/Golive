@@ -2137,13 +2137,13 @@ input:focus-visible,
 .gl-top-progress.is-settling span {
   transition-duration: 0.14s;
 }
+/* No transform on the page wrapper: a transform (even will-change: transform)
+   makes it the containing block for position: fixed descendants, which pins
+   floating buttons and the mobile player to the page instead of the viewport. */
 .gl-route-page {
   min-width: 0;
-  backface-visibility: hidden;
-  transform: translate3d(0, 0, 0);
 }
 .gl-route-page.is-entering {
-  will-change: opacity, transform;
   animation: glRouteEnter 0.16s cubic-bezier(0.2, 0, 0, 1) both;
 }
 .gl-route-loading {
@@ -2176,11 +2176,9 @@ input:focus-visible,
 @keyframes glRouteEnter {
   from {
     opacity: 0.96;
-    transform: translate3d(0, 4px, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 @media (prefers-reduced-motion: reduce) {

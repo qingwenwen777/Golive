@@ -267,7 +267,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
             <div
               className={cn(
                 'mt-1 text-right text-xs',
-                textTooLong ? 'text-red-500' : 'text-text-secondary',
+                textTooLong ? 'text-red-600 dark:text-red-400' : 'text-text-secondary',
               )}
             >
               {superChatTextLength(text)} / {maxText}
@@ -276,7 +276,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         </div>
 
         {textTooLong && (
-          <div className="text-red-500 text-xs">
+          <div className="text-red-600 dark:text-red-400 text-xs">
             {t('liveRoom.superChatDialog.textTooLong', {
               count: maxText,
               defaultValue: 'Message is too long for this tier (max {{count}} characters).',
@@ -285,7 +285,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         )}
 
         {insufficient && (
-          <div className="text-red-500 text-xs">
+          <div className="text-red-600 dark:text-red-400 text-xs">
             {t('liveRoom.superChatDialog.insufficientBalance', {
               coins: (amount - balance).toLocaleString(locale),
               defaultValue: 'Insufficient balance (need {{coins}} more).',

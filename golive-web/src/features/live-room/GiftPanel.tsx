@@ -249,7 +249,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                 <div
                   className={cn(
                     'gl-gift-selected-meta',
-                    locked || insufficient ? 'text-red-500' : 'text-text-secondary',
+                    locked || insufficient ? 'text-red-600 dark:text-red-400' : 'text-text-secondary',
                   )}
                 >
                   {locked
