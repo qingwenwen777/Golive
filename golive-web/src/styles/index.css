@@ -1251,7 +1251,10 @@ input:focus-visible,
   top: 0;
   z-index: 50;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  /* The search column gives way first. A plain 1fr can't shrink below the
+     search input's default width, so when space ran out the grid squeezed
+     the right-hand buttons instead and they slid under the search pill. */
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
   height: 56px;
@@ -1856,6 +1859,9 @@ input:focus-visible,
   left: 0;
   z-index: 70;
   width: calc(100% - 56px);
+  /* A crowded top bar can leave the pill narrow; keep suggestions as wide as
+     on the smallest phones. */
+  min-width: min(320px, 100vw - 32px);
   max-height: min(72vh, 620px);
   overflow-y: auto;
   border: 1px solid var(--gl-border);
