@@ -719,9 +719,15 @@
   z-index: 4;
 }
 .gl-player:not(.is-fullscreen):hover .gl-player-ctl,
-.gl-player-ctl.is-on {
+.gl-player-ctl.is-on,
+.gl-player:focus-visible .gl-player-ctl,
+.gl-player-ctl:has(:focus-visible) {
   opacity: 1;
   pointer-events: auto;
+}
+.gl-player:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 .gl-player.is-idle {
   cursor: none;

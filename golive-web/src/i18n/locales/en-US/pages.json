@@ -291,6 +291,7 @@
   },
   "player": {
     "play": "Play",
+    "region": "Video player",
     "pause": "Pause",
     "mute": "Mute",
     "unmute": "Unmute",

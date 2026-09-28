@@ -291,6 +291,7 @@
   },
   "player": {
     "play": "播放",
+    "region": "视频播放器",
     "pause": "暂停",
     "mute": "静音",
     "unmute": "取消静音",

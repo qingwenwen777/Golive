@@ -17,6 +17,7 @@ import { cn } from '@/lib/cn';
 import { type DanmuFontSize, useDanmuStore } from '@/stores/useDanmuStore';
 import { usePlayerPreferenceStore } from '@/stores/usePlayerPreferenceStore';
 import { DanmuLayer } from './DanmuLayer';
+import { playerShortcutFor } from './playerShortcuts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -472,38 +473,28 @@ export function Player({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const active = document.activeElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
-      const inRoom = containerRef.current && containerRef.current.isConnected;
-      if (!inRoom) return;
-
-      switch (e.key) {
-        case ' ':
-        case 'Spacebar':
-          e.preventDefault();
+      const player = containerRef.current;
+      if (!player || !player.isConnected) return;
+      const action = playerShortcutFor(e, player);
+      if (!action) return;
+      e.preventDefault();
+      switch (action) {
+        case 'togglePlay':
           togglePlay();
           break;
-        case 'f':
-        case 'F':
-          e.preventDefault();
+        case 'fullscreen':
           toggleFullscreen();
           break;
-        case 'm':
-        case 'M':
-          e.preventDefault();
+        case 'mute':
           toggleMute();
           break;
-        case 'd':
-        case 'D':
-          e.preventDefault();
+        case 'danmu':
           toggleDanmu();
           break;
-        case 'ArrowUp':
-          e.preventDefault();
+        case 'volumeUp':
           changeVolume(volume + 0.05);
           break;
-        case 'ArrowDown':
-          e.preventDefault();
+        case 'volumeDown':
           changeVolume(volume - 0.05);
           break;
       }
@@ -658,6 +649,9 @@ export function Player({
   return (
     <div
       ref={containerRef}
+      role="region"
+      aria-label={t('player.region')}
+      tabIndex={0}
       className={cn(
         'gl-player group',
         fullscreen && 'is-fullscreen',
