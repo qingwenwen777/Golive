@@ -1141,15 +1141,17 @@ input:focus-visible,
 .gl-chip:focus-visible,
 .gl-side-item:focus-visible,
 .gl-logo:focus-visible {
-  outline: 2px solid #1c62b9;
+  outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }
-.gl-topbar-search button:focus,
-.gl-topbar-search button:focus-visible,
+/* The search pill draws the ring for its input (.gl-search-pill:focus-within);
+   buttons inside the pill keep theirs inset so the rounded edge can't clip it. */
 .gl-topbar-search input:focus,
 .gl-topbar-search input:focus-visible {
   outline: 0;
-  box-shadow: none;
+}
+.gl-topbar-search button:focus-visible {
+  outline-offset: -3px;
 }
 
 /* ── TopBar ──────────────────────────────────────────────────────────── */
@@ -1189,19 +1191,11 @@ input:focus-visible,
   border-radius: 50%;
   background: transparent;
   padding: 2px;
-  outline: none;
 }
-.gl-account-menu-trigger:focus {
-  outline: none;
-}
-.gl-account-menu-trigger:focus-visible {
-  outline: 0;
-  box-shadow: none;
-}
-.gl-topbar .gl-icon-btn:focus,
-.gl-topbar .gl-icon-btn:focus-visible,
-.gl-account-menu-trigger:focus,
-.gl-account-menu-trigger:focus-visible {
+/* Hide the ring for mouse and touch focus only; keyboard focus keeps the
+   global :focus-visible ring. */
+.gl-topbar .gl-icon-btn:focus:not(:focus-visible),
+.gl-account-menu-trigger:focus:not(:focus-visible) {
   outline: 0;
   box-shadow: none;
 }
@@ -1708,8 +1702,8 @@ input:focus-visible,
   border-color: #303030;
 }
 .gl-search-pill:focus-within {
-  border-color: color-mix(in srgb, var(--gl-border) 72%, var(--gl-text));
-  box-shadow: none;
+  border-color: hsl(var(--ring));
+  box-shadow: inset 0 0 0 1px hsl(var(--ring));
 }
 .gl-search-input {
   flex: 1;
