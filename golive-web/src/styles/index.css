@@ -64,6 +64,20 @@
   --gl-font-ui: var(--gl-font-latin), var(--gl-font-cjk);
 }
 
+/* CJK glyph forms follow the UI language (the app keeps <html lang> in sync).
+   Kanji taken from a Simplified Chinese font look wrong to Japanese readers,
+   so Japanese pages list Japanese fonts first. */
+:root:lang(ja) {
+  --gl-font-cjk:
+    'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo,
+    'Noto Sans JP', 'Noto Sans CJK JP', sans-serif;
+}
+:root:lang(zh) {
+  --gl-font-cjk:
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', 'Noto Sans CJK SC',
+    sans-serif;
+}
+
 .gl-creator-replay-page {
   display: flex;
   flex-direction: column;
