@@ -1,9 +1,43 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import fs from 'node:fs';
 import path from 'node:path';
 
+const THEME_INIT_SRC = '/src/theme-init.js';
+
+// index.html loads src/theme-init.js as a classic, render-blocking script so the
+// theme is applied before first paint (the production CSP rules out an inline
+// script). Vite only bundles module scripts, so in builds this emits the file
+// as a content-hashed asset (nginx caches .js as immutable) and points the tag
+// at it. The dev server serves the source file directly.
+function themeInitScript(): Plugin {
+  return {
+    name: 'golive-theme-init',
+    apply: 'build',
+    buildStart() {
+      this.emitFile({
+        type: 'asset',
+        name: 'theme-init.js',
+        source: fs.readFileSync(path.resolve(__dirname, 'src/theme-init.js'), 'utf8'),
+      });
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const asset = Object.values(ctx.bundle ?? {}).find(
+          (output) =>
+            output.type === 'asset' &&
+            (output.names?.includes('theme-init.js') || output.name === 'theme-init.js'),
+        );
+        if (!asset) throw new Error('theme-init.js was not emitted');
+        return html.replace(`src="${THEME_INIT_SRC}"`, `src="/${asset.fileName}"`);
+      },
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), themeInitScript()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
