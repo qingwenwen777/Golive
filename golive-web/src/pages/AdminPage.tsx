@@ -112,6 +112,7 @@ import {
   type CoinAdjustAction,
 } from '@/api/admin';
 import { Avatar } from '@/components/Avatar';
+import { GiftArt } from '@/features/gifts/GiftArt';
 import { GoLiveLogo } from '@/components/Logo';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -3224,7 +3225,7 @@ function EconomyGiftsPanel() {
               <article className="gl-admin-gift-row" key={item.id}>
                 <div className="gl-admin-gift-main">
                   <span className="gl-admin-gift-icon" aria-hidden="true">
-                    <span>{item.icon}</span>
+                    <GiftArt gift={item} size={48} />
                   </span>
                   <div>
                     <strong>{item.name}</strong>

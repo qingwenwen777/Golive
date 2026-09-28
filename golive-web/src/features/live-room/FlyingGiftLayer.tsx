@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { GiftArt } from '@/features/gifts/GiftArt';
 import { useLiveRoomUiStore } from '@/features/live-room/useLiveRoomUiStore';
 
 export interface FlyingGift {
   id: string;
   icon: string;
+  giftId?: string;
   label: string;
 }
 
@@ -48,9 +50,7 @@ function FlyingGiftItem({ item, onDone }: { item: FlyingGift; onDone: () => void
       className="absolute bottom-6 right-6 flex flex-col items-center gap-1 text-center"
       style={{ animation: 'gl-gift-fly 3s cubic-bezier(0.2, 0.7, 0.3, 1) forwards' }}
     >
-      <span className="text-6xl drop-shadow-lg" aria-hidden>
-        {item.icon}
-      </span>
+      <GiftArt gift={{ id: item.giftId, icon: item.icon }} size={72} className="drop-shadow-lg" />
       <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
         {item.label}
       </span>

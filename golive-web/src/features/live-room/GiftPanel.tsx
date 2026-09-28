@@ -13,6 +13,7 @@ import {
 import { useMe } from '@/api/auth';
 import { useGifts, useSendGift, newRequestId } from '@/api/gift';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { GiftArt } from '@/features/gifts/GiftArt';
 import { cn } from '@/lib/cn';
 import { localizedGiftName } from '@/lib/gift';
 import { normalizeLevelInfo } from '@/lib/userLevel';
@@ -205,7 +206,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                       </span>
                     )}
                     <span className="gl-gift-icon" aria-hidden>
-                      {g.icon}
+                      <GiftArt gift={g} size={42} />
                     </span>
                     <span className="gl-gift-name">{giftName}</span>
                     <span className="gl-gift-price">
@@ -242,7 +243,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
             </div>
             <div className="gl-gift-sendrow">
               <span className="gl-gift-selected-icon" aria-hidden>
-                {selected.icon}
+                <GiftArt gift={selected} size={38} />
               </span>
               <div className="gl-gift-selected-copy">
                 <div className="gl-gift-selected-name">{selectedName}</div>

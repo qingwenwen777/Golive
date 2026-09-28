@@ -939,6 +939,7 @@ export default function LiveRoomPage() {
             pushFlyingGift({
               id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               icon: gift.icon,
+              giftId: gift.id,
               label: `${giftName} x${count}`,
             });
             appendMessage(roomId, {
@@ -950,6 +951,7 @@ export default function LiveRoomPage() {
               avatar: currentUser?.avatar,
               giftName,
               giftIcon: gift.icon,
+              giftId: gift.id,
               count,
               tier: gift.tier,
               userLevel: currentUser?.levelInfo?.level,
@@ -1111,6 +1113,7 @@ export default function LiveRoomPage() {
           pushFlyingGift({
             id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             icon: gift.icon,
+            giftId: gift.id,
             label: `${giftName} x${count}`,
           });
           appendMessage(roomId, {
@@ -1122,6 +1125,7 @@ export default function LiveRoomPage() {
             avatar: currentUser?.avatar,
             giftName,
             giftIcon: gift.icon,
+            giftId: gift.id,
             count,
             tier: gift.tier,
             userLevel: currentUser?.levelInfo?.level,

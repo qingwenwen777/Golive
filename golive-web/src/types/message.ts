@@ -52,6 +52,8 @@ export interface GiftMessage {
   avatar?: string;
   giftName: string;
   giftIcon?: string;
+  /** Set on gifts this viewer sent; server broadcasts carry only name and icon. */
+  giftId?: string;
   count?: number;
   tier?: 0 | 1 | 2 | 3;
   userLevel?: number;

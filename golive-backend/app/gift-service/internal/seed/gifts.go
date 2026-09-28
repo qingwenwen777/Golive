@@ -30,7 +30,7 @@ var defaults = []model.Gift{
 	{ID: "castle", Name: "Castle", NameJa: "Castle", Icon: "\U0001F3F0", PriceCoin: 10000, Category: "luxury", Animation: "rain", Tier: 3, UnlockLevel: 1},
 	{ID: "meteor", Name: "Meteor", NameJa: "Meteor", Icon: "\u2604\uFE0F", PriceCoin: 12000, Category: "luxury", Animation: "explode", Tier: 3, UnlockLevel: 24},
 	{ID: "galaxy_ship", Name: "Galaxy Ship", NameJa: "Galaxy Ship", Icon: "\U0001F6F8", PriceCoin: 50000, Category: "luxury", Animation: "fly", Tier: 3, UnlockLevel: 42},
-	{ID: "royal_crown", Name: "Royal Crown", NameJa: "Royal Crown", Icon: "\U0001F48D", PriceCoin: 120000, Category: "luxury", Animation: "explode", Tier: 3, UnlockLevel: 60},
+	{ID: "royal_crown", Name: "Royal Crown", NameJa: "Royal Crown", Icon: "\U0001F451", PriceCoin: 120000, Category: "luxury", Animation: "explode", Tier: 3, UnlockLevel: 60},
 	{ID: "nebula_ring", Name: "Nebula Ring", NameJa: "Nebula Ring", Icon: "\U0001FA90", PriceCoin: 520000, Category: "luxury", Animation: "rain", Tier: 3, UnlockLevel: 78},
 	{ID: "eternal_scepter", Name: "Eternal Scepter", NameJa: "Eternal Scepter", Icon: "\u2728", PriceCoin: 1314000, Category: "luxury", Animation: "explode", Tier: 3, UnlockLevel: 92},
 }

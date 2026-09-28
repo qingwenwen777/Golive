@@ -1727,18 +1727,10 @@
 }
 .gl-gift-notice-icon {
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-  background: #ffffff;
-  color: var(--gift-ink);
-  font-size: 22px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gift-accent) 22%, transparent);
-}
-.dark .gl-gift-notice-icon {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--gift-accent);
+  width: 36px;
+  height: 36px;
 }
 .gl-gift-notice-body {
   min-width: 0;

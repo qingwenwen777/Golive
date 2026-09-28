@@ -91,6 +91,7 @@ import {
   type AppointmentItem,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { GiftArt } from '@/features/gifts/GiftArt';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -4209,7 +4210,7 @@ function StudioInteractionRail({
           {visibleGifts.length > 0 ? (
             visibleGifts.map((item) => (
               <div className="gl-live-console-gift-row" key={item.key}>
-                <span>{item.icon || item.name}</span>
+                <GiftArt gift={{ name: item.name, icon: item.icon }} size={28} />
                 <div className="gl-live-console-gift-main">
                   <strong>{item.user}</strong>
                   <small>{item.name}</small>
