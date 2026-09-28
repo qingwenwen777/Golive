@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -392,9 +391,6 @@ func (s *SocialService) ListSubscriptions(ctx context.Context, uid string) (*Sub
 				item.Verified = room.Verified
 			}
 		}
-		if strings.TrimSpace(item.Avatar) == "" {
-			item.Avatar = generatedAvatar(item.Name)
-		}
 		if item.Stream == nil {
 			item.Stream = &model.Stream{
 				ID:              channelID,
@@ -467,9 +463,6 @@ func (s *SocialService) RecommendedCreators(ctx context.Context, uid string, lim
 			Following:       following,
 			Score:           recommendationScore(candidate, subscriberCount, following, now),
 		}
-		if item.Avatar == "" {
-			item.Avatar = generatedAvatar(name)
-		}
 		if candidate.LastLiveAt != nil && !candidate.LastLiveAt.IsZero() {
 			item.LastLiveAt = candidate.LastLiveAt.UTC().Format(time.RFC3339)
 		}
@@ -537,9 +530,6 @@ func (s *SocialService) SearchCreators(ctx context.Context, uid, query string, l
 			LastTitle:       strings.TrimSpace(row.LastTitle),
 			Following:       following,
 			Self:            self,
-		}
-		if item.Avatar == "" {
-			item.Avatar = generatedAvatar(name)
 		}
 		if row.LastLiveAt != nil && !row.LastLiveAt.IsZero() {
 			item.LastLiveAt = row.LastLiveAt.UTC().Format(time.RFC3339)
@@ -661,14 +651,6 @@ func ownerProfileName(profile repo.OwnerProfile) string {
 		return "Creator"
 	}
 	return "Creator " + id
-}
-
-func generatedAvatar(name string) string {
-	seed := strings.TrimSpace(name)
-	if seed == "" {
-		seed = "Creator"
-	}
-	return "https://api.dicebear.com/7.x/initials/svg?seed=" + url.QueryEscape(seed)
 }
 
 func fallbackStreamChannelName(room model.Room) string {

@@ -1,4 +1,9 @@
-export async function copyText(value: string, label = 'value'): Promise<'clipboard' | 'fallback' | 'manual'> {
+// promptTitle is shown (already translated) when the browser can't copy and
+// the text has to be copied by hand.
+export async function copyText(
+  value: string,
+  promptTitle = '',
+): Promise<'clipboard' | 'fallback' | 'manual'> {
   const text = String(value ?? '');
   if (!text) throw new Error('empty-copy-value');
 
@@ -15,7 +20,7 @@ export async function copyText(value: string, label = 'value'): Promise<'clipboa
     return 'fallback';
   }
 
-  window.prompt(`Copy ${label}`, text);
+  window.prompt(promptTitle, text);
   return 'manual';
 }
 

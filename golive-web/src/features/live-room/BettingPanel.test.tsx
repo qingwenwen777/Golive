@@ -108,7 +108,7 @@ describe('BettingPanel', () => {
 
     render(<BettingPanel roomId="room-1" ownsStream={false} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Can win/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Will win/ }));
 
     expect(authMock.openLogin).toHaveBeenCalledTimes(1);
     expect(betApiMock.placeMutate).not.toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('BettingPanel', () => {
 
     render(<BettingPanel roomId="room-1" ownsStream={false} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Can win/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Will win/ }));
 
     expect(toastMock.error).toHaveBeenCalledWith('Insufficient coin balance.');
     expect(betApiMock.placeMutate).not.toHaveBeenCalled();
@@ -132,10 +132,10 @@ describe('BettingPanel', () => {
 
     render(<BettingPanel roomId="room-1" ownsStream />);
 
-    const settle = screen.getByRole('button', { name: 'Can win' }) as HTMLButtonElement;
+    const settle = screen.getByRole('button', { name: 'Will win' }) as HTMLButtonElement;
     expect(settle.disabled).toBe(true);
     expect(settle.title).toBe('You can settle once betting closes.');
-    for (const button of screen.getAllByRole('button', { name: /Can win/ })) {
+    for (const button of screen.getAllByRole('button', { name: /Will win/ })) {
       expect((button as HTMLButtonElement).disabled).toBe(true);
     }
     fireEvent.click(settle);
@@ -150,7 +150,7 @@ describe('BettingPanel', () => {
 
     render(<BettingPanel roomId="room-1" ownsStream />);
 
-    const settle = screen.getByRole('button', { name: 'Can win' }) as HTMLButtonElement;
+    const settle = screen.getByRole('button', { name: 'Will win' }) as HTMLButtonElement;
     expect(settle.disabled).toBe(false);
     fireEvent.click(settle);
     expect(betApiMock.settleMutate).toHaveBeenCalledWith(

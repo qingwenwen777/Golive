@@ -18,7 +18,6 @@ import {
   Smile,
   CircleDollarSign,
   Send,
-  Gift,
   MessageCircle,
   Users,
   Crown,
@@ -28,6 +27,8 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
+import { GiftArt } from '@/features/gifts/GiftArt';
+import { builtInGiftKey, GIFT_ART } from '@/features/gifts/giftArt';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { tierSpec } from '@/constants/chat';
 import type {
@@ -179,27 +180,6 @@ function comparePinnedSuperChats(
   const amountDelta = parseAmountValue(b.message.amount) - parseAmountValue(a.message.amount);
   if (amountDelta !== 0) return amountDelta;
   return b.message.ts - a.message.ts;
-}
-
-const GIFT_META: Record<string, { icon: string; tier: 0 | 1 | 2 | 3 }> = {
-  flower: { icon: '\u{1f33c}', tier: 0 },
-  donut: { icon: '\u{1f369}', tier: 0 },
-  cake: { icon: '\u{1f370}', tier: 0 },
-  ramen: { icon: '\u{1f35c}', tier: 0 },
-  rocket: { icon: '\u{1f680}', tier: 1 },
-  fan_light: { icon: '\u{1f4a1}', tier: 2 },
-  crown: { icon: '\u{1f451}', tier: 2 },
-  gem: { icon: '\u{1f48e}', tier: 2 },
-  yacht: { icon: '\u{1f6e5}\ufe0f', tier: 3 },
-  castle: { icon: '\u{1f3f0}', tier: 3 },
-};
-
-function giftMeta(name: string): { icon?: string; tier: 0 | 1 | 2 | 3 } {
-  const fallback = GIFT_META[name.trim().toLowerCase().replace(/\s+/g, '_')];
-  return {
-    icon: fallback?.icon,
-    tier: fallback?.tier ?? 0,
-  };
 }
 
 function charCount(s: string): number {
@@ -523,15 +503,13 @@ const SystemNotice = memo(function SystemNotice({ m }: { m: SystemMessage }) {
 const GiftNotice = memo(function GiftNotice({ m }: { m: GiftMessage }) {
   const { t } = useTranslation('pages');
   const count = m.count ?? 1;
-  const meta = giftMeta(m.giftName);
-  // Treat empty string as missing so server broadcasts that omit the icon
-  // (or send "") still render the same colored card sender sees locally.
-  const icon = m.giftIcon && m.giftIcon.length > 0 ? m.giftIcon : meta.icon;
-  const tier = (m.tier ?? meta.tier) as 0 | 1 | 2 | 3;
+  const gift = { id: m.giftId, name: m.giftName, icon: m.giftIcon };
+  const builtIn = builtInGiftKey(gift);
+  const tier = m.tier ?? (builtIn ? GIFT_ART[builtIn].tier : 0);
   return (
     <div className={cn('gl-gift-notice', `tier-${tier}`)}>
       <div className="gl-gift-notice-icon" aria-hidden="true">
-        {icon ? <span>{icon}</span> : <Gift size={18} />}
+        <GiftArt gift={gift} size={36} />
       </div>
       <div className="gl-gift-notice-body">
         <div className="gl-gift-notice-title">

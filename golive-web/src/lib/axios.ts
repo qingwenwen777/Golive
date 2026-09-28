@@ -9,6 +9,17 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   _csrfRetry?: boolean;
 }
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /**
+     * For a request a signed-out visitor makes on purpose: a 401 is an
+     * answer, not an expired session to refresh (or a reason to show the
+     * sign-in dialog).
+     */
+    skipAuthRefresh?: boolean;
+  }
+}
+
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE,
   timeout: 10_000,
@@ -70,7 +81,13 @@ http.interceptors.response.use(
       return http.request(config as AxiosRequestConfig);
     }
 
-    if (status === 401 && config && !config._retry && !isAuthEndpoint(config.url)) {
+    if (
+      status === 401 &&
+      config &&
+      !config._retry &&
+      !config.skipAuthRefresh &&
+      !isAuthEndpoint(config.url)
+    ) {
       try {
         const newToken = await doRefresh();
         config._retry = true;

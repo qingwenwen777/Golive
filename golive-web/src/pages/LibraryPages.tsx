@@ -444,7 +444,7 @@ export function YouPage() {
                 <span>
                   {t('library.you.levelProgress.title', {
                     level: levelInfo.level,
-                    defaultValue: 'Lv.{{level}} identity',
+                    defaultValue: 'Your level: Lv.{{level}}',
                   })}
                 </span>
                 <strong>
@@ -464,13 +464,13 @@ export function YouPage() {
                 <span>
                   {t('library.you.levelProgress.charged', {
                     coins: levelInfo.totalTopupCoins.toLocaleString(locale),
-                    defaultValue: '{{coins}} charged',
+                    defaultValue: 'Topped up: {{coins}}',
                   })}
                 </span>
                 <span>
                   {t('library.you.levelProgress.target', {
                     coins: levelInfo.nextLevelTargetCoins.toLocaleString(locale),
-                    defaultValue: '{{coins}} target',
+                    defaultValue: 'Goal: {{coins}}',
                   })}
                 </span>
               </div>
@@ -927,7 +927,7 @@ export function SettingsPage() {
     if (!currentUser?.email) {
       toast.error(
         t('library.settings.errors.boundEmailMissing', {
-          defaultValue: 'No current email is bound to this account.',
+          defaultValue: 'No email is linked to this account.',
         }),
       );
       return;
@@ -970,7 +970,7 @@ export function SettingsPage() {
           setEmailEditing(false);
           toast.success(
             t('library.settings.security.emailUpdated', {
-              defaultValue: 'Email binding updated.',
+              defaultValue: 'Email updated.',
             }),
           );
         },
@@ -1485,7 +1485,7 @@ function SecuritySettings({
             <Mail size={18} />
           </span>
           <div>
-            <h2>{t('library.settings.security.emailTitle', { defaultValue: 'Email binding' })}</h2>
+            <h2>{t('library.settings.security.emailTitle', { defaultValue: 'Email' })}</h2>
             <p>
               {t('library.settings.security.emailSub', {
                 defaultValue:
@@ -1501,7 +1501,7 @@ function SecuritySettings({
             <span className="gl-settings-email-value">
               {boundEmail ||
                 t('library.settings.security.emailEmpty', {
-                  defaultValue: 'No email is bound to this account.',
+                  defaultValue: 'No email is linked to this account.',
                 })}
             </span>
             <button className="gl-settings-button is-compact" type="button" onClick={onEmailEdit}>
@@ -1825,7 +1825,7 @@ function settingsErrorMessage(
     }
     if (data?.reason === 'email_taken') {
       return t('library.settings.errors.emailTaken', {
-        defaultValue: 'This email is already bound to another account.',
+        defaultValue: 'This email is already linked to another account.',
       });
     }
     if (data?.reason === 'invalid_email') {
@@ -1870,7 +1870,7 @@ function settingsErrorMessage(
     }
     if (data?.reason === 'google_not_configured') {
       return t('library.settings.errors.googleNotConfigured', {
-        defaultValue: 'Google sign-in is not configured yet.',
+        defaultValue: "Google sign-in isn't available right now.",
       });
     }
     if (data?.reason === 'google_not_linked') {
@@ -2213,7 +2213,7 @@ function AppointmentPager({
   return (
     <div
       className="gl-history-pager"
-      aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}
+      aria-label={t('appointments.pagination', { defaultValue: 'Scheduled stream pages' })}
     >
       <div className="gl-history-pager-count">
         {t('appointments.pageCount', {

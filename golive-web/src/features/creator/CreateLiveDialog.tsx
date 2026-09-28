@@ -271,7 +271,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
               <span>
                 <strong>
                   {t('createLive.fields.fanClubOnly', {
-                    defaultValue: 'Fan club exclusive live',
+                    defaultValue: 'Fan club members only',
                   })}
                 </strong>
                 <small>

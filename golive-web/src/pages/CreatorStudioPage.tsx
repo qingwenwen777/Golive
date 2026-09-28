@@ -91,6 +91,7 @@ import {
   type AppointmentItem,
 } from '@/api/room';
 import { Avatar } from '@/components/Avatar';
+import { GiftArt } from '@/features/gifts/GiftArt';
 import { AppointmentCard } from '@/components/AppointmentCard';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -318,7 +319,7 @@ export function CreatorStudioOverviewPage() {
             <div>
               <span>{t('studio.overview.quickTitle', { defaultValue: 'Quick actions' })}</span>
               <h2>
-                {t('studio.overview.quickHeading', { defaultValue: 'Prepare your next live' })}
+                {t('studio.overview.quickHeading', { defaultValue: 'Prepare your next stream' })}
               </h2>
             </div>
             <ListChecks size={22} />
@@ -336,7 +337,7 @@ export function CreatorStudioOverviewPage() {
               icon={<BarChart3 size={18} />}
               title={t('studio.actions.analytics', { defaultValue: 'Review analytics' })}
               body={t('studio.actions.analyticsSub', {
-                defaultValue: 'Revenue, viewers, and finished live reports.',
+                defaultValue: 'Revenue, viewers, and reports on past streams.',
               })}
               onClick={() => navigate(`/studio/analytics/${encodeURIComponent(channelKey)}`)}
             />
@@ -352,12 +353,12 @@ export function CreatorStudioOverviewPage() {
               icon={platformApproved ? <CheckCircle2 size={18} /> : <ShieldCheck size={18} />}
               title={
                 !liveApproved
-                  ? t('studio.actions.platformLocked', { defaultValue: 'Join the platform' })
+                  ? t('studio.actions.platformLocked', { defaultValue: 'Get certified' })
                   : platformApproved
                     ? t('studio.actions.platformApproved', { defaultValue: 'Platform certified' })
                     : platformPending
                       ? t('studio.actions.platformPending', { defaultValue: 'Application pending' })
-                      : t('studio.actions.platform', { defaultValue: 'Join the platform' })
+                      : t('studio.actions.platform', { defaultValue: 'Get certified' })
               }
               body={
                 !liveApproved
@@ -421,9 +422,9 @@ export function CreatorStudioOverviewPage() {
         <div className="gl-creator-panel">
           <div className="gl-creator-panel-head">
             <div>
-              <span>{t('studio.overview.recentTitle', { defaultValue: 'Latest result' })}</span>
+              <span>{t('studio.overview.recentTitle', { defaultValue: 'Latest stream' })}</span>
               <h2>
-                {latest?.title ?? t('studio.overview.noRecent', { defaultValue: 'No stream yet' })}
+                {latest?.title ?? t('studio.overview.noRecent', { defaultValue: 'No streams yet' })}
               </h2>
             </div>
             <Trophy size={22} />
@@ -451,7 +452,7 @@ export function CreatorStudioOverviewPage() {
           ) : (
             <div className="gl-creator-empty-soft">
               {t('studio.overview.emptyRecent', {
-                defaultValue: 'Start a live and the recap will appear here.',
+                defaultValue: 'Go live and your stream recap will appear here.',
               })}
             </div>
           )}
@@ -517,7 +518,7 @@ export function CreatorPreparePage() {
     setCoverPreview(lastLive.cover || '');
     toast.success(
       t('studio.prepare.reuseLastDone', {
-        defaultValue: 'Reused the previous live info.',
+        defaultValue: 'Copied details from your last stream.',
       }),
     );
   };
@@ -527,7 +528,8 @@ export function CreatorPreparePage() {
     if (dueAppointment) {
       toast.info(
         t('studio.prepare.appointmentRequired', {
-          defaultValue: 'A scheduled appointment is ready. Please start from Live appointments.',
+          defaultValue:
+            'One of your scheduled streams is ready to start. Go live from Scheduled streams.',
         }),
       );
       navigate('/studio/appointments');
@@ -552,7 +554,7 @@ export function CreatorPreparePage() {
             savePublisherSession(stream);
             toast.success(
               t('studio.prepare.created', {
-                defaultValue: 'Live room created. Open OBS and begin publishing.',
+                defaultValue: 'Stream created. Open OBS and start streaming.',
               }),
             );
             navigate(`/studio/live/${encodeURIComponent(stream.id)}`);
@@ -573,7 +575,7 @@ export function CreatorPreparePage() {
           active={step === 1}
           done={done1}
           locked={false}
-          title={t('studio.prepare.steps.info', { defaultValue: 'Fill live info' })}
+          title={t('studio.prepare.steps.info', { defaultValue: 'Add stream details' })}
           actionLabel={
             done1 ? undefined : t('studio.prepare.startWriting', { defaultValue: '开始填写' })
           }
@@ -588,10 +590,10 @@ export function CreatorPreparePage() {
             >
               <History size={16} />
               {lastLive
-                ? t('studio.prepare.reuseLast', { defaultValue: 'Reuse last live info' })
+                ? t('studio.prepare.reuseLast', { defaultValue: "Reuse last stream's details" })
                 : analytics.isPending
-                  ? t('studio.prepare.loadingLast', { defaultValue: 'Loading last live...' })
-                  : t('studio.prepare.noLastLive', { defaultValue: 'No previous live yet' })}
+                  ? t('studio.prepare.loadingLast', { defaultValue: 'Loading your last stream...' })
+                  : t('studio.prepare.noLastLive', { defaultValue: 'No previous streams yet' })}
             </button>
             {lastLive && (
               <span>
@@ -617,7 +619,7 @@ export function CreatorPreparePage() {
               rows={4}
               maxLength={2000}
               placeholder={t('studio.prepare.descriptionPlaceholder', {
-                defaultValue: 'Tell viewers what this live is about.',
+                defaultValue: 'Tell viewers what this stream is about.',
               })}
               onChange={(event) => setDescription(event.target.value)}
             />
@@ -665,7 +667,7 @@ export function CreatorPreparePage() {
           done={done3}
           locked={!done2}
           title={t('studio.prepare.steps.check', {
-            defaultValue: 'Check publishing and permission',
+            defaultValue: 'Check OBS connection and access',
           })}
           onOpen={() => done2 && setStep(3)}
         >
@@ -673,7 +675,7 @@ export function CreatorPreparePage() {
             <CheckRow
               ok={user?.livePermissionStatus === 'approved'}
               label={t('studio.prepare.permissionApproved', {
-                defaultValue: 'Creator permission approved',
+                defaultValue: 'Live access approved',
               })}
             />
             <CheckRow
@@ -705,12 +707,12 @@ export function CreatorPreparePage() {
           active={step === 4}
           done={false}
           locked={!done3}
-          title={t('studio.prepare.steps.confirm', { defaultValue: 'Confirm and start live' })}
+          title={t('studio.prepare.steps.confirm', { defaultValue: 'Confirm and go live' })}
           onOpen={() => done3 && setStep(4)}
         >
           <div className="gl-creator-confirm">
             <strong>
-              {t('studio.prepare.readyTitle', { defaultValue: 'Ready to create the live room' })}
+              {t('studio.prepare.readyTitle', { defaultValue: 'Ready to set up your stream' })}
             </strong>
             <span>
               {t('studio.prepare.readyBody', {
@@ -723,7 +725,7 @@ export function CreatorPreparePage() {
             <div className="gl-creator-confirm">
               <strong>
                 {t('studio.prepare.appointmentRequiredTitle', {
-                  defaultValue: 'Start from your appointment',
+                  defaultValue: 'Start your scheduled stream',
                 })}
               </strong>
               <span>{dueAppointment.title}</span>
@@ -738,7 +740,7 @@ export function CreatorPreparePage() {
             <Radio size={17} />
             {starting
               ? t('createLive.starting')
-              : t('studio.prepare.startLive', { defaultValue: 'Start live' })}
+              : t('studio.prepare.startLive', { defaultValue: 'Go live' })}
           </button>
         </StepCard>
       </section>
@@ -790,7 +792,7 @@ export function CreatorLiveReplaysPage() {
         <div className="gl-creator-panel-head">
           <div>
             <span>{t('studio.replay.label', { defaultValue: 'Live replay' })}</span>
-            <h2>{t('studio.replay.title', { defaultValue: 'Manage completed live replays' })}</h2>
+            <h2>{t('studio.replay.title', { defaultValue: 'Manage replays of past streams' })}</h2>
           </div>
           <PlayCircle size={22} />
         </div>
@@ -1002,7 +1004,7 @@ function replayVisibilityOptions(t: TFunction): Array<{
     },
     {
       value: 'followers',
-      label: t('studio.replay.visibility.followersShort', { defaultValue: 'Followers' }),
+      label: t('studio.replay.visibility.followersShort', { defaultValue: 'Subscribers' }),
       Icon: Users,
     },
     {
@@ -1176,11 +1178,13 @@ export function CreatorAppointmentsPage() {
       };
       if (!editing) {
         await createAppointment.mutateAsync(payload);
-        toast.success(t('studio.appointments.created', { defaultValue: 'Appointment published.' }));
+        toast.success(t('studio.appointments.created', { defaultValue: 'Stream scheduled.' }));
         setAppointmentPage(1);
       } else {
         await updateAppointment.mutateAsync(payload);
-        toast.success(t('studio.appointments.updated', { defaultValue: 'Appointment updated.' }));
+        toast.success(
+          t('studio.appointments.updated', { defaultValue: 'Scheduled stream updated.' }),
+        );
       }
       setAppointmentDialogOpen(false);
       clearDraft();
@@ -1191,7 +1195,7 @@ export function CreatorAppointmentsPage() {
         err instanceof Error
           ? err.message
           : t('studio.appointments.saveFailed', {
-              defaultValue: 'Could not save the appointment.',
+              defaultValue: 'Could not save the scheduled stream.',
             }),
       );
     }
@@ -1224,9 +1228,9 @@ export function CreatorAppointmentsPage() {
       <section className="gl-creator-kpis">
         <StudioKpi
           icon={<CalendarClock size={18} />}
-          label={t('studio.appointments.total', { defaultValue: 'Appointments' })}
+          label={t('studio.appointments.total', { defaultValue: 'Scheduled streams' })}
           value={String(total)}
-          sub={t('studio.appointments.totalSub', { defaultValue: 'all records' })}
+          sub={t('studio.appointments.totalSub', { defaultValue: 'all time' })}
         />
         <StudioKpi
           icon={<Clock3 size={18} />}
@@ -1255,7 +1259,7 @@ export function CreatorAppointmentsPage() {
           onClick={openCreateDialog}
         >
           <Plus size={16} />
-          {t('studio.appointments.createTitle', { defaultValue: 'Create appointment' })}
+          {t('studio.appointments.createTitle', { defaultValue: 'Schedule a stream' })}
         </button>
       </div>
 
@@ -1263,9 +1267,11 @@ export function CreatorAppointmentsPage() {
         <div className="gl-creator-panel gl-appointments-list-panel">
           <div className="gl-creator-panel-head">
             <div>
-              <span>{t('studio.appointments.listLabel', { defaultValue: 'My appointments' })}</span>
+              <span>
+                {t('studio.appointments.listLabel', { defaultValue: 'Your scheduled streams' })}
+              </span>
               <h2>
-                {t('studio.appointments.listTitle', { defaultValue: 'All appointment states' })}
+                {t('studio.appointments.listTitle', { defaultValue: 'All scheduled streams' })}
               </h2>
             </div>
             <Bell size={22} />
@@ -1278,7 +1284,7 @@ export function CreatorAppointmentsPage() {
                 </div>
               ) : items.length === 0 ? (
                 <div className="gl-creator-empty-soft">
-                  {t('studio.appointments.empty', { defaultValue: 'No appointments yet.' })}
+                  {t('studio.appointments.empty', { defaultValue: 'No scheduled streams yet.' })}
                 </div>
               ) : (
                 items.map((item) => (
@@ -1313,14 +1319,16 @@ export function CreatorAppointmentsPage() {
             <div className="gl-creator-panel-head">
               <div>
                 <span>
-                  {t('studio.appointments.formLabel', { defaultValue: 'Live appointments' })}
+                  {t('studio.appointments.formLabel', { defaultValue: 'Scheduled streams' })}
                 </span>
                 <DialogTitle asChild>
                   <h2>
                     {editing
-                      ? t('studio.appointments.editTitle', { defaultValue: 'Edit appointment' })
+                      ? t('studio.appointments.editTitle', {
+                          defaultValue: 'Edit scheduled stream',
+                        })
                       : t('studio.appointments.createTitle', {
-                          defaultValue: 'Create appointment',
+                          defaultValue: 'Schedule a stream',
                         })}
                   </h2>
                 </DialogTitle>
@@ -1359,7 +1367,7 @@ export function CreatorAppointmentsPage() {
                     rows={4}
                     maxLength={2000}
                     placeholder={t('studio.appointments.descriptionPlaceholder', {
-                      defaultValue: 'Tell viewers what this appointment is about.',
+                      defaultValue: 'Tell viewers what this stream is about.',
                     })}
                     onChange={(event) => setDescription(event.target.value)}
                   />
@@ -1368,7 +1376,7 @@ export function CreatorAppointmentsPage() {
                   checked={fanClubOnly}
                   onChange={setFanClubOnly}
                   title={t('studio.appointments.fanClubOnly', {
-                    defaultValue: 'Fan club exclusive appointment',
+                    defaultValue: 'Fan club members only',
                   })}
                   description={t('studio.appointments.fanClubOnlySub', {
                     defaultValue:
@@ -1411,7 +1419,7 @@ export function CreatorAppointmentsPage() {
                 <Save size={16} />
                 {editing
                   ? t('studio.appointments.saveEdit', { defaultValue: 'Save changes' })
-                  : t('studio.appointments.publish', { defaultValue: 'Publish appointment' })}
+                  : t('studio.appointments.publish', { defaultValue: 'Schedule stream' })}
               </button>
             </div>
           </div>
@@ -2244,7 +2252,7 @@ function FanGroupPanel({
                 <small>
                   {member.rejoinRequestedAt
                     ? formatFanGroupDate(member.rejoinRequestedAt, locale)
-                    : t('studio.fanGroups.waitingApproval', { defaultValue: 'Waiting approval' })}
+                    : t('studio.fanGroups.waitingApproval', { defaultValue: 'Awaiting approval' })}
                 </small>
               </span>
               <button
@@ -2479,7 +2487,7 @@ function AppointmentStudioRow({
           onSuccess: (stream) => {
             savePublisherSession(stream);
             toast.success(
-              t('studio.appointments.started', { defaultValue: 'Appointment live started.' }),
+              t('studio.appointments.started', { defaultValue: 'Scheduled stream started.' }),
             );
             navigate(`/studio/live/${encodeURIComponent(stream.id)}`);
           },
@@ -2487,7 +2495,7 @@ function AppointmentStudioRow({
             toast.error(
               err.message ||
                 t('studio.appointments.startFailed', {
-                  defaultValue: 'Could not start the appointment.',
+                  defaultValue: 'Could not start the scheduled stream.',
                 }),
             ),
         });
@@ -2496,7 +2504,7 @@ function AppointmentStudioRow({
         if (!mutable) {
           toast.info(
             t('studio.appointments.locked', {
-              defaultValue: 'This appointment can no longer be edited.',
+              defaultValue: 'This scheduled stream can no longer be edited.',
             }),
           );
           return;
@@ -2507,7 +2515,7 @@ function AppointmentStudioRow({
         if (!mutable) {
           toast.info(
             t('studio.appointments.locked', {
-              defaultValue: 'This appointment can no longer be edited.',
+              defaultValue: 'This scheduled stream can no longer be edited.',
             }),
           );
           return;
@@ -2515,7 +2523,7 @@ function AppointmentStudioRow({
         cancelAppointment.mutate(undefined, {
           onSuccess: () => {
             toast.success(
-              t('studio.appointments.canceled', { defaultValue: 'Appointment canceled.' }),
+              t('studio.appointments.canceled', { defaultValue: 'Scheduled stream canceled.' }),
             );
             onUpdated();
           },
@@ -2523,7 +2531,7 @@ function AppointmentStudioRow({
             toast.error(
               err.message ||
                 t('studio.appointments.deleteFailed', {
-                  defaultValue: 'Could not delete the appointment.',
+                  defaultValue: 'Could not delete the scheduled stream.',
                 }),
             ),
         });
@@ -2761,7 +2769,7 @@ function StudioAppointmentPager({
   return (
     <div
       className="gl-history-pager gl-appointment-pager"
-      aria-label={t('appointments.pagination', { defaultValue: 'Appointment pagination' })}
+      aria-label={t('appointments.pagination', { defaultValue: 'Scheduled stream pages' })}
     >
       <div className="gl-history-pager-count">
         {t('appointments.pageCount', {
@@ -2815,7 +2823,7 @@ function StudioPostPager({
   return (
     <div
       className="gl-history-pager gl-appointment-pager"
-      aria-label={t('posts.editor.pagination', { defaultValue: 'Post pagination' })}
+      aria-label={t('posts.editor.pagination', { defaultValue: 'Post pages' })}
     >
       <div className="gl-history-pager-count">
         {t('posts.editor.pageCount', {
@@ -3001,9 +3009,9 @@ export function CreatorLiveConsolePage() {
     return (
       <StudioAccessPage
         icon={<Radio size={24} />}
-        title={t('studio.console.notFound', { defaultValue: 'Live room unavailable' })}
+        title={t('studio.console.notFound', { defaultValue: 'Stream unavailable' })}
         body={t('studio.console.notFoundBody', {
-          defaultValue: 'The live room could not be loaded.',
+          defaultValue: 'This stream could not be loaded.',
         })}
         actionLabel={t('notFound.back')}
         onAction={() => navigate('/studio/overview')}
@@ -3015,9 +3023,9 @@ export function CreatorLiveConsolePage() {
     return (
       <StudioAccessPage
         icon={<ShieldCheck size={24} />}
-        title={t('studio.console.ownerOnly', { defaultValue: 'Owner console only' })}
+        title={t('studio.console.ownerOnly', { defaultValue: 'Creator access only' })}
         body={t('studio.console.ownerOnlyBody', {
-          defaultValue: 'Only the channel owner can control this live.',
+          defaultValue: 'Only the channel owner can control this stream.',
         })}
         actionLabel={t('notFound.back')}
         onAction={() => navigate('/studio/overview')}
@@ -3029,7 +3037,7 @@ export function CreatorLiveConsolePage() {
     return (
       <StudioAccessPage
         icon={<Square size={24} />}
-        title={t('studio.console.ended', { defaultValue: 'Live ended.' })}
+        title={t('studio.console.ended', { defaultValue: 'Stream ended.' })}
         body={t('studio.console.endFinished', {
           defaultValue:
             'This live has already finished. Open the studio overview to start a new one.',
@@ -3044,11 +3052,11 @@ export function CreatorLiveConsolePage() {
     stopLive.mutate(undefined, {
       onSuccess: () => {
         clearPublisherSession();
-        toast.success(t('studio.console.ended', { defaultValue: 'Live ended.' }));
+        toast.success(t('studio.console.ended', { defaultValue: 'Stream ended.' }));
         navigate('/studio/overview');
       },
       onError: () =>
-        toast.error(t('studio.console.endFailed', { defaultValue: 'Could not end the live.' })),
+        toast.error(t('studio.console.endFailed', { defaultValue: 'Could not end the stream.' })),
     });
   };
   const submitMute = (durationMinutes: MuteUserPayload['durationMinutes']) => {
@@ -3114,7 +3122,7 @@ export function CreatorLiveConsolePage() {
             value={elapsed}
           />
           <StatusMetric
-            label={t('studio.console.online', { defaultValue: 'Online' })}
+            label={t('studio.console.online', { defaultValue: 'Viewers' })}
             value={formatNumber(viewerCount)}
           />
         </div>
@@ -3127,7 +3135,7 @@ export function CreatorLiveConsolePage() {
           <Square size={15} />
           {stopLive.isPending
             ? t('studio.console.ending', { defaultValue: 'Ending...' })
-            : t('studio.console.endLive', { defaultValue: 'End live' })}
+            : t('studio.console.endLive', { defaultValue: 'End stream' })}
         </button>
       </header>
 
@@ -3165,8 +3173,8 @@ export function CreatorLiveConsolePage() {
           <section className="gl-creator-panel gl-live-console-activity">
             <div className="gl-creator-panel-head">
               <div>
-                <span>{t('studio.console.activity', { defaultValue: 'Interaction' })}</span>
-                <h2>{t('studio.console.bettingTitle', { defaultValue: 'Betting module' })}</h2>
+                <span>{t('studio.console.activity', { defaultValue: 'Engagement' })}</span>
+                <h2>{t('studio.console.bettingTitle', { defaultValue: 'Betting' })}</h2>
               </div>
               <Trophy size={22} />
             </div>
@@ -3175,8 +3183,8 @@ export function CreatorLiveConsolePage() {
           <section className="gl-creator-panel gl-live-console-activity">
             <div className="gl-creator-panel-head">
               <div>
-                <span>{t('studio.console.activity', { defaultValue: 'Interaction' })}</span>
-                <h2>{t('studio.console.luckyBagTitle', { defaultValue: 'Lucky bag module' })}</h2>
+                <span>{t('studio.console.activity', { defaultValue: 'Engagement' })}</span>
+                <h2>{t('studio.console.luckyBagTitle', { defaultValue: 'Lucky bags' })}</h2>
               </div>
               <Gift size={22} />
             </div>
@@ -3185,7 +3193,7 @@ export function CreatorLiveConsolePage() {
           <section className="gl-creator-panel gl-live-console-activity">
             <div className="gl-creator-panel-head">
               <div>
-                <span>{t('studio.console.activity', { defaultValue: 'Interaction' })}</span>
+                <span>{t('studio.console.activity', { defaultValue: 'Engagement' })}</span>
                 <h2>{t('micLink.title')}</h2>
               </div>
               <Mic size={22} />
@@ -3210,7 +3218,7 @@ export function CreatorLiveConsolePage() {
             realtime.readyState === 'reconnecting'
               ? t('studio.console.reconnecting', {
                   count: realtime.retryCount,
-                  defaultValue: 'Reconnecting #{{count}}',
+                  defaultValue: 'Reconnecting (attempt {{count}})',
                 })
               : t('studio.console.disconnected', { defaultValue: 'Disconnected' })
           }
@@ -3240,7 +3248,7 @@ function StudioHeader({ user }: { user?: User | null }) {
       <div>
         <span>{t('studio.brand', { defaultValue: 'Creator Studio' })}</span>
         <h1>
-          {t('studio.title', { name: userDisplayName(user), defaultValue: '{{name}} workspace' })}
+          {t('studio.title', { name: userDisplayName(user), defaultValue: "{{name}}'s workspace" })}
         </h1>
       </div>
     </header>
@@ -3262,7 +3270,7 @@ function StudioTabs() {
       </NavLink>
       <NavLink to="/studio/posts">{t('studio.tabs.posts', { defaultValue: '帖子动态' })}</NavLink>
       <NavLink to="/studio/appointments">
-        {t('studio.tabs.appointments', { defaultValue: 'Live appointments' })}
+        {t('studio.tabs.appointments', { defaultValue: 'Scheduled streams' })}
       </NavLink>
       <NavLink to="/studio/moderators">
         {t('studio.tabs.moderators', { defaultValue: '房间房管' })}
@@ -3271,7 +3279,7 @@ function StudioTabs() {
         {t('studio.tabs.fanGroups', { defaultValue: '群聊管理' })}
       </NavLink>
       <NavLink to="/studio/replay">
-        {t('studio.tabs.replay', { defaultValue: 'Data replay' })}
+        {t('studio.tabs.replay', { defaultValue: 'Analytics' })}
       </NavLink>
       <NavLink to="/studio/live-replays">
         {t('studio.tabs.liveReplays', { defaultValue: 'Live replays' })}
@@ -3348,7 +3356,7 @@ function StudioPermissionPage({
               defaultValue: 'Rejected reason: {{reason}}',
             })
           : t('studio.permission.progress', {
-              defaultValue: 'Progress: submitted -> manual review -> result.',
+              defaultValue: 'Progress: Submitted → Manual review → Decision',
             }),
       ]}
     >
@@ -3365,7 +3373,8 @@ function StudioPermissionPage({
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}
             placeholder={t('studio.permission.reasonPlaceholder', {
-              defaultValue: 'Tell admins your live content plan, schedule, and channel readiness.',
+              defaultValue:
+                'Tell admins what you plan to stream, how often, and how your channel is set up.',
             })}
           />
         </label>
@@ -3404,7 +3413,8 @@ function JoinPlatformDialog({
       defaultValue: 'Withdrawal fees are reduced by 10 percentage points, from 35% to 25%.',
     }),
     t('studio.platform.benefits.protection', {
-      defaultValue: 'Certified creators receive stronger platform protection and recommendation.',
+      defaultValue:
+        'Certified creators get stronger platform protection and are recommended more often.',
     }),
   ];
 
@@ -3412,7 +3422,7 @@ function JoinPlatformDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gl-platform-join-dialog">
         <DialogTitle>
-          {t('studio.platform.title', { defaultValue: 'Join the GoLive platform' })}
+          {t('studio.platform.title', { defaultValue: 'Become a certified creator' })}
         </DialogTitle>
         <DialogDescription>
           {t('studio.platform.description', {
@@ -3687,7 +3697,7 @@ function FanClubOnlyToggle({
 }) {
   const { t } = useTranslation('pages');
   const resolvedTitle =
-    title ?? t('studio.prepare.fanClubOnly', { defaultValue: 'Fan club exclusive live' });
+    title ?? t('studio.prepare.fanClubOnly', { defaultValue: 'Fan club members only' });
   const resolvedDescription =
     description ??
     t('studio.prepare.fanClubOnlySub', {
@@ -3762,12 +3772,11 @@ function PublisherPreview({ rtmpServer }: { rtmpServer: string }) {
       <PublisherLine
         label={t('studio.publisher.server', { defaultValue: 'OBS server' })}
         value={rtmpServer}
-        copyLabel="OBS server"
       />
       <div className="gl-creator-key-placeholder">
         <span>{t('studio.publisher.key', { defaultValue: 'Stream key' })}</span>
         <strong>
-          {t('studio.publisher.keyAfterStart', { defaultValue: 'Issued after confirmation' })}
+          {t('studio.publisher.keyAfterStart', { defaultValue: 'Available after you confirm' })}
         </strong>
       </div>
     </div>
@@ -3791,7 +3800,7 @@ function ConsolePublisherPanel({
     <section className="gl-creator-publisher-console">
       <div className="gl-creator-panel-head">
         <div>
-          <span>{t('studio.publisher.title', { defaultValue: 'Publishing' })}</span>
+          <span>{t('studio.publisher.title', { defaultValue: 'Stream connection' })}</span>
           <h2>
             {live
               ? t('studio.publisher.connected', { defaultValue: 'OBS connected' })
@@ -3811,19 +3820,16 @@ function ConsolePublisherPanel({
         <PublisherLine
           label={t('studio.publisher.server', { defaultValue: 'OBS server' })}
           value={session.rtmpServer}
-          copyLabel="OBS server"
         />
         <PublisherLine
           label={t('studio.publisher.key', { defaultValue: 'Stream key' })}
           value={session.streamKey}
           secret
-          copyLabel="Stream key"
         />
         {streamUrl && (
           <PublisherLine
             label={t('studio.publisher.playback', { defaultValue: 'Playback URL' })}
             value={streamUrl}
-            copyLabel="Playback URL"
           />
         )}
       </div>
@@ -3834,29 +3840,37 @@ function ConsolePublisherPanel({
 function PublisherLine({
   label,
   value,
-  copyLabel,
   secret,
 }: {
   label: string;
   value: string;
-  copyLabel: string;
   secret?: boolean;
 }) {
+  const { t } = useTranslation('pages');
+  const copyTitle = t('studio.publisher.copyAria', { label, defaultValue: 'Copy {{label}}' });
   const copy = async () => {
     try {
-      const method = await copyText(value, copyLabel);
-      toast.success(
-        method === 'manual' ? `${copyLabel} opened for manual copy.` : `${copyLabel} copied.`,
-      );
+      const method = await copyText(value, copyTitle);
+      if (method === 'manual') {
+        toast.info(
+          t('studio.publisher.copyManual', {
+            defaultValue: "Automatic copy isn't available. Copy it manually.",
+          }),
+        );
+      } else {
+        toast.success(t('studio.publisher.copied', { label, defaultValue: '{{label}} copied.' }));
+      }
     } catch {
-      toast.error(`Could not copy ${copyLabel.toLowerCase()}.`);
+      toast.error(
+        t('studio.publisher.copyFailed', { defaultValue: 'Could not copy. Please try again.' }),
+      );
     }
   };
   return (
     <div className="gl-creator-publisher-line">
       <span>{label}</span>
       <code>{secret ? value.replace(/.(?=.{6})/g, '*') : value}</code>
-      <button type="button" onClick={() => void copy()} aria-label={`Copy ${label}`}>
+      <button type="button" onClick={() => void copy()} aria-label={copyTitle}>
         <Copy size={15} />
       </button>
     </div>
@@ -3871,7 +3885,7 @@ function WaitingPreview({ stream }: { stream: Stream }) {
       <div>
         <Radio size={34} />
         <strong>
-          {t('studio.console.waitingPreview', { defaultValue: 'Waiting for publisher' })}
+          {t('studio.console.waitingPreview', { defaultValue: 'Waiting for your stream' })}
         </strong>
         <span>
           {t('studio.console.waitingPreviewBody', {
@@ -3937,14 +3951,14 @@ function LiveMetadataEditor({ stream, onUpdated }: { stream: Stream; onUpdated: 
       setDescription(next.description ?? '');
       setCoverFile(null);
       setCoverPreview(next.cover ?? '');
-      toast.success(t('studio.console.metadataSaved', { defaultValue: 'Live room info updated.' }));
+      toast.success(t('studio.console.metadataSaved', { defaultValue: 'Stream details updated.' }));
       onUpdated();
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
           : t('studio.console.metadataFailed', {
-              defaultValue: 'Could not update live room info.',
+              defaultValue: 'Could not update stream details.',
             }),
       );
     }
@@ -3954,8 +3968,8 @@ function LiveMetadataEditor({ stream, onUpdated }: { stream: Stream; onUpdated: 
     <section className="gl-creator-panel gl-live-metadata-panel">
       <div className="gl-creator-panel-head">
         <div>
-          <span>{t('studio.console.metadataLabel', { defaultValue: 'Room info' })}</span>
-          <h2>{t('studio.console.metadataTitle', { defaultValue: 'Live room details' })}</h2>
+          <span>{t('studio.console.metadataLabel', { defaultValue: 'Stream info' })}</span>
+          <h2>{t('studio.console.metadataTitle', { defaultValue: 'Stream details' })}</h2>
         </div>
         <ImagePlus size={22} />
       </div>
@@ -3983,7 +3997,7 @@ function LiveMetadataEditor({ stream, onUpdated }: { stream: Stream; onUpdated: 
                 rows={4}
                 maxLength={2000}
                 placeholder={t('studio.prepare.descriptionPlaceholder', {
-                  defaultValue: 'Tell viewers what this live is about.',
+                  defaultValue: 'Tell viewers what this stream is about.',
                 })}
                 onChange={(event) => setDescription(event.target.value)}
               />
@@ -4060,7 +4074,7 @@ function LiveReplaySettingsPanel({ stream }: { stream: Stream }) {
       <div className="gl-creator-panel-head">
         <div>
           <span>{t('studio.replay.liveLabel', { defaultValue: 'Replay upload' })}</span>
-          <h2>{t('studio.replay.liveTitle', { defaultValue: 'After this live ends' })}</h2>
+          <h2>{t('studio.replay.liveTitle', { defaultValue: 'After this stream ends' })}</h2>
         </div>
         <PlayCircle size={22} />
       </div>
@@ -4075,7 +4089,9 @@ function LiveReplaySettingsPanel({ stream }: { stream: Stream }) {
           <span>
             <strong>
               {uploadAfterEnd
-                ? t('studio.replay.uploadOn', { defaultValue: 'Upload replay after ending' })
+                ? t('studio.replay.uploadOn', {
+                    defaultValue: 'Upload a replay when the stream ends',
+                  })
                 : t('studio.replay.uploadOff', { defaultValue: 'Do not upload replay' })}
             </strong>
             <small>
@@ -4165,7 +4181,7 @@ function StudioInteractionRail({
       <section className="gl-creator-panel gl-live-console-chat-panel">
         <div className="gl-creator-panel-head">
           <div>
-            <span>{t('studio.console.danmu', { defaultValue: 'Danmu management' })}</span>
+            <span>{t('studio.console.danmu', { defaultValue: 'On-screen chat' })}</span>
             <h2>{t('studio.console.chatControl', { defaultValue: 'Live chat' })}</h2>
           </div>
           <MessageSquare size={22} />
@@ -4174,7 +4190,7 @@ function StudioInteractionRail({
           <span>
             {t('studio.console.activeBullets', {
               count: bulletsCount,
-              defaultValue: '{{count}} active bullets',
+              defaultValue: 'On screen: {{count}}',
             })}
           </span>
           <button type="button" onClick={onClearBullets} disabled={bulletsCount === 0}>
@@ -4209,7 +4225,7 @@ function StudioInteractionRail({
           {visibleGifts.length > 0 ? (
             visibleGifts.map((item) => (
               <div className="gl-live-console-gift-row" key={item.key}>
-                <span>{item.icon || item.name}</span>
+                <GiftArt gift={{ name: item.name, icon: item.icon }} size={28} />
                 <div className="gl-live-console-gift-main">
                   <strong>{item.user}</strong>
                   <small>{item.name}</small>
@@ -4358,7 +4374,7 @@ function ConsoleMuteUserDialog({
   const durations: MuteUserPayload['durationMinutes'][] = [5, 10, 30, 60];
   const statusText = blocked
     ? t('liveRoom.moderation.blocked', {
-        defaultValue: 'Creators, moderators, and yourself cannot be muted.',
+        defaultValue: "You can't mute the creator, moderators, or yourself.",
       })
     : statePending
       ? t('liveRoom.moderation.checkingMute', { defaultValue: 'Checking mute status...' })

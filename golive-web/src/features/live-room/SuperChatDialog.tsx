@@ -139,7 +139,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
           } else if (err.reason === 'user_restricted') {
             toast.error(
               t('contentPolicy.userRestricted', {
-                defaultValue: 'Your account is restricted from sending interactive content.',
+                defaultValue: "Your account is restricted, so you can't post or chat right now.",
               }),
             );
           } else if (err.reason === 'super_chat_text_too_long') {
@@ -281,7 +281,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         </div>
 
         {textTooLong && (
-          <div className="text-red-600 dark:text-red-400 text-xs">
+          <div className="text-xs text-red-600 dark:text-red-400">
             {t('liveRoom.superChatDialog.textTooLong', {
               count: maxText,
               defaultValue: 'Message is too long for this tier (max {{count}} characters).',
@@ -290,7 +290,7 @@ export function SuperChatDialog({ open, onOpenChange, roomId }: SuperChatDialogP
         )}
 
         {insufficient && (
-          <div className="text-red-600 dark:text-red-400 text-xs">
+          <div className="text-xs text-red-600 dark:text-red-400">
             {t('liveRoom.superChatDialog.insufficientBalance', {
               coins: (amount - balance).toLocaleString(locale),
               defaultValue: 'Insufficient balance (need {{coins}} more).',

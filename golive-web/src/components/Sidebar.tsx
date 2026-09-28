@@ -148,7 +148,7 @@ export function Sidebar({ collapsed, activeKey, onNav }: SidebarProps) {
     {
       key: 'studio-replay',
       icon: Icons.History,
-      label: t('nav.studioReplay', { defaultValue: 'Data replay' }),
+      label: t('nav.studioReplay', { defaultValue: 'Analytics' }),
       route: '/studio/replay',
     },
     {

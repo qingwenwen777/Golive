@@ -154,6 +154,22 @@ describe('http axios client', () => {
     expect(useAuthModalStore.getState().open).toBe(true);
   });
 
+  it('treats a 401 as an answer for requests marked skipAuthRefresh', async () => {
+    useAuthStore.setState({ token: null, user: null });
+    const adapter = vi.fn<AxiosAdapter>(async (config) => {
+      throw unauthorized(config);
+    });
+    setAdapter(adapter);
+
+    await expect(http.get('/rooms/room-1/like', { skipAuthRefresh: true })).rejects.toMatchObject({
+      response: { status: 401 },
+    });
+
+    expect(refreshAuthTokenMock).not.toHaveBeenCalled();
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(useAuthModalStore.getState().open).toBe(false);
+  });
+
   it('keeps the session when token refresh fails transiently', async () => {
     refreshAuthTokenMock.mockRejectedValueOnce(
       new AuthRefreshError('refresh-failed', {

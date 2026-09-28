@@ -866,7 +866,7 @@ function ChannelPostPager({
   return (
     <div
       className="gl-history-pager gl-channel-post-pager"
-      aria-label={t('channel.posts.pagination', { defaultValue: 'Post pagination' })}
+      aria-label={t('channel.posts.pagination', { defaultValue: 'Post pages' })}
     >
       <div className="gl-history-pager-controls">
         <button

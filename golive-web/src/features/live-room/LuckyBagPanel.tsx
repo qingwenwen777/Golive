@@ -114,7 +114,7 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
     if (amountMode === 'fixed' && safeTotal % safeCount !== 0) {
       toast.error(
         t('luckyBag.errorNotDivisible', {
-          defaultValue: 'For fixed packets the total must divide evenly by the count.',
+          defaultValue: 'For equal packets, the total must divide evenly by the number of packets.',
         }),
       );
       return;
@@ -175,7 +175,7 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
         onSuccess: () =>
           toast.success(
             t('luckyBag.cancelSuccess', {
-              defaultValue: 'Lucky bag cancelled. Coins were refunded.',
+              defaultValue: 'Lucky bag canceled. Coins were refunded.',
             }),
           ),
         onError: (err) => toast.error(bagErrorText(err.reason, err.message, t)),
@@ -186,7 +186,10 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
   if (!bag && !ownsStream) return null;
 
   return (
-    <section className="gl-bag-panel" aria-label={t('luckyBag.title', { defaultValue: 'Lucky bag' })}>
+    <section
+      className="gl-bag-panel"
+      aria-label={t('luckyBag.title', { defaultValue: 'Lucky bag' })}
+    >
       <div className="gl-bag-head">
         <div className="gl-bag-icon" aria-hidden="true">
           <Gift size={17} />
@@ -295,7 +298,7 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
                 <XCircle size={14} />
                 <span>
                   {cancelBag.isPending
-                    ? t('luckyBag.cancelling', { defaultValue: 'Cancelling...' })
+                    ? t('luckyBag.cancelling', { defaultValue: 'Canceling...' })
                     : t('luckyBag.cancel', { defaultValue: 'Cancel & refund' })}
                 </span>
               </button>
@@ -349,9 +352,7 @@ function LuckyBagWinnersDialog({
                 <span className="gl-bag-winner-name" title={winner.name}>
                   {winner.name}
                 </span>
-                <span className="gl-bag-winner-payout">
-                  +{formatNumber(winner.payout)}
-                </span>
+                <span className="gl-bag-winner-payout">+{formatNumber(winner.payout)}</span>
               </li>
             ))}
           </ol>
@@ -403,7 +404,9 @@ function ViewerBagAction({
     return (
       <div className="gl-bag-result is-missed">
         <Sparkles size={16} />
-        <span>{t('luckyBag.youMissed', { defaultValue: 'No luck this time. Try the next one!' })}</span>
+        <span>
+          {t('luckyBag.youMissed', { defaultValue: 'No luck this time. Try the next one!' })}
+        </span>
       </div>
     );
   }
@@ -411,17 +414,14 @@ function ViewerBagAction({
     return (
       <div className="gl-bag-result is-joined">
         <Ticket size={16} />
-        <span>{t('luckyBag.joinedWaiting', { defaultValue: 'You are in. Stay for the draw!' })}</span>
+        <span>
+          {t('luckyBag.joinedWaiting', { defaultValue: 'You are in. Stay for the draw!' })}
+        </span>
       </div>
     );
   }
   return (
-    <button
-      type="button"
-      className="gl-bag-join"
-      onClick={onJoin}
-      disabled={!accepting || pending}
-    >
+    <button type="button" className="gl-bag-join" onClick={onJoin} disabled={!accepting || pending}>
       <Gift size={16} />
       <span>
         {pending
@@ -474,7 +474,11 @@ function OpenLuckyBagForm({
   const { t } = useTranslation('pages');
   return (
     <div className="gl-bag-open">
-      <div className="gl-bag-mode" role="tablist" aria-label={t('luckyBag.amountMode', { defaultValue: 'Amount mode' })}>
+      <div
+        className="gl-bag-mode"
+        role="tablist"
+        aria-label={t('luckyBag.amountMode', { defaultValue: 'Split' })}
+      >
         <button
           type="button"
           role="tab"
@@ -482,7 +486,7 @@ function OpenLuckyBagForm({
           className={cn(amountMode === 'random' && 'is-active')}
           onClick={() => onAmountModeChange('random')}
         >
-          {t('luckyBag.modeRandom', { defaultValue: 'Lucky draw' })}
+          {t('luckyBag.modeRandom', { defaultValue: 'Random' })}
         </button>
         <button
           type="button"
@@ -595,7 +599,7 @@ function OpenLuckyBagForm({
       )}
 
       <label className="gl-bag-message">
-        <span>{t('luckyBag.messageLabel', { defaultValue: 'Blessing (optional)' })}</span>
+        <span>{t('luckyBag.messageLabel', { defaultValue: 'Message (optional)' })}</span>
         <input
           type="text"
           maxLength={MAX_MESSAGE}
@@ -630,7 +634,7 @@ function statusText(status: string | undefined, t: ReturnType<typeof useTranslat
   if (status === 'open') return t('luckyBag.status.open', { defaultValue: 'Open' });
   if (status === 'drawing') return t('luckyBag.status.drawing', { defaultValue: 'Drawing' });
   if (status === 'drawn') return t('luckyBag.status.drawn', { defaultValue: 'Drawn' });
-  if (status === 'cancelled') return t('luckyBag.status.cancelled', { defaultValue: 'Cancelled' });
+  if (status === 'cancelled') return t('luckyBag.status.cancelled', { defaultValue: 'Canceled' });
   return t('luckyBag.title', { defaultValue: 'Lucky bag' });
 }
 
@@ -640,7 +644,7 @@ function eligibilityOptionLabel(
 ): string {
   switch (option) {
     case 'followers':
-      return t('luckyBag.eligibility.followers', { defaultValue: 'Followers' });
+      return t('luckyBag.eligibility.followers', { defaultValue: 'Subscribers' });
     case 'fans':
       return t('luckyBag.eligibility.fans', { defaultValue: 'Fan club members' });
     case 'fans_level':
@@ -670,6 +674,11 @@ function bagErrorText(
   t: ReturnType<typeof useTranslation>['t'],
 ): string {
   switch (reason) {
+    case 'network':
+      return t('loadError.networkHint', {
+        ns: 'common',
+        defaultValue: 'Check your connection and try again.',
+      });
     case 'insufficient_coin':
       return t('luckyBag.errorInsufficient', { defaultValue: 'Insufficient coin balance.' });
     case 'active_lucky_bag_exists':
@@ -687,7 +696,7 @@ function bagErrorText(
     case 'bad_lucky_bag':
       return t('luckyBag.errorBad', { defaultValue: 'Please check the lucky bag settings.' });
     case 'forbidden':
-      return t('luckyBag.errorForbidden', { defaultValue: 'Only the streamer can manage this.' });
+      return t('luckyBag.errorForbidden', { defaultValue: 'Only the creator can manage this.' });
     default:
       return fallback || t('luckyBag.errorGeneric', { defaultValue: 'Action failed.' });
   }

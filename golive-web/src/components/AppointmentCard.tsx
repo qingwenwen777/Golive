@@ -70,7 +70,7 @@ export function AppointmentCard({
   });
   const channelName = appointment.channel || `Creator ${appointment.ownerId.slice(0, 8)}`;
   const hasChannelName = !isPlaceholderChannelName(channelName);
-  const appointmentLabel = t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' });
+  const appointmentLabel = t('liveRoom.scheduledBadge', { defaultValue: 'Scheduled' });
   const hoverStyle = useCoverHoverStyle(
     appointment.cover,
     channelName || appointment.title || appointment.id,
@@ -271,7 +271,7 @@ export function AppointmentCard({
           {appointment.canStart && (
             <button type="button" className="gl-retry-btn" disabled={pending} onClick={onStart}>
               <PlayCircle size={15} />
-              {t('appointments.start', { defaultValue: 'Start live' })}
+              {t('appointments.start', { defaultValue: 'Go live' })}
             </button>
           )}
           <button type="button" className="gl-secondary-btn" disabled={pending} onClick={onEdit}>

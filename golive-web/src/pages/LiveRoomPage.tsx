@@ -191,7 +191,7 @@ export default function LiveRoomPage() {
       ? {
           readOnly: true,
           readOnlyLabel: t('liveRoom.endingChatReadOnly', {
-            defaultValue: 'Live has ended. Chat is now read-only.',
+            defaultValue: 'The stream has ended. Chat is now read-only.',
           }),
         }
       : {}),
@@ -361,7 +361,7 @@ export default function LiveRoomPage() {
       return (
         <LoadError
           variant="page"
-          title={t('liveRoom.loadError', { defaultValue: "Couldn't load this live room" })}
+          title={t('liveRoom.loadError', { defaultValue: "Couldn't load this stream" })}
           error={roomError}
           onRetry={refetch}
           retrying={isFetching}
@@ -491,7 +491,7 @@ export default function LiveRoomPage() {
           refreshFanClubAccess();
           toast.success(
             t('liveRoom.fanClubExclusive.joined', {
-              defaultValue: 'Fan club joined. The room is unlocked.',
+              defaultValue: 'You joined the fan club. This stream is now unlocked.',
             }),
           );
         },
@@ -531,7 +531,7 @@ export default function LiveRoomPage() {
   );
   const reportDialog = <LiveRoomReportDialog />;
   const lockedInteractionLabel = t('liveRoom.fanClubExclusive.giftLocked', {
-    defaultValue: 'Join the fan club to send gifts in this room.',
+    defaultValue: 'Join the fan club to send gifts on this stream.',
   });
   const openGifts = () => {
     if (exclusiveLocked) {
@@ -738,7 +738,7 @@ export default function LiveRoomPage() {
                     onSuccess: () =>
                       toast.success(
                         t('liveRoom.appointmentReserved', {
-                          defaultValue: 'Appointment reserved.',
+                          defaultValue: 'Reminder set.',
                         }),
                       ),
                     onError: (err) =>
@@ -755,7 +755,7 @@ export default function LiveRoomPage() {
                     onSuccess: () =>
                       toast.success(
                         t('liveRoom.appointmentUnreserved', {
-                          defaultValue: 'Reservation removed.',
+                          defaultValue: 'Reminder removed.',
                         }),
                       ),
                     onError: (err) =>
@@ -773,7 +773,7 @@ export default function LiveRoomPage() {
                       savePublisherSession(next);
                       toast.success(
                         t('liveRoom.appointmentStartSuccess', {
-                          defaultValue: 'Appointment live started.',
+                          defaultValue: 'Scheduled stream started.',
                         }),
                       );
                       navigate(`/studio/live/${encodeURIComponent(next.id)}`);
@@ -782,7 +782,7 @@ export default function LiveRoomPage() {
                       toast.error(
                         err.message ||
                           t('liveRoom.appointmentStartFailed', {
-                            defaultValue: 'Could not start this appointment.',
+                            defaultValue: 'Could not start this scheduled stream.',
                           }),
                       ),
                   });
@@ -801,7 +801,7 @@ export default function LiveRoomPage() {
                 <div>
                   <h2>
                     {t('liveRoom.appointmentOwnerTitle', {
-                      defaultValue: 'Appointment management',
+                      defaultValue: 'Manage scheduled stream',
                     })}
                   </h2>
                   <p>
@@ -825,7 +825,7 @@ export default function LiveRoomPage() {
                           toast.error(
                             err.message ||
                               t('liveRoom.appointmentStartFailed', {
-                                defaultValue: 'Could not start this appointment.',
+                                defaultValue: 'Could not start this scheduled stream.',
                               }),
                           ),
                       });
@@ -836,7 +836,7 @@ export default function LiveRoomPage() {
                     <span>
                       {startAppointment.isPending
                         ? t('liveRoom.starting', { defaultValue: 'Starting...' })
-                        : t('liveRoom.startLive', { defaultValue: 'Start live' })}
+                        : t('liveRoom.startLive', { defaultValue: 'Go live' })}
                     </span>
                   </button>
                 )}
@@ -939,6 +939,7 @@ export default function LiveRoomPage() {
             pushFlyingGift({
               id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               icon: gift.icon,
+              giftId: gift.id,
               label: `${giftName} x${count}`,
             });
             appendMessage(roomId, {
@@ -950,6 +951,7 @@ export default function LiveRoomPage() {
               avatar: currentUser?.avatar,
               giftName,
               giftIcon: gift.icon,
+              giftId: gift.id,
               count,
               tier: gift.tier,
               userLevel: currentUser?.levelInfo?.level,
@@ -1111,6 +1113,7 @@ export default function LiveRoomPage() {
           pushFlyingGift({
             id: `fg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             icon: gift.icon,
+            giftId: gift.id,
             label: `${giftName} x${count}`,
           });
           appendMessage(roomId, {
@@ -1122,6 +1125,7 @@ export default function LiveRoomPage() {
             avatar: currentUser?.avatar,
             giftName,
             giftIcon: gift.icon,
+            giftId: gift.id,
             count,
             tier: gift.tier,
             userLevel: currentUser?.levelInfo?.level,
@@ -1230,7 +1234,8 @@ function ReplayRoomView({
           : loadingMessages
             ? t('liveRoom.replay.loadingChat', { defaultValue: 'Loading replay chat...' })
             : t('liveRoom.replay.chatReadOnly', {
-                defaultValue: 'Replay chat is read-only. Comments and SuperChat follow playback.',
+                defaultValue:
+                  'Replay chat is read-only. Messages and SuperChats appear in time with the video.',
               })
       }
     />
@@ -1401,8 +1406,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
   const likedMembership = useLibraryMembership(LIKED_STREAMS_KEY, stream.id, isAuthed);
   const channelName = streamChannelName(stream, currentUser);
   const liked = likeState.data?.liked ?? likedMembership.isMember;
-  const likes =
-    likeState.data?.likes ?? Math.max(0, Math.floor((stream.peakViewers ?? stream.viewers) * 0.3));
+  const likes = likeState.data?.likes;
   const endedAt = formatDateTime(stream.endedAt, i18n.language);
 
   const toggleLike = () => {
@@ -1411,7 +1415,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
       if (nextLiked) {
         saveToLibrary(LIKED_STREAMS_KEY, stream);
         likedMembership.setLocalMember(true);
-        toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+        toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to Liked streams.' }));
       } else {
         removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
         likedMembership.setLocalMember(false);
@@ -1420,7 +1424,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
       return;
     }
     if (nextLiked) {
-      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to Liked streams.' }));
     }
     like.mutate(liked ? 'unlike' : 'like');
   };
@@ -1444,7 +1448,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
               <div className="gl-info-chan-subs">
                 {endedAt
                   ? t('liveRoom.replay.endedAt', { time: endedAt, defaultValue: 'Ended {{time}}' })
-                  : t('liveRoom.replay.ended', { defaultValue: 'Ended live replay' })}
+                  : t('liveRoom.replay.ended', { defaultValue: 'Stream replay' })}
               </div>
             </div>
           </Link>
@@ -1457,7 +1461,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
             onClick={toggleLike}
           >
             <ThumbsUp size={18} />
-            <span>{formatCount(likes)}</span>
+            {likes !== undefined && <span>{formatCount(likes)}</span>}
           </button>
         </div>
       </div>
@@ -1531,7 +1535,7 @@ function FanClubLockedPlayer({
             <span className="gl-scheduled-player-badge">
               <ShieldCheck size={14} />
               {variant === 'scheduled'
-                ? t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' })
+                ? t('liveRoom.scheduledBadge', { defaultValue: 'Scheduled' })
                 : variant === 'replay'
                   ? t('liveRoom.replay.badge', { defaultValue: 'Replay' })
                   : t('liveRoom.liveBadge', { defaultValue: 'Live' })}
@@ -1545,7 +1549,7 @@ function FanClubLockedPlayer({
                 })
               : variant === 'replay'
                 ? t('liveRoom.fanClubExclusive.replayTitle', {
-                    defaultValue: 'Fan club members only replay',
+                    defaultValue: 'Replay for fan club members only',
                   })
                 : t('liveRoom.fanClubExclusive.liveTitle', {
                     defaultValue: 'Fan club members only',
@@ -1586,7 +1590,7 @@ function FanClubLockedPlayer({
               <UserPlus size={17} />
               {member
                 ? t('liveRoom.fanClubExclusive.unlocking', {
-                    defaultValue: 'Joined. Unlocking the room...',
+                    defaultValue: 'Joined. Unlocking the stream...',
                   })
                 : pending
                   ? t('liveRoom.fanClubExclusive.joining', { defaultValue: 'Joining...' })
@@ -1658,7 +1662,7 @@ function ScheduledRoomPlayer({
         <div className="gl-scheduled-player-overlay">
           <span className="gl-scheduled-player-badge">
             <CalendarClock size={14} />
-            {t('liveRoom.scheduledBadge', { defaultValue: 'Appointment' })}
+            {t('liveRoom.scheduledBadge', { defaultValue: 'Scheduled' })}
           </span>
           {stream.fanClubOnly && <FanClubExclusiveBadge className="gl-scheduled-exclusive" />}
           <h2>{stream.title}</h2>
@@ -1674,10 +1678,10 @@ function ScheduledRoomPlayer({
             <span>
               <CheckCircle2 size={14} />
               {owner
-                ? t('liveRoom.scheduledOwner', { defaultValue: 'Owner view' })
+                ? t('liveRoom.scheduledOwner', { defaultValue: 'Creator view' })
                 : reserved
-                  ? t('liveRoom.scheduledReservedByYou', { defaultValue: 'Reserved by you' })
-                  : t('liveRoom.scheduledOpen', { defaultValue: 'Open for reservation' })}
+                  ? t('liveRoom.scheduledReservedByYou', { defaultValue: 'Reminder set' })
+                  : t('liveRoom.scheduledOpen', { defaultValue: 'You can set a reminder' })}
             </span>
           </div>
           <div className="gl-scheduled-player-actions">
@@ -1689,7 +1693,7 @@ function ScheduledRoomPlayer({
                 onClick={onStart}
               >
                 <PlayCircle size={16} />
-                {t('liveRoom.startLive', { defaultValue: 'Start live' })}
+                {t('liveRoom.startLive', { defaultValue: 'Go live' })}
               </button>
             ) : reserved ? (
               <button
@@ -1699,12 +1703,12 @@ function ScheduledRoomPlayer({
                 onClick={onUnreserve}
               >
                 <X size={16} />
-                {t('liveRoom.cancelReserve', { defaultValue: 'Cancel reservation' })}
+                {t('liveRoom.cancelReserve', { defaultValue: 'Remove reminder' })}
               </button>
             ) : (
               <button type="button" className="gl-retry-btn" disabled={pending} onClick={onReserve}>
                 <UserPlus size={16} />
-                {t('liveRoom.reserve', { defaultValue: 'Reserve' })}
+                {t('liveRoom.reserve', { defaultValue: 'Remind me' })}
               </button>
             )}
           </div>

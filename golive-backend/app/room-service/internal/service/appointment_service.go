@@ -173,7 +173,7 @@ func (s *AppointmentService) Create(ctx context.Context, ownerID string, payload
 		Channel:     channelName,
 		ChannelID:   channelID,
 		Verified:    verified,
-		Avatar:      cleanAvatar(payload.Avatar, channelName),
+		Avatar:      cleanAvatar(payload.Avatar),
 		FanClubOnly: payload.FanClubOnly,
 		Viewers:     0,
 		PeakViewers: 0,

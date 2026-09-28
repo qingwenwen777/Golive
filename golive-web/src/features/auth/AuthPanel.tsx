@@ -33,7 +33,8 @@ type EmailCodePurpose = SendEmailCodePayload['purpose'];
  */
 type SignInCheck = 'captcha' | 'emailCode';
 
-const PASSWORD_RULE_TEXT = '至少 8 位，包含英文和数字';
+// English fallback; the rule is translated as auth.errors.invalidPassword.
+const PASSWORD_RULE_TEXT = 'At least 8 characters with letters and numbers';
 const PASSWORD_PATTERN = '(?=.*[A-Za-z])(?=.*[0-9]).{8,}';
 const PASSWORD_RULE_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 const EMAIL_CODE_COOLDOWN_SECONDS = 60;
@@ -108,14 +109,16 @@ function authErrorMessage(
       return t('auth.errors.inviteUsed', { defaultValue: 'Invite code has already been used.' });
     }
     if (reason === 'email_not_found') {
-      return t('auth.errors.emailNotFound', { defaultValue: 'No account is bound to this email.' });
+      return t('auth.errors.emailNotFound', {
+        defaultValue: 'No account is linked to this email.',
+      });
     }
     if (reason === 'invalid_password') {
       return t('auth.errors.invalidPassword', { defaultValue: PASSWORD_RULE_TEXT });
     }
     if (reason === 'google_not_configured') {
       return t('auth.errors.googleNotConfigured', {
-        defaultValue: 'Google sign-in is not configured yet.',
+        defaultValue: "Google sign-in isn't available right now.",
       });
     }
     if (reason === 'invalid_google_credential') {
@@ -152,6 +155,7 @@ function authErrorMessage(
 
 export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const { t } = useTranslation('common');
+  const passwordRule = t('auth.errors.invalidPassword', { defaultValue: PASSWORD_RULE_TEXT });
   const id = useId();
   const [mode, setMode] = useState<AuthMode>('signin');
   const [username, setUsername] = useState('');
@@ -675,7 +679,6 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       <div className="gl-auth-head">
         <div className="gl-auth-brand" aria-hidden="true">
           <GoLiveLogo height={26} />
-          <span className="gl-auth-brand-region">JP</span>
         </div>
         <div className="gl-auth-live">
           <span className="gl-live-dot-red" />
@@ -784,10 +787,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   autoComplete="new-password"
                   value={resetPassword}
                   onChange={(e) => setResetPassword(e.target.value)}
-                  placeholder={PASSWORD_RULE_TEXT}
+                  placeholder={passwordRule}
                   minLength={8}
                   pattern={PASSWORD_PATTERN}
-                  title={PASSWORD_RULE_TEXT}
+                  title={passwordRule}
                   required
                 />
               </span>
@@ -805,7 +808,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   placeholder={t('auth.confirmPasswordPlaceholder')}
                   minLength={8}
                   pattern={PASSWORD_PATTERN}
-                  title={PASSWORD_RULE_TEXT}
+                  title={passwordRule}
                   required
                 />
               </span>
@@ -925,10 +928,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   autoComplete={isSigningUp ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSigningUp ? PASSWORD_RULE_TEXT : undefined}
+                  placeholder={isSigningUp ? passwordRule : undefined}
                   minLength={isSigningUp ? 8 : undefined}
                   pattern={isSigningUp ? PASSWORD_PATTERN : undefined}
-                  title={isSigningUp ? PASSWORD_RULE_TEXT : undefined}
+                  title={isSigningUp ? passwordRule : undefined}
                   required
                 />
               </span>
@@ -948,7 +951,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                     placeholder={t('auth.confirmPasswordPlaceholder')}
                     minLength={8}
                     pattern={PASSWORD_PATTERN}
-                    title={PASSWORD_RULE_TEXT}
+                    title={passwordRule}
                     required
                   />
                 </span>
@@ -1088,7 +1091,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         {googleLinkCredential && (
           <div className="gl-auth-google-link" role="status">
             <strong>
-              {t('auth.googleLinkExistingTitle', { defaultValue: 'Google email already exists' })}
+              {t('auth.googleLinkExistingTitle', {
+                defaultValue: 'This email already has a GoLive account',
+              })}
             </strong>
             <p>
               {t('auth.googleLinkExistingSub', {
@@ -1266,7 +1271,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
                   : googleRegisterReady
                     ? t('auth.continueGoogle')
                     : t('auth.googleRegisterFillFirst', {
-                        defaultValue: 'Fill username and invite code first',
+                        defaultValue: 'Enter a username and invite code first',
                       })
               }
               onCredential={handleGoogleRegisterCredential}

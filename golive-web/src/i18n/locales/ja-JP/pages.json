@@ -34,7 +34,7 @@
     },
     "hotReplays": {
       "title": "人気ライブリプレイ",
-      "subtitle": "直近3日間の高評価、コメント、coins、ピーク視聴者数でランキングします。",
+      "subtitle": "直近3日間の人気配信をまとめてチェックできます。",
       "rank": "#{{rank}}",
       "metrics": "リプレイ指標",
       "likes": "高評価 {{count}}",
@@ -53,7 +53,7 @@
     },
     "upcoming": {
       "title": "近日配信予定のライブ",
-      "subtitle": "今後3日以内のライブ予約をランダムに最大3件表示します。",
+      "subtitle": "まもなく始まる配信です。リマインダーを設定して見逃さないようにしましょう。",
       "refresh": "更新",
       "empty": "今後3日以内のライブ予約はありません。"
     },
@@ -91,7 +91,7 @@
   "shareDialog": {
     "copyLink": "リンクをコピー",
     "copyTarget": "共有リンク",
-    "copyManual": "リンクを手動コピー用に開きました。",
+    "copyManual": "自動でコピーできません。リンクを手動でコピーしてください。",
     "copySuccess": "リンクをコピーしました。",
     "copyFailed": "リンクをコピーできませんでした。",
     "x": "X",
@@ -157,7 +157,7 @@
     "scheduledReservedByYou": "予約済み",
     "scheduledOpen": "予約受付中",
     "appointmentWaiting": "{{count, compact}} 人が待機中",
-    "appointmentPremiereTime": "プレミア公開：{{time}}",
+    "appointmentPremiereTime": "配信予定：{{time}}",
     "appointmentStartingSoon": "まもなく開始",
     "quickReserve": "予約",
     "quickUnreserve": "予約をキャンセル",
@@ -244,7 +244,8 @@
       "title": "ギフト",
       "balance": "{{coins}} coins",
       "tabs": {
-        "all": "すべて"
+        "all": "すべて",
+        "upTo": "{{coins}} 以下"
       },
       "sent": "{{name}} x{{count}} を送りました",
       "insufficientCoins": "coins が不足しています",
@@ -279,7 +280,7 @@
     "fanClubExclusive": {
       "badge": "メンバー限定",
       "liveTitle": "ファンクラブ限定配信",
-      "scheduledTitle": "ファンクラブ会員が先に入れる予約配信",
+      "scheduledTitle": "ファンクラブ会員限定の配信予定",
       "replayTitle": "ファンクラブ限定アーカイブ",
       "body": "この配信を視聴してチャットできるのはファンクラブ会員だけです。参加すると配信画面が解放されます。",
       "scheduledBody": "ファンクラブに参加すると予約ルーム、予約操作、カウントダウンが解放されます。",
@@ -320,6 +321,8 @@
     "retry": "再試行",
     "buffering": "バッファリング中...",
     "streamEnded": "配信は終了しました。",
+    "offlineTitle": "現在は配信されていません",
+    "offlineBody": "配信者の映像が届きしだい、ここで再生が始まります。",
     "endingBadge": "終了",
     "endingTitle": "配信は終了しました",
     "endingSubtitle": "ご視聴ありがとうございました。ルームを整理しています...",
@@ -411,15 +414,15 @@
     "fanClub": {
       "label": "{{channelName}} ファンクラブ",
       "title": "ファンクラブ",
-      "subtitle": "ファンバッジを点灯してくれた視聴者に感謝します。",
-      "members": "ファンバッジメンバー",
+      "subtitle": "ファンクラブに参加してくれたみなさん、ありがとうございます。",
+      "members": "ファンクラブメンバー",
       "emptyMembers": "最初のファンを待っています",
       "memberCount": "{{count, compact}}人のファンが参加済み",
       "memberCount_one": "{{count, compact}}人のファンが参加済み",
       "memberCount_other": "{{count, compact}}人のファンが参加済み",
       "join": "ファンクラブに参加",
-      "lit": "点灯済み",
-      "alreadyLit": "ファンバッジは点灯済みです。"
+      "lit": "参加済み",
+      "alreadyLit": "すでにこのファンクラブに参加しています。"
     },
     "fanBadge": {
       "title": "{{channelName}} ファンクラブに参加",
@@ -430,7 +433,7 @@
       "cancel": "キャンセル",
       "confirm": "購入を確認",
       "pending": "購入中...",
-      "success": "ファンバッジを点灯しました。",
+      "success": "ファンクラブに参加しました。",
       "insufficient": "coins が不足しているため、ファンバッジを購入できません。",
       "alreadyMember": "すでにこのファンクラブに参加しています。coins は消費されていません。",
       "failed": "ファンバッジを購入できませんでした。"
@@ -470,7 +473,7 @@
       "posts": {
         "title": "登録チャンネルの最新投稿",
         "channelTitle": "最新投稿",
-        "subtitle": "登録済みクリエイターごとの最新投稿がここに表示されます。",
+        "subtitle": "登録チャンネルのクリエイターの最新投稿をチェックできます。",
         "channelSubtitle": "{{name}} の最近の投稿を確認できます。",
         "empty": "登録チャンネルにはまだ投稿がありません。",
         "channelEmpty": "このクリエイターはまだ投稿していません。",
@@ -655,7 +658,7 @@
         "googleSub": "このアカウントに Google を連携して、よりすばやくログインできます。",
         "googleBind": "Google を連携",
         "googleLinked": "Google アカウントを連携済みです。",
-        "googleUnavailable": "Google ログインはまだ設定されていません。",
+        "googleUnavailable": "Google ログインは現在利用できません。",
         "googleUnlink": "解除",
         "googleUnlinkTitle": "Google アカウントの連携を解除",
         "googleUnlinkSub": "Google の連携を解除する前に、現在のパスワードを入力してください。",
@@ -698,7 +701,7 @@
         "googleEmailExists": "この Google メールは別の GoLive アカウントで使用されています。",
         "googleAlreadyLinked": "この Google アカウントはすでに連携されています。",
         "invalidGoogleCredential": "Google ログインを確認できませんでした。",
-        "googleNotConfigured": "Google ログインはまだ設定されていません。",
+        "googleNotConfigured": "Google ログインは現在利用できません。",
         "googleNotLinked": "このアカウントは Google と連携されていません。",
         "googleUnlinkPasswordRequired": "Google 連携を解除するには現在のパスワードを入力してください。"
       },
@@ -808,7 +811,7 @@
       "overview": "概要",
       "prepare": "配信準備",
       "posts": "投稿",
-      "replay": "データ振り返り",
+      "replay": "分析",
       "liveReplays": "ライブアーカイブ",
       "appointments": "ライブ予約",
       "moderators": "ルームモデレーター",
@@ -1100,7 +1103,7 @@
       "followers": "選択できるファンクラブ会員",
       "followersSub": "ファンクラブ会員のみ",
       "logs": "操作記録",
-      "logsSub": "ページ分け",
+      "logsSub": "累計",
       "muteOptions": "ミュート時間",
       "muteOptionsSub": "分",
       "searchLabel": "ファンクラブ会員",
@@ -1130,7 +1133,11 @@
       "playback": "再生 URL",
       "connected": "OBS 接続済み",
       "waiting": "OBS 接続待ち",
-      "refresh": "状態を更新"
+      "refresh": "状態を更新",
+      "copied": "{{label}}をコピーしました。",
+      "copyManual": "自動でコピーできません。手動でコピーしてください。",
+      "copyFailed": "コピーできませんでした。もう一度お試しください。",
+      "copyAria": "{{label}}をコピー"
     },
     "console": {
       "notFound": "ライブルームを利用できません",
@@ -1150,8 +1157,8 @@
       "ending": "終了中...",
       "endLive": "配信終了",
       "activity": "インタラクション",
-      "bettingTitle": "予想モジュール",
-      "luckyBagTitle": "福袋モジュール",
+      "bettingTitle": "予想",
+      "luckyBagTitle": "福袋",
       "reconnecting": "再接続中 #{{count}}",
       "disconnected": "切断中",
       "waitingPreview": "配信待機中",
@@ -1336,10 +1343,6 @@
         "down": "異常",
         "unknown": "未確認",
         "empty": "ヘルスデータはありません。"
-      },
-      "modules": {
-        "eyebrow": "モジュール",
-        "title": "管理モジュール"
       },
       "focus": {
         "eyebrow": "運用",
@@ -2070,7 +2073,11 @@
   },
   "login": {
     "title": "ログイン",
-    "placeholder": "ステージ 2 プレースホルダー"
+    "showcase": {
+      "title": "ライブ配信、チャット、アーカイブをひとつの場所で",
+      "body": "アカウントなしで視聴できます。ログインするとチャット、チャンネル登録、ギフトの送信ができます。",
+      "watch": "{{title}} を視聴"
+    }
   },
   "notFound": {
     "title": "404",
@@ -2116,7 +2123,9 @@
         "title": "30 分視聴",
         "description": "少し長めに視聴すると coins を獲得できます。",
         "target": "30 分"
-      }
+      },
+      "reward": "+{{amount}} coins",
+      "progressAria": "{{title}} の進捗"
     },
     "ledger": "Coin 履歴",
     "filters": {
@@ -2143,8 +2152,8 @@
     },
     "withdraw": {
       "title": "出金",
-      "sub": "手数料 35% のプレビューです。出金機能は未実装です。",
-      "subCertified": "認定クリエイター向け手数料 25% のプレビューです。出金機能は未実装です。",
+      "sub": "出金機能はまだご利用いただけません。手数料 35% のプレビューです。",
+      "subCertified": "出金機能はまだご利用いただけません。認定クリエイター向け手数料 25% のプレビューです。",
       "amount": "出金数量",
       "amountAria": "出金する coins 数量",
       "available": "出金可能",
@@ -2187,8 +2196,14 @@
       "alreadyClaimed": "今日はこのタスクを受け取り済みです。",
       "claimSuccess": "{{amount}} coins を獲得しました。",
       "claimFailed": "受け取りに失敗しました。",
-      "withdrawPreview": "出金機能は未実装です。現在 coins は差し引かれません。"
-    }
+      "withdrawPreview": "出金機能はまだご利用いただけません。coins は差し引かれていません。"
+    },
+    "title": "コインセンター",
+    "unit": "coins",
+    "walletAria": "coins ウォレット",
+    "summaryAria": "coins の概要",
+    "filtersAria": "coins 履歴の絞り込み",
+    "paginationAria": "coins 履歴のページ"
   },
   "luckyBag": {
     "title": "福袋",
@@ -2454,8 +2469,8 @@
       "disablePush": "プッシュを受け取らない",
       "enablePush": "プッシュを受け取る",
       "report": "このユーザーを通報",
-      "block": "ブラックリストに追加",
-      "blockedToast": "ブラックリストに追加しました",
+      "block": "ブロック",
+      "blockedToast": "ブロックしました",
       "loadingMessages": "メッセージを読み込み中...",
       "startTitle": "配信者に DM を送る",
       "startBody": "配信者が最初に返信するまでは、送信できるメッセージは 1 件だけです。",
@@ -2528,7 +2543,7 @@
     "errors": {
       "awaitingCreatorReply": "配信者が最初に返信するまでは、送信できるメッセージは 1 件だけです。",
       "followRequired": "この配信者をフォローしてから DM を送信してください。",
-      "userBlocked": "ブラックリスト関係があるため、DM は利用できません。",
+      "userBlocked": "ブロック中のため、DM は利用できません。",
       "sendFailed": "メッセージを送信できませんでした。"
     }
   },

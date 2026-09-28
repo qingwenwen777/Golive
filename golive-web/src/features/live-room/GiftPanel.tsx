@@ -13,7 +13,9 @@ import {
 import { useMe } from '@/api/auth';
 import { useGifts, useSendGift, newRequestId } from '@/api/gift';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { GiftArt } from '@/features/gifts/GiftArt';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
 import { localizedGiftName } from '@/lib/gift';
 import { normalizeLevelInfo } from '@/lib/userLevel';
 import { UserLevelBadge } from '@/components/UserLevelBadge';
@@ -29,12 +31,14 @@ const ALL_PRICE_TAB: PriceTab = {
   max: Infinity,
 };
 
+const UP_TO = 'liveRoom.giftPanel.tabs.upTo';
+
 const PRICE_TABS: PriceTab[] = [
   ALL_PRICE_TAB,
-  { id: 't50', label: '<=50', min: 0, max: 50 },
-  { id: 't100', label: '<=100', min: 0, max: 100 },
-  { id: 't500', label: '<=500', min: 0, max: 500 },
-  { id: 't1000', label: '<=1000', min: 0, max: 1000 },
+  { id: 't50', labelKey: UP_TO, label: 'Up to {{coins}}', min: 0, max: 50 },
+  { id: 't100', labelKey: UP_TO, label: 'Up to {{coins}}', min: 0, max: 100 },
+  { id: 't500', labelKey: UP_TO, label: 'Up to {{coins}}', min: 0, max: 500 },
+  { id: 't1000', labelKey: UP_TO, label: 'Up to {{coins}}', min: 0, max: 1000 },
 ];
 
 const COUNT_PRESETS = [1, 10, 52, 99, 520, 1314] as const;
@@ -121,8 +125,13 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
             );
           } else {
             toast.error(
-              err.message ||
-                t('liveRoom.giftPanel.failed', { defaultValue: 'Failed to send gift' }),
+              err.reason === 'network'
+                ? t('loadError.networkHint', {
+                    ns: 'common',
+                    defaultValue: 'Check your connection and try again.',
+                  })
+                : err.message ||
+                    t('liveRoom.giftPanel.failed', { defaultValue: 'Failed to send gift' }),
             );
           }
         },
@@ -165,7 +174,12 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                 tab === tabDef.id ? 'is-active' : 'text-text-secondary hover:text-text-primary',
               )}
             >
-              {tabDef.labelKey ? t(tabDef.labelKey, { defaultValue: tabDef.label }) : tabDef.label}
+              {tabDef.labelKey
+                ? t(tabDef.labelKey, {
+                    coins: formatNumber(tabDef.max),
+                    defaultValue: tabDef.label,
+                  })
+                : tabDef.label}
             </button>
           ))}
         </div>
@@ -205,7 +219,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                       </span>
                     )}
                     <span className="gl-gift-icon" aria-hidden>
-                      {g.icon}
+                      <GiftArt gift={g} size={42} />
                     </span>
                     <span className="gl-gift-name">{giftName}</span>
                     <span className="gl-gift-price">
@@ -242,7 +256,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
             </div>
             <div className="gl-gift-sendrow">
               <span className="gl-gift-selected-icon" aria-hidden>
-                {selected.icon}
+                <GiftArt gift={selected} size={38} />
               </span>
               <div className="gl-gift-selected-copy">
                 <div className="gl-gift-selected-name">{selectedName}</div>
@@ -257,7 +271,7 @@ export function GiftPanel({ open, onOpenChange, roomId, onSent }: GiftPanelProps
                   {locked
                     ? t('liveRoom.giftPanel.unlockHint', {
                         level: requiredLevel,
-                        defaultValue: 'Unlocks at Lv.{{level}}. Recharge to level up.',
+                        defaultValue: 'Unlocks at Lv.{{level}}. Top up to level up.',
                       })
                     : insufficient
                       ? t('liveRoom.giftPanel.needCoins', {

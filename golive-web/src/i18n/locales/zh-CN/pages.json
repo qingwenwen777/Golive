@@ -34,7 +34,7 @@
     },
     "hotReplays": {
       "title": "热门直播回放",
-      "subtitle": "近三天按点赞、评论、coins 收益和峰值人数综合排序。",
+      "subtitle": "回看最近三天的热门直播。",
       "rank": "#{{rank}}",
       "metrics": "回放热度指标",
       "likes": "{{count}} 个赞",
@@ -53,7 +53,7 @@
     },
     "upcoming": {
       "title": "即将到来的直播",
-      "subtitle": "随机展示最多三个未来三天内的直播预约。",
+      "subtitle": "即将开播的直播，设置提醒，开播不错过。",
       "refresh": "刷新",
       "empty": "未来三天暂无预约直播。"
     },
@@ -91,7 +91,7 @@
   "shareDialog": {
     "copyLink": "复制链接",
     "copyTarget": "分享链接",
-    "copyManual": "链接已打开，请手动复制。",
+    "copyManual": "无法自动复制，请手动复制链接。",
     "copySuccess": "链接已复制。",
     "copyFailed": "无法复制链接。",
     "x": "X",
@@ -244,7 +244,8 @@
       "title": "礼物",
       "balance": "{{coins}} coins",
       "tabs": {
-        "all": "全部"
+        "all": "全部",
+        "upTo": "{{coins}} 以内"
       },
       "sent": "已送出 {{name}} x{{count}}",
       "insufficientCoins": "coins 不足",
@@ -279,7 +280,7 @@
     "fanClubExclusive": {
       "badge": "会员专享",
       "liveTitle": "粉丝团会员专属直播",
-      "scheduledTitle": "粉丝团会员优先进入预约",
+      "scheduledTitle": "粉丝团会员专属预约直播",
       "replayTitle": "粉丝团会员专属回放",
       "body": "这场直播仅粉丝团成员可观看和参与聊天。加入粉丝团后即可解锁直播画面。",
       "scheduledBody": "加入粉丝团后才能进入预约直播间，预约、倒计时和提醒都会为你解锁。",
@@ -321,6 +322,8 @@
     "retry": "重试",
     "buffering": "正在缓冲...",
     "streamEnded": "直播已结束。",
+    "offlineTitle": "暂时没有画面",
+    "offlineBody": "主播的推流一到，画面就会在这里开始播放。",
     "endingBadge": "已结束",
     "endingTitle": "直播已结束",
     "endingSubtitle": "正在整理直播间...",
@@ -470,7 +473,7 @@
       "posts": {
         "title": "订阅主播的最新动态",
         "channelTitle": "最新动态",
-        "subtitle": "每位已订阅主播最近发布的一条动态会显示在这里。",
+        "subtitle": "看看你订阅的主播最近发了什么。",
         "channelSubtitle": "查看 {{name}} 最近发布的动态。",
         "empty": "你订阅的主播暂时还没有发布动态。",
         "channelEmpty": "这个主播暂时还没有发布动态。",
@@ -655,7 +658,7 @@
         "googleSub": "绑定后可以更快登录当前账号。",
         "googleBind": "绑定 Google",
         "googleLinked": "已绑定 Google 账号。",
-        "googleUnavailable": "Google 登录尚未配置完成。",
+        "googleUnavailable": "Google 登录暂不可用。",
         "googleUnlink": "解绑",
         "googleUnlinkTitle": "解绑 Google 账号",
         "googleUnlinkSub": "解绑前需要输入当前账号密码进行验证。",
@@ -698,7 +701,7 @@
         "googleEmailExists": "这个 Google 邮箱已经属于另一个 GoLive 账号。",
         "googleAlreadyLinked": "这个 Google 账号已经被绑定。",
         "invalidGoogleCredential": "无法验证 Google 登录。",
-        "googleNotConfigured": "Google 登录尚未配置完成。",
+        "googleNotConfigured": "Google 登录暂不可用。",
         "googleNotLinked": "当前账号尚未绑定 Google。",
         "googleUnlinkPasswordRequired": "请输入当前密码来解绑 Google。"
       },
@@ -1100,7 +1103,7 @@
       "followers": "可选粉丝团成员",
       "followersSub": "仅已加入粉丝团",
       "logs": "操作记录",
-      "logsSub": "分页记录",
+      "logsSub": "累计",
       "muteOptions": "禁言时长",
       "muteOptionsSub": "分钟",
       "searchLabel": "粉丝团成员",
@@ -1130,7 +1133,11 @@
       "playback": "播放地址",
       "connected": "OBS 已连接",
       "waiting": "等待 OBS 连接",
-      "refresh": "刷新状态"
+      "refresh": "刷新状态",
+      "copied": "{{label}}已复制。",
+      "copyManual": "无法自动复制，请手动复制。",
+      "copyFailed": "复制失败，请重试。",
+      "copyAria": "复制{{label}}"
     },
     "console": {
       "notFound": "直播间不可用",
@@ -1150,8 +1157,8 @@
       "ending": "结束中...",
       "endLive": "结束直播",
       "activity": "互动",
-      "bettingTitle": "竞猜模块",
-      "luckyBagTitle": "福袋模块",
+      "bettingTitle": "竞猜",
+      "luckyBagTitle": "福袋",
       "reconnecting": "重连中 #{{count}}",
       "disconnected": "已断开",
       "waitingPreview": "等待推流",
@@ -1336,10 +1343,6 @@
         "down": "异常",
         "unknown": "未检测",
         "empty": "暂无健康状态数据。"
-      },
-      "modules": {
-        "eyebrow": "模块",
-        "title": "管理台模块"
       },
       "focus": {
         "eyebrow": "运营",
@@ -2070,7 +2073,11 @@
   },
   "login": {
     "title": "登录",
-    "placeholder": "阶段 2 占位内容"
+    "showcase": {
+      "title": "直播、聊天和回放，都在这里",
+      "body": "不登录也能观看。登录后可以聊天、关注频道和送礼物。",
+      "watch": "观看 {{title}}"
+    }
   },
   "notFound": {
     "title": "404",
@@ -2116,7 +2123,9 @@
         "title": "累计观看 30 分钟",
         "description": "认真看一会儿，给一点点 coins。",
         "target": "30 分钟"
-      }
+      },
+      "reward": "+{{amount}} coins",
+      "progressAria": "{{title}}进度"
     },
     "ledger": "Coin 流水",
     "filters": {
@@ -2143,8 +2152,8 @@
     },
     "withdraw": {
       "title": "提现",
-      "sub": "手续费 35% 预览。提现功能待实现。",
-      "subCertified": "平台认证费率预览：手续费 25%。提现功能待实现。",
+      "sub": "提现功能暂未开放，当前为 35% 手续费预览。",
+      "subCertified": "提现功能暂未开放，当前为平台认证费率 25% 的预览。",
       "amount": "提现数量",
       "amountAria": "提现 coins 数量",
       "available": "可提现",
@@ -2187,8 +2196,14 @@
       "alreadyClaimed": "今天已经领取过这个任务。",
       "claimSuccess": "已获得 {{amount}} coins。",
       "claimFailed": "领取失败。",
-      "withdrawPreview": "提现功能待实现，当前不会扣除 coins。"
-    }
+      "withdrawPreview": "提现功能暂未开放，本次未扣除 coins。"
+    },
+    "title": "金币中心",
+    "unit": "coins",
+    "walletAria": "coins 钱包",
+    "summaryAria": "coins 概览",
+    "filtersAria": "coins 记录筛选",
+    "paginationAria": "coins 记录分页"
   },
   "luckyBag": {
     "title": "福袋",

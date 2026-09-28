@@ -95,12 +95,21 @@ func TestSocialHTTP_LikeDislikeAuthStateMachine(t *testing.T) {
 	token := signedToken(t, "viewer-1")
 	require.NoError(t, fx.redis.Set("like:stream-1:count", "10"))
 
-	unauthorized := request(fx.router, http.MethodGet, "/rooms/stream-1/like", "")
+	// Anyone can read the count; only a signed-in viewer can change it.
+	guest := request(fx.router, http.MethodGet, "/rooms/stream-1/like", "")
+	require.Equal(t, http.StatusOK, guest.Code)
+	require.JSONEq(t, `{"streamId":"stream-1","liked":false,"disliked":false,"likes":10}`, guest.Body.String())
+
+	unauthorized := request(fx.router, http.MethodPost, "/rooms/stream-1/like", "")
 	require.Equal(t, http.StatusUnauthorized, unauthorized.Code)
 
 	like := request(fx.router, http.MethodPost, "/rooms/stream-1/like", token)
 	require.Equal(t, http.StatusOK, like.Code)
 	require.JSONEq(t, `{"streamId":"stream-1","liked":true,"disliked":false,"likes":11}`, like.Body.String())
+
+	guestAfter := request(fx.router, http.MethodGet, "/rooms/stream-1/like", "")
+	require.Equal(t, http.StatusOK, guestAfter.Code)
+	require.JSONEq(t, `{"streamId":"stream-1","liked":false,"disliked":false,"likes":11}`, guestAfter.Body.String())
 
 	dislike := request(fx.router, http.MethodPost, "/rooms/stream-1/dislike", token)
 	require.Equal(t, http.StatusOK, dislike.Code)

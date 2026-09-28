@@ -89,8 +89,7 @@ export function InfoBlock({
     ? (stream.subscriberCount ?? subscriberCount)
     : subscriberCount;
   const likeInfo = likeState.data;
-  const baseLikes = Math.floor(stream.viewers * 0.3);
-  const likes = likeInfo?.likes ?? baseLikes;
+  const likes = likeInfo?.likes;
   const liked = likeInfo?.liked ?? likedMembership.isMember;
   const disliked = likeInfo?.disliked ?? false;
   const saved = watchLaterMembership.isMember;
@@ -112,7 +111,7 @@ export function InfoBlock({
         saveToLibrary(LIKED_STREAMS_KEY, stream);
         likedMembership.setLocalMember(true);
         setLikeBurstKey((value) => value + 1);
-        toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+        toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to Liked streams.' }));
       } else {
         removeFromLibrary(LIKED_STREAMS_KEY, stream.id);
         likedMembership.setLocalMember(false);
@@ -122,7 +121,7 @@ export function InfoBlock({
     }
     if (nextLiked) {
       setLikeBurstKey((value) => value + 1);
-      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to liked live rooms.' }));
+      toast.success(t('liveRoom.addedLiked', { defaultValue: 'Added to Liked streams.' }));
     }
     like.mutate(liked ? 'unlike' : 'like');
   };
@@ -160,7 +159,7 @@ export function InfoBlock({
       toast.info(
         lockedInteractionLabel ??
           t('liveRoom.fanClubExclusive.giftLocked', {
-            defaultValue: 'Join the fan club to send gifts in this room.',
+            defaultValue: 'Join the fan club to send gifts on this stream.',
           }),
       );
       return;
@@ -242,7 +241,7 @@ export function InfoBlock({
               onClick={handleLike}
             >
               <ThumbsUp size={18} />
-              <span>{formatCount(likes)}</span>
+              {likes !== undefined && <span>{formatCount(likes)}</span>}
               {likeBurstKey > 0 && <LikeBurst key={likeBurstKey} />}
             </button>
             <div className="gl-pg-div" />
@@ -328,7 +327,7 @@ export function InfoBlock({
         url={window.location.href}
         description={description}
         previewImage={stream.cover}
-        previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live room' })}
+        previewKicker={t('shareDialog.liveKicker', { defaultValue: 'Live stream' })}
         previewMeta={`${channelName}${t('shareDialog.metaSeparator', { defaultValue: ' · ' })}${t(
           'liveRoom.watching',
           { count: viewerCount ?? stream.viewers },

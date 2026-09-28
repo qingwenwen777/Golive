@@ -1447,6 +1447,31 @@ input:focus-visible,
   font-size: 30px;
   line-height: 1;
 }
+/* Drawn gift icons (features/gifts/GiftArt.tsx): the same on every platform,
+   unlike emoji. */
+.gl-gift-art {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 28%;
+  background: linear-gradient(145deg, var(--gift-from), var(--gift-to));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(15, 23, 42, 0.18);
+  line-height: 1;
+}
+.gl-gift-art > svg {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+.gl-gift-art.is-plain {
+  background: var(--gl-bg-hover);
+  color: var(--gl-text-2);
+  box-shadow: none;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+}
+.gl-gift-art.is-plain > svg {
+  filter: none;
+}
 .gl-gift-name {
   position: relative;
   z-index: 1;
@@ -1578,9 +1603,6 @@ input:focus-visible,
   height: 38px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 999px;
-  background: var(--gl-bg-hover);
-  font-size: 24px;
 }
 .gl-gift-selected-copy {
   min-width: 0;
@@ -1755,7 +1777,7 @@ input:focus-visible,
   color: #ffffff;
 }
 .gl-brand-logo-live {
-  color: #fdd3d0;
+  color: var(--gl-red-fg);
 }
 .gl-logo-word {
   font-weight: 700;
@@ -4402,13 +4424,6 @@ input:focus-visible,
   font-size: 20px;
   font-weight: 700;
 }
-.gl-auth-brand-region {
-  align-self: flex-start;
-  color: var(--gl-text-2);
-  font-size: 10px;
-  font-weight: 500;
-  margin-top: 2px;
-}
 .gl-auth-live {
   display: inline-flex;
   align-items: center;
@@ -6641,11 +6656,47 @@ input:focus-visible,
 }
 .gl-auth-preview {
   position: relative;
+  display: block;
   min-height: 380px;
   overflow: hidden;
   border-radius: 12px;
   background: #000;
   color: #fff;
+}
+.gl-auth-preview.is-loading {
+  background: var(--gl-bg-hover);
+}
+.gl-auth-preview.is-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px;
+  background: linear-gradient(160deg, #fff5f6, #ffe3e8);
+  color: var(--gl-text);
+  text-align: center;
+}
+.dark .gl-auth-preview.is-brand {
+  background: linear-gradient(160deg, #2a171b, #181012);
+}
+.gl-auth-preview.is-brand img {
+  position: static;
+  width: min(200px, 55%);
+  height: auto;
+  object-fit: contain;
+}
+.gl-auth-preview.is-brand h2 {
+  max-width: 420px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.gl-auth-preview.is-brand p {
+  max-width: 380px;
+  color: var(--gl-text-2);
+  font-size: 14px;
+  line-height: 1.5;
 }
 .gl-auth-preview img {
   position: absolute;
@@ -7556,45 +7607,6 @@ input:focus-visible,
   font-size: 12px;
   font-weight: 800;
   line-height: 1.25;
-}
-.gl-admin-module-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px;
-}
-.gl-admin-module-card {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--gl-border);
-  border-radius: 8px;
-  background: var(--gl-bg);
-  color: var(--gl-text);
-  padding: 14px;
-  text-decoration: none;
-}
-.gl-admin-module-card:hover {
-  background: var(--gl-bg-hover);
-}
-.gl-admin-module-card svg {
-  color: var(--gl-red-fg);
-}
-.gl-admin-module-card strong,
-.gl-admin-module-card span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gl-admin-module-card strong {
-  font-size: 14px;
-  font-weight: 900;
-}
-.gl-admin-module-card span {
-  color: var(--gl-text-2);
-  font-size: 12px;
-  font-weight: 700;
 }
 .gl-admin-health-grid {
   display: grid;
@@ -11641,6 +11653,11 @@ button.gl-fan-badge-empty {
 .gl-creator-tabs::-webkit-scrollbar {
   display: none;
 }
+/* The same links are in the sidebar while its Creator Studio list is open;
+   the tabs are for when it isn't (phones, a collapsed or folded sidebar). */
+.gl-layout:has(#gl-sidebar-studio-subnav) .gl-creator-tabs {
+  display: none;
+}
 .gl-creator-tabs a {
   flex: 0 0 auto;
   border-bottom: 3px solid transparent;
@@ -13075,7 +13092,6 @@ button.gl-fan-badge-empty {
   }
   .gl-auth-preview {
     min-height: 240px;
-    order: -1;
   }
   .gl-auth-copy h1 {
     font-size: 22px;
@@ -14934,9 +14950,6 @@ button.gl-fan-badge-empty {
   .gl-admin-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .gl-admin-module-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 767px) {
@@ -14957,7 +14970,6 @@ button.gl-fan-badge-empty {
   }
   .gl-admin-nav-list,
   .gl-admin-kpi-grid,
-  .gl-admin-module-grid,
   .gl-admin-detail-row {
     grid-template-columns: 1fr;
   }

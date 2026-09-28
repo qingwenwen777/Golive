@@ -163,9 +163,7 @@ export default function CoinPage() {
     };
 
     if (topupStatus === 'cancelled') {
-      toast.info(
-        t('coin.toast.topupCancelled', { defaultValue: 'Stripe checkout was cancelled.' }),
-      );
+      toast.info(t('coin.toast.topupCancelled', { defaultValue: 'Stripe checkout was canceled.' }));
       clearStripeParams();
       return;
     }
@@ -337,7 +335,7 @@ export default function CoinPage() {
     }
     toast.info(
       t('coin.toast.withdrawPreview', {
-        defaultValue: 'Withdrawals are not implemented yet and no coins will be deducted.',
+        defaultValue: "Withdrawals aren't available yet. No coins were deducted.",
       }),
     );
   };
@@ -377,18 +375,21 @@ export default function CoinPage() {
         </div>
       )}
 
-      <section className="gl-coin-wallet" aria-label="Coin wallet">
+      <section
+        className="gl-coin-wallet"
+        aria-label={t('coin.walletAria', { defaultValue: 'Coin wallet' })}
+      >
         <div className="gl-coin-wallet-info">
           <div className="gl-coin-wallet-kicker">
             <Wallet size={15} />
-            Coin Center
+            {t('coin.title', { defaultValue: 'Coin center' })}
           </div>
           <div className="gl-coin-wallet-amount">
             <span className="gl-coin-wallet-coin" aria-hidden="true">
               <Coins size={26} />
             </span>
             <strong>{formatNumber(balance)}</strong>
-            <em>coins</em>
+            <em>{t('coin.unit', { defaultValue: 'coins' })}</em>
           </div>
           <div className="gl-coin-wallet-breakdown">
             <span>
@@ -426,7 +427,10 @@ export default function CoinPage() {
         </div>
       </section>
 
-      <section className="gl-coin-stats" aria-label="Coin summary">
+      <section
+        className="gl-coin-stats"
+        aria-label={t('coin.summaryAria', { defaultValue: 'Coin summary' })}
+      >
         <StatPill
           icon={<ArrowUpRight size={18} />}
           value={formatCoins(monthSpend)}
@@ -473,13 +477,18 @@ export default function CoinPage() {
 
       <section className="gl-coin-section gl-coin-ledger-section">
         <div className="gl-coin-section-head">
-          <h2>{t('coin.ledger', { defaultValue: 'Coin ledger' })}</h2>
+          <h2>{t('coin.ledger', { defaultValue: 'Coin history' })}</h2>
         </div>
-        <div className="gl-coin-filters" role="tablist" aria-label="Coin record filters">
+        <div
+          className="gl-coin-filters"
+          role="group"
+          aria-label={t('coin.filtersAria', { defaultValue: 'Coin history filters' })}
+        >
           {FILTERS.map((item) => (
             <button
               key={item.id}
               type="button"
+              aria-pressed={filter === item.id}
               className={cn('gl-coin-filter', filter === item.id && 'is-active')}
               onClick={() => setFilter(item.id)}
             >
@@ -503,10 +512,10 @@ export default function CoinPage() {
         ) : filteredRows.length === 0 ? (
           <div className="gl-coin-empty">
             <Sparkles size={32} />
-            <strong>{t('coin.emptyTitle', { defaultValue: 'No coin records yet' })}</strong>
+            <strong>{t('coin.emptyTitle', { defaultValue: 'No coin activity yet' })}</strong>
             <span>
               {t('coin.emptySub', {
-                defaultValue: 'Top-ups, gifts, Super Chats, and betting activity will appear here.',
+                defaultValue: 'Top-ups, gifts, SuperChats, and betting activity will appear here.',
               })}
             </span>
           </div>
@@ -557,7 +566,7 @@ export default function CoinPage() {
                 }}
                 aria-label={t('coin.topup.amountAria', { defaultValue: 'Top-up coin amount' })}
               />
-              <span>coins</span>
+              <span>{t('coin.unit', { defaultValue: 'coins' })}</span>
             </div>
           </label>
           <div className="gl-coin-quick">
@@ -625,7 +634,7 @@ export default function CoinPage() {
                   defaultValue: 'Withdrawal coin amount',
                 })}
               />
-              <span>coins</span>
+              <span>{t('coin.unit', { defaultValue: 'coins' })}</span>
             </div>
           </label>
           <div className="gl-coin-withdraw-lines">
@@ -642,7 +651,7 @@ export default function CoinPage() {
               <strong>{formatCoins(withdrawFee)}</strong>
             </span>
             <span>
-              {t('coin.withdraw.net', { defaultValue: 'Estimated arrival' })}{' '}
+              {t('coin.withdraw.net', { defaultValue: "You'll receive" })}{' '}
               <strong>{formatCoins(withdrawNet)}</strong>
             </span>
             <span>
@@ -709,11 +718,19 @@ function TaskCard({
         <div className="gl-coin-task-icon">
           <CalendarCheck size={18} />
         </div>
-        <span>+{reward} coins</span>
+        <span>
+          {t('coin.tasks.reward', {
+            amount: reward,
+            defaultValue: '+{{amount}} coins',
+          })}
+        </span>
       </div>
       <h3>{title}</h3>
       <p>{description}</p>
-      <div className="gl-coin-progress" aria-label={`${title} progress`}>
+      <div
+        className="gl-coin-progress"
+        aria-label={t('coin.tasks.progressAria', { title, defaultValue: '{{title}} progress' })}
+      >
         <i style={{ width: `${ratio * 100}%` }} />
       </div>
       <div className="gl-coin-task-bottom">
@@ -782,13 +799,16 @@ function RecordPagination({
 }) {
   const { t } = useTranslation('pages');
   return (
-    <div className="gl-coin-pagination" aria-label="Coin record pagination">
+    <div
+      className="gl-coin-pagination"
+      aria-label={t('coin.paginationAria', { defaultValue: 'Coin history pages' })}
+    >
       <span>
         {t('coin.pagination', {
           total: formatNumber(totalItems),
           page,
           totalPages,
-          defaultValue: '{{total}} records · Page {{page}} / {{totalPages}}',
+          defaultValue: '{{total}} transactions · Page {{page}} of {{totalPages}}',
         })}
       </span>
       <div className="gl-coin-page-controls">
