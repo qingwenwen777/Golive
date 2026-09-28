@@ -22,7 +22,9 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
-      '/live': {
+      // Only stream files go to the FLV server; /live/:id is an app route and
+      // must fall through to the SPA (nginx does the same in production).
+      '^/live/.*\\.(?:flv|m3u8|ts)$': {
         target: 'http://localhost:8082',
         changeOrigin: true,
         ws: false,
