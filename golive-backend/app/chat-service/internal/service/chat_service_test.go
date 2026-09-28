@@ -60,6 +60,21 @@ func newTestService(t *testing.T) *ChatService {
 	return New(f, chatlimit.New(rdb, "rl:test:", 100, time.Second), danmus, repo.NewPublisher(rdb))
 }
 
+// A chat event without a sender name (the gateway could not load the
+// profile) was stored and broadcast with the full user id as the name.
+func TestProcess_NeverNamesTheSenderByID(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	require.NoError(t, svc.Process(ctx, Event{RoomID: "R1", UserID: "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f", Text: "hi", Ts: 1}))
+
+	rows, err := svc.danmus.History(ctx, "R1", 0, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Empty(t, rows[0].Username)
+	require.Equal(t, "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f", rows[0].UserID)
+}
+
 // The Kafka path used the client's clientId as the message primary key.
 func TestProcess_MessageIDIsServerGenerated(t *testing.T) {
 	svc := newTestService(t)

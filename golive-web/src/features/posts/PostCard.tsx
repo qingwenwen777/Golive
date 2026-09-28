@@ -35,6 +35,7 @@ import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { formatCount, formatRelativeTime } from '@/lib/format';
+import { creatorName, personName } from '@/types/user';
 
 export function PostCard({
   post,
@@ -192,10 +193,10 @@ export function PostCard({
       id={`post-${post.id}`}
     >
       <header className="gl-post-head">
-        <Avatar name={post.author.name} src={post.author.avatar} size={42} />
+        <Avatar name={creatorName(post.author.name)} src={post.author.avatar} size={42} />
         <div className="gl-post-author">
           <strong>
-            {post.author.name}
+            {creatorName(post.author.name)}
             {post.author.verified && <VerifiedBadge size={15} />}
           </strong>
           <span>{formatPostDate(post.createdAt, i18n.language)}</span>
@@ -349,7 +350,7 @@ export function PostCard({
                   <div className="gl-post-reply-target">
                     <span>
                       {t('posts.comments.replyingTo', {
-                        name: replyTarget.author.name,
+                        name: personName(replyTarget.author.name),
                         defaultValue: '回复 {{name}}',
                       })}
                     </span>
@@ -453,11 +454,11 @@ function PostCommentRow({
       className={cn('gl-post-comment', `is-depth-${Math.min(comment.depth, 2)}`)}
       id={`comment-${comment.id}`}
     >
-      <Avatar name={comment.author.name} src={comment.author.avatar} size={30} />
+      <Avatar name={personName(comment.author.name)} src={comment.author.avatar} size={30} />
       <div className="gl-post-comment-main">
         <div className="gl-post-comment-bubble">
           <div className="gl-post-comment-author">
-            <strong>{comment.author.name}</strong>
+            <strong>{personName(comment.author.name)}</strong>
             <span>{formatPostDate(comment.createdAt, i18n.language)}</span>
           </div>
           <p>{comment.content}</p>

@@ -42,7 +42,7 @@ import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/format';
 import { CoinAmount } from '@/components/CoinAmount';
 import { useIsAuthed, useAuthStore } from '@/stores/useAuthStore';
-import { userDisplayName } from '@/types/user';
+import { guestName, personName, userDisplayName } from '@/types/user';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import type { RoomViewer } from '@/stores/useRealtimeStore';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
@@ -251,6 +251,7 @@ const ChatRow = memo(function ChatRow({
 }) {
   const { t } = useTranslation('pages');
   const role = isOwner ? 'owner' : m.role;
+  const name = personName(m.user);
   const canOpenModeration = Boolean(canModerate && m.userId);
   const target = {
     userId: m.userId ?? '',
@@ -290,20 +291,20 @@ const ChatRow = memo(function ChatRow({
             onOpenModeration?.(target);
           }}
           aria-label={t('liveRoom.chatPanel.moderateUser', {
-            user: m.user,
-            defaultValue: `Moderate ${m.user}`,
+            user: name,
+            defaultValue: `Moderate ${name}`,
           })}
         >
-          <Avatar name={m.user} src={m.avatar} size={24} />
+          <Avatar name={name} src={m.avatar} size={24} />
         </button>
       </div>
       <div className="gl-chat-body">
         <span className="gl-chat-meta">
           <span
             className="gl-chat-user"
-            style={{ color: isOwner ? undefined : (m.color ?? userColor(m.user)) }}
+            style={{ color: isOwner ? undefined : (m.color ?? userColor(name)) }}
           >
-            {m.user}
+            {name}
           </span>
           {isOwner && <span className="gl-chat-owner-badge">{t('liveRoom.chatPanel.host')}</span>}
           {!isOwner && m.role === 'moderator' && (
@@ -372,14 +373,15 @@ const SuperChatCard = memo(function SuperChatCard({
 }) {
   const spec = tierSpec(m.tier);
   const { t } = useTranslation('pages');
+  const name = personName(m.user);
   return (
     <div
       className={cn('gl-sc', m.pending && 'opacity-50 saturate-50')}
       aria-busy={m.pending ? 'true' : undefined}
     >
       <div className="gl-sc-head" style={{ background: spec.bg }}>
-        <Avatar name={m.user} src={m.avatar} size={28} />
-        <span className="gl-sc-user">{m.user}</span>
+        <Avatar name={name} src={m.avatar} size={28} />
+        <span className="gl-sc-user">{name}</span>
         {m.userLevel && (
           <UserLevelBadge level={m.userLevel} size="compact" className="gl-sc-level" />
         )}
@@ -428,6 +430,7 @@ function PinnedSuperChatPill({
 }) {
   const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
+  const name = personName(m.user);
   const progress = Math.max(0, Math.min(100, (remainingMs / durationMs) * 100));
   const style = {
     '--sc-bg': spec.bg,
@@ -448,12 +451,12 @@ function PinnedSuperChatPill({
       aria-expanded={active}
       data-sc-pin-id={m.id}
       aria-label={t('liveRoom.chatPanel.openSuperChat', {
-        user: m.user,
+        user: name,
         defaultValue: 'Open SuperChat from {{user}}',
       })}
     >
-      <Avatar name={m.user} src={m.avatar} size={26} ring="rgba(255, 255, 255, 0.76)" />
-      <span className="gl-sc-pin-user">{m.user}</span>
+      <Avatar name={name} src={m.avatar} size={26} ring="rgba(255, 255, 255, 0.76)" />
+      <span className="gl-sc-pin-user">{name}</span>
     </button>
   );
 }
@@ -461,6 +464,7 @@ function PinnedSuperChatPill({
 function PinnedSuperChatBubble({ m, locale }: { m: SuperChatMessage; locale: string }) {
   const { t } = useTranslation('pages');
   const spec = tierSpec(m.tier);
+  const name = personName(m.user);
   const style = {
     '--sc-bg': spec.bg,
     '--sc-soft': spec.soft,
@@ -470,14 +474,14 @@ function PinnedSuperChatBubble({ m, locale }: { m: SuperChatMessage; locale: str
     <div className="gl-sc-pin-popover" role="dialog" style={style} data-sc-pin-popover-id={m.id}>
       <div className="gl-sc-pin-popover-head">
         <Avatar
-          name={m.user}
+          name={name}
           src={m.avatar}
           size={28}
           ring="rgba(255, 255, 255, 0.8)"
           className="gl-sc-pin-popover-avatar"
         />
         <div className="gl-sc-pin-popover-meta">
-          <strong>{m.user}</strong>
+          <strong>{name}</strong>
           <span>
             {t('account.coins', {
               ns: 'common',
@@ -514,7 +518,7 @@ const GiftNotice = memo(function GiftNotice({ m }: { m: GiftMessage }) {
       <div className="gl-gift-notice-body">
         <div className="gl-gift-notice-title">
           <span className="gl-gift-notice-user">
-            {m.self ? t('liveRoom.chatPanel.you') : m.user}
+            {m.self ? t('liveRoom.chatPanel.you') : personName(m.user)}
           </span>
           {m.userLevel && <UserLevelBadge level={m.userLevel} size="compact" />}
           <span>{t('liveRoom.chatPanel.sentGift')}</span>
@@ -573,6 +577,7 @@ function ViewerRankList({
         <div className="gl-viewer-list">
           {sorted.map((viewer, index) => {
             const rank = index + 1;
+            const name = viewer.userId ? personName(viewer.user) : guestName();
             return (
               <div key={`${viewer.userId ?? viewer.user}-${index}`} className="gl-viewer-row">
                 <span className={cn('gl-viewer-rank', rank <= 3 && `top-${rank}`)}>
@@ -592,15 +597,15 @@ function ViewerRankList({
                     });
                   }}
                   aria-label={t('liveRoom.chatPanel.moderateUser', {
-                    user: viewer.user,
-                    defaultValue: `Moderate ${viewer.user}`,
+                    user: name,
+                    defaultValue: `Moderate ${name}`,
                   })}
                 >
-                  <Avatar name={viewer.user} src={viewer.avatar} size={34} />
+                  <Avatar name={name} src={viewer.avatar} size={34} />
                 </button>
                 <div className="gl-viewer-main">
                   <span className="gl-viewer-name">
-                    <span>{viewer.user}</span>
+                    <span>{name}</span>
                     {viewer.userLevel && <UserLevelBadge level={viewer.userLevel} size="compact" />}
                   </span>
                   <span className="gl-viewer-sub">{t('liveRoom.chatPanel.online')}</span>

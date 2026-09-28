@@ -114,17 +114,16 @@ func heartbeat(t *testing.T, c *Conn) {
 }
 
 // A connection that resolved its identity while user-service was down (as
-// every client does when they all reconnect after a gateway deploy) kept
-// "Creator <id>" and level 0 for its whole life, in chat and in the viewer
-// list.
+// every client does when they all reconnect after a gateway deploy) kept no
+// name and level 0 for its whole life, in chat and in the viewer list.
 func TestConn_FallbackIdentityIsResolvedAgain(t *testing.T) {
 	res := &scriptedProfiles{}
-	res.set(profile.Profile{Name: "Creator u-7"}, false)
+	res.set(profile.Profile{}, false)
 	prod := &fakeProducer{}
 	c := newTestConn(auth.Identity{UserID: "u-7"}, prod)
 	c.profiles = res
 	joinTestRoom(t, c)
-	waitForViewer(t, c, "Creator u-7")
+	require.Equal(t, "u-7", waitForViewer(t, c, "").UserID)
 
 	// Retries wait for profileRetry.
 	heartbeat(t, c)
@@ -172,9 +171,9 @@ func TestConn_ChatUsesIdentityAsOfSending(t *testing.T) {
 	require.Equal(t, 4, waitForViewer(t, c, "Luna Moon").UserLevel, "the viewer list follows")
 
 	// A fallback served during an outage never replaces the entry.
-	res.set(profile.Profile{Name: "Creator u-7"}, false)
+	res.set(profile.Profile{}, false)
 	c.dispatchInbound(context.Background(), hub.Inbound{Type: "chat", Text: "still here"})
-	requireNoViewer(t, c, "Creator u-7")
+	requireNoViewer(t, c, "")
 }
 
 // viewer_profile, which the client sends after the user edits their profile,

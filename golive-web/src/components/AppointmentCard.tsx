@@ -19,7 +19,8 @@ import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import type { AppointmentItem } from '@/api/room';
-import { isPlaceholderChannelName, type Stream } from '@/types/stream';
+import type { Stream } from '@/types/stream';
+import { isPlaceholderName } from '@/types/user';
 import { formatDateTime } from '@/lib/format';
 
 export interface AppointmentCardProps {
@@ -68,8 +69,8 @@ export function AppointmentCard({
   const categoryLabel = t(`createLive.categories.${categoryKey(category)}`, {
     defaultValue: category,
   });
-  const channelName = appointment.channel || `Creator ${appointment.ownerId.slice(0, 8)}`;
-  const hasChannelName = !isPlaceholderChannelName(channelName);
+  const channelName = appointment.channel?.trim() ?? '';
+  const hasChannelName = !isPlaceholderName(channelName);
   const appointmentLabel = t('liveRoom.scheduledBadge', { defaultValue: 'Scheduled' });
   const hoverStyle = useCoverHoverStyle(
     appointment.cover,

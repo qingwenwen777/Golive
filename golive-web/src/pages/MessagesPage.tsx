@@ -74,6 +74,7 @@ import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { formatRelativeTime } from '@/lib/format';
+import { isUuidLike, personName, userName } from '@/types/user';
 
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
 type Translate = ReturnType<typeof useTranslation>['t'];
@@ -138,7 +139,7 @@ export default function MessagesPage() {
                 id: user?.id ?? '',
                 username: user?.username,
                 displayName: user?.displayName,
-                name: user?.displayName || user?.username || user?.id || '我',
+                name: userName(user),
                 avatar: user?.avatar,
                 verified: Boolean(user?.verified),
                 livePermissionStatus: user?.livePermissionStatus,
@@ -409,7 +410,7 @@ function PrivateMessages({
               />
               <div className="gl-direct-chat-meta">
                 <strong>
-                  {selectedThread.peer.name}
+                  {personName(selectedThread.peer.name)}
                   {selectedThread.peer.verified && <VerifiedBadge size={14} />}
                 </strong>
                 <span>
@@ -977,10 +978,10 @@ function ThreadButton({
       className={cn('gl-direct-thread', active && 'is-active')}
       onClick={onClick}
     >
-      <Avatar name={thread.peer.name} src={thread.peer.avatar} size={44} />
+      <Avatar name={personName(thread.peer.name)} src={thread.peer.avatar} size={44} />
       <span>
         <strong>
-          {thread.peer.name}
+          {personName(thread.peer.name)}
           {thread.peer.verified && <VerifiedBadge size={12} />}
         </strong>
         <small>
@@ -1015,7 +1016,7 @@ function FanGroupThreadButton({
           previewMembers.map((member) => (
             <Avatar
               key={member.user.id}
-              name={member.user.name}
+              name={personName(member.user.name)}
               src={member.user.avatar}
               size={26}
             />
@@ -1158,7 +1159,7 @@ function FanGroupChatView({
             })}
             {owner
               ? t('messages.fanGroupChat.ownerSuffix', {
-                  name: owner.user.name,
+                  name: personName(owner.user.name),
                   defaultValue: ' · 群主 {{name}}',
                 })
               : ''}
@@ -1239,7 +1240,7 @@ function FanGroupChatView({
                   avatarActions={avatarActions}
                   avatarTitle={
                     avatarActions.length
-                      ? item.sender.name
+                      ? personName(item.sender.name)
                       : isCreatorMessage
                         ? t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })
                         : undefined
@@ -1342,6 +1343,7 @@ function ChatMessageRow({
 }) {
   const { t } = useTranslation('pages');
   const isMine = sender.id === currentUserId;
+  const senderName = personName(sender.name);
   const hasAvatarActions = Boolean(avatarActions?.length);
   const actionable = Boolean(onAvatarClick || hasAvatarActions);
   const avatarButton = (
@@ -1360,10 +1362,10 @@ function ChatMessageRow({
           ? muted
             ? t('messages.fanGroupChat.avatarUnmute', { defaultValue: '解除禁言' })
             : t('messages.fanGroupChat.avatarMute', { defaultValue: '禁言该用户' })
-          : sender.name)
+          : senderName)
       }
     >
-      <Avatar name={sender.name} src={sender.avatar} size={38} />
+      <Avatar name={senderName} src={sender.avatar} size={38} />
       {muted && <span>{t('messages.fanGroupChat.mutedMark', { defaultValue: '禁' })}</span>}
     </button>
   );
@@ -1396,7 +1398,7 @@ function ChatMessageRow({
       {!isMine && avatar}
       <div className="gl-chat-message-stack">
         <div className="gl-chat-message-meta">
-          <strong>{sender.name}</strong>
+          <strong>{senderName}</strong>
           <FanBadgePill badge={fanBadge ?? sender.fanBadge} />
           <RoleBadge role={role} />
         </div>
@@ -1451,7 +1453,7 @@ function CreatorAvatarButton({
   const navigate = useNavigate();
   const { t } = useTranslation('pages');
   if (!enabled || !creatorId) {
-    return <Avatar name={user.name} src={user.avatar} size={42} />;
+    return <Avatar name={personName(user.name)} src={user.avatar} size={42} />;
   }
   return (
     <button
@@ -1460,7 +1462,7 @@ function CreatorAvatarButton({
       onClick={() => navigate(`/channel/${creatorId}`)}
       title={t('messages.actions.openCreatorChannel', { defaultValue: '进入主播频道' })}
     >
-      <Avatar name={user.name} src={user.avatar} size={42} />
+      <Avatar name={personName(user.name)} src={user.avatar} size={42} />
     </button>
   );
 }
@@ -1527,7 +1529,7 @@ function FanGroupMuteDialog({
         <div className="gl-mute-target">
           <ShieldCheck size={22} />
           <div>
-            <strong>{target?.user.name ?? ''}</strong>
+            <strong>{target ? personName(target.user.name) : ''}</strong>
             <span>{statusText}</span>
           </div>
         </div>
@@ -1718,7 +1720,13 @@ function NotificationPanel({ title, box, empty }: { title: string; box: string; 
               <Avatar name={item.actorName || item.title} src={item.actorAvatar} size={42} />
               <span>
                 <strong>{item.title}</strong>
-                {item.actorName && <small>@{item.actorUsername || item.actorName}</small>}
+                {item.actorName && (
+                  <small>
+                    {item.actorUsername && !isUuidLike(item.actorUsername)
+                      ? `@${item.actorUsername}`
+                      : personName(item.actorName)}
+                  </small>
+                )}
                 {item.body && <p>{item.body}</p>}
                 <time>{formatMessageTime(item.createdAt, i18n.language)}</time>
               </span>

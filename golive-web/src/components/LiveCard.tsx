@@ -29,7 +29,8 @@ import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { useLangStore } from '@/stores/useLangStore';
-import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
+import { streamChannelName, type Stream } from '@/types/stream';
+import { isPlaceholderName } from '@/types/user';
 
 export interface LiveCardProps {
   stream: Stream;
@@ -47,7 +48,7 @@ export function LiveCard({ stream, onClick, priority }: LiveCardProps) {
   const title = lang === 'ja' ? (stream.titleJa ?? stream.title) : stream.title;
   const category = lang === 'ja' ? (stream.categoryJa ?? stream.category) : stream.category;
   const channelName = streamChannelName(stream);
-  const hasChannelName = !isPlaceholderChannelName(channelName);
+  const hasChannelName = !isPlaceholderName(channelName);
   const isLive = stream.isLive === true || stream.status === 'live';
   const hasReplay = stream.status === 'ended' && Boolean(stream.replay?.canWatch);
   const isScheduled = stream.status === 'scheduled' || stream.status === 'publishing';

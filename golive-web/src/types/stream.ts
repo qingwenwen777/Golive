@@ -1,4 +1,4 @@
-import { isUuidLike, userDisplayName, type User } from './user';
+import { isPlaceholderName, unknownCreatorName, userName, type User } from './user';
 
 export interface Stream {
   id: string;
@@ -75,22 +75,18 @@ export interface RoomsQuery {
   size?: number;
 }
 
+// streamChannelName is the stream's channel name, the viewer's own name on
+// their own stream, or a translated "Unknown creator" (a placeholder: see
+// isPlaceholderName).
 export function streamChannelName(
   stream: Pick<Stream, 'channel' | 'ownerId'>,
   viewer?: Pick<User, 'displayName' | 'username' | 'id'> | null,
 ): string {
   const raw = stream.channel?.trim();
-  if (raw && !isUuidLike(raw)) return raw;
-  if (viewer && stream.ownerId && viewer.id === stream.ownerId) return userDisplayName(viewer);
-  const fallback = raw || stream.ownerId;
-  if (fallback) return `Creator ${fallback.slice(0, 8)}`;
-  return 'Creator';
-}
-
-export function isPlaceholderChannelName(name: string | null | undefined): boolean {
-  const trimmed = name?.trim() ?? '';
-  if (!trimmed) return true;
-  if (isUuidLike(trimmed)) return true;
-  if (trimmed.toLowerCase() === 'creator') return true;
-  return /^Creator\s+[0-9a-f-]{6,}$/i.test(trimmed);
+  if (raw && !isPlaceholderName(raw)) return raw;
+  if (viewer && stream.ownerId && viewer.id === stream.ownerId) {
+    const own = userName(viewer);
+    if (own) return own;
+  }
+  return unknownCreatorName();
 }

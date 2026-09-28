@@ -125,7 +125,7 @@ import { LoadableImage } from '@/components/LoadableImage';
 import { PostCard } from '@/features/posts/PostCard';
 import type { Message } from '@/types/message';
 import type { ReplayVisibility, Stream } from '@/types/stream';
-import { userDisplayName, type User } from '@/types/user';
+import { personName, userDisplayName, userName, type User } from '@/types/user';
 import { formatDateTime, formatNumber } from '@/lib/format';
 
 const DEFAULT_CATEGORY = 'Just Chatting';
@@ -545,7 +545,7 @@ export function CreatorPreparePage() {
           description: description.trim(),
           category,
           cover: uploadedCover,
-          channelName: userDisplayName(user),
+          channelName: userName(user),
           avatar: user.avatar,
           fanClubOnly,
         },
@@ -1172,7 +1172,7 @@ export function CreatorAppointmentsPage() {
         description: normalizedDescription,
         category,
         cover,
-        channelName: userDisplayName(user),
+        channelName: userName(user),
         avatar: user.avatar,
         fanClubOnly,
       };
@@ -1807,8 +1807,8 @@ export function CreatorRoomModeratorsPage() {
       onSuccess: () =>
         toast.success(
           t('studio.moderators.added', {
-            name: target.name,
-            defaultValue: `${target.name} 已成为房间房管。`,
+            name: personName(target.name),
+            defaultValue: `${personName(target.name)} 已成为房间房管。`,
           }),
         ),
       onError: (err) => toast.error(moderatorAddErrorMessage(err, t)),
@@ -1820,8 +1820,8 @@ export function CreatorRoomModeratorsPage() {
       onSuccess: () =>
         toast.success(
           t('studio.moderators.removed', {
-            name: target.name,
-            defaultValue: `${target.name} 已取消房管资格。`,
+            name: personName(target.name),
+            defaultValue: `${personName(target.name)} 已取消房管资格。`,
           }),
         ),
       onError: (err) =>
@@ -2246,9 +2246,9 @@ function FanGroupPanel({
           </strong>
           {pendingMembers.map((member) => (
             <div key={member.user.id} className="gl-fan-group-request">
-              <Avatar name={member.user.name} src={member.user.avatar} size={34} />
+              <Avatar name={personName(member.user.name)} src={member.user.avatar} size={34} />
               <span>
-                <b>{member.user.name}</b>
+                <b>{personName(member.user.name)}</b>
                 <small>
                   {member.rejoinRequestedAt
                     ? formatFanGroupDate(member.rejoinRequestedAt, locale)
@@ -2282,9 +2282,9 @@ function FanGroupPanel({
             const canManage = member.role !== 'owner';
             return (
               <div key={member.user.id} className="gl-fan-group-member">
-                <Avatar name={member.user.name} src={member.user.avatar} size={38} />
+                <Avatar name={personName(member.user.name)} src={member.user.avatar} size={38} />
                 <div className="gl-fan-group-member-main">
-                  <strong>{member.user.name}</strong>
+                  <strong>{personName(member.user.name)}</strong>
                   <span>
                     {member.user.username ? `@${member.user.username}` : member.user.id} ·{' '}
                     {fanGroupRoleLabel(member.role, t)}
@@ -2377,9 +2377,9 @@ function ModerationUserRow({
   const { t } = useTranslation('pages');
   return (
     <div className="gl-room-mod-user-row">
-      <Avatar name={user.name} src={user.avatar} size={38} />
+      <Avatar name={personName(user.name)} src={user.avatar} size={38} />
       <div>
-        <strong>{user.name}</strong>
+        <strong>{personName(user.name)}</strong>
         <span>{user.username ? `@${user.username}` : user.id}</span>
       </div>
       {active && (
@@ -3072,9 +3072,9 @@ export function CreatorLiveConsolePage() {
         onSuccess: (resp) => {
           toast.success(
             t('liveRoom.moderation.muted', {
-              user: resp.targetName,
+              user: personName(resp.targetName),
               minutes: resp.durationMinutes,
-              defaultValue: `${resp.targetName} muted for ${resp.durationMinutes} minutes.`,
+              defaultValue: `${personName(resp.targetName)} muted for ${resp.durationMinutes} minutes.`,
             }),
           );
           setModerationTarget(null);
@@ -3093,8 +3093,8 @@ export function CreatorLiveConsolePage() {
       onSuccess: () => {
         toast.success(
           t('liveRoom.moderation.unmuted', {
-            user: moderationTarget.user,
-            defaultValue: `${moderationTarget.user} was unmuted.`,
+            user: personName(moderationTarget.user),
+            defaultValue: `${personName(moderationTarget.user)} was unmuted.`,
           }),
         );
         setModerationTarget(null);
@@ -4227,7 +4227,7 @@ function StudioInteractionRail({
               <div className="gl-live-console-gift-row" key={item.key}>
                 <GiftArt gift={{ name: item.name, icon: item.icon }} size={28} />
                 <div className="gl-live-console-gift-main">
-                  <strong>{item.user}</strong>
+                  <strong>{personName(item.user)}</strong>
                   <small>{item.name}</small>
                 </div>
                 <small>x{item.count}</small>
@@ -4262,7 +4262,7 @@ function StudioInteractionRail({
           {visibleSuperChats.length > 0 ? (
             visibleSuperChats.map((item) => (
               <div key={item.id}>
-                <strong>{item.user}</strong>
+                <strong>{personName(item.user)}</strong>
                 <span>{item.amount}</span>
                 <p>{item.text}</p>
               </div>
@@ -4391,7 +4391,7 @@ function ConsoleMuteUserDialog({
         <div className="gl-mute-target">
           <ShieldCheck size={22} />
           <div>
-            <strong>{target?.user ?? ''}</strong>
+            <strong>{target ? personName(target.user) : ''}</strong>
             <span>{statusText}</span>
           </div>
         </div>

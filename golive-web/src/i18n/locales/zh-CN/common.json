@@ -75,6 +75,11 @@
     "signOut": "退出登录",
     "bannedAppeal": "限制申诉"
   },
+  "names": {
+    "unknownUser": "未知用户",
+    "unknownCreator": "未知主播",
+    "guest": "游客"
+  },
   "badges": {
     "platformVerified": "平台认证主播"
   },

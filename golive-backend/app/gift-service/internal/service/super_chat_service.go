@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -190,24 +191,20 @@ func (s *SuperChatService) containsBlockedWord(ctx context.Context, text string)
 
 func (s *SuperChatService) broadcastName(ctx context.Context, req SendSuperChatReq) string {
 	if name, err := s.orders.DisplayNameForUser(ctx, req.UserID); err == nil && name != "" {
-		return cleanBroadcastName(name, req.UserID)
+		return cleanBroadcastName(name)
 	}
-	return cleanBroadcastName(req.Username, req.UserID)
+	return cleanBroadcastName(req.Username)
 }
 
-func cleanBroadcastName(name, userID string) string {
-	name = strings.TrimSpace(name)
-	if name != "" && len([]rune(name)) <= 64 && !strings.ContainsAny(name, "\r\n\t") {
-		return name
-	}
+var uuidLike = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-	id := strings.TrimSpace(userID)
-	if id == "" {
-		return "Creator"
+// cleanBroadcastName is the sender name broadcast with a gift or Super Chat,
+// or "" when there is no usable one (a bare uuid is not a name); the apps
+// then label the sender in the viewer's language.
+func cleanBroadcastName(name string) string {
+	name = strings.TrimSpace(name)
+	if len([]rune(name)) > 64 || strings.ContainsAny(name, "\r\n\t") || uuidLike.MatchString(name) {
+		return ""
 	}
-	runes := []rune(id)
-	if len(runes) > 8 {
-		id = string(runes[:8])
-	}
-	return "Creator " + id
+	return name
 }

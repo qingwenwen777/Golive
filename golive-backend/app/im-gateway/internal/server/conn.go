@@ -284,7 +284,7 @@ const profileRetryDelay = 5 * time.Second
 // again on a later frame.
 func (c *Conn) resolveProfile(ctx context.Context, refresh bool) (profile.Profile, bool) {
 	if c.profiles == nil {
-		return profile.Profile{UserID: c.identity.UserID, Name: profile.FallbackName(c.identity.UserID)}, true
+		return profile.Profile{UserID: c.identity.UserID}, true
 	}
 	var p profile.Profile
 	var ok bool

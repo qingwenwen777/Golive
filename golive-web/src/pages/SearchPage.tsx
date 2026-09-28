@@ -22,6 +22,7 @@ import { LoadableImage } from '@/components/LoadableImage';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
 import { streamChannelName, type Stream } from '@/types/stream';
+import { creatorName, isUuidLike } from '@/types/user';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import { formatCount, formatDateTime, formatRelativeTime } from '@/lib/format';
@@ -192,6 +193,7 @@ function SearchSection({
 
 function CreatorResultRow({ creator }: { creator: SearchCreator }) {
   const { t } = useTranslation('pages');
+  const name = creatorName(creator.name);
   const isAuthed = useIsAuthed();
   const openLogin = useAuthModalStore((s) => s.openLogin);
   const queryClient = useQueryClient();
@@ -218,15 +220,15 @@ function CreatorResultRow({ creator }: { creator: SearchCreator }) {
   return (
     <article className="gl-search-result-row is-creator">
       <Link className="gl-search-creator-link" to={channelPath}>
-        <Avatar name={creator.name} src={creator.avatar} size={116} />
+        <Avatar name={name} src={creator.avatar} size={116} />
       </Link>
       <div className="gl-search-result-main">
         <Link className="gl-search-title" to={channelPath}>
-          {creator.name}
+          {name}
           {creator.verified && <VerifiedBadge size={16} />}
         </Link>
         <div className="gl-search-meta">
-          {creator.username && <span>@{creator.username}</span>}
+          {creator.username && !isUuidLike(creator.username) && <span>@{creator.username}</span>}
           <span>
             {t('search.subscribers', {
               count: creator.subscriberCount,
@@ -366,15 +368,16 @@ function PostResultRow({ post }: { post: ChannelPost }) {
   const { t, i18n } = useTranslation('pages');
   const channelPath = `/channel/${encodeURIComponent(post.channelId)}`;
   const image = post.images[0];
+  const authorName = creatorName(post.author.name);
 
   return (
     <article className="gl-search-result-row is-post">
       <Link className="gl-search-post-author" to={channelPath}>
-        <Avatar name={post.author.name} src={post.author.avatar} size={44} />
+        <Avatar name={authorName} src={post.author.avatar} size={44} />
       </Link>
       <div className="gl-search-result-main">
         <Link className="gl-search-channel-line is-post-author" to={channelPath}>
-          <span>{post.author.name}</span>
+          <span>{authorName}</span>
           {post.author.verified && <VerifiedBadge size={14} />}
           <small>{formatRelativeTime(post.createdAt, i18n.language)}</small>
         </Link>

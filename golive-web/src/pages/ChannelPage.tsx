@@ -68,8 +68,15 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import type { FanClubMember } from '@/types/gift';
-import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
-import { isUuidLike, userDisplayName, type User } from '@/types/user';
+import { streamChannelName, type Stream } from '@/types/stream';
+import {
+  isPlaceholderName,
+  isUuidLike,
+  personName,
+  unknownCreatorName,
+  userName,
+  type User,
+} from '@/types/user';
 import { formatNumber, formatRelativeTime } from '@/lib/format';
 
 const HISTORY_PAGE_SIZE = 4;
@@ -122,7 +129,7 @@ export default function ChannelPage() {
     [channelKey, profile, profileUnknown, streams],
   );
   const primary = channelStreams[0];
-  const resolvedChannelName = resolveChannelName(profile, primary, channelKey, t);
+  const resolvedChannelName = resolveChannelName(profile, primary, channelKey);
   const channelIdentityPending = shouldHoldChannelIdentity({
     channelKey,
     profile,
@@ -131,6 +138,7 @@ export default function ChannelPage() {
     roomsPending: rooms.isPending,
   });
   const channelName = resolvedChannelName;
+  const channelHandle = formatChannelHandle(profile, channelKey, t);
   const channelAvatar = channelIdentityPending ? '' : profile?.avatar || primary?.avatar || '';
   const channelCover = channelIdentityPending ? '' : resolveChannelCover(profile);
   const channelId =
@@ -380,10 +388,8 @@ export default function ChannelPage() {
                   <Skeleton className="gl-channel-handle-skeleton is-short" />
                   <Skeleton className="gl-channel-handle-skeleton" />
                 </>
-              ) : profile?.username ? (
-                <span>@{profile.username}</span>
               ) : (
-                <span>{formatChannelKey(channelKey, t)}</span>
+                channelHandle && <span>{channelHandle}</span>
               )}
               <span>{t('channel.subscribers', { count: subscriberCount })}</span>
             </div>
@@ -1070,8 +1076,8 @@ function FanClubBanner({
               ))
             ) : preview.length ? (
               preview.map((fan) => (
-                <div className="gl-fan-club-avatar-wrap" key={fan.id} title={fan.name}>
-                  <Avatar name={fan.name} src={fan.avatar ?? ''} size={42} />
+                <div className="gl-fan-club-avatar-wrap" key={fan.id} title={personName(fan.name)}>
+                  <Avatar name={personName(fan.name)} src={fan.avatar ?? ''} size={42} />
                   {fan.level && (
                     <span
                       className={cn(
@@ -1206,16 +1212,11 @@ function resolveProfile(
   return null;
 }
 
-function resolveChannelName(
-  profile: User | null,
-  stream: Stream | undefined,
-  key: string,
-  t: ReturnType<typeof useTranslation>['t'],
-): string {
-  if (profile) return userDisplayName(profile);
+function resolveChannelName(profile: User | null, stream: Stream | undefined, key: string): string {
+  if (profile) return userName(profile) || unknownCreatorName();
   if (stream) return streamChannelName(stream);
-  if (key && !isUuidLike(key)) return key;
-  return t('channel.creatorFallback');
+  if (!isPlaceholderName(normalizeCreatorId(key))) return key;
+  return unknownCreatorName();
 }
 
 function shouldHoldChannelIdentity({
@@ -1233,9 +1234,8 @@ function shouldHoldChannelIdentity({
 }): boolean {
   if (profile || (!profilePending && !roomsPending)) return false;
   const key = channelKey.startsWith('ch-') ? channelKey.slice(3) : channelKey;
-  if (!key || isUuidLike(key)) return true;
-  if (isPlaceholderChannelName(key)) return true;
-  return Boolean(stream && isPlaceholderChannelName(streamChannelName(stream)));
+  if (isPlaceholderName(key)) return true;
+  return Boolean(stream && isPlaceholderName(streamChannelName(stream)));
 }
 
 export function resolveChannelCover(profile: User | null): string {
@@ -1284,10 +1284,16 @@ function normalizeCreatorId(id: string): string {
   return id.startsWith('ch-') ? id.slice(3) : id;
 }
 
-function formatChannelKey(key: string, t: ReturnType<typeof useTranslation>['t']): string {
+// The handle under the channel name: @username, else the key the page was
+// opened with, else nothing when either is only an id.
+function formatChannelHandle(
+  profile: User | null,
+  key: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  if (profile?.username && !isUuidLike(profile.username)) return `@${profile.username}`;
   if (!key) return t('channel.title');
-  if (!isUuidLike(key)) return key;
-  return t('channel.creatorShort', { id: key.slice(0, 8) });
+  return isUuidLike(normalizeCreatorId(key)) ? '' : key;
 }
 
 function formatHistoryDate(value: string, locale: string): string {

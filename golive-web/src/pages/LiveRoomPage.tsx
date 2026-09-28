@@ -69,7 +69,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
 import { isNotFoundError } from '@/lib/httpError';
 import type { AppointmentItem } from '@/api/room';
-import { userDisplayName } from '@/types/user';
+import { personName, userName } from '@/types/user';
 import { streamChannelName, type Stream } from '@/types/stream';
 import type { FanBadge } from '@/types/gift';
 import type { Message } from '@/types/message';
@@ -921,7 +921,7 @@ export default function LiveRoomPage() {
           onSent={({ gift, count, requestId }) => {
             const totalCoin = gift.priceCoin * count;
             const giftName = localizedGiftName(gift, locale, t);
-            const currentName = currentUser ? userDisplayName(currentUser) : 'You';
+            const currentName = userName(currentUser);
             if (currentUser) {
               incrementViewerContribution(
                 roomId,
@@ -1095,7 +1095,7 @@ export default function LiveRoomPage() {
         onSent={({ gift, count, requestId }) => {
           const totalCoin = gift.priceCoin * count;
           const giftName = localizedGiftName(gift, locale, t);
-          const currentName = currentUser ? userDisplayName(currentUser) : 'You';
+          const currentName = userName(currentUser);
           if (currentUser) {
             incrementViewerContribution(
               roomId,
@@ -1768,9 +1768,9 @@ function LiveRoomModerationDialog({
         onSuccess: (resp) => {
           toast.success(
             t('liveRoom.moderation.muted', {
-              user: resp.targetName,
+              user: personName(resp.targetName),
               minutes: resp.durationMinutes,
-              defaultValue: `${resp.targetName} muted for ${resp.durationMinutes} minutes.`,
+              defaultValue: `${personName(resp.targetName)} muted for ${resp.durationMinutes} minutes.`,
             }),
           );
           closeModeration();
@@ -1790,8 +1790,8 @@ function LiveRoomModerationDialog({
       onSuccess: () => {
         toast.success(
           t('liveRoom.moderation.unmuted', {
-            user: moderationTarget.user,
-            defaultValue: `${moderationTarget.user} was unmuted.`,
+            user: personName(moderationTarget.user),
+            defaultValue: `${personName(moderationTarget.user)} was unmuted.`,
           }),
         );
         closeModeration();
@@ -1867,7 +1867,7 @@ function MuteUserDialog({
         <div className="gl-mute-target">
           <ShieldCheck size={22} />
           <div>
-            <strong>{target?.user ?? ''}</strong>
+            <strong>{target ? personName(target.user) : ''}</strong>
             <span>{statusText}</span>
           </div>
         </div>

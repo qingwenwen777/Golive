@@ -20,7 +20,6 @@ import (
 // SendGiftReq is what the HTTP layer hands us after parsing the body.
 type SendGiftReq struct {
 	UserID    string
-	Username  string // for the broadcast "user" field
 	RoomID    string
 	GiftID    string
 	Count     int
@@ -308,9 +307,9 @@ func (s *GiftService) JoinFanClub(ctx context.Context, req JoinFanClubReq) (*mod
 	return persisted, false, ErrInsufficientCoin
 }
 
+// broadcastName is the sender's name from users, or "" when it can't be
+// read; the apps label a sender without a name.
 func (s *GiftService) broadcastName(ctx context.Context, req SendGiftReq) string {
-	if name, err := s.orders.DisplayNameForUser(ctx, req.UserID); err == nil && name != "" {
-		return cleanBroadcastName(name, req.UserID)
-	}
-	return cleanBroadcastName(req.Username, req.UserID)
+	name, _ := s.orders.DisplayNameForUser(ctx, req.UserID)
+	return cleanBroadcastName(name)
 }

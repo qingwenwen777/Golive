@@ -5,7 +5,8 @@ import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { LoadableImage } from '@/components/LoadableImage';
 import { useCoverHoverStyle } from '@/hooks/useCoverHoverStyle';
 import { cn } from '@/lib/cn';
-import { isPlaceholderChannelName, streamChannelName } from '@/types/stream';
+import { streamChannelName } from '@/types/stream';
+import { isPlaceholderName } from '@/types/user';
 
 /**
  * Minimal shape needed to render a replay (VOD) card. Both `HotReplayItem`
@@ -43,7 +44,7 @@ export function ReplayCard({ replay, channelName, channelAvatar, priority }: Rep
   const { t, i18n } = useTranslation('pages');
   const resolvedChannelName =
     channelName ?? streamChannelName({ channel: replay.channel ?? '', ownerId: replay.ownerId });
-  const hasChannelName = !isPlaceholderChannelName(resolvedChannelName);
+  const hasChannelName = !isPlaceholderName(resolvedChannelName);
   const title = i18n.language === 'ja' ? (replay.titleJa ?? replay.title) : replay.title;
   const category =
     i18n.language === 'ja' ? (replay.categoryJa ?? replay.category) : replay.category;

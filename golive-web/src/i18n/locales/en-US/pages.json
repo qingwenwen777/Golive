@@ -336,8 +336,6 @@
   "channel": {
     "title": "Channel",
     "name": "Channel: {{name}}",
-    "creatorFallback": "Creator",
-    "creatorShort": "Creator {{id}}",
     "copyTarget": "channel link",
     "copyManual": "Channel link opened for manual copy.",
     "copySuccess": "Channel link copied.",

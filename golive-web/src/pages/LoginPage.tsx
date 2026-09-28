@@ -4,7 +4,8 @@ import { useRecommendedRooms } from '@/api/room';
 import { LoadableImage } from '@/components/LoadableImage';
 import { AuthPanel } from '@/features/auth/AuthPanel';
 import { useLangStore } from '@/stores/useLangStore';
-import { isPlaceholderChannelName, streamChannelName } from '@/types/stream';
+import { streamChannelName } from '@/types/stream';
+import { isPlaceholderName } from '@/types/user';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -74,7 +75,7 @@ function LoginShowcase() {
       </div>
       <div className="gl-auth-preview-bottom">
         <div className="gl-auth-preview-title">{title}</div>
-        {!isPlaceholderChannelName(channelName) && (
+        {!isPlaceholderName(channelName) && (
           <div className="gl-auth-preview-meta">{channelName}</div>
         )}
       </div>

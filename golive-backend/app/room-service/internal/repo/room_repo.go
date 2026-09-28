@@ -1184,27 +1184,30 @@ func IsUUIDLike(s string) bool {
 	return uuidPatternRe.MatchString(strings.TrimSpace(s))
 }
 
-// FixUUIDChannels rewrites legacy rows where rooms.channel was stored as a
-// raw user UUID. Prefer the real display name from users; fall back to a
-// short Creator label if the matching user row is not available.
-// Runs once on startup; safe to invoke repeatedly.
+// FixUUIDChannels repairs rooms.channel values that are not names: a raw
+// user uuid, or the English "Creator <owner id prefix>" label older builds
+// stored for a creator without a name. They get the owner's display name or
+// username from users, or "" when the owner has none, and the apps label a
+// channel without a name in the viewer's language. Runs once on startup;
+// safe to invoke repeatedly.
 func (r *RoomRepo) FixUUIDChannels(ctx context.Context) (int64, error) {
 	joined := r.db.WithContext(ctx).Exec(`
 UPDATE rooms AS r
 JOIN users AS u ON u.id = r.owner_id
 SET r.channel = COALESCE(NULLIF(u.display_name, ''), u.username),
     r.avatar = COALESCE(NULLIF(u.avatar, ''), r.avatar)
-WHERE r.channel REGEXP ?
+WHERE (r.channel REGEXP ? OR r.channel = CONCAT('Creator ', SUBSTRING(r.owner_id, 1, 8)))
   AND COALESCE(NULLIF(u.display_name, ''), u.username) <> ''
-`, uuidPattern)
+  AND COALESCE(NULLIF(u.display_name, ''), u.username) NOT REGEXP ?
+`, uuidPattern, uuidPattern)
 	if joined.Error != nil {
 		return joined.RowsAffected, joined.Error
 	}
 
 	fallback := r.db.WithContext(ctx).
 		Model(&model.Room{}).
-		Where("channel REGEXP ?", uuidPattern).
-		Update("channel", gorm.Expr("CONCAT('Creator ', SUBSTRING(channel, 1, 8))"))
+		Where("channel REGEXP ? OR channel = CONCAT('Creator ', SUBSTRING(owner_id, 1, 8))", uuidPattern).
+		Update("channel", "")
 	return joined.RowsAffected + fallback.RowsAffected, fallback.Error
 }
 

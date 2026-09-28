@@ -75,6 +75,11 @@
     "signOut": "Sign out",
     "bannedAppeal": "Restriction appeal"
   },
+  "names": {
+    "unknownUser": "Unknown user",
+    "unknownCreator": "Unknown creator",
+    "guest": "Guest"
+  },
   "badges": {
     "platformVerified": "Platform verified creator"
   },

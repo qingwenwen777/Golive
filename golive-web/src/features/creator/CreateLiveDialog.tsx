@@ -22,7 +22,7 @@ import {
 } from '@/features/media/ImageCropField';
 import { savePublisherSession } from '@/features/creator/publisherSession';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { userDisplayName } from '@/types/user';
+import { userName } from '@/types/user';
 
 const MAX_LIVE_COVER_SIZE = 5 * 1024 * 1024;
 const LIVE_COVER_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -101,7 +101,7 @@ export function CreateLiveDialog({ open, onOpenChange }: CreateLiveDialogProps) 
   const [processingCover, setProcessingCover] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentUser = meUser ?? user;
-  const channelName = useMemo(() => userDisplayName(currentUser), [currentUser]);
+  const channelName = useMemo(() => userName(currentUser), [currentUser]);
   const categories = CATEGORIES_EN.filter((c) => c !== 'All');
   const livePermissionStatus = currentUser?.livePermissionStatus ?? 'none';
   const canGoLive = livePermissionStatus === 'approved';

@@ -16,6 +16,7 @@ import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { formatCount, formatNumber } from '@/lib/format';
+import { isUuidLike, personName, userDisplayName } from '@/types/user';
 
 const MAX_COMMENT_LENGTH = 500;
 
@@ -177,13 +178,13 @@ export function ReplayComments({
       </div>
 
       <form className="gl-replay-comment-composer" onSubmit={submit}>
-        <Avatar name={currentUser?.displayName || currentUser?.username || 'Guest'} src={currentUser?.avatar} size={40} />
+        <Avatar name={userDisplayName(currentUser)} src={currentUser?.avatar} size={40} />
         <div className="gl-replay-comment-composer-main">
           {replyTarget && (
             <div className="gl-replay-comment-reply-chip">
               <span>
                 {t('replayComments.replyingTo', {
-                  name: replyTarget.author.name,
+                  name: personName(replyTarget.author.name),
                   defaultValue: '回复 {{name}}',
                 })}
               </span>
@@ -292,6 +293,8 @@ function ReplayCommentRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const nestedCount = countNested(comment.children);
   const isOwnerComment = Boolean(ownerId) && comment.userId === ownerId;
+  const authorName = personName(comment.author.name);
+  const { username } = comment.author;
 
   const handleLike = () => {
     if (!isAuthed) {
@@ -315,11 +318,11 @@ function ReplayCommentRow({
 
   return (
     <div className="gl-replay-comment" id={`replay-comment-${comment.id}`}>
-      <Avatar name={comment.author.name} src={comment.author.avatar} size={comment.depth > 0 ? 30 : 40} />
+      <Avatar name={authorName} src={comment.author.avatar} size={comment.depth > 0 ? 30 : 40} />
       <div className="gl-replay-comment-body">
         <div className="gl-replay-comment-meta">
           <span className={cn('gl-replay-comment-author', isOwnerComment && 'is-owner')}>
-            @{comment.author.username || comment.author.name}
+            {username && !isUuidLike(username) ? `@${username}` : authorName}
           </span>
           {comment.author.verified && <VerifiedBadge size={13} />}
           <span className="gl-replay-comment-time">

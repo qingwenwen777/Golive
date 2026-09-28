@@ -82,7 +82,8 @@ func TestUserProfiles(t *testing.T) {
 	require.Greater(t, profiles["u1"].Level, 1, "level comes from top-ups")
 	require.Equal(t, "kabun", profiles["u2"].Name)
 	require.Equal(t, 1, profiles["u2"].Level)
-	require.Equal(t, "Creator 3f2a0c1e", profiles["3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"].Name)
+	require.Empty(t, profiles["3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f"].Name,
+		"no name made from the id; the apps label it")
 }
 
 func TestAutoMigrateCreatesRoomTsIndexPerShard(t *testing.T) {
@@ -145,6 +146,32 @@ func TestSuperChatHistory_ExcludesModerated(t *testing.T) {
 	rows, err := NewDanmuRepo(db, 8).SuperChatHistory(context.Background(), "live-1", 0, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// A sender without a name used to be shown by user id (a deleted user) or
+// uuid username; the apps label a sender without a name instead.
+func TestSuperChatHistory_NeverNamesSendersByID(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	db, err := gorm.Open(mysql.New(mysql.Config{Conn: sqlDB, SkipInitializeWithVersion: true}), &gorm.Config{})
+	require.NoError(t, err)
+
+	mock.ExpectQuery(`COALESCE\(NULLIF\(u\.display_name, ''\), NULLIF\(u\.username, ''\), ''\) AS user`).
+		WithArgs("live-1", "success", 50).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user", "avatar", "amount", "tier", "text", "ts"}).
+			AddRow("sc-1", "Fan", "", 1000, 2, "hi", 3).
+			AddRow("sc-2", "3f2a0c1e-9b7d-4c1a-8e2f-0a1b2c3d4e5f", "", 1000, 2, "hi", 2).
+			AddRow("sc-3", "", "", 1000, 2, "hi", 1))
+
+	rows, err := NewDanmuRepo(db, 8).SuperChatHistory(context.Background(), "live-1", 0, 0)
+	require.NoError(t, err)
+	names := make([]string, 0, len(rows))
+	for _, row := range rows {
+		names = append(names, row.User)
+	}
+	require.Equal(t, []string{"Fan", "", ""}, names)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

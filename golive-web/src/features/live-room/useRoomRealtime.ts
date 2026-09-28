@@ -12,7 +12,7 @@ import {
 } from '@/lib/authToken';
 import { loadRecentChatMessages, saveRecentChatMessage } from '@/lib/recentChatCache';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { userDisplayName } from '@/types/user';
+import { userName } from '@/types/user';
 import type { Stream } from '@/types/stream';
 import { betQueryKey } from '@/api/bet';
 import { luckyBagQueryKey } from '@/api/luckyBag';
@@ -329,7 +329,7 @@ export function useRoomRealtime(
       }
       case 'gift': {
         const count = parsed.count ?? 1;
-        const currentName = userDisplayName(currentUser);
+        const currentName = userName(currentUser);
         // Dedupe priority:
         //   1) Same requestId already present (the local optimistic copy).
         //      The server broadcast may use a different message id (orderID)
