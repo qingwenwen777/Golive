@@ -73,6 +73,7 @@ import { cn } from '@/lib/cn';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import { formatRelativeTime } from '@/lib/format';
 
 type MessageSection = 'private' | 'replies' | 'likes' | 'system' | 'settings';
 type Translate = ReturnType<typeof useTranslation>['t'];
@@ -1983,12 +1984,7 @@ function isSameCalendarDay(left: Date, right: Date): boolean {
 }
 
 function formatMessageTime(value: string, locale = 'en-US'): string {
-  return new Intl.DateTimeFormat(locale || 'en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  return formatRelativeTime(value, locale || 'en-US');
 }
 
 function apiErrorReason(err: unknown): string | undefined {

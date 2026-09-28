@@ -80,6 +80,7 @@ import { useThemeStore } from '@/stores/useThemeStore';
 import type { FanBadge } from '@/types/gift';
 import type { Stream } from '@/types/stream';
 import { userDisplayName, type User } from '@/types/user';
+import { formatNumber } from '@/lib/format';
 
 export function SubscriptionsPage() {
   const { t } = useTranslation('pages');
@@ -419,7 +420,7 @@ export function YouPage() {
               title={t('library.you.openCoinCenter')}
             >
               <Wallet size={14} />
-              <span>{balance.toLocaleString()}</span>
+              <span>{formatNumber(balance)}</span>
               <span className="gl-yt-coin-chip-add">{t('library.you.recharge')}</span>
             </button>
             <Link className="gl-yt-chip" to="/watch-later">
@@ -669,7 +670,7 @@ function FanBadgeShelf({
                 </span>
                 <span>
                   {t('library.fanBadges.contribution', {
-                    amount: badge.totalContribution.toLocaleString(),
+                    amount: formatNumber(badge.totalContribution),
                   })}
                 </span>
               </div>
@@ -1747,7 +1748,7 @@ function BlacklistSettings({
         </div>
       </div>
       {pending ? (
-        <div className="gl-settings-empty-line">{t('loading', { defaultValue: 'Loading...' })}</div>
+        <div className="gl-settings-empty-line">{t('loading', { ns: 'common' })}</div>
       ) : items.length ? (
         <div className="gl-blacklist-list">
           {items.map((item) => (
@@ -2291,7 +2292,7 @@ function SettingRow({
         role="switch"
         aria-checked={checked}
         aria-label={title}
-        className={`gl-yt-switch${checked ? 'is-on' : ''}`}
+        className={cn('gl-yt-switch', checked && 'is-on')}
         onClick={onChange}
       >
         <span className="gl-yt-switch-thumb" />

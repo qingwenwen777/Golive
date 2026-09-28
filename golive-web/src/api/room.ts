@@ -6,6 +6,7 @@
   keepPreviousData,
 } from '@tanstack/react-query';
 import { http } from '@/lib/axios';
+import { isNotFoundError } from '@/lib/httpError';
 import { LIKED_STREAMS_KEY, WATCH_HISTORY_KEY } from '@/lib/liveLibrary';
 import { userLibraryQueryKey } from '@/api/library';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
@@ -111,7 +112,8 @@ export function useRoom(id: string, enabled = true) {
     },
     enabled: enabled && !!id,
     staleTime: 30_000,
-    retry: 1,
+    // A 404 is an answer (ended or no such room), not a glitch worth retrying.
+    retry: (failureCount, error) => failureCount < 1 && !isNotFoundError(error),
   });
 }
 

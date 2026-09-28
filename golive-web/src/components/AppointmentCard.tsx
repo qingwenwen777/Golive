@@ -20,6 +20,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import type { AppointmentItem } from '@/api/room';
 import { isPlaceholderChannelName, type Stream } from '@/types/stream';
+import { formatDateTime } from '@/lib/format';
 
 export interface AppointmentCardProps {
   appointment: AppointmentItem;
@@ -57,14 +58,7 @@ export function AppointmentCard({
     appointment.waitingCount ?? appointment.reservationCount,
   );
   const scheduled = useMemo(
-    () =>
-      new Intl.DateTimeFormat(i18n.language, {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(appointment.scheduledAt)),
+    () => formatDateTime(appointment.scheduledAt, i18n.language),
     [appointment.scheduledAt, i18n.language],
   );
   const category =

@@ -25,8 +25,10 @@ import {
   type CoinTransactionType,
 } from '@/api/coins';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { LoadError } from '@/components/LoadError';
 import { readDailyCoinActivity, coinTodayKey } from '@/lib/coinActivity';
 import { cn } from '@/lib/cn';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { userDisplayName } from '@/types/user';
@@ -42,8 +44,11 @@ type RecordFilter =
   | 'task'
   | 'creator';
 
-const COINS_PER_CURRENCY_UNIT = 10;
-const DISPLAY_CURRENCY = 'USD';
+// Top-ups are charged in this currency at this rate. They must match the
+// user-service's USERSVC_STRIPE_CURRENCY and USERSVC_STRIPE_COINS_PER_CURRENCY_UNIT,
+// whose defaults are also USD and 10.
+const COINS_PER_CURRENCY_UNIT = Number(import.meta.env.VITE_COINS_PER_CURRENCY_UNIT) || 10;
+const DISPLAY_CURRENCY = (import.meta.env.VITE_TOPUP_CURRENCY || 'USD').toUpperCase();
 const MIN_TOPUP_COINS = 10;
 const MIN_WITHDRAW_COINS = 10;
 const QUICK_TOPUPS = [10, 50, 100, 500] as const;
@@ -173,7 +178,7 @@ export default function CoinPage() {
             toast.success(
               resp.credited
                 ? t('coin.toast.topupSuccess', {
-                    balance: resp.user.coinBalance.toLocaleString(),
+                    balance: formatNumber(resp.user.coinBalance),
                     defaultValue: 'Top-up complete. Current balance: {{balance}} coins.',
                   })
                 : t('coin.toast.topupAlreadyCredited', {
@@ -297,7 +302,7 @@ export default function CoinPage() {
           }
           toast.success(
             t('coin.toast.claimSuccess', {
-              amount: resp.transaction.amount.toLocaleString(),
+              amount: formatNumber(resp.transaction.amount),
               defaultValue: 'Earned {{amount}} coins.',
             }),
           );
@@ -382,19 +387,19 @@ export default function CoinPage() {
             <span className="gl-coin-wallet-coin" aria-hidden="true">
               <Coins size={26} />
             </span>
-            <strong>{balance.toLocaleString()}</strong>
+            <strong>{formatNumber(balance)}</strong>
             <em>coins</em>
           </div>
           <div className="gl-coin-wallet-breakdown">
             <span>
               {t('coin.availableLabel', { defaultValue: 'Available' })}
-              <strong>{availableBalance.toLocaleString()}</strong>
+              <strong>{formatNumber(availableBalance)}</strong>
             </span>
             {frozenBalance > 0 && (
               <span className="gl-coin-wallet-frozen">
                 <Snowflake size={13} />
                 {t('coin.frozenLabel', { defaultValue: 'Frozen' })}
-                <strong>{frozenBalance.toLocaleString()}</strong>
+                <strong>{formatNumber(frozenBalance)}</strong>
               </span>
             )}
           </div>
@@ -403,7 +408,9 @@ export default function CoinPage() {
               name: currentUser
                 ? userDisplayName(currentUser)
                 : t('coin.guest', { defaultValue: 'Guest' }),
-              defaultValue: '{{name}} coin account. Top-up rate: 10 coins = ¥1.',
+              coins: formatNumber(COINS_PER_CURRENCY_UNIT, i18n.language),
+              price: formatFiat(COINS_PER_CURRENCY_UNIT, i18n.language),
+              defaultValue: '{{name}} coin account. Top-up rate: {{coins}} coins = {{price}}.',
             })}
           </p>
         </div>
@@ -412,11 +419,7 @@ export default function CoinPage() {
             <CreditCard size={16} />
             {t('coin.goTopup', { defaultValue: 'Top up' })}
           </button>
-          <button
-            type="button"
-            className="gl-secondary-btn gl-coin-wide"
-            onClick={openWithdraw}
-          >
+          <button type="button" className="gl-secondary-btn gl-coin-wide" onClick={openWithdraw}>
             <ArrowUpRight size={16} />
             {t('coin.withdraw.title', { defaultValue: 'Withdraw' })}
           </button>
@@ -491,14 +494,19 @@ export default function CoinPage() {
               <div key={i} className="gl-coin-record is-loading" />
             ))}
           </div>
+        ) : transactions.isError && rows.length === 0 ? (
+          <LoadError
+            error={transactions.error}
+            onRetry={transactions.refetch}
+            retrying={transactions.isFetching}
+          />
         ) : filteredRows.length === 0 ? (
           <div className="gl-coin-empty">
             <Sparkles size={32} />
             <strong>{t('coin.emptyTitle', { defaultValue: 'No coin records yet' })}</strong>
             <span>
               {t('coin.emptySub', {
-                defaultValue:
-                  'Top-ups, gifts, Super Chats, and betting activity will appear here.',
+                defaultValue: 'Top-ups, gifts, Super Chats, and betting activity will appear here.',
               })}
             </span>
           </div>
@@ -560,7 +568,7 @@ export default function CoinPage() {
                 className={cn(topupAmount === amount && 'is-active')}
                 onClick={() => setTopupText(String(amount))}
               >
-                {amount.toLocaleString()}
+                {formatNumber(amount)}
               </button>
             ))}
           </div>
@@ -748,11 +756,11 @@ function CoinRecordRow({ item }: { item: CoinTransaction }) {
       <div className={cn('gl-coin-record-amount', positive ? 'is-income' : 'is-spend')}>
         <strong>
           {positive ? '+' : ''}
-          {item.amount.toLocaleString()}
+          {formatNumber(item.amount)}
         </strong>
         <span>
           {t('coin.record.balance', {
-            balance: item.balanceAfter.toLocaleString(),
+            balance: formatNumber(item.balanceAfter),
             defaultValue: 'Balance {{balance}}',
           })}
         </span>
@@ -777,7 +785,7 @@ function RecordPagination({
     <div className="gl-coin-pagination" aria-label="Coin record pagination">
       <span>
         {t('coin.pagination', {
-          total: totalItems.toLocaleString(),
+          total: formatNumber(totalItems),
           page,
           totalPages,
           defaultValue: '{{total}} records · Page {{page}} / {{totalPages}}',
@@ -880,7 +888,7 @@ function sum(rows: CoinTransaction[]): number {
 }
 
 function formatCoins(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+  return `${formatNumber(Math.round(value))} coins`;
 }
 
 function formatFiat(coins: number, locale: string): string {
@@ -893,14 +901,7 @@ function formatFiat(coins: number, locale: string): string {
 }
 
 function formatTime(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatDateTime(value, locale) || value;
 }
 
 function parseCoinInput(value: string): number {

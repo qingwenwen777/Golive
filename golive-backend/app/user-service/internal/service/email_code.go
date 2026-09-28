@@ -25,6 +25,9 @@ const (
 	EmailPurposeRegister      = "register"
 	EmailPurposePasswordReset = "password_reset"
 	EmailPurposeEmailChange   = "email_change"
+	// EmailPurposeLogin codes stand in for the login captcha for people who
+	// cannot read its image. They go only to an account's verified email.
+	EmailPurposeLogin = "login"
 
 	emailCodeMaxVerifyFailures = 5
 	// DefaultEmailCodesPerHour caps the codes sent to one address for one
@@ -223,6 +226,8 @@ func normalizeEmailPurpose(raw string) (string, bool) {
 		return EmailPurposePasswordReset, true
 	case EmailPurposeEmailChange:
 		return EmailPurposeEmailChange, true
+	case EmailPurposeLogin:
+		return EmailPurposeLogin, true
 	default:
 		return "", false
 	}

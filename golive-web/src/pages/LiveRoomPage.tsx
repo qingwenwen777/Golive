@@ -59,21 +59,21 @@ import {
   removeFromLibrary,
   saveToLibrary,
 } from '@/lib/liveLibrary';
-import {
-  clearPublisherSession,
-  savePublisherSession,
-} from '@/features/creator/publisherSession';
+import { clearPublisherSession, savePublisherSession } from '@/features/creator/publisherSession';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { LoadableImage } from '@/components/LoadableImage';
+import { LoadError } from '@/components/LoadError';
 import { Avatar } from '@/components/Avatar';
 import { FanClubExclusiveBadge } from '@/components/FanClubExclusiveBadge';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { cn } from '@/lib/cn';
+import { isNotFoundError } from '@/lib/httpError';
 import type { AppointmentItem } from '@/api/room';
 import { userDisplayName } from '@/types/user';
 import { streamChannelName, type Stream } from '@/types/stream';
 import type { FanBadge } from '@/types/gift';
 import type { Message } from '@/types/message';
+import { formatCount, formatDateTime } from '@/lib/format';
 
 const LIVE_END_TRANSITION_MS = 3200;
 const FAN_BADGE_LEVEL_STEP_CONTRIBUTION = 1000;
@@ -116,7 +116,14 @@ export default function LiveRoomPage() {
   } | null>(null);
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
-  const { data: stream, isPending, isError, refetch } = useRoom(id, authHydrated);
+  const {
+    data: stream,
+    error: roomError,
+    isPending,
+    isError,
+    isFetching,
+    refetch,
+  } = useRoom(id, authHydrated);
   const isScheduledRoom = stream?.status === 'scheduled';
   const appointmentList = useChannelAppointments(
     stream?.channelId ?? '',
@@ -348,11 +355,30 @@ export default function LiveRoomPage() {
 
   const displayStream = endTransition?.stream ?? stream;
 
-  if ((isError && !displayStream) || !displayStream) {
+  if (!displayStream) {
+    // Only a 404 means the room is gone; any other failure gets a retry.
+    if (isError && !isNotFoundError(roomError)) {
+      return (
+        <LoadError
+          variant="page"
+          title={t('liveRoom.loadError', { defaultValue: "Couldn't load this live room" })}
+          error={roomError}
+          onRetry={refetch}
+          retrying={isFetching}
+        >
+          <Link to="/" className="text-blue hover:underline">
+            {t('notFound.back')}
+          </Link>
+        </LoadError>
+      );
+    }
     return (
       <div className="gl-empty">
         <CloudOff size={64} strokeWidth={1.5} />
         <div className="gl-empty-title">{t('liveRoom.ended')}</div>
+        <div className="gl-empty-sub">
+          {t('liveRoom.endedSub', { defaultValue: 'It may have ended, or the link may be wrong.' })}
+        </div>
         <button className="gl-retry-btn mt-4" onClick={() => navigate('/')}>
           {t('notFound.back')}
         </button>
@@ -1366,7 +1392,7 @@ function BunnyReplayPlayer({
 }
 
 function ReplayInfoBlock({ stream }: { stream: Stream }) {
-  const { t } = useTranslation('pages');
+  const { t, i18n } = useTranslation('pages');
   const isAuthed = useIsAuthed();
   const currentUser = useAuthStore((s) => s.user);
   const openLogin = useAuthModalStore((s) => s.openLogin);
@@ -1377,14 +1403,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
   const liked = likeState.data?.liked ?? likedMembership.isMember;
   const likes =
     likeState.data?.likes ?? Math.max(0, Math.floor((stream.peakViewers ?? stream.viewers) * 0.3));
-  const endedAt = stream.endedAt
-    ? new Intl.DateTimeFormat(undefined, {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(stream.endedAt))
-    : '';
+  const endedAt = formatDateTime(stream.endedAt, i18n.language);
 
   const toggleLike = () => {
     const nextLiked = !liked;
@@ -1438,7 +1457,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
             onClick={toggleLike}
           >
             <ThumbsUp size={18} />
-            <span>{likes.toLocaleString()}</span>
+            <span>{formatCount(likes)}</span>
           </button>
         </div>
       </div>
@@ -1625,12 +1644,7 @@ function ScheduledRoomPlayer({
   onStart: () => void;
 }) {
   const { t, i18n } = useTranslation('pages');
-  const scheduled = new Intl.DateTimeFormat(i18n.language, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(stream.startedAt));
+  const scheduled = formatDateTime(stream.startedAt, i18n.language);
   const reserved = appointment?.reserved ?? false;
   const reservationCount = appointment?.reservationCount ?? 0;
   return (

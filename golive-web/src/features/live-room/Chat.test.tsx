@@ -279,7 +279,7 @@ describe('Chat', () => {
     expect(pinned.querySelector('.gl-sc-pin-row')).toBeTruthy();
     expect(within(pinned).getByRole('button', { name: 'Open SuperChat from Alice' })).toBeTruthy();
     expect(within(pinned).getByRole('button', { name: 'Open SuperChat from Bob' })).toBeTruthy();
-    expect(within(pinned).queryByText('\u00a51,000')).toBeNull();
+    expect(within(pinned).queryByText('1,000 coins')).toBeNull();
     expect(within(pinned).queryByText('Pinned hello')).toBeNull();
 
     fireEvent.click(within(pinned).getByRole('button', { name: 'Open SuperChat from Alice' }));

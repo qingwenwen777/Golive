@@ -1,6 +1,7 @@
 {
   "search": "搜索",
   "searchPlaceholder": "搜索",
+  "searchClose": "关闭搜索",
   "voiceSearch": "语音搜索",
   "create": "开播",
   "goLive": "开播",
@@ -111,7 +112,12 @@
     "inviteCodePlaceholder": "邀请码",
     "captcha": "验证码",
     "captchaPlaceholder": "验证码",
-    "refreshCaptcha": "刷新验证码",
+    "refreshCaptcha": "换一张验证码图片",
+    "captchaImageAlt": "验证码图片",
+    "captchaHint": "输入图片中的 6 个字符",
+    "useEmailCodeInstead": "看不清图片？改用邮箱接收验证码",
+    "useCaptchaInstead": "改用图形验证码",
+    "loginEmailHint": "我们会把验证码发送到你账号绑定的邮箱。",
     "creating": "创建中...",
     "signingIn": "登录中...",
     "createAccount": "创建账号",
@@ -129,6 +135,7 @@
     "cancelGoogleLink": "取消",
     "errors": {
       "invalidCredentials": "用户名或密码不正确。",
+      "invalidCredentialsCodeUsed": "用户名或密码不正确。每个验证码只能使用一次，请重新发送验证码后再试。",
       "loginCooldown": "密码连续错误次数过多，请 1 分钟后再试。",
       "usernameTaken": "这个用户名已被使用。",
       "displayNameTaken": "这个显示名称与其他用户的用户名相同，请换一个。",
@@ -145,6 +152,7 @@
       "emailCodeLimit": "该邮箱请求验证码的次数过多，请稍后再试。",
       "emailCodeUnavailable": "邮箱验证暂时不可用。",
       "emailUserMismatch": "该用户名未绑定此邮箱。",
+      "emailNotVerified": "该邮箱尚未验证，无法接收验证码。",
       "emailCodeRequired": "请输入邮箱验证码。",
       "resetIdentityRequired": "请先填写用户名和绑定邮箱。",
       "invalidPassword": "至少 8 位，包含英文和数字",
@@ -165,6 +173,13 @@
     }
   },
   "loading": "加载中...",
+  "loadError": {
+    "title": "这部分内容加载失败",
+    "networkHint": "请检查网络连接后重试。",
+    "serverHint": "服务器出了点问题，请稍后重试。",
+    "retry": "重试",
+    "retrying": "正在重试…"
+  },
   "notificationsReadAll": "全部已读",
   "notificationsViewAll": "查看全部",
   "notificationsEmpty": "暂无通知",
@@ -176,10 +191,14 @@
       "title": "预约直播已开播"
     },
     "direct_message": {
-      "title": "{{name}} 发来 {{count}} 条私信"
+      "title": "{{name}} 发来 {{count, number}} 条私信",
+      "title_one": "{{name}} 发来 {{count, number}} 条私信",
+      "title_other": "{{name}} 发来 {{count, number}} 条私信"
     },
     "fan_group_message": {
-      "title": "{{name}} 有 {{count}} 条新消息",
+      "title": "{{name}} 有 {{count, number}} 条新消息",
+      "title_one": "{{name}} 有 {{count, number}} 条新消息",
+      "title_other": "{{name}} 有 {{count, number}} 条新消息",
       "body": "{{count}}/200 人 · 粉丝团群聊"
     }
   },

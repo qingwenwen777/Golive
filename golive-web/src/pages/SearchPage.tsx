@@ -24,6 +24,7 @@ import { cn } from '@/lib/cn';
 import { streamChannelName, type Stream } from '@/types/stream';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
+import { formatCount, formatDateTime, formatRelativeTime } from '@/lib/format';
 
 type SearchFilter = 'all' | 'creators' | 'live' | 'replays' | 'appointments' | 'posts';
 
@@ -245,7 +246,7 @@ function CreatorResultRow({ creator }: { creator: SearchCreator }) {
         onClick={toggleFollow}
       >
         {creator.self ? (
-          t('account.yourChannel', { defaultValue: '你的频道' })
+          t('channel.yourChannel')
         ) : creator.following ? (
           <>
             <Bell size={18} />
@@ -297,7 +298,9 @@ function StreamResultRow({ stream, kind }: { stream: Stream; kind: 'live' | 'rep
               : t('search.views', { count: stream.viewers, defaultValue: '{{count}} views' })}
           </span>
           <span>{category}</span>
-          {!isLive && stream.endedAt && <span>{formatDate(stream.endedAt, i18n.language)}</span>}
+          {!isLive && stream.endedAt && (
+            <span>{formatRelativeTime(stream.endedAt, i18n.language)}</span>
+          )}
         </div>
         <Link
           className="gl-search-channel-line"
@@ -336,7 +339,7 @@ function AppointmentResultRow({ appointment }: { appointment: AppointmentItem })
           {appointment.title}
         </Link>
         <div className="gl-search-meta">
-          <span>{formatDate(appointment.scheduledAt, i18n.language)}</span>
+          <span>{formatDateTime(appointment.scheduledAt, i18n.language)}</span>
           <span>
             {t('search.reservations', {
               count: appointment.reservationCount,
@@ -373,7 +376,7 @@ function PostResultRow({ post }: { post: ChannelPost }) {
         <Link className="gl-search-channel-line is-post-author" to={channelPath}>
           <span>{post.author.name}</span>
           {post.author.verified && <VerifiedBadge size={14} />}
-          <small>{formatDate(post.createdAt, i18n.language)}</small>
+          <small>{formatRelativeTime(post.createdAt, i18n.language)}</small>
         </Link>
         <Link className="gl-search-post-content" to={channelPath}>
           {post.content || t('search.imagePost', { defaultValue: 'Image post' })}
@@ -381,11 +384,11 @@ function PostResultRow({ post }: { post: ChannelPost }) {
         <div className="gl-search-post-actions">
           <span>
             <Heart size={16} />
-            {post.likeCount.toLocaleString()}
+            {formatCount(post.likeCount)}
           </span>
           <span>
             <MessageCircle size={16} />
-            {post.commentCount.toLocaleString()}
+            {formatCount(post.commentCount)}
           </span>
         </div>
       </div>
@@ -434,15 +437,4 @@ function SearchEmpty({
       {action}
     </div>
   );
-}
-
-function formatDate(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }

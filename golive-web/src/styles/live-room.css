@@ -411,7 +411,7 @@
 }
 
 .gl-replay-comment-menu button.is-danger {
-  color: #d33426;
+  color: var(--gl-danger-fg-4);
 }
 
 .gl-replay-comment-toggle {
@@ -432,6 +432,13 @@
 
 .gl-replay-comment-toggle:hover {
   background: color-mix(in srgb, var(--gl-accent, #065fd4) 12%, transparent);
+}
+
+/* #065fd4 text is 2.6:1 on dark surfaces; the filled button keeps it as a
+   background, where white text stays at 5.8:1. */
+.dark .gl-replay-comment-reply-chip button,
+.dark .gl-replay-comment-toggle {
+  color: var(--gl-accent-fg);
 }
 
 .gl-replay-comment-children {
@@ -719,9 +726,15 @@
   z-index: 4;
 }
 .gl-player:not(.is-fullscreen):hover .gl-player-ctl,
-.gl-player-ctl.is-on {
+.gl-player-ctl.is-on,
+.gl-player:focus-visible .gl-player-ctl,
+.gl-player-ctl:has(:focus-visible) {
   opacity: 1;
   pointer-events: auto;
+}
+.gl-player:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 .gl-player.is-idle {
   cursor: none;
@@ -824,16 +837,19 @@
   gap: 24px;
   flex-wrap: wrap;
 }
+/* The channel block keeps a real basis so that, when the row runs out of
+   room, the action buttons wrap to the next line instead of squeezing the
+   channel name down to its first letter. */
 .gl-info-chan {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 280px;
+  min-width: min(280px, 100%);
 }
 .gl-info-chan-link {
   display: inline-flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   align-items: center;
@@ -866,6 +882,7 @@
 }
 
 .gl-sub-btn {
+  flex: 0 0 auto;
   height: 36px;
   padding: 0 16px;
   border: 0;
@@ -971,7 +988,7 @@
 .gl-pg-left.is-on,
 .gl-pg-right.is-on,
 .gl-pg-solo.is-on {
-  color: #1c62b9;
+  color: var(--gl-accent-fg);
 }
 .gl-like-burst {
   position: absolute;
@@ -1218,7 +1235,7 @@
 }
 .gl-chat-tab-btn.is-active .gl-chat-tab-count {
   background: rgba(255, 0, 51, 0.12);
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-viewer-panel {
   flex: 1;
@@ -1938,7 +1955,7 @@
   background: var(--gl-bg-hover);
 }
 .gl-chat-action-popover button:first-child {
-  color: var(--gl-red);
+  color: var(--gl-red-fg);
 }
 .gl-chat-owner-badge {
   display: inline-flex;

@@ -2,6 +2,8 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
+import { formatCount } from '@/lib/format';
+
 import commonEn from './locales/en-US/common.json';
 import commonJa from './locales/ja-JP/common.json';
 import commonZh from './locales/zh-CN/common.json';
@@ -67,5 +69,12 @@ void i18n
     interpolation: { escapeValue: false },
     returnNull: false,
   });
+
+// Number formats for translations: {{count, compact}} for audience sizes
+// ("233K", "23万"); i18next's built-in {{count, number}} for exact figures
+// ("12,480"). Both follow the UI language.
+i18n.services.formatter?.add('compact', (value, lng) =>
+  formatCount(Number(value), lng || undefined),
+);
 
 export default i18n;

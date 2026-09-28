@@ -24,11 +24,15 @@ func NewAuthHandler(svc *service.AuthService, captcha *service.CaptchaService, e
 	return &AuthHandler{svc: svc, captcha: captcha, emailCodes: emailCodes}
 }
 
+// loginReq carries the image captcha or, for people who cannot read it, a
+// login code sent to the account's verified email (Email and EmailCode).
 type loginReq struct {
 	Username    string `json:"username" binding:"required"`
 	Password    string `json:"password" binding:"required"`
 	CaptchaID   string `json:"captchaId"`
 	CaptchaCode string `json:"captchaCode"`
+	Email       string `json:"email"`
+	EmailCode   string `json:"emailCode"`
 }
 
 type registerReq struct {
@@ -100,7 +104,7 @@ func (h *AuthHandler) SendEmailCode(c *gin.Context) {
 	}
 	switch req.Purpose {
 	case service.EmailPurposeRegister:
-	case service.EmailPurposePasswordReset:
+	case service.EmailPurposePasswordReset, service.EmailPurposeLogin:
 		if err := h.svc.EnsureUsernameEmailMatch(c.Request.Context(), req.Username, req.Email); err != nil {
 			errcode.Respond(c, err)
 			return
@@ -126,7 +130,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		errcode.Respond(c, service.ErrInvalidCredentials)
 		return
 	}
-	if !h.verifyCaptcha(c, req.CaptchaID, req.CaptchaCode) {
+	if strings.TrimSpace(req.EmailCode) != "" {
+		if !h.verifyLoginEmailCode(c, req.Username, req.Email, req.EmailCode) {
+			return
+		}
+	} else if !h.verifyCaptcha(c, req.CaptchaID, req.CaptchaCode) {
 		return
 	}
 	resp, err := h.svc.Login(c.Request.Context(), req.Username, req.Password)
@@ -338,6 +346,28 @@ func (h *AuthHandler) verifyCaptcha(c *gin.Context, id, code string) bool {
 		return true
 	}
 	if err := h.captcha.Verify(c.Request.Context(), id, code); err != nil {
+		errcode.Respond(c, err)
+		return false
+	}
+	return true
+}
+
+// verifyLoginEmailCode stands in for verifyCaptcha when a password sign-in
+// brings a login code sent to the account's verified email. The code is
+// checked, and used up, before the password is looked at: without the mailbox
+// this path says nothing about the password, and with it every guess at the
+// password costs a new code.
+func (h *AuthHandler) verifyLoginEmailCode(c *gin.Context, username, email, code string) bool {
+	if h.emailCodes == nil {
+		errcode.Respond(c, service.ErrEmailNotConfigured)
+		return false
+	}
+	ctx := c.Request.Context()
+	if err := h.svc.EnsureUsernameEmailMatch(ctx, username, email); err != nil {
+		errcode.Respond(c, err)
+		return false
+	}
+	if err := h.emailCodes.Verify(ctx, service.EmailPurposeLogin, email, code); err != nil {
 		errcode.Respond(c, err)
 		return false
 	}

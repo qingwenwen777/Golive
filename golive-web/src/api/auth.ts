@@ -4,12 +4,18 @@ import { http } from '@/lib/axios';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import type { LoginResp, User } from '@/types/user';
 
-export interface LoginPayload {
+interface PasswordCredentials {
   username: string;
   password: string;
-  captchaId: string;
-  captchaCode: string;
 }
+
+/**
+ * Password sign-in comes with the image captcha or, for people who can't read
+ * it, with a code sent to the account's verified email (purpose `login`).
+ */
+export type LoginPayload =
+  | (PasswordCredentials & { captchaId: string; captchaCode: string })
+  | (PasswordCredentials & { email: string; emailCode: string });
 
 export interface RegisterPayload {
   username: string;
@@ -36,8 +42,9 @@ export interface ResetPasswordPayload {
 }
 
 export interface SendEmailCodePayload {
-  purpose: 'register' | 'password_reset';
+  purpose: 'register' | 'password_reset' | 'login';
   email: string;
+  /** Required for `password_reset` and `login`: the email must be this account's. */
   username?: string;
 }
 

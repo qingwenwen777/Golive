@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AxiosError } from 'axios';
 import { BadgeCheck, KeyRound, Mail, PlayCircle, RefreshCw, Ticket, UserRound } from 'lucide-react';
@@ -12,6 +12,7 @@ import {
   useRegisterMutation,
   useResetPasswordMutation,
   useSendEmailCodeMutation,
+  type SendEmailCodePayload,
 } from '@/api/auth';
 import { GoLiveLogo } from '@/components/Logo';
 import { cn } from '@/lib/cn';
@@ -25,6 +26,12 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import type { LoginResp } from '@/types/user';
 
 type AuthMode = 'signin' | 'signup' | 'reset';
+type EmailCodePurpose = SendEmailCodePayload['purpose'];
+/**
+ * How a password sign-in shows it's a person: the image captcha or, for people
+ * who can't read the image, a code emailed to the account.
+ */
+type SignInCheck = 'captcha' | 'emailCode';
 
 const PASSWORD_RULE_TEXT = '至少 8 位，包含英文和数字';
 const PASSWORD_PATTERN = '(?=.*[A-Za-z])(?=.*[0-9]).{8,}';
@@ -82,6 +89,11 @@ function authErrorMessage(
     if (reason === 'email_user_mismatch') {
       return t('auth.errors.emailUserMismatch', {
         defaultValue: 'Username and email do not match.',
+      });
+    }
+    if (reason === 'email_not_verified') {
+      return t('auth.errors.emailNotVerified', {
+        defaultValue: "This email hasn't been verified, so it can't receive codes.",
       });
     }
     if (reason === 'display_name_taken') {
@@ -159,6 +171,8 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const [captchaId, setCaptchaId] = useState('');
   const [captchaImage, setCaptchaImage] = useState('');
   const [captchaCode, setCaptchaCode] = useState('');
+  const [signInCheck, setSignInCheck] = useState<SignInCheck>('captcha');
+  const [loginEmailCodeCooldown, setLoginEmailCodeCooldown] = useState(0);
   const [googleLinkCredential, setGoogleLinkCredential] = useState('');
   const [googleLinkEmail, setGoogleLinkEmail] = useState('');
   const [googleLinkPassword, setGoogleLinkPassword] = useState('');
@@ -169,6 +183,11 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const captchaInputRef = useRef<HTMLInputElement>(null);
+  const loginEmailInputRef = useRef<HTMLInputElement>(null);
+  // Set when the person switches between the captcha and an email code, so
+  // focus moves to the field that replaced the button they pressed.
+  const focusSignInCheckRef = useRef(false);
 
   const loginMut = useLoginMutation();
   const registerMut = useRegisterMutation();
@@ -179,6 +198,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const googleLinkExistingMut = useGoogleLinkExistingMutation();
   const isSigningUp = mode === 'signup';
   const isResetting = mode === 'reset';
+  const signingInWithEmailCode = mode === 'signin' && signInCheck === 'emailCode';
   const isPending = isResetting
     ? resetPasswordMut.isPending
     : isSigningUp
@@ -197,6 +217,10 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
   const resetPasswordId = `${id}-reset-password`;
   const resetConfirmPasswordId = `${id}-reset-confirm-password`;
   const captchaIdAttr = `${id}-captcha`;
+  const captchaHintId = `${id}-captcha-hint`;
+  const loginEmailId = `${id}-login-email`;
+  const loginEmailHintId = `${id}-login-email-hint`;
+  const loginEmailCodeId = `${id}-login-email-code`;
   const googleRegisterUsernameId = `${id}-google-register-username`;
   const googleRegisterInviteCodeId = `${id}-google-register-invite`;
 
@@ -241,22 +265,35 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       setCaptchaCode('');
       return;
     }
+    // Signing in with an email code needs no image; switching back loads one.
+    if (mode === 'signin' && signInCheck === 'emailCode') return;
     void refreshCaptcha();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   useEffect(() => {
-    if (registerEmailCodeCooldown <= 0 && resetEmailCodeCooldown <= 0) return undefined;
+    if (
+      registerEmailCodeCooldown <= 0 &&
+      resetEmailCodeCooldown <= 0 &&
+      loginEmailCodeCooldown <= 0
+    ) {
+      return undefined;
+    }
     const timer = window.setInterval(() => {
       setRegisterEmailCodeCooldown((seconds) => Math.max(0, seconds - 1));
       setResetEmailCodeCooldown((seconds) => Math.max(0, seconds - 1));
+      setLoginEmailCodeCooldown((seconds) => Math.max(0, seconds - 1));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [registerEmailCodeCooldown, resetEmailCodeCooldown]);
+  }, [registerEmailCodeCooldown, resetEmailCodeCooldown, loginEmailCodeCooldown]);
 
-  const setEmailCodeCooldown = (purpose: 'register' | 'password_reset') => {
+  const setEmailCodeCooldown = (purpose: EmailCodePurpose) => {
     if (purpose === 'register') {
       setRegisterEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
+      return;
+    }
+    if (purpose === 'login') {
+      setLoginEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
       return;
     }
     setResetEmailCodeCooldown(EMAIL_CODE_COOLDOWN_SECONDS);
@@ -273,10 +310,15 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     return t('auth.sendCode', { defaultValue: 'Send code' });
   };
 
-  const sendEmailCode = (purpose: 'register' | 'password_reset') => {
+  const sendEmailCode = (purpose: EmailCodePurpose) => {
     setError(null);
     setSuccess(null);
-    const cooldown = purpose === 'register' ? registerEmailCodeCooldown : resetEmailCodeCooldown;
+    const cooldown =
+      purpose === 'register'
+        ? registerEmailCodeCooldown
+        : purpose === 'login'
+          ? loginEmailCodeCooldown
+          : resetEmailCodeCooldown;
     if (cooldown > 0) return;
     if (purpose === 'register') {
       const cleanEmail = email.trim();
@@ -299,8 +341,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       return;
     }
 
-    const cleanUsername = resetUsername.trim();
-    const cleanEmail = resetEmail.trim();
+    // Reset and sign-in codes go only to the email on the named account.
+    const cleanUsername = (purpose === 'login' ? username : resetUsername).trim();
+    const cleanEmail = (purpose === 'login' ? email : resetEmail).trim();
     if (!cleanUsername || !cleanEmail) {
       setError(
         t('auth.errors.resetIdentityRequired', {
@@ -319,6 +362,21 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         onError: (err: Error) => setError(authErrorMessage(err, mode, t)),
       },
     );
+  };
+
+  useEffect(() => {
+    if (!focusSignInCheckRef.current) return;
+    focusSignInCheckRef.current = false;
+    (signInCheck === 'emailCode' ? loginEmailInputRef : captchaInputRef).current?.focus();
+  }, [signInCheck]);
+
+  const switchSignInCheck = (next: SignInCheck) => {
+    focusSignInCheckRef.current = true;
+    setSignInCheck(next);
+    setError(null);
+    setSuccess(null);
+    // The image shown earlier may have expired in the meantime.
+    if (next === 'captcha') void refreshCaptcha();
   };
 
   const onSubmit = (e: FormEvent) => {
@@ -383,7 +441,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     const cleanInviteCode = inviteCode.trim();
     const cleanCaptcha = captchaCode.trim();
 
-    if (!captchaId || !cleanCaptcha) {
+    if (!signingInWithEmailCode && (!captchaId || !cleanCaptcha)) {
       setError(
         t('auth.errors.captchaRequired', { defaultValue: 'Enter the captcha to continue.' }),
       );
@@ -394,7 +452,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       setError(t('auth.errors.passwordMismatch'));
       return;
     }
-    if (isSigningUp && !cleanEmailCode) {
+    if ((isSigningUp || signingInWithEmailCode) && !cleanEmailCode) {
       setError(
         t('auth.errors.emailCodeRequired', {
           defaultValue: 'Enter the email verification code to continue.',
@@ -412,8 +470,24 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
         onAuthenticated?.(resp);
       },
       onError: (err: Error) => {
-        setError(authErrorMessage(err, mode, t));
-        void refreshCaptcha();
+        if (!signingInWithEmailCode) {
+          setError(authErrorMessage(err, mode, t));
+          void refreshCaptcha();
+          return;
+        }
+        // The server takes the code before it checks the password, and a code
+        // works once: after a wrong password or a cooldown it needs a new one.
+        const response = err instanceof AxiosError ? err.response : undefined;
+        const reason = (response?.data as { reason?: string } | undefined)?.reason;
+        if (response?.status === 401 || reason === 'login_cooldown') setEmailCode('');
+        setError(
+          response?.status === 401
+            ? t('auth.errors.invalidCredentialsCodeUsed', {
+                defaultValue:
+                  'Invalid username or password. Each code works only once, so send a new one to try again.',
+              })
+            : authErrorMessage(err, mode, t),
+        );
       },
     };
 
@@ -433,7 +507,9 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
       );
     } else {
       loginMut.mutate(
-        { username: cleanUsername, password, captchaId, captchaCode: cleanCaptcha },
+        signingInWithEmailCode
+          ? { username: cleanUsername, password, email: cleanEmail, emailCode: cleanEmailCode }
+          : { username: cleanUsername, password, captchaId, captchaCode: cleanCaptcha },
         callbacks,
       );
     }
@@ -573,6 +649,7 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
     googleRegisterInviteCode.trim().length > 0 &&
     !googleRegisterMut.isPending;
 
+  const refreshCaptchaLabel = t('auth.refreshCaptcha', { defaultValue: 'Get a new captcha image' });
   const title = isResetting
     ? t('auth.resetTitle', { defaultValue: 'Reset password' })
     : isSigningUp
@@ -878,37 +955,122 @@ export function AuthPanel({ className, onAuthenticated }: AuthPanelProps) {
               </label>
             )}
 
-            <label className="gl-auth-field" htmlFor={captchaIdAttr}>
-              <span className="gl-auth-label">
-                {t('auth.captcha', { defaultValue: 'Captcha' })}
-              </span>
-              <span className="gl-auth-captcha-row">
-                <span className="gl-auth-input-wrap">
-                  <input
-                    id={captchaIdAttr}
-                    type="text"
-                    value={captchaCode}
-                    onChange={(e) => setCaptchaCode(e.target.value.toUpperCase())}
-                    placeholder={t('auth.captchaPlaceholder', { defaultValue: 'Code' })}
-                    autoComplete="off"
-                    required
-                  />
+            {signingInWithEmailCode ? (
+              <>
+                <div className="gl-auth-field">
+                  <label className="gl-auth-label" htmlFor={loginEmailId}>
+                    {t('auth.email', { defaultValue: 'Email' })}
+                  </label>
+                  <span className="gl-auth-input-wrap">
+                    <Mail size={18} />
+                    <input
+                      ref={loginEmailInputRef}
+                      id={loginEmailId}
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={t('auth.emailPlaceholder', { defaultValue: 'you@example.com' })}
+                      aria-describedby={loginEmailHintId}
+                      required
+                    />
+                  </span>
+                  <span id={loginEmailHintId} className="gl-auth-hint">
+                    {t('auth.loginEmailHint', {
+                      defaultValue: "We'll send a code to the email on your account.",
+                    })}
+                  </span>
+                </div>
+                <div className="gl-auth-field">
+                  <label className="gl-auth-label" htmlFor={loginEmailCodeId}>
+                    {t('auth.emailCode', { defaultValue: 'Email code' })}
+                  </label>
+                  <span className="gl-auth-code-row">
+                    <span className="gl-auth-input-wrap">
+                      <input
+                        id={loginEmailCodeId}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={emailCode}
+                        onChange={(e) => setEmailCode(e.target.value)}
+                        placeholder={t('auth.emailCodePlaceholder', {
+                          defaultValue: '6-digit code',
+                        })}
+                        required
+                      />
+                    </span>
+                    <button
+                      type="button"
+                      className="gl-auth-code-send"
+                      disabled={sendEmailCodeMut.isPending || loginEmailCodeCooldown > 0}
+                      onClick={() => sendEmailCode('login')}
+                    >
+                      {emailCodeButtonText(loginEmailCodeCooldown)}
+                    </button>
+                  </span>
+                  <button
+                    type="button"
+                    className="gl-auth-link-btn"
+                    onClick={() => switchSignInCheck('captcha')}
+                  >
+                    {t('auth.useCaptchaInstead', { defaultValue: 'Use the image captcha instead' })}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="gl-auth-field">
+                <label className="gl-auth-label" htmlFor={captchaIdAttr}>
+                  {t('auth.captcha', { defaultValue: 'Captcha' })}
+                </label>
+                <span className="gl-auth-captcha-row">
+                  <span className="gl-auth-input-wrap">
+                    <input
+                      ref={captchaInputRef}
+                      id={captchaIdAttr}
+                      type="text"
+                      value={captchaCode}
+                      onChange={(e) => setCaptchaCode(e.target.value.toUpperCase())}
+                      placeholder={t('auth.captchaPlaceholder', { defaultValue: 'Code' })}
+                      aria-describedby={captchaHintId}
+                      autoComplete="off"
+                      required
+                    />
+                  </span>
+                  <button
+                    type="button"
+                    className="gl-auth-captcha-image"
+                    onClick={() => void refreshCaptcha()}
+                    disabled={captchaLoading}
+                    aria-label={refreshCaptchaLabel}
+                    title={refreshCaptchaLabel}
+                  >
+                    {captchaImage ? (
+                      <img
+                        src={captchaImage}
+                        alt={t('auth.captchaImageAlt', { defaultValue: 'Captcha image' })}
+                      />
+                    ) : (
+                      <RefreshCw size={18} />
+                    )}
+                  </button>
                 </span>
-                <button
-                  type="button"
-                  className="gl-auth-captcha-image"
-                  onClick={() => void refreshCaptcha()}
-                  disabled={captchaLoading}
-                  title={t('auth.refreshCaptcha', { defaultValue: 'Refresh captcha' })}
-                >
-                  {captchaImage ? (
-                    <img src={captchaImage} alt={t('auth.captcha', { defaultValue: 'Captcha' })} />
-                  ) : (
-                    <RefreshCw size={18} />
-                  )}
-                </button>
-              </span>
-            </label>
+                <span id={captchaHintId} className="gl-auth-hint">
+                  {t('auth.captchaHint', { defaultValue: 'Type the 6 characters in the image' })}
+                </span>
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    className="gl-auth-link-btn"
+                    onClick={() => switchSignInCheck('emailCode')}
+                  >
+                    {t('auth.useEmailCodeInstead', {
+                      defaultValue: "Can't read the image? Get a code by email instead",
+                    })}
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 

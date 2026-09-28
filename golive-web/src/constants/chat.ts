@@ -4,23 +4,21 @@ export interface SuperChatTierSpec {
   tier: SuperChatTier;
   bg: string;
   soft: string;
-  label: string;
 }
 
 export const SC_TIERS: SuperChatTierSpec[] = [
-  { tier: 0, bg: '#1e88e5', soft: '#90caf9', label: '¥100' },
-  { tier: 1, bg: '#00acc1', soft: '#80deea', label: '¥200' },
-  { tier: 2, bg: '#43a047', soft: '#a5d6a7', label: '¥500' },
-  { tier: 3, bg: '#f9a825', soft: '#ffe082', label: '¥2,000' },
-  { tier: 4, bg: '#f4511e', soft: '#ffab91', label: '¥5,000' },
-  { tier: 5, bg: '#e91e63', soft: '#f48fb1', label: '¥10,000+' },
+  { tier: 0, bg: '#1e88e5', soft: '#90caf9' },
+  { tier: 1, bg: '#00acc1', soft: '#80deea' },
+  { tier: 2, bg: '#43a047', soft: '#a5d6a7' },
+  { tier: 3, bg: '#f9a825', soft: '#ffe082' },
+  { tier: 4, bg: '#f4511e', soft: '#ffab91' },
+  { tier: 5, bg: '#e91e63', soft: '#f48fb1' },
 ];
 
 export const SC_TIER_MAX: SuperChatTierSpec = {
   tier: 5,
   bg: '#e91e63',
   soft: '#f48fb1',
-  label: '¥20,000',
 };
 
 export function tierSpec(tier: SuperChatTier): SuperChatTierSpec {

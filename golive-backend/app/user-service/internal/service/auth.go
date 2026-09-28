@@ -34,7 +34,7 @@ var (
 	ErrEmailTaken              = errcode.New(http.StatusConflict, "Email already exists").WithReason("email_taken")
 	ErrEmailNotFound           = errcode.New(http.StatusNotFound, "Email not found").WithReason("email_not_found")
 	ErrEmailUserMismatch       = errcode.New(http.StatusNotFound, "Username and email do not match").WithReason("email_user_mismatch")
-	ErrEmailNotVerified        = errcode.New(http.StatusForbidden, "This email address has not been verified and cannot be used to reset the password").WithReason("email_not_verified")
+	ErrEmailNotVerified        = errcode.New(http.StatusForbidden, "This email address has not been verified and cannot be used to sign in or reset the password").WithReason("email_not_verified")
 	ErrInvalidInvite           = errcode.New(http.StatusBadRequest, "Invalid invite code").WithReason("invalid_invite")
 	ErrInviteUsed              = errcode.New(http.StatusConflict, "Invite code already used").WithReason("invite_used")
 	ErrInvalidPassword         = errcode.New(http.StatusBadRequest, "Password must be at least 8 characters and include letters and numbers").WithReason("invalid_password")

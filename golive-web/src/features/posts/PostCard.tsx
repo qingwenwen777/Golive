@@ -34,6 +34,7 @@ import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/Repor
 import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
+import { formatCount, formatRelativeTime } from '@/lib/format';
 
 export function PostCard({
   post,
@@ -302,7 +303,7 @@ export function PostCard({
           onClick={handleLike}
         >
           <Heart size={17} fill={post.liked ? 'currentColor' : 'none'} />
-          {post.likeCount.toLocaleString()}
+          {formatCount(post.likeCount)}
         </button>
         <button
           type="button"
@@ -310,7 +311,7 @@ export function PostCard({
           onClick={() => setCommentsOpen((open) => !open)}
         >
           <MessageCircle size={17} />
-          {post.commentCount.toLocaleString()}
+          {formatCount(post.commentCount)}
         </button>
       </footer>
 
@@ -469,7 +470,7 @@ function PostCommentRow({
             onClick={handleLike}
           >
             <Heart size={14} fill={comment.liked ? 'currentColor' : 'none'} />
-            {comment.likeCount.toLocaleString()}
+            {formatCount(comment.likeCount)}
           </button>
           {canComment && comment.depth < 2 && (
             <button type="button" onClick={() => onReply(comment)}>
@@ -636,12 +637,5 @@ function visibilityMeta(post: ChannelPost, t: ReturnType<typeof useTranslation>[
 }
 
 function formatPostDate(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatRelativeTime(value, locale);
 }

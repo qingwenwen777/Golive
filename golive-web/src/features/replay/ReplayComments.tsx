@@ -15,6 +15,7 @@ import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/Repor
 import { cn } from '@/lib/cn';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
+import { formatCount, formatNumber } from '@/lib/format';
 
 const MAX_COMMENT_LENGTH = 500;
 
@@ -126,7 +127,7 @@ export function ReplayComments({
         <h2>
           {t('replayComments.count', {
             count: total,
-            formattedCount: total.toLocaleString(),
+            formattedCount: formatNumber(total),
             defaultValue: '{{formattedCount}} 条评论',
           })}
         </h2>
@@ -335,7 +336,7 @@ function ReplayCommentRow({
             aria-label={t('replayComments.like', { defaultValue: '赞' })}
           >
             <ThumbsUp size={16} fill={comment.liked ? 'currentColor' : 'none'} />
-            {comment.likeCount > 0 && <span>{comment.likeCount.toLocaleString()}</span>}
+            {comment.likeCount > 0 && <span>{formatCount(comment.likeCount)}</span>}
           </button>
           <button
             type="button"
@@ -404,7 +405,7 @@ function ReplayCommentRow({
             {collapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
             {t('replayComments.replyCount', {
               count: nestedCount,
-              formattedCount: nestedCount.toLocaleString(),
+              formattedCount: formatNumber(nestedCount),
               defaultValue: '{{formattedCount}} 条回复',
             })}
           </button>

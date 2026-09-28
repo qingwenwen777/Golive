@@ -33,6 +33,7 @@ import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useIsAuthed } from '@/stores/useAuthStore';
 import type { LuckyBagAmountMode, LuckyBagEligibility, LuckyBagWinner } from '@/types/luckyBag';
 import { cn } from '@/lib/cn';
+import { formatNumber } from '@/lib/format';
 
 const DEFAULT_TOTAL = 1000;
 const DEFAULT_COUNT = 10;
@@ -233,7 +234,7 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
             <span>
               <Coins size={14} />
               {t('luckyBag.totalMeta', {
-                total: bag.totalCoin.toLocaleString(),
+                total: formatNumber(bag.totalCoin),
                 defaultValue: '{{total}} coins',
               })}
             </span>
@@ -241,7 +242,7 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
               <Ticket size={14} />
               {t('luckyBag.countMeta', {
                 count: bag.count,
-                formattedCount: bag.count.toLocaleString(),
+                formattedCount: formatNumber(bag.count),
                 defaultValue: '{{formattedCount}} packets',
               })}
             </span>
@@ -266,7 +267,7 @@ export function LuckyBagPanel({ roomId, ownsStream }: { roomId: string; ownsStre
             <span className="gl-bag-participants">
               {t('luckyBag.participants', {
                 count: participantCount,
-                formattedCount: participantCount.toLocaleString(),
+                formattedCount: formatNumber(participantCount),
                 defaultValue: '{{formattedCount}} joined',
               })}
             </span>
@@ -334,7 +335,7 @@ function LuckyBagWinnersDialog({
           <p className="gl-bag-winners-sub">
             {t('luckyBag.winnersCount', {
               count: winners.length,
-              formattedCount: winners.length.toLocaleString(),
+              formattedCount: formatNumber(winners.length),
               defaultValue: '{{formattedCount}} winners',
             })}
           </p>
@@ -349,7 +350,7 @@ function LuckyBagWinnersDialog({
                   {winner.name}
                 </span>
                 <span className="gl-bag-winner-payout">
-                  +{winner.payout.toLocaleString()}
+                  +{formatNumber(winner.payout)}
                 </span>
               </li>
             ))}
@@ -391,7 +392,7 @@ function ViewerBagAction({
         <PartyPopper size={18} />
         <span>
           {t('luckyBag.youWon', {
-            payout: payout.toLocaleString(),
+            payout: formatNumber(payout),
             defaultValue: 'You won {{payout}} coins!',
           })}
         </span>
@@ -521,7 +522,7 @@ function OpenLuckyBagForm({
       <div className="gl-bag-hint">
         {amountMode === 'fixed'
           ? t('luckyBag.fixedHint', {
-              perPacket: perPacket.toLocaleString(),
+              perPacket: formatNumber(perPacket),
               defaultValue: '{{perPacket}} coins per packet',
             })
           : t('luckyBag.randomHint', { defaultValue: 'Random amount per packet' })}

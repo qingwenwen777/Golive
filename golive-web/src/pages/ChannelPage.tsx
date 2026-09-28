@@ -46,6 +46,7 @@ import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { AppointmentViewerCard } from '@/components/AppointmentViewerCard';
 import { LiveCard } from '@/components/LiveCard';
 import { LoadableImage } from '@/components/LoadableImage';
+import { LoadError } from '@/components/LoadError';
 import { ReplayCard } from '@/components/ReplayCard';
 import { ShareDialog } from '@/components/ShareDialog';
 import { LiveCardSkeleton, Skeleton } from '@/components/Skeleton';
@@ -62,12 +63,14 @@ import { useActiveCreatorLiveId } from '@/features/creator/useActiveCreatorLiveI
 import { PostCard } from '@/features/posts/PostCard';
 import { ReportDialog, type ReportTargetDraft } from '@/features/reporting/ReportDialog';
 import { cn } from '@/lib/cn';
+import { isNotFoundError } from '@/lib/httpError';
 import { useAuthModalStore } from '@/stores/useAuthModalStore';
 import { useAuthStore, useIsAuthed } from '@/stores/useAuthStore';
 import { fanBadgeToneClass } from '@/lib/fanBadgeTone';
 import type { FanClubMember } from '@/types/gift';
 import { isPlaceholderChannelName, streamChannelName, type Stream } from '@/types/stream';
 import { isUuidLike, userDisplayName, type User } from '@/types/user';
+import { formatNumber, formatRelativeTime } from '@/lib/format';
 
 const HISTORY_PAGE_SIZE = 4;
 const REPLAY_GRID_PAGE_SIZE = 8;
@@ -109,11 +112,14 @@ export default function ChannelPage() {
     () => resolveProfile(profileLookupKey, publicUser.data, authUser),
     [authUser, profileLookupKey, publicUser.data],
   );
+  // A failed profile lookup (anything but a 404) says nothing about whether
+  // the key names a user, so it counts as unresolved, like a pending one.
+  const profileFailed = publicUser.isError && !isNotFoundError(publicUser.error);
+  const profileUnknown = publicUser.isPending || profileFailed;
   const streams = useMemo(() => rooms.data?.items ?? [], [rooms.data?.items]);
   const channelStreams = useMemo(
-    () =>
-      streams.filter((stream) => matchesChannel(stream, channelKey, profile, publicUser.isPending)),
-    [channelKey, profile, publicUser.isPending, streams],
+    () => streams.filter((stream) => matchesChannel(stream, channelKey, profile, profileUnknown)),
+    [channelKey, profile, profileUnknown, streams],
   );
   const primary = channelStreams[0];
   const resolvedChannelName = resolveChannelName(profile, primary, channelKey, t);
@@ -156,7 +162,14 @@ export default function ChannelPage() {
   );
 
   const subscriberCount = followState.data?.subscriberCount ?? primary?.subscriberCount ?? 0;
-  const isUnknown = !profile && !primary && !publicUser.isPending && !rooms.isPending;
+  // "Not found" needs both lookups to have answered; if either failed, say so.
+  const identityFailed = !profile && !primary && (profileFailed || rooms.isError);
+  const isUnknown =
+    !identityFailed && !profile && !primary && !publicUser.isPending && !rooms.isPending;
+  const retryIdentity = () => {
+    if (publicUser.isError) void publicUser.refetch();
+    void rooms.refetch();
+  };
   const joinFanClub = useJoinFanClub();
   const fanBadges = useFanBadges(isAuthed, authUser?.id);
   const creatorId = profile?.id || primary?.ownerId || normalizeCreatorId(channelId);
@@ -500,6 +513,19 @@ export default function ChannelPage() {
                   <LiveCard key={stream.id} stream={stream} priority={i < 2} />
                 ))}
               </div>
+            ) : identityFailed ? (
+              <LoadError
+                title={
+                  profileFailed
+                    ? t('channel.loadError', { defaultValue: "Couldn't load this channel" })
+                    : undefined
+                }
+                error={profileFailed ? publicUser.error : rooms.error}
+                onRetry={retryIdentity}
+                retrying={publicUser.isFetching || rooms.isFetching}
+              />
+            ) : rooms.isError ? (
+              <LoadError error={rooms.error} onRetry={rooms.refetch} retrying={rooms.isFetching} />
             ) : (
               <div className="gl-channel-empty">
                 <Video size={34} />
@@ -561,6 +587,12 @@ export default function ChannelPage() {
                   />
                 )}
               </>
+            ) : channelAppointments.isError ? (
+              <LoadError
+                error={channelAppointments.error}
+                onRetry={channelAppointments.refetch}
+                retrying={channelAppointments.isFetching}
+              />
             ) : (
               <div className="gl-channel-empty">
                 <CalendarDays size={34} />
@@ -613,6 +645,12 @@ export default function ChannelPage() {
                 />
               )}
             </>
+          ) : channelPosts.isError ? (
+            <LoadError
+              error={channelPosts.error}
+              onRetry={channelPosts.refetch}
+              retrying={channelPosts.isFetching}
+            />
           ) : (
             <div className="gl-channel-empty">
               <FileText size={34} />
@@ -689,6 +727,12 @@ export default function ChannelPage() {
                 />
               )}
             </>
+          ) : liveHistory.isError ? (
+            <LoadError
+              error={liveHistory.error}
+              onRetry={liveHistory.refetch}
+              retrying={liveHistory.isFetching}
+            />
           ) : (
             <div className="gl-channel-empty">
               <Clock3 size={34} />
@@ -906,7 +950,7 @@ function ChannelHistoryRow({
           <span>
             <Users size={14} />
             {t('channel.history.peakViewers', {
-              amount: record.peakViewers.toLocaleString(),
+              amount: formatNumber(record.peakViewers),
             })}
           </span>
         </div>
@@ -1082,7 +1126,7 @@ function FanBadgeConfirmDialog({
   onConfirm: () => void;
 }) {
   const { t } = useTranslation('pages');
-  const amount = FAN_BADGE_PRICE.toLocaleString();
+  const amount = formatNumber(FAN_BADGE_PRICE);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gl-fan-badge-dialog p-0 sm:max-w-[460px]">
@@ -1201,12 +1245,12 @@ export function resolveChannelCover(profile: User | null): string {
 // A stream's channel label is whatever its streamer sent, so it can copy
 // another user's name. Once the key names a user, only that user's streams
 // belong to the channel; labels count only for keys that name no user, and
-// not while that is still being looked up.
+// not while that is unknown (still being looked up, or the lookup failed).
 export function matchesChannel(
   stream: Stream,
   key: string,
   profile: User | null,
-  profilePending = false,
+  profileUnknown = false,
 ): boolean {
   if (profile) {
     const ownerID = profile.id.toLowerCase();
@@ -1223,7 +1267,7 @@ export function matchesChannel(
     return true;
   }
   return (
-    !profilePending &&
+    !profileUnknown &&
     (stream.channel.toLowerCase() === normalized ||
       streamChannelName(stream).toLowerCase() === normalized)
   );
@@ -1247,14 +1291,9 @@ function formatChannelKey(key: string, t: ReturnType<typeof useTranslation>['t']
 }
 
 function formatHistoryDate(value: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
+  return formatRelativeTime(value, locale);
 }
 
 function formatCoin(value: number): string {
-  return `${Math.round(value).toLocaleString()} coins`;
+  return `${formatNumber(Math.round(value))} coins`;
 }

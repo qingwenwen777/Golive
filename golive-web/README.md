@@ -46,6 +46,8 @@ The Vite development server proxies `/api`, `/ws`, and `/live` to local backend 
 | `VITE_FLV_BASE` | HTTP-FLV base URL | `/live` |
 | `VITE_RTMP_BASE` | OBS publishing URL prefix | `rtmp://localhost/live` |
 | `VITE_GOOGLE_CLIENT_ID` | Google Identity Services client ID | See `.env.example` |
+| `VITE_TOPUP_CURRENCY` | Currency top-ups are charged in; must match the user-service Stripe currency | `USD` (default) |
+| `VITE_COINS_PER_CURRENCY_UNIT` | Coins per currency unit; must match the user-service Stripe rate | `10` (default) |
 
 Production uses same-origin requests by default: nginx serves static files and proxies `/api`, `/ws`, and `/live`.
 

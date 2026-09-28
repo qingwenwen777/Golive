@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ThumbsUp, ThumbsDown, Share2, Bell, Gift, MoreHorizontal, Flag } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
-import { UserLevelBadge } from '@/components/UserLevelBadge';
 import { Icons } from '@/components/Icons';
 import { ShareDialog } from '@/components/ShareDialog';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
@@ -17,7 +16,6 @@ import {
   useRemoveUserLibraryItem,
   useSaveUserLibraryItem,
 } from '@/api/library';
-import { usePublicUser } from '@/api/auth';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +31,7 @@ import {
   saveToLibrary,
 } from '@/lib/liveLibrary';
 import { streamChannelName, type Stream } from '@/types/stream';
+import { formatCount } from '@/lib/format';
 
 export interface InfoBlockProps {
   stream: Stream;
@@ -83,8 +82,6 @@ export function InfoBlock({
   const likedMembership = useLibraryMembership(LIKED_STREAMS_KEY, stream.id, isAuthed);
   const saveWatchLater = useSaveUserLibraryItem(WATCH_LATER_KEY);
   const removeWatchLater = useRemoveUserLibraryItem(WATCH_LATER_KEY);
-  const ownerProfile = usePublicUser(stream.ownerId ?? '');
-  const ownerLevelInfo = isOwnChannel ? currentUser?.levelInfo : ownerProfile.data?.levelInfo;
 
   const subscribed = followState.data?.following ?? false;
   const subscriberCount = followState.data?.subscriberCount ?? stream.subscriberCount ?? 0;
@@ -211,7 +208,6 @@ export function InfoBlock({
               <div className="gl-info-chan-name">
                 <span className="truncate">{channelName}</span>
                 {stream.verified && <VerifiedBadge size={14} />}
-                <UserLevelBadge levelInfo={ownerLevelInfo} size="compact" />
               </div>
               <div className="gl-info-chan-subs">
                 {t('liveRoom.subscribers', { count: displaySubscriberCount })}
@@ -246,7 +242,7 @@ export function InfoBlock({
               onClick={handleLike}
             >
               <ThumbsUp size={18} />
-              <span>{likes.toLocaleString()}</span>
+              <span>{formatCount(likes)}</span>
               {likeBurstKey > 0 && <LikeBurst key={likeBurstKey} />}
             </button>
             <div className="gl-pg-div" />

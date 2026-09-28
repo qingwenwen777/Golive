@@ -24,6 +24,7 @@ import {
   type BetRound,
   type BetRoundView,
 } from '@/types/bet';
+import { formatNumber } from '@/lib/format';
 
 interface ServerChat {
   type: 'chat';
@@ -496,7 +497,7 @@ export function useRoomRealtime(
               ? i18n.t('luckyBag.systemDrawn', {
                   ns: 'pages',
                   count: parsed.winnerCount ?? 0,
-                  formattedCount: (parsed.winnerCount ?? 0).toLocaleString(),
+                  formattedCount: formatNumber(parsed.winnerCount ?? 0),
                   defaultValue: 'Lucky bag drawn: {{formattedCount}} winners.',
                 })
               : i18n.t('luckyBag.systemCancelled', {

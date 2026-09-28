@@ -1,6 +1,7 @@
 {
   "search": "Search",
   "searchPlaceholder": "Search",
+  "searchClose": "Close search",
   "voiceSearch": "Search with your voice",
   "create": "Create",
   "goLive": "Go live",
@@ -111,7 +112,12 @@
     "inviteCodePlaceholder": "Invite code",
     "captcha": "Captcha",
     "captchaPlaceholder": "Code",
-    "refreshCaptcha": "Refresh captcha",
+    "refreshCaptcha": "Get a new captcha image",
+    "captchaImageAlt": "Captcha image",
+    "captchaHint": "Type the 6 characters in the image",
+    "useEmailCodeInstead": "Can't read the image? Get a code by email instead",
+    "useCaptchaInstead": "Use the image captcha instead",
+    "loginEmailHint": "We'll send a code to the email on your account.",
     "creating": "Creating...",
     "signingIn": "Signing in...",
     "createAccount": "Create account",
@@ -129,6 +135,7 @@
     "cancelGoogleLink": "Cancel",
     "errors": {
       "invalidCredentials": "Invalid username or password.",
+      "invalidCredentialsCodeUsed": "Invalid username or password. Each code works only once, so send a new one to try again.",
       "loginCooldown": "Too many failed password attempts. Try again in 1 minute.",
       "usernameTaken": "That username is already taken.",
       "displayNameTaken": "That display name is another user's username. Choose a different one.",
@@ -145,6 +152,7 @@
       "emailCodeLimit": "Too many codes were requested for this email. Please try again later.",
       "emailCodeUnavailable": "Email verification is temporarily unavailable.",
       "emailUserMismatch": "That username is not bound to this email.",
+      "emailNotVerified": "This email hasn't been verified, so it can't receive codes.",
       "emailCodeRequired": "Enter the email verification code.",
       "resetIdentityRequired": "Enter your username and bound email first.",
       "invalidPassword": "At least 8 characters with letters and numbers",
@@ -165,6 +173,13 @@
     }
   },
   "loading": "Loading...",
+  "loadError": {
+    "title": "Couldn't load this section",
+    "networkHint": "Check your connection and try again.",
+    "serverHint": "Something went wrong on our end. Try again in a moment.",
+    "retry": "Retry",
+    "retrying": "Retrying…"
+  },
   "notificationsReadAll": "Read all",
   "notificationsViewAll": "View all",
   "notificationsEmpty": "No notifications yet",
@@ -176,10 +191,14 @@
       "title": "Scheduled live has started"
     },
     "direct_message": {
-      "title": "{{name}} sent {{count}} DMs"
+      "title": "{{name}} sent {{count, number}} DMs",
+      "title_one": "{{name}} sent {{count, number}} DM",
+      "title_other": "{{name}} sent {{count, number}} DMs"
     },
     "fan_group_message": {
-      "title": "{{name}} has {{count}} new messages",
+      "title": "{{name}} has {{count, number}} new messages",
+      "title_one": "{{name}} has {{count, number}} new message",
+      "title_other": "{{name}} has {{count, number}} new messages",
       "body": "{{count}}/200 members · Fan club group chat"
     }
   },
