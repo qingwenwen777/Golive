@@ -320,6 +320,8 @@
     "retry": "再試行",
     "buffering": "バッファリング中...",
     "streamEnded": "配信は終了しました。",
+    "offlineTitle": "現在は配信されていません",
+    "offlineBody": "配信者の映像が届きしだい、ここで再生が始まります。",
     "endingBadge": "終了",
     "endingTitle": "配信は終了しました",
     "endingSubtitle": "ご視聴ありがとうございました。ルームを整理しています...",

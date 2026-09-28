@@ -321,6 +321,8 @@
     "retry": "重试",
     "buffering": "正在缓冲...",
     "streamEnded": "直播已结束。",
+    "offlineTitle": "暂时没有画面",
+    "offlineBody": "主播的推流一到，画面就会在这里开始播放。",
     "endingBadge": "已结束",
     "endingTitle": "直播已结束",
     "endingSubtitle": "正在整理直播间...",

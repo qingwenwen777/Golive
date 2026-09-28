@@ -89,8 +89,7 @@ export function InfoBlock({
     ? (stream.subscriberCount ?? subscriberCount)
     : subscriberCount;
   const likeInfo = likeState.data;
-  const baseLikes = Math.floor(stream.viewers * 0.3);
-  const likes = likeInfo?.likes ?? baseLikes;
+  const likes = likeInfo?.likes;
   const liked = likeInfo?.liked ?? likedMembership.isMember;
   const disliked = likeInfo?.disliked ?? false;
   const saved = watchLaterMembership.isMember;
@@ -242,7 +241,7 @@ export function InfoBlock({
               onClick={handleLike}
             >
               <ThumbsUp size={18} />
-              <span>{formatCount(likes)}</span>
+              {likes !== undefined && <span>{formatCount(likes)}</span>}
               {likeBurstKey > 0 && <LikeBurst key={likeBurstKey} />}
             </button>
             <div className="gl-pg-div" />

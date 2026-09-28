@@ -320,6 +320,8 @@
     "retry": "Retry",
     "buffering": "Buffering...",
     "streamEnded": "Live has ended.",
+    "offlineTitle": "Not broadcasting right now",
+    "offlineBody": "The video starts here as soon as the creator’s stream comes in.",
     "endingBadge": "Ended",
     "endingTitle": "Live ended",
     "endingSubtitle": "Thanks for watching. Preparing the room...",

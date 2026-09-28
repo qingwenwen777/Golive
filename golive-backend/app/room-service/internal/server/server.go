@@ -165,6 +165,7 @@ func NewRouter(d Deps) *gin.Engine {
 		rooms.DELETE("/:id/moderation/mutes/:userID", auth, moderationH.Unmute)
 		rooms.GET("/:id", optionalAuth, roomH.Get)
 		rooms.GET("/:id/follow", optionalAuth, socialH.GetFollow)
+		rooms.GET("/:id/like", optionalAuth, socialH.GetLike)
 		rooms.GET("/:id/replay/comments", optionalAuth, replayCommentH.List)
 
 		// Authenticated mutations / personalized state.
@@ -172,7 +173,6 @@ func NewRouter(d Deps) *gin.Engine {
 		authed.POST("/:id/follow", socialH.Follow)
 		authed.DELETE("/:id/follow", socialH.Unfollow)
 
-		authed.GET("/:id/like", socialH.GetLike)
 		authed.POST("/:id/watch", roomH.RecordWatch)
 		authed.POST("/:id/like", socialH.Like)
 		authed.DELETE("/:id/like", socialH.Unlike)

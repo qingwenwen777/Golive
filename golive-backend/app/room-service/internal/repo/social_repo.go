@@ -199,9 +199,8 @@ type LikeState struct {
 	Likes    int64
 }
 
-// SeedLikeCount sets the counter only if it doesn't already exist. Used at
-// bootstrap to give each room a starting `likes` number similar to MSW's
-// 1000 + rand*9000 — but deterministic across restarts.
+// SeedLikeCount sets the counter only if it doesn't already exist. Tests use
+// it to set up like counts; rooms themselves start from zero.
 func (s *SocialRepo) SeedLikeCount(ctx context.Context, sid string, count int64) error {
 	return s.rdb.SetNX(ctx, likeCountKey(sid), count, 0).Err()
 }

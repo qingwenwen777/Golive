@@ -89,11 +89,10 @@ func (h *SocialHandler) Unfollow(c *gin.Context) {
 
 // like / dislike -------------------------------------------------------
 
+// GetLike is public like GetFollow: anyone sees the like count, while liked
+// and disliked are only filled in for a signed-in viewer.
 func (h *SocialHandler) GetLike(c *gin.Context) {
-	uid, ok := h.require(c)
-	if !ok {
-		return
-	}
+	uid := UserIDFromCtx(c)
 	state, err := h.svc.GetLike(c.Request.Context(), uid, c.Param("id"))
 	if err != nil {
 		errcode.Respond(c, err)

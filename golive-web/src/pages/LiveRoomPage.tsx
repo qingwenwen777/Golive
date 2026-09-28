@@ -1405,8 +1405,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
   const likedMembership = useLibraryMembership(LIKED_STREAMS_KEY, stream.id, isAuthed);
   const channelName = streamChannelName(stream, currentUser);
   const liked = likeState.data?.liked ?? likedMembership.isMember;
-  const likes =
-    likeState.data?.likes ?? Math.max(0, Math.floor((stream.peakViewers ?? stream.viewers) * 0.3));
+  const likes = likeState.data?.likes;
   const endedAt = formatDateTime(stream.endedAt, i18n.language);
 
   const toggleLike = () => {
@@ -1461,7 +1460,7 @@ function ReplayInfoBlock({ stream }: { stream: Stream }) {
             onClick={toggleLike}
           >
             <ThumbsUp size={18} />
-            <span>{formatCount(likes)}</span>
+            {likes !== undefined && <span>{formatCount(likes)}</span>}
           </button>
         </div>
       </div>

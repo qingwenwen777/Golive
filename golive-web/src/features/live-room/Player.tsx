@@ -30,9 +30,6 @@ import type { Stream } from '@/types/stream';
 import type { Bullet } from '@/stores/useRealtimeStore';
 import { formatNumber } from '@/lib/format';
 
-const DEFAULT_VIDEO_SRC =
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-
 const LIVE_STASH_INITIAL_SIZE = 384 * 1024;
 const LIVE_RECOVERY_DELAY_MS = 2500;
 const LIVE_RECONNECT_DELAY_MS = 1800;
@@ -155,7 +152,8 @@ export function Player({
 
   const flvUrl = buildFlvUrl(stream);
   const isLiveFlv = !!flvUrl && stream.isLive !== false;
-  const fallbackSrc = videoSrc ?? DEFAULT_VIDEO_SRC;
+  // Nothing to play: say so over the cover rather than playing a demo video.
+  const noSignal = !isLiveFlv && !videoSrc && !liveEnding;
 
   const [flvError, setFlvError] = useState<string | null>(null);
   const [buffering, setBuffering] = useState(false);
@@ -668,7 +666,8 @@ export function Player({
       <video
         ref={videoRef}
         className="gl-video"
-        src={isLiveFlv ? undefined : fallbackSrc}
+        src={isLiveFlv ? undefined : videoSrc}
+        poster={noSignal ? stream.cover || undefined : undefined}
         autoPlay
         muted={muted}
         playsInline
@@ -684,6 +683,19 @@ export function Player({
           {formatNumber(viewers)}
         </span>
       </div>
+
+      {noSignal && (
+        <div className="gl-player-offline" role="status">
+          <strong>
+            {t('player.offlineTitle', { defaultValue: 'Not broadcasting right now' })}
+          </strong>
+          <span>
+            {t('player.offlineBody', {
+              defaultValue: 'The video starts here as soon as the creator’s stream comes in.',
+            })}
+          </span>
+        </div>
+      )}
 
       {isLiveFlv && flvError && !liveEnding && (
         <div
@@ -735,6 +747,7 @@ export function Player({
 
       <div
         className={cn('gl-player-ctl', controlsVisible && 'is-on')}
+        hidden={noSignal}
         onPointerDown={showControlsTemporarily}
       >
         <div className="gl-progress" aria-label={t('player.liveProgress')}>

@@ -1,4 +1,5 @@
-﻿import {
+﻿import { useEffect, useRef } from 'react';
+import {
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -1035,17 +1036,30 @@ function notificationMatchesBox(item: NotificationItem, box: string): boolean {
   return !chatTypes.has(item.type);
 }
 
-export function useLikeState(streamId: string, enabled: boolean) {
-  return useQuery<LikeState, Error>({
+// Everyone sees the like count; whether you liked it depends on who is
+// signed in, so it is fetched again when that changes.
+export function useLikeState(streamId: string, isAuthed: boolean) {
+  const qc = useQueryClient();
+  const query = useQuery<LikeState, Error>({
     queryKey: ['like', streamId],
     queryFn: async ({ signal }) => {
-      const { data } = await http.get<LikeState>(`/rooms/${streamId}/like`, { signal });
+      const { data } = await http.get<LikeState>(`/rooms/${streamId}/like`, {
+        signal,
+        skipAuthRefresh: !isAuthed,
+      });
       return data;
     },
-    enabled: enabled && !!streamId,
+    enabled: !!streamId,
     staleTime: 30_000,
     retry: 0,
   });
+  const authedRef = useRef(isAuthed);
+  useEffect(() => {
+    if (authedRef.current === isAuthed) return;
+    authedRef.current = isAuthed;
+    void qc.invalidateQueries({ queryKey: ['like', streamId] });
+  }, [isAuthed, qc, streamId]);
+  return query;
 }
 
 type LikeAction = 'like' | 'unlike' | 'dislike' | 'undislike';
